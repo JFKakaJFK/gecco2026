@@ -1,0 +1,4 @@
+add_subdirectory(Eigen)
+add_subdirectory(doctest)
+add_subdirectory(OpenRAND)
+add_subdirectory(gomea)

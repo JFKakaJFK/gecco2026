@@ -1,0 +1,8 @@
+---
+BasedOnStyle: Chromium
+ColumnLimit:  120
+---
+Language:     Cpp
+BasedOnStyle: Chromium
+ColumnLimit:  120
+SortIncludes: false

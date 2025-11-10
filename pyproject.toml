@@ -1,0 +1,66 @@
+[build-system]
+requires = ["scikit-build-core>=0.3.3", "nanobind"]
+build-backend = "scikit_build_core.build"
+
+
+[project]
+name = "pygom"
+version = "0.1.0"
+description="pygom, goblin C++ library interface"
+readme = "README.md"
+authors = [ { name = "Johannes Koch", email = "johannes.koch@cwi.nl" } ]
+requires-python = ">=3.7"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+
+dependencies = [
+    "numpy",
+    "scikit-learn>=1.0.2",
+    "sympy>=1.10.1",
+]
+
+[tool.scikit-build]
+# cmake.build-type = "Release"
+# cmake.build-type = "RelWithDebInfo"
+build.targets = ["_pygoblin"] # cmake target to build...
+wheel.expand-macos-universal-tags = true
+wheel.packages = ["pylib/pygom"]
+
+
+[tool.cibuildwheel]
+# Target python versions:
+build = ["cp310-*", "cp311-*", "cp312-*"]
+
+build-verbosity = 1
+test-command = "pytest {project}/pylib/tests"
+test-extras = ["test"]
+test-skip = ["*universal2:arm64"]
+
+
+[tool.uv.dependency-groups.dev]
+requires_python = ">=3.10"
+
+[dependency-groups]
+dev = [
+    "black>=23.3.0",
+    "litgen>=0.20.0; python_version >= '3.10'",
+    "mypy>=1.4.1",
+    "nanobind>=2.9.1",
+    "pre-commit>=2.21.0",
+    "pytest>=7.4.4",
+    "ruff>=0.12.11",
+]
+
+[tool.uv.sources]
+litgen = { git = "https://github.com/pthom/litgen" }
