@@ -30,18 +30,18 @@ class OneMax final : public ObjectiveBase {
     return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     return std::make_tuple(parent_objective_value + discrete_values(discrete_indices).array().cast<double>().sum() -
                                parent_discrete_values(discrete_indices).array().cast<double>().sum(),
@@ -67,18 +67,18 @@ class ZeroMax final : public ObjectiveBase {
     return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     return std::make_tuple(parent_objective_value - discrete_values(discrete_indices).array().cast<double>().sum() +
                                parent_discrete_values(discrete_indices).array().cast<double>().sum(),
@@ -159,7 +159,7 @@ class DeceptiveTrap final : public ObjectiveBase {
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i += block_size) {
       int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
-      ov += unitation == block_size ? block_size : block_size - unitation - 1;
+      ov += unitation == static_cast<isize>(block_size) ? block_size : static_cast<isize>(block_size) - unitation - 1;
     }
     return std::make_tuple(ov, 0.0);
   };
@@ -185,8 +185,8 @@ class BimodalTrap final : public ObjectiveBase {
 
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i += block_size) {
-      int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
-      ov += unitation == 0 || unitation == block_size ? block_size : std::abs<int>(2 * unitation - block_size - 2);
+      isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
+      ov += unitation == 0 || unitation == static_cast<isize>(block_size) ? static_cast<isize>(block_size) : std::abs<isize>(2 * unitation - block_size - 2);
     }
     return std::make_tuple(ov, 0.0);
   };

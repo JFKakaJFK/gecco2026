@@ -179,7 +179,7 @@ class OpMul : public OperatorBase {
     // sum(df_i * prod(f_{j!=i}))
     d_out = d_args.col(0) * args(Eigen::placeholders::all, Eigen::seq(1, args.cols() - 1)).rowwise().prod();
 
-    for (usize i = 1; i < d_args.cols() - 1; i++) {
+    for (isize i = 1; i < d_args.cols() - 1; i++) {
       d_out += args(Eigen::placeholders::all, Eigen::seq(0, i - 1)).rowwise().prod() * d_args.col(i) *
                args(Eigen::placeholders::all, Eigen::seq(i + 1, args.cols() - 1)).rowwise().prod();
     }
@@ -226,7 +226,7 @@ class OpDiv : public OperatorBase {
     out = args.col(0) / denom;
 
     d_out = d_args.col(0) / denom;
-    for (usize i = 1; i < args.cols(); i++) {
+    for (isize i = 1; i < args.cols(); i++) {
       d_out -= d_args.col(i) * out / args.col(i);
     }
   };
@@ -460,7 +460,7 @@ class OpMin : public OperatorBase {
                   Ref<Array<CType>> d_out,
                   CRef<Arr2D<CType>> args,
                   CRef<Arr2D<CType>> d_args) const override final {
-    for (usize i = 0; i < args.rows(); i++) {
+    for (isize i = 0; i < args.rows(); i++) {
       usize arg_min;
       out(i) = args.row(i).minCoeff(&arg_min);
       d_out(i) = d_args(i, arg_min);
@@ -495,7 +495,7 @@ class OpMax : public OperatorBase {
                   Ref<Array<CType>> d_out,
                   CRef<Arr2D<CType>> args,
                   CRef<Arr2D<CType>> d_args) const override final {
-    for (usize i = 0; i < args.rows(); i++) {
+    for (isize i = 0; i < args.rows(); i++) {
       usize arg_max;
       out(i) = args.row(i).maxCoeff(&arg_max);
       d_out(i) = d_args(i, arg_max);

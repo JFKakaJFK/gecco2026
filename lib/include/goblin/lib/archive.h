@@ -1,7 +1,6 @@
+#pragma once
 #ifndef _GOBLIN_LIB_ARCHIVE_H
 #define _GOBLIN_LIB_ARCHIVE_H
-
-#pragma once
 
 #include <cassert>
 #include <concepts>
@@ -43,7 +42,7 @@ class ArchiveBase {
 
   virtual void clear() = 0;
 
-  virtual const Fitness& fitness() const = 0;
+  virtual const ArchiveFitnessBase& fitness() const = 0;
 
   virtual std::unique_ptr<ArchiveBase> clone() const = 0;
 
@@ -82,14 +81,14 @@ class ArchiveBase {
   bool dominates(const SolutionBase& solution, bool strict) const {
     if (!empty()) {
       for (usize i = 0; i < fitness().num_objectives(); i++) {
-        auto o = fitness().cmp(so_solution(i).quality(), solution.quality());
+        auto o = fitness().cmp(so_solution(i).quality(), solution.quality(), std::nullopt);
         if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
           return true;
         }
       }
 
       for (usize i = 0; i < size(); i++) {
-        auto o = fitness().cmp(operator[](i).quality(), solution.quality());
+        auto o = fitness().cmp(operator[](i).quality(), solution.quality(), std::nullopt);
         if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
           return true;
         }
@@ -119,7 +118,7 @@ class ArchiveBase {
       for (usize other_idx = 0; other_idx < other.size(); other_idx++) {
         bool covered = false;
         for (usize idx = 0; idx < size(); idx++) {
-          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality());
+          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality(), std::nullopt);
           if (o == Ordering::Better || o == Ordering::Equal) {
             covered = true;
             break;
@@ -155,7 +154,7 @@ class ArchiveBase {
 
 class UnboundedArchive : public ArchiveBase {
  public:
-  UnboundedArchive(const Fitness& fitness) : _fitness(fitness) {};
+  UnboundedArchive(const ArchiveFitnessBase& fitness) : _fitness(fitness) {};
 
   std::unique_ptr<ArchiveBase> clone() const override final { return std::make_unique<UnboundedArchive>(*this); };
 
@@ -205,7 +204,7 @@ class UnboundedArchive : public ArchiveBase {
     return std::make_tuple(true, true);
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   // is_so_elite, is_dominated
@@ -232,12 +231,12 @@ class UnboundedArchive : public ArchiveBase {
 
   DefaultSolutionSet _so_solutions;
   DefaultSolutionSet _solutions;
-  const Fitness& _fitness;
+  const ArchiveFitnessBase& _fitness;
 };
 
 class AdaptiveGridArchive : public ArchiveBase {
  public:
-  AdaptiveGridArchive(const Fitness& fitness,
+  AdaptiveGridArchive(const ArchiveFitnessBase& fitness,
                       usize capacity,
                       float max_deviation = 0.25,
                       usize max_iterations = 25,
@@ -406,7 +405,7 @@ class AdaptiveGridArchive : public ArchiveBase {
     }
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   bool same_box(const SolutionBase& lhs, const SolutionBase& rhs) {
@@ -448,7 +447,7 @@ class AdaptiveGridArchive : public ArchiveBase {
     return false;
   };
 
-  const Fitness& _fitness;
+  const ArchiveFitnessBase& _fitness;
   [[maybe_unused]] usize _capacity;
   [[maybe_unused]] float _max_deviation;
   usize _c_min;

@@ -21,7 +21,7 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
     actual.push_back(solutions[indices[i]].quality());
   }
 
-  std::vector<Quality> q_e(indices.size(), fitness().worst());
+  std::vector<Quality> q_e(indices.size(), archive_fitness().worst());
 
   std::vector<usize> solutions_to_evaluate;
   solutions_to_evaluate.reserve(indices.size());
@@ -37,7 +37,7 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
       }
     }
 
-    evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     evaluations += solutions_to_evaluate.size();
 
     for (size_t i = 0; i < indices.size(); i++) {
@@ -52,7 +52,7 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
       }
     }
 
-    evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     evaluations += solutions_to_evaluate.size();
 
     for (size_t i = 0; i < indices.size(); i++) {
@@ -138,7 +138,7 @@ std::tuple<std::vector<usize>, u64> InstanceBase::gradient_steps(Rng& rng,
     }
   }
   // update the quality now that the solution has been changed
-  evaluate(rng, solutions, parents, subsets, changed_solutions);
+  evaluate_partial(rng, solutions, parents, subsets, changed_solutions);
   evaluations += changed_solutions.size();
   return std::make_tuple(changed_solutions, evaluations);
 }

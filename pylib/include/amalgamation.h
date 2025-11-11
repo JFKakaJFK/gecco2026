@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -43,8 +44,10 @@ using u8 = std::uint8_t;
 using u16 = std::uint16_t;
 using u64 = std::uint64_t;
 using usize = std::size_t;
+using isize = std::ptrdiff_t; // ~= Eigen::Index
 
-using f64 = std::double_t;
+using f32 = float;
+using f64 = double;
 
 // currently the python conversion between nanobind/numpy is broken - discrete
 // values + active don't translate?
@@ -189,35 +192,61 @@ inline std::ostream& operator<<(std::ostream& os, Ordering o) {
 
 namespace goblin {
 
-class MOFitness {
+// TODO make quality virtual to allow arbitrary quality types?
+// -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
+// -> performance issue?
+
+/// Something that describes how good a solution is
+class Quality {
  public:
-  // TODO remove fitness type and add the comparison, distance and
-  // num_objectives to the quality
-  // -> Can do runtime polymorphism again
-  // !PROBLEM: how to have different fitneses for the use in the archive, and
-  // how to init?
-  // -> quality could expose multiple comparisons
-  // -> init to empty, and put initializing on the function?
-  class Quality {
-   public:
-    Quality() = delete;
+  Quality() = delete;
 
-    Vec<CType> objectives;
-    CType constraint_value;
+  Vec<CType> objectives;
+  CType constraint_value;
 
-   private:
-    friend class MOFitness;  // Allow constructing qualities
-    Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
-        : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+ private:
+  friend class MOFitness;  // Allow constructing qualities
+  Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
+      : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+};
+
+class FitnessBase {
+ public:
+  virtual usize num_objectives() const = 0;
+
+  virtual Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+
+  virtual CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+
+  virtual void log_header(std::ostream& os) const = 0;
+
+  virtual void log(std::ostream& os, const Quality& quality) const = 0;
+
+  virtual std::string format(const Quality& quality) const {
+    std::stringstream ss;
+    log(ss, quality);
+    return ss.str();
   };
 
+  virtual ~FitnessBase() = default;
+};
+
+class ArchiveFitnessBase : public FitnessBase {
+ public:
+  virtual Quality worst() const = 0;
+
+  virtual ~ArchiveFitnessBase() = default;
+};
+
+class MOFitness final : public ArchiveFitnessBase {
+ public:
   MOFitness() = delete;
   MOFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
       : _num_objectives(num_objectives), _epsilon(epsilon), _minimize(minimize) {};
 
-  void log_header(std::ostream& os) const { os << "objectives,constraint_value"; };
+  void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
-  void log(std::ostream& os, const Quality& quality) const {
+  void log(std::ostream& os, const Quality& quality) const override final {
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -228,16 +257,17 @@ class MOFitness {
     os << "]\"," << quality.constraint_value;
   };
 
-  std::string format(const Quality& quality) const {
+  std::string format(const Quality& quality) const override final {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
   };
 
-  inline usize num_objectives() const { return _num_objectives; };
+  usize num_objectives() const override final { return _num_objectives; };
 
-  [[nodiscard]]
-  inline Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective = std::nullopt) const {
+  Ordering cmp(const Quality& lhs,
+               const Quality& rhs,
+               std::optional<usize> objective = std::nullopt) const override final {
     // Constraints are always minimized
     Ordering o = cmp(lhs.constraint_value, rhs.constraint_value, _epsilon, true);
 
@@ -253,8 +283,9 @@ class MOFitness {
     return o;
   };
 
-  [[nodiscard]]
-  inline CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective = std::nullopt) const {
+  CType distance(const Quality& lhs,
+                 const Quality& rhs,
+                 std::optional<usize> objective = std::nullopt) const override final {
     if (objective.has_value()) {
       return distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
     } else {
@@ -262,7 +293,7 @@ class MOFitness {
     }
   };
 
-  Quality worst() const {
+  Quality worst() const override final {
     return Quality(Vec<CType>::Constant(_num_objectives, (_minimize ? CType(1.0) : CType(-1.0)) *
                                                              std::numeric_limits<CType>().infinity()),
                    std::numeric_limits<CType>().infinity());
@@ -298,11 +329,6 @@ class MOFitness {
   CType _epsilon;
   bool _minimize;
 };
-
-// Shoddy compile time polymorphism - replace these with compatible classes to
-// use different fitnesses
-using Fitness = MOFitness;
-using Quality = Fitness::Quality;
 
 };  // namespace goblin
 
@@ -479,7 +505,8 @@ class SolutionBase {
     if (is_continuous) {
       for (usize ci, i = 0; i < subset.continuous.size(); i++) {
         ci = subset.continuous[i];
-        // TODO sufficiently relatively + absolutely different...
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
         if (continuous_values()(ci) != donor.continuous_values()(ci)) {
           any_active_changed |= continuous_active()(ci);
           continuous_values()(ci) = donor.continuous_values()(ci);
@@ -588,6 +615,8 @@ class SolutionSetBase {
 
   virtual ~SolutionSetBase() {};
 };
+
+// TODO possibly convert the runtime to normal asserts if they measurably impact performance
 
 struct AoSSet : public SolutionSetBase {
  public:
@@ -741,11 +770,14 @@ class SoASet : public SolutionSetBase {
     }
   }
 
-  // todo, the following potentially causes a use-after-free:
+  // TODO, the following potentially causes a use-after-free:
   //
   // auto& s = set[0];
   // set.add(s); // can move handles!!!
   // s.quality(); // use-after-free
+  // I'm not sure if that is still the case, but the same idea holds if the whole SoASet is moved (e.g. when you have a
+  // vector of populations that gets resized and all populations move so that the arena pointer in the solution is out
+  // of date)
   void add(const SolutionBase& s) override final {
     bool resize_needed = _size + 1 >= _capacity;
     if (_num_discrete == 0 && _num_continuous == 0 &&
@@ -843,7 +875,6 @@ using DefaultSolutionSet = AoSSet;
 #ifndef _GOBLIN_LIB_ARCHIVE_H
 #define _GOBLIN_LIB_ARCHIVE_H
 
-
 #include <print>
 #include <tuple>
 
@@ -872,7 +903,7 @@ class ArchiveBase {
 
   virtual void clear() = 0;
 
-  virtual const Fitness& fitness() const = 0;
+  virtual const ArchiveFitnessBase& fitness() const = 0;
 
   virtual std::unique_ptr<ArchiveBase> clone() const = 0;
 
@@ -911,14 +942,14 @@ class ArchiveBase {
   bool dominates(const SolutionBase& solution, bool strict) const {
     if (!empty()) {
       for (usize i = 0; i < fitness().num_objectives(); i++) {
-        auto o = fitness().cmp(so_solution(i).quality(), solution.quality());
+        auto o = fitness().cmp(so_solution(i).quality(), solution.quality(), std::nullopt);
         if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
           return true;
         }
       }
 
       for (usize i = 0; i < size(); i++) {
-        auto o = fitness().cmp(operator[](i).quality(), solution.quality());
+        auto o = fitness().cmp(operator[](i).quality(), solution.quality(), std::nullopt);
         if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
           return true;
         }
@@ -948,7 +979,7 @@ class ArchiveBase {
       for (usize other_idx = 0; other_idx < other.size(); other_idx++) {
         bool covered = false;
         for (usize idx = 0; idx < size(); idx++) {
-          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality());
+          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality(), std::nullopt);
           if (o == Ordering::Better || o == Ordering::Equal) {
             covered = true;
             break;
@@ -984,7 +1015,7 @@ class ArchiveBase {
 
 class UnboundedArchive : public ArchiveBase {
  public:
-  UnboundedArchive(const Fitness& fitness) : _fitness(fitness) {};
+  UnboundedArchive(const ArchiveFitnessBase& fitness) : _fitness(fitness) {};
 
   std::unique_ptr<ArchiveBase> clone() const override final { return std::make_unique<UnboundedArchive>(*this); };
 
@@ -1034,7 +1065,7 @@ class UnboundedArchive : public ArchiveBase {
     return std::make_tuple(true, true);
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   // is_so_elite, is_dominated
@@ -1061,12 +1092,12 @@ class UnboundedArchive : public ArchiveBase {
 
   DefaultSolutionSet _so_solutions;
   DefaultSolutionSet _solutions;
-  const Fitness& _fitness;
+  const ArchiveFitnessBase& _fitness;
 };
 
 class AdaptiveGridArchive : public ArchiveBase {
  public:
-  AdaptiveGridArchive(const Fitness& fitness,
+  AdaptiveGridArchive(const ArchiveFitnessBase& fitness,
                       usize capacity,
                       float max_deviation = 0.25,
                       usize max_iterations = 25,
@@ -1235,7 +1266,7 @@ class AdaptiveGridArchive : public ArchiveBase {
     }
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   bool same_box(const SolutionBase& lhs, const SolutionBase& rhs) {
@@ -1277,7 +1308,7 @@ class AdaptiveGridArchive : public ArchiveBase {
     return false;
   };
 
-  const Fitness& _fitness;
+  const ArchiveFitnessBase& _fitness;
   [[maybe_unused]] usize _capacity;
   [[maybe_unused]] float _max_deviation;
   usize _c_min;
@@ -1369,11 +1400,19 @@ struct Budget {
     if (max_time.has_value() && elapsed >= max_time.value()) {
       return std::make_optional(TerminationStatus::TimeLimitReached);
     }
+
+    return std::nullopt;
+  }
+
+  std::optional<TerminationStatus> constexpr exhausted_or_external_criterion_met(
+      usize generations,
+      usize evaluations,
+      std::chrono::nanoseconds elapsed) const {
     if (termination_callback.has_value() && termination_callback.value()()) {
       return std::make_optional(TerminationStatus::Aborted);
     }
 
-    return std::nullopt;
+    return exhausted(generations, evaluations, elapsed);
   }
 };
 };  // namespace goblin
@@ -1404,11 +1443,11 @@ class InstanceBase {
   virtual CRef<Vec<CType>> continuous_init_upper_bounds() const = 0;
 
   virtual void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) = 0;
-  virtual void evaluate(Rng& rng,
-                        SolutionSetBase& solutions,
-                        SolutionSetBase& parents,
-                        const std::vector<const Subset*>& subsets,
-                        const std::span<const usize>& indices) {
+  virtual void evaluate_partial(Rng& rng,
+                                SolutionSetBase& solutions,
+                                SolutionSetBase& parents,
+                                const std::vector<const Subset*>& subsets,
+                                const std::span<const usize>& indices) {
     evaluate(rng, solutions, indices);
   };
 
@@ -1435,7 +1474,13 @@ class InstanceBase {
 
   virtual void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const = 0;
 
-  virtual const Fitness& fitness() const = 0;
+  virtual const FitnessBase& fitness() const = 0;
+
+  /// The fitness the archive should be use, in case the archive should record the front in more objectives than what
+  /// should be optimized (as per https://arxiv.org/abs/2507.03777v1)
+  ///
+  /// Note: What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.
+  virtual const ArchiveFitnessBase& archive_fitness() const = 0;
 
   // corresponds to e.g. ERCs / one constant per edge in GP
   virtual bool always_inherit_continuous() const { return false; };
@@ -2197,7 +2242,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
 
   void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
     if (normalize_initial_linkage_bias && variables == VariableSet::Discrete) {
-      __goblin_runtime_assert(intron_strategy == "none");
+      // __goblin_runtime_assert(intron_strategy == "none");
       // Intron awareness and Marco's linkage normalization are incompatible
       // - conditioning the unbiasing matrix to only consider active variables
       // would lead to potential division by 0 issues (you can't normalize no
@@ -2237,7 +2282,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
     bool is_continuous = variables & VariableSet::Continuous;
 
     // 1. get similarity matrix based on the measure...
-    usize l;
+    isize l;
     Mat<CType> similarity;
     if (variables == VariableSet::Mixed) {
       l = problem.num_discrete() + problem.num_continuous();
@@ -2261,8 +2306,8 @@ class LinkageTreeFOS final : public LinkageModelBase {
       Mat<CType> cov = covariance.value();
       __goblin_runtime_assert(cov.rows() == l);
       __goblin_runtime_assert(cov.cols() == l);
-      for (usize i = 0; i < l; i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < l; i++) {
+        for (isize j = 0; j < i; j++) {
           // https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
           double r = cov(i, j) / (std::sqrt(cov(i, i)) * std::sqrt(cov(j, j)));
           similarity(i, j) = std::log(std::sqrt(1.0 / (1.0 - r * r)));
@@ -2353,16 +2398,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
     // entropy -> MI/NMI
     if (metric == "mi") {
       auto& MI = H;
-      for (usize i = 0; i < H.rows(); i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < H.rows(); i++) {
+        for (isize j = 0; j < i; j++) {
           MI(i, j) = H(i, i) + H(j, j) - H(i, j);
           MI(j, i) = MI(i, j);
         }
       }
     } else if (metric == "nmi") {
       auto& NMI = H;
-      for (usize i = 0; i < H.rows(); i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < H.rows(); i++) {
+        for (isize j = 0; j < i; j++) {
           NMI(i, j) = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
           NMI(j, i) = NMI(i, j);
         }
@@ -2419,7 +2464,6 @@ class MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/ims.h included by goblin.h                                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "budget.h"
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
 
@@ -2432,7 +2476,7 @@ struct IMSOptions {
   usize initial_population_size = 2;
   usize max_num_populations = 25;
   usize subgeneration_factor = 4;
-  bool restart_stale_populations = true;
+  bool restart_stale_populations = false;
   bool stop_covered_populations = false;
   usize initial_num_clusters = 1;
   std::optional<usize> archive_capacity = 100;
@@ -2457,9 +2501,10 @@ class IMS final : public MethodBase {
       const Budget& budget,
       std::optional<u64> seed = std::nullopt,
       std::optional<usize> population_size = std::nullopt) override final {
+    bool is_multi_objective = problem.num_objectives() > 1;
     IMSOptions opts = options;
     if (opts.initial_num_clusters == 0) {
-      opts.initial_num_clusters = problem.num_objectives() + (problem.num_objectives() > 1 ? 1 : 0);
+      opts.initial_num_clusters = problem.num_objectives() + (is_multi_objective ? 1 : 0);
     }
 
     if (opts.initial_population_size <= opts.initial_num_clusters) {
@@ -2471,17 +2516,18 @@ class IMS final : public MethodBase {
       opts.max_num_populations = 1;
     }
 
-    if (!opts.so_parameter_space_clustering && problem.num_objectives() == 1) {
+    if (!opts.so_parameter_space_clustering && !is_multi_objective) {
       opts.additional_clusters_per_start = 0;
     }
 
     std::random_device rd;
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
-    auto archive = opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
-                       ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.fitness()))
-                       : std::static_pointer_cast<ArchiveBase>(
-                             std::make_shared<AdaptiveGridArchive>(problem.fitness(), opts.archive_capacity.value()));
+    auto archive =
+        opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
+            ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.archive_fitness()))
+            : std::static_pointer_cast<ArchiveBase>(
+                  std::make_shared<AdaptiveGridArchive>(problem.archive_fitness(), opts.archive_capacity.value()));
 
     std::vector<P> populations;
     populations.reserve(opts.max_num_populations);
@@ -2496,11 +2542,15 @@ class IMS final : public MethodBase {
     u64 evaluations = 0;
     std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
 
-    auto should_terminate = [&](usize additional_evaluations = 0) -> std::optional<TerminationStatus> {
+    auto should_terminate = [&](usize additional_evaluations = 0,
+                                bool check_external_criterion = false) -> std::optional<TerminationStatus> {
       std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
       std::chrono::nanoseconds elapsed = now - t_start;
 
-      auto status = budget.exhausted(total_generations, evaluations + additional_evaluations, elapsed);
+      auto status = check_external_criterion
+                        ? budget.exhausted_or_external_criterion_met(total_generations,
+                                                                     evaluations + additional_evaluations, elapsed)
+                        : budget.exhausted(total_generations, evaluations + additional_evaluations, elapsed);
       if (status.has_value()) {
         // std::println("{}", format_as(status.value()));
         return status;
@@ -2525,7 +2575,7 @@ class IMS final : public MethodBase {
 
     Vec<CType> avg_dist_to_so_elite(opts.max_num_populations);
     usize i = 0;
-    while (!should_terminate() &&
+    while (!should_terminate(/* additional_evaluations = */ 0, /* check_external_criterion = */ true) &&
            (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
       // init/restart population if necessary
       if (i >= populations.size()) {
@@ -2535,8 +2585,7 @@ class IMS final : public MethodBase {
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
       } else if (!running[i] && opts.restart_stale_populations &&
-                 (i == opts.max_num_populations - 1 || !opts.stop_covered_populations)) {
-        std::println("Restarting population {}", i);
+                 (i == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
         populations[i].restart();
         generations[i] = 0;
         generations_since_last_improvement[i] = 0;
@@ -2559,14 +2608,14 @@ class IMS final : public MethodBase {
 
         archive->adapt();
 
-        if (problem.num_objectives() == 1 || opts.stop_covered_populations) {
+        if (!is_multi_objective || opts.stop_covered_populations) {
           for (usize j = 0; j < i; j++) {
             if (populations[i].archive().covers(populations[j].archive())) {
               running[j] = false;
             }
           }
         }
-        if (problem.num_objectives() == 1 && problem.num_discrete() == 0) {  // continuous only
+        if (!is_multi_objective && problem.num_discrete() == 0) {  // continuous only
           // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
           // population is better condition
           avg_dist_to_so_elite(i) = populations[i].avg_dist_to_global_so_elite();
@@ -2633,14 +2682,14 @@ class InitBase {
   void add_random(Rng& rng, const InstanceBase& problem, SolutionSetBase& solutions, usize count) const {
     auto [dvals, cvals] = sample(rng, problem, count);
 
-    assert(dvals.rows() == count);
-    assert(dvals.cols() == problem.num_discrete());
-    assert(cvals.rows() == count);
-    assert(cvals.cols() == problem.num_continuous());
+    assert(static_cast<usize>(dvals.rows()) == count);
+    assert(static_cast<usize>(dvals.cols()) == problem.num_discrete());
+    assert(static_cast<usize>(cvals.rows()) == count);
+    assert(static_cast<usize>(cvals.cols()) == problem.num_continuous());
 
     for (usize i = 0; i < count; i++) {
       solutions.add(
-          Solution(problem.fitness().worst(),
+          Solution(problem.archive_fitness().worst(),
                    problem.num_discrete() > 0 ? std::make_optional<Vec<DType>>(dvals.row(i)) : std::nullopt,
                    problem.num_continuous() > 0 ? std::make_optional<Vec<CType>>(cvals.row(i)) : std::nullopt));
     }
@@ -2667,8 +2716,8 @@ class RandomDInit final : public DiscreteInitBase {
  public:
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
-    for (usize c = 0; c < dvals.cols(); c++) {
-      std::uniform_int_distribution<DType> d(0, problem.discrete_domain_sizes()(c) - 1);
+    for (isize c = 0; c < dvals.cols(); c++) {
+      std::uniform_int_distribution<DType> d(0, problem.discrete_domain_sizes()(c) - DType(1));
       for (usize i = 0; i < count; i++) {
         dvals(i, c) = d(rng);
       }
@@ -2681,7 +2730,7 @@ class RandomCInit final : public ContinuousInitBase {
  public:
   Mat<CType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<CType> cvals(count, problem.num_continuous());
-    for (usize c = 0; c < cvals.cols(); c++) {
+    for (isize c = 0; c < cvals.cols(); c++) {
       std::uniform_real_distribution<CType> d(problem.continuous_init_lower_bounds()(c),
                                               problem.continuous_init_upper_bounds()(c));
       for (usize i = 0; i < count; i++) {
@@ -2743,7 +2792,7 @@ class CompleteInit final : public DiscreteInitBase {
  public:
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
-    for (usize c = 0; c < dvals.cols(); c++) {
+    for (isize c = 0; c < dvals.cols(); c++) {
       std::vector<DType> perm(problem.discrete_domain_sizes()(c));
       std::iota(perm.begin(), perm.end(), 0);
 
@@ -3099,7 +3148,7 @@ class OpMul : public OperatorBase {
     // sum(df_i * prod(f_{j!=i}))
     d_out = d_args.col(0) * args(Eigen::placeholders::all, Eigen::seq(1, args.cols() - 1)).rowwise().prod();
 
-    for (usize i = 1; i < d_args.cols() - 1; i++) {
+    for (isize i = 1; i < d_args.cols() - 1; i++) {
       d_out += args(Eigen::placeholders::all, Eigen::seq(0, i - 1)).rowwise().prod() * d_args.col(i) *
                args(Eigen::placeholders::all, Eigen::seq(i + 1, args.cols() - 1)).rowwise().prod();
     }
@@ -3146,7 +3195,7 @@ class OpDiv : public OperatorBase {
     out = args.col(0) / denom;
 
     d_out = d_args.col(0) / denom;
-    for (usize i = 1; i < args.cols(); i++) {
+    for (isize i = 1; i < args.cols(); i++) {
       d_out -= d_args.col(i) * out / args.col(i);
     }
   };
@@ -3380,7 +3429,7 @@ class OpMin : public OperatorBase {
                   Ref<Array<CType>> d_out,
                   CRef<Arr2D<CType>> args,
                   CRef<Arr2D<CType>> d_args) const override final {
-    for (usize i = 0; i < args.rows(); i++) {
+    for (isize i = 0; i < args.rows(); i++) {
       usize arg_min;
       out(i) = args.row(i).minCoeff(&arg_min);
       d_out(i) = d_args(i, arg_min);
@@ -3415,7 +3464,7 @@ class OpMax : public OperatorBase {
                   Ref<Array<CType>> d_out,
                   CRef<Arr2D<CType>> args,
                   CRef<Arr2D<CType>> d_args) const override final {
-    for (usize i = 0; i < args.rows(); i++) {
+    for (isize i = 0; i < args.rows(); i++) {
       usize arg_max;
       out(i) = args.row(i).maxCoeff(&arg_max);
       d_out(i) = d_args(i, arg_max);
@@ -3527,11 +3576,6 @@ class GPContext {
     }
     for (usize i = 0; i < num_subexpressions; i++) {
       value_kind.push_back(ValueKind::Subtree);
-      // TODO - conservative, but alternative is bad if branching factor is not
-      // fixed
-      // -> at least one argument is needed for subfunctions
-      // -> if not enough are there, arg_idx % num_args could be used to
-      // enforce "anywhere, just not in leaf positions"
       value_min_arity.push_back(enable_subfunctions ? 1 : 0);
       value_max_arity.push_back(enable_subfunctions ? num_subtree_args : 0);
       value_idx.push_back(i);
@@ -3666,7 +3710,7 @@ class GPContext {
 
       assert(idx < num_discrete);
       usize domain_value = solution.discrete_values()(idx);
-      assert(domain_value < domain2value.cols());
+      assert(domain_value < static_cast<usize>(domain2value.cols()));
       assert(domain_value < domain_sizes[idx]);
       DType value = domain2value(idx, domain_value);
       assert(value < value_idx.size());
@@ -3888,7 +3932,7 @@ class FullInit final : public DiscreteInitBase {
       const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
 
       Mat<DType> dvals(count, problem.num_discrete());
-      for (usize c = 0; c < dvals.cols(); c++) {
+      for (isize c = 0; c < dvals.cols(); c++) {
         std::vector<usize> idx2domain;
 
         bool is_leaf = ctx.children[c].empty();
@@ -4008,7 +4052,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
         }
       }
 
-      for (usize c = 0; c < dvals.cols(); c++) {
+      for (isize c = 0; c < dvals.cols(); c++) {
         std::vector<usize> idx2domain;
 
         bool is_leaf = ctx.children[c].empty();
@@ -4057,9 +4101,9 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 namespace goblin {
 
 class SRProblem : public GPInstanceBase {
-  using Scalar = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can at
-                         // compile time delegate to different scalars (float, double, mpfr, autodiff versions) while
-                         // still having a nice Python API...
+  using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
+                             // at compile time delegate to different ScalarTypes (float, double, mpfr, autodiff
+                             // versions) while still having a nice Python API...
 
  public:
   SRProblem(GPContext ctx,
@@ -4068,14 +4112,21 @@ class SRProblem : public GPInstanceBase {
             std::optional<Arr2D<CType>> X_test = std::nullopt,
             std::optional<Arr2D<CType>> Y_test = std::nullopt,
             std::variant<std::string, std::vector<std::string>> objectives =
-                "mse",  // TODO I really don't like this API - it is the way it is because this way is convenient for
-                        // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
-                        // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
-                        // objective value") would potentially mean recomputing the output multiple times, and passing a
-                        // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
-                        // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
-                        // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
-                        // do it to see if there are better solutions.
+                "mse",  /// The objectives that should be recorded in the archive, and by default the objectives that
+                        /// are optimized.
+
+            // TODO I really don't like this API - it is the way it is because this way is convenient for
+            // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
+            // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
+            // objective value") would potentially mean recomputing the output multiple times, and passing a
+            // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
+            // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
+            // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
+            // do it to see if there are better solutions.
+
+            std::optional<usize> objectives_to_optimize =
+                std::nullopt,  /// The number of objectives to optimize in case those differ from the `objectives`
+                               /// parameter, corresponds to the first `objectives_to_optimize` entries in `objectives`.
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
@@ -4085,12 +4136,16 @@ class SRProblem : public GPInstanceBase {
         objectives(std::holds_alternative<std::string>(objectives)
                        ? std::vector<std::string>{std::get<std::string>(objectives)}
                        : std::get<std::vector<std::string>>(objectives)),
-        X_train(X_train.cast<Scalar>()),
-        Y_train(Y_train.cast<Scalar>()),
-        _fitness(MOFitness(this->objectives.size())),
+        X_train(X_train.cast<ScalarType>()),
+        Y_train(Y_train.cast<ScalarType>()),
+        _archive_fitness(MOFitness(this->objectives.size())),
+        _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_fitness) {
+        _target(_archive_fitness) {
     __goblin_runtime_assert(this->objectives.size() > 0);
+    __goblin_runtime_assert(
+        !objectives_to_optimize.has_value() ||
+        (objectives_to_optimize.value() > 0 && objectives_to_optimize.value() <= this->objectives.size()));
 
     _num_continuous = this->ctx.num_continuous;
     if (linear_scaling) {
@@ -4112,13 +4167,13 @@ class SRProblem : public GPInstanceBase {
     _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
     __goblin_runtime_assert(this->X_train.rows() == this->Y_train.rows());
-    __goblin_runtime_assert(this->X_train.cols() == ctx.num_inputs);
-    __goblin_runtime_assert(this->Y_train.cols() == ctx.num_outputs);
+    __goblin_runtime_assert(static_cast<usize>(this->X_train.cols()) == ctx.num_inputs);
+    __goblin_runtime_assert(static_cast<usize>(this->Y_train.cols()) == ctx.num_outputs);
 
     var_Y_train = (this->Y_train.rowwise() - this->Y_train.colwise().mean()).square().colwise().mean();
     // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
     // normalizing...)
-    for (usize i = 0; i < var_Y_train.size(); i++) {
+    for (isize i = 0; i < var_Y_train.size(); i++) {
       if (std::abs(var_Y_train(i)) < CType(1e-12)) {
         var_Y_train(i) = 1.0;
       }
@@ -4126,8 +4181,8 @@ class SRProblem : public GPInstanceBase {
 
     if (X_test.has_value()) {
       __goblin_runtime_assert(Y_test.has_value());
-      this->X_test = X_test.value().cast<Scalar>();
-      this->Y_test = Y_test.value().cast<Scalar>();
+      this->X_test = X_test.value().cast<ScalarType>();
+      this->Y_test = Y_test.value().cast<ScalarType>();
 
       __goblin_runtime_assert(this->X_train.cols() == this->X_test.cols());
       __goblin_runtime_assert(this->Y_train.cols() == this->Y_test.cols());
@@ -4137,7 +4192,7 @@ class SRProblem : public GPInstanceBase {
       var_Y_test = (this->Y_test.rowwise() - this->Y_test.colwise().mean()).square().colwise().mean();
       // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
       // normalizing...)
-      for (usize i = 0; i < var_Y_test.size(); i++) {
+      for (isize i = 0; i < var_Y_test.size(); i++) {
         if (std::abs(var_Y_test(i)) < CType(1e-12)) {
           var_Y_test(i) = 1.0;
         }
@@ -4156,7 +4211,7 @@ class SRProblem : public GPInstanceBase {
   CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    Array<Scalar> params;
+    Array<ScalarType> params;
     for (auto i : indices) {
       eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, solutions[i].quality());
     }
@@ -4166,7 +4221,9 @@ class SRProblem : public GPInstanceBase {
     _init->add_random(rng, *this, solutions, count);
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const FitnessBase& fitness() const override final { return _fitness; };
+
+  const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final { return ctx.const_repr != ConstantRepr::Pool; };
 
@@ -4181,11 +4238,11 @@ class SRProblem : public GPInstanceBase {
   void register_target(CRefS<Vec<CType>> target_objectives) {
     _target.clear();
     Solution s(
-        fitness().worst(),
+        archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
     s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(s.quality().objectives.size() >= fitness().num_objectives());
+    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
     s.quality().constraint_value = 0.0;
     _target.update(s, false);
   };
@@ -4227,8 +4284,8 @@ class SRProblem : public GPInstanceBase {
       // TODO cache this -> solution gets optional second quality?
       // Then again, one can just call predict using the SKlearn regressor for actual use
       // and for all other experiments the overhead is not an issue yet
-      Quality q_test = fitness().worst();
-      Array<Scalar> params;  // TODO fit FC params...
+      Quality q_test = archive_fitness().worst();
+      Array<ScalarType> params;  // TODO fit FC params...
       eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
       for (usize i = 0; i < objectives.size(); i++) {
         os << q_test.objectives(i) << ',';
@@ -4264,32 +4321,32 @@ class SRProblem : public GPInstanceBase {
   GPContext ctx;
   bool linear_scaling;
   std::vector<std::string> objectives;
-  Arr2D<Scalar> X_train;
-  Arr2D<Scalar> Y_train;
-  Array<Scalar> var_Y_train;
-  Arr2D<Scalar> X_test;
-  Arr2D<Scalar> Y_test;
-  Array<Scalar> var_Y_test;
+  Arr2D<ScalarType> X_train;
+  Arr2D<ScalarType> Y_train;
+  Array<ScalarType> var_Y_train;
+  Arr2D<ScalarType> X_test;
+  Arr2D<ScalarType> Y_test;
+  Array<ScalarType> var_Y_test;
 
  private:
   // solution, X, Y, train/test, quality to write to
   void eval_one(SolutionBase& solution,
-                const Arr2D<Scalar>& X,
-                const Arr2D<Scalar>& Y,
-                const Array<Scalar>& var_Y,
-                const Array<Scalar>& params,
+                const Arr2D<ScalarType>& X,
+                const Arr2D<ScalarType>& Y,
+                const Array<ScalarType>& var_Y,
+                const Array<ScalarType>& params,
                 bool is_train,
                 Quality& quality) {
     usize expression_size;
-    Arr2D<Scalar> Y_pred = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
+    Arr2D<ScalarType> Y_pred = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
     if (linear_scaling) {
-      Arr2D<Scalar> Y_pred_train;
+      Arr2D<ScalarType> Y_pred_train;
       if (!is_train) {
         Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size);
       }
 
-      Arr2D<Scalar> A_ls = Arr2D<Scalar>::Ones(Y_train.rows(), 2);
+      Arr2D<ScalarType> A_ls = Arr2D<ScalarType>::Ones(Y_train.rows(), 2);
       for (usize o = 0; o < ctx.num_outputs; o++) {
         A_ls.col(1) = (is_train ? Y_pred : Y_pred_train).col(o);
         solution.continuous_values()(Eigen::seqN(ctx.num_continuous + 2 * o, 2)) =
@@ -4330,7 +4387,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  Fitness _fitness;
+  MOFitness _archive_fitness;
+  MOFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
   usize _num_continuous;
@@ -4338,7 +4396,7 @@ class SRProblem : public GPInstanceBase {
   Vec<CType> _continuous_upper_bounds;
   Vec<CType> _continuous_init_lower_bounds;
   Vec<CType> _continuous_init_upper_bounds;
-  Arr2D<Scalar> _eval_buffer;
+  Arr2D<ScalarType> _eval_buffer;
 };
 
 };  // namespace goblin
@@ -4365,18 +4423,18 @@ class ObjectiveBase {
                                             RefS<Active> discrete_active,
                                             RefS<Active> continuous_active) = 0;
 
-  virtual std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                            RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
-                                            CRefS<Vec<DType>> parent_discrete_values,
-                                            CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
-                                            const CType parent_objective_value,
-                                            const CType parent_constraint_value,
-                                            const std::span<const usize>& discrete_indices,
-                                            const std::span<const usize>& continuous_indices) {
+  virtual std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                                    RefS<Vec<CType>> continuous_values,
+                                                    RefS<Active> discrete_active,
+                                                    RefS<Active> continuous_active,
+                                                    CRefS<Vec<DType>> parent_discrete_values,
+                                                    CRefS<Vec<CType>> parent_continuous_values,
+                                                    CRefS<Active> parent_discrete_active,
+                                                    CRefS<Active> parent_continuous_active,
+                                                    const CType parent_objective_value,
+                                                    const CType parent_constraint_value,
+                                                    const std::span<const usize>& discrete_indices,
+                                                    const std::span<const usize>& continuous_indices) {
     return evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
   };
 
@@ -4420,18 +4478,18 @@ class OneMax final : public ObjectiveBase {
     return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     return std::make_tuple(parent_objective_value + discrete_values(discrete_indices).array().cast<double>().sum() -
                                parent_discrete_values(discrete_indices).array().cast<double>().sum(),
@@ -4457,18 +4515,18 @@ class ZeroMax final : public ObjectiveBase {
     return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     return std::make_tuple(parent_objective_value - discrete_values(discrete_indices).array().cast<double>().sum() +
                                parent_discrete_values(discrete_indices).array().cast<double>().sum(),
@@ -4549,7 +4607,7 @@ class DeceptiveTrap final : public ObjectiveBase {
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i += block_size) {
       int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
-      ov += unitation == block_size ? block_size : block_size - unitation - 1;
+      ov += unitation == static_cast<isize>(block_size) ? block_size : static_cast<isize>(block_size) - unitation - 1;
     }
     return std::make_tuple(ov, 0.0);
   };
@@ -4575,8 +4633,8 @@ class BimodalTrap final : public ObjectiveBase {
 
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i += block_size) {
-      int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
-      ov += unitation == 0 || unitation == block_size ? block_size : std::abs<int>(2 * unitation - block_size - 2);
+      isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
+      ov += unitation == 0 || unitation == static_cast<isize>(block_size) ? static_cast<isize>(block_size) : std::abs<isize>(2 * unitation - block_size - 2);
     }
     return std::make_tuple(ov, 0.0);
   };
@@ -4616,18 +4674,18 @@ class Sphere final : public ObjectiveBase {
     return std::make_tuple(continuous_values.array().pow(2).sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     continuous_active.fill(true);
     return std::make_tuple(parent_objective_value + continuous_values(continuous_indices).array().pow(2).sum() -
                                parent_continuous_values(continuous_indices).array().pow(2).sum(),
@@ -4838,23 +4896,24 @@ class Masked final : public ObjectiveBase {
     return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
-    return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values,
-                        parent_continuous_values, parent_discrete_active, parent_continuous_active,
-                        parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices);
+    return fn->evaluate_partial(discrete_values, continuous_values, discrete_active, continuous_active,
+                                parent_discrete_values, parent_continuous_values, parent_discrete_active,
+                                parent_continuous_active, parent_objective_value, parent_constraint_value,
+                                discrete_indices, continuous_indices);
   };
 
  private:
@@ -4879,27 +4938,27 @@ class Inverted final : public ObjectiveBase {
     return fn->evaluate(d_inverted, c_inverted, discrete_active, continuous_active);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     // TODO this does not forward modifications to the actual solutions
     // (non-issue for my use cases so far, but still a violation of the api...)
     Vec<DType> d_inverted = DType(1) - discrete_values.array();
     Vec<CType> c_inverted = CType(0.0) - continuous_values.array();
     Vec<DType> dp_inverted = DType(1) - parent_discrete_values.array();
     Vec<CType> cp_inverted = CType(0.0) - parent_continuous_values.array();
-    return fn->evaluate(d_inverted, c_inverted, discrete_active, continuous_active, dp_inverted, cp_inverted,
-                        parent_discrete_active, parent_continuous_active, parent_objective_value,
-                        parent_constraint_value, discrete_indices, continuous_indices);
+    return fn->evaluate_partial(d_inverted, c_inverted, discrete_active, continuous_active, dp_inverted, cp_inverted,
+                                parent_discrete_active, parent_continuous_active, parent_objective_value,
+                                parent_constraint_value, discrete_indices, continuous_indices);
   };
 
  private:
@@ -4987,25 +5046,25 @@ class Rotated final : public ObjectiveBase {
     return fn->evaluate(discrete_values, r_values, discrete_active, continuous_active);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
     auto r_values = rotated(continuous_values);
     auto r_parent_values = rotated(parent_continuous_values);
-    return fn->evaluate(discrete_values, r_values, discrete_active, continuous_active, parent_discrete_values,
-                        r_parent_values, parent_discrete_active, parent_continuous_active, parent_objective_value,
-                        parent_constraint_value, discrete_indices, continuous_indices);
+    return fn->evaluate_partial(discrete_values, r_values, discrete_active, continuous_active, parent_discrete_values,
+                                r_parent_values, parent_discrete_active, parent_continuous_active,
+                                parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices);
   };
 
  private:
@@ -5013,8 +5072,8 @@ class Rotated final : public ObjectiveBase {
   Vec<CType> rotated(V v) {
     Vec<CType> r(v.size());
     Vec<CType> tmp = Vec<CType>::Zero(block_rotation_matrix.rows());
-    for (usize i = 0; i < v.size(); i += block_rotation_matrix.rows()) {
-      usize l = std::min(v.size(), block_rotation_matrix.rows());
+    for (isize i = 0; i < v.size(); i += block_rotation_matrix.rows()) {
+      isize l = std::min(v.size(), block_rotation_matrix.rows());
       tmp.setZero();
       tmp(Eigen::seqN(0, l)) = v(Eigen::seqN(i, l));
       r(Eigen::seqN(i, l)) = (block_rotation_matrix * tmp)(Eigen::seqN(0, l));
@@ -5053,24 +5112,24 @@ class Sum final : public ObjectiveBase {
     return std::make_tuple(ov, cv);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     for (auto& o : fns) {
-      auto [fov, fcv] =
-          o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values,
-                      parent_continuous_values, parent_discrete_active, parent_continuous_active,
-                      parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices);
+      auto [fov, fcv] = o->evaluate_partial(discrete_values, continuous_values, discrete_active, continuous_active,
+                                            parent_discrete_values, parent_continuous_values, parent_discrete_active,
+                                            parent_continuous_active, parent_objective_value, parent_constraint_value,
+                                            discrete_indices, continuous_indices);
       ov += fov;
       cv += std::max(CType(0.0), cv);
     }
@@ -5110,24 +5169,24 @@ class Max final : public ObjectiveBase {
     return std::make_tuple(ov, cv);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     CType ov = -std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
-      auto [fov, fcv] =
-          o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values,
-                      parent_continuous_values, parent_discrete_active, parent_continuous_active,
-                      parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices);
+      auto [fov, fcv] = o->evaluate_partial(discrete_values, continuous_values, discrete_active, continuous_active,
+                                            parent_discrete_values, parent_continuous_values, parent_discrete_active,
+                                            parent_continuous_active, parent_objective_value, parent_constraint_value,
+                                            discrete_indices, continuous_indices);
       ov = std::max(ov, fov);
       cv += std::max(CType(0.0), cv);
     }
@@ -5167,24 +5226,24 @@ class Min final : public ObjectiveBase {
     return std::make_tuple(ov, cv);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     CType ov = std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
-      auto [fov, fcv] =
-          o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values,
-                      parent_continuous_values, parent_discrete_active, parent_continuous_active,
-                      parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices);
+      auto [fov, fcv] = o->evaluate_partial(discrete_values, continuous_values, discrete_active, continuous_active,
+                                            parent_discrete_values, parent_continuous_values, parent_discrete_active,
+                                            parent_continuous_active, parent_objective_value, parent_constraint_value,
+                                            discrete_indices, continuous_indices);
       ov = std::min(ov, fov);
       cv += std::max(CType(0.0), cv);
     }
@@ -5232,18 +5291,18 @@ class Concat final : public ObjectiveBase {
     return std::make_tuple(ov, cv);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (auto& o : fns) {
@@ -5251,7 +5310,7 @@ class Concat final : public ObjectiveBase {
       c_len = o->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
-      auto [fov, fcv] = o->evaluate(
+      auto [fov, fcv] = o->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
           parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
@@ -5302,18 +5361,18 @@ class Repeat final : public ObjectiveBase {
     return std::make_tuple(ov, cv);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (usize i = 0; i < _repeats; i++) {
@@ -5321,7 +5380,7 @@ class Repeat final : public ObjectiveBase {
       c_len = fn->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
-      auto [fov, fcv] = fn->evaluate(
+      auto [fov, fcv] = fn->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
           parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
@@ -5363,7 +5422,7 @@ class MOFunctionBase {
 
   virtual void evaluate(SolutionBase& solution) = 0;
 
-  virtual void evaluate(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
+  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
     evaluate(solution);
   };
 
@@ -5397,16 +5456,16 @@ class Objectives final : public MOFunctionBase {
     }
   };
 
-  void evaluate(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
+  void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
     solution.quality().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
-      auto [ov, cv] =
-          objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
-                                  solution.continuous_active(), parent.discrete_values(), parent.continuous_values(),
-                                  parent.discrete_active(), parent.continuous_active(), parent.quality().objectives(i),
-                                  parent.quality().constraint_value, subset.discrete, subset.continuous);
+      auto [ov, cv] = objectives[i]->evaluate_partial(
+          solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
+          solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
+          parent.continuous_active(), parent.quality().objectives(i), parent.quality().constraint_value,
+          subset.discrete, subset.continuous);
       solution.quality().objectives(i) = ov;
       solution.quality().constraint_value += std::max(CType(0.0), cv);
     }
@@ -5451,7 +5510,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _discrete_domain_sizes = std::get<Vec<DType>>(discrete_domain);
     }
-    __goblin_runtime_assert(_discrete_domain_sizes.size() == _objectives->num_discrete());
+    __goblin_runtime_assert(static_cast<usize>(_discrete_domain_sizes.size()) == _objectives->num_discrete());
 
     if (std::holds_alternative<CType>(continuous_lower_bound)) {
       _continuous_lower_bounds.resize(_objectives->num_continuous());
@@ -5459,7 +5518,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_lower_bounds = std::get<Vec<CType>>(continuous_lower_bound);
     }
-    __goblin_runtime_assert(_continuous_lower_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_lower_bounds.size()) == _objectives->num_continuous());
 
     if (std::holds_alternative<CType>(continuous_upper_bound)) {
       _continuous_upper_bounds.resize(_objectives->num_continuous());
@@ -5467,7 +5526,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_upper_bounds = std::get<Vec<CType>>(continuous_upper_bound);
     }
-    __goblin_runtime_assert(_continuous_upper_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_upper_bounds.size()) == _objectives->num_continuous());
 
     set_initial_bounds(continuous_init_lower_bound, continuous_init_upper_bound);
 
@@ -5500,7 +5559,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_init_lower_bounds = std::get<Vec<CType>>(continuous_init_lower_bound);
     }
-    __goblin_runtime_assert(_continuous_init_lower_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_init_lower_bounds.size()) == _objectives->num_continuous());
 
     if (std::holds_alternative<CType>(continuous_init_upper_bound)) {
       _continuous_init_upper_bounds.resize(_objectives->num_continuous());
@@ -5508,17 +5567,17 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_init_upper_bounds = std::get<Vec<CType>>(continuous_init_upper_bound);
     }
-    __goblin_runtime_assert(_continuous_init_upper_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_init_upper_bounds.size()) == _objectives->num_continuous());
   };
 
   void register_target(CRefS<Vec<CType>> target_objectives) {
     _target.clear();
     Solution s(
-        fitness().worst(),
+        archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
     s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(s.quality().objectives.size() >= fitness().num_objectives());
+    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
     s.quality().constraint_value = 0.0;
     _target.update(s, false);
   };
@@ -5537,10 +5596,11 @@ class BenchmarkInstance final : public InstanceBase {
   void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
     _target.clear();
     __goblin_runtime_assert(discrete.rows() == continuous.rows());
-    __goblin_runtime_assert(discrete.cols() == num_discrete());
-    __goblin_runtime_assert(continuous.cols() == num_continuous());
-    for (usize i = 0; i < discrete.rows(); i++) {
-      Solution s(fitness().worst(), num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
+    __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
+    __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
+    for (isize i = 0; i < discrete.rows(); i++) {
+      Solution s(archive_fitness().worst(),
+                 num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
                  num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.row(i)) : std::nullopt);
       _objectives->evaluate(s);
       _target.update(s, false);
@@ -5574,17 +5634,19 @@ class BenchmarkInstance final : public InstanceBase {
     }
   };
 
-  void evaluate(Rng& rng,
-                SolutionSetBase& solutions,
-                SolutionSetBase& parents,
-                const std::vector<const Subset*>& subsets,
-                const std::span<const usize>& indices) override final {
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
     for (auto i : indices) {
-      _objectives->evaluate(solutions[i], parents[i], *(subsets[i]));
+      _objectives->evaluate_partial(solutions[i], parents[i], *(subsets[i]));
     }
   };
 
-  const MOFitness& fitness() const override final { return _fitness; }
+  const FitnessBase& fitness() const override final { return _fitness; }
+
+  const ArchiveFitnessBase& archive_fitness() const override final { return _fitness; }
 
   bool target_reached(const ArchiveBase& archive) const override final {
     if (!_target.empty()) {
@@ -5747,13 +5809,15 @@ class Tracked final : public InstanceBase {
     wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
               indices);
   };
-  void evaluate(Rng& rng,
-                SolutionSetBase& solutions,
-                SolutionSetBase& parents,
-                const std::vector<const Subset*>& subsets,
-                const std::span<const usize>& indices) override final {
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
     wrap_eval(
-        [&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, parents, subsets, _indices); },
+        [&](const std::span<const usize>& _indices) {
+          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+        },
         solutions, indices);
   };
 
@@ -5761,7 +5825,8 @@ class Tracked final : public InstanceBase {
     return instance.add_random(rng, solutions, count);
   };
 
-  const Fitness& fitness() const override final { return instance.fitness(); };
+  const FitnessBase& fitness() const override final { return instance.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
 
   bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
 
@@ -5808,8 +5873,7 @@ class Tracked final : public InstanceBase {
     Tracked ti(instance, method, budget, config, _seed);
     try {
       ti.alg_timer.start();
-      auto [_, alg_status] = method.run(ti, budget, _seed,
-                                        population_size);  // TODO alg should return a status...
+      auto [_, alg_status] = method.run(ti, budget, _seed, population_size);
       ti.alg_timer.stop();
       ti.status = alg_status;
 
@@ -5851,7 +5915,7 @@ class Tracked final : public InstanceBase {
         config(config),
         seed(seed),
         status(TerminationStatus::Running),
-        archive(instance.fitness(), config.archive_capacity),
+        archive(instance.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
         evaluations(0),
         evaluations_at_next_report(config.initial_evaluations_until_next_report),
@@ -5951,12 +6015,12 @@ class Tracked final : public InstanceBase {
   void log_eigen(std::ostream& os, const EigenLike& m) {
     os << "\"[";
     if (m.rows() > 1 && m.cols() > 1) {
-      for (usize r = 0; r < m.rows(); r++) {
+      for (isize r = 0; r < m.rows(); r++) {
         if (r > 0) {
           os << ',';
         }
         os << '[';
-        for (usize c = 0; c < m.cols(); c++) {
+        for (isize c = 0; c < m.cols(); c++) {
           if (c > 0) {
             os << ',';
           }
@@ -5978,7 +6042,7 @@ class Tracked final : public InstanceBase {
         os << ']';
       }
     } else {
-      for (usize i = 0; i < m.size(); i++) {
+      for (isize i = 0; i < m.size(); i++) {
         if (i > 0) {
           os << ',';
         }
@@ -6098,11 +6162,15 @@ class Tracked final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -6152,7 +6220,7 @@ class AMaLGaM final : public MethodBase {
       __goblin_runtime_assert(false);  // Problem not supported
     }
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     std::random_device rd;
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
@@ -6180,7 +6248,7 @@ class AMaLGaM final : public MethodBase {
     }
 
     AoSSet s;
-    s.add(Solution(problem.fitness().worst(), std::nullopt, Vec<double>::Zero(problem.num_continuous())));
+    s.add(Solution(problem.archive_fitness().worst(), std::nullopt, Vec<double>::Zero(problem.num_continuous())));
     std::vector<usize> idxs{0};
     std::function<std::tuple<double, double>(const Eigen::Ref<Eigen::VectorXd>& parameters)> fn =
         [&](const Eigen::Ref<Eigen::VectorXd>& parameters) {
@@ -6226,11 +6294,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -6277,7 +6348,7 @@ class DiscreteGOMEA final : public MethodBase {
       const Budget& budget,
       std::optional<u64> seed = std::nullopt,
       std::optional<usize> population_size = std::nullopt) override final {
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     // copy to make the base options persist over multiple calls
     auto conf = config;
 
@@ -6319,7 +6390,7 @@ class DiscreteGOMEA final : public MethodBase {
             a(a),
             idxs({0}) {
         initialize();
-        s.add(Solution(p.fitness().worst(), Vec<DType>::Zero(p.num_discrete()), std::nullopt));
+        s.add(Solution(p.archive_fitness().worst(), Vec<DType>::Zero(p.num_discrete()), std::nullopt));
       };
 
       void evaluationFunction(gomea::solution_t<char>* solution) {
@@ -6463,7 +6534,7 @@ class RvGOMEA final : public MethodBase {
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     // copy to make the base options persist over multiple calls
     auto conf = config;
 
@@ -6498,7 +6569,7 @@ class RvGOMEA final : public MethodBase {
       Wrapper(Rng& rng, InstanceBase& p, ArchiveBase& a)
           : gomea::fitness::fitness_t<double>(p.num_continuous()), rng(rng), p(p), a(a), idxs({0}) {
         initialize();
-        s.add(Solution(p.fitness().worst(), std::nullopt, Vec<CType>::Zero(p.num_continuous())));
+        s.add(Solution(p.archive_fitness().worst(), std::nullopt, Vec<CType>::Zero(p.num_continuous())));
       };
 
       void evaluationFunction(gomea::solution_t<double>* solution) {
@@ -6587,6 +6658,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -6616,14 +6690,14 @@ class MOBinaryGOMEA final : public MethodBase {
       __goblin_runtime_assert(false);  // problem not supported
     }
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     TerminationStatus status = TerminationStatus::Converged;
     std::random_device rd;
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
 
     AoSSet s;
-    s.add(Solution(problem.fitness().worst(), Vec<DType>::Zero(problem.num_discrete()), std::nullopt));
+    s.add(Solution(problem.archive_fitness().worst(), Vec<DType>::Zero(problem.num_discrete()), std::nullopt));
     std::vector<usize> idxs{0};
     std::function<void(char*, double*, double*)> fn = [&](char* solution, double* obj, double* con) {
       for (usize i = 0; i < problem.num_discrete(); i++) {
@@ -6684,13 +6758,17 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
+
 
 namespace goblin {
 
@@ -6730,7 +6808,7 @@ struct RvOptions {
   };
 };
 
-inline std::vector<usize> sort_by_quality_decreasing(const Fitness& fitness,
+inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
                                                      const SolutionSetBase& solutions,
                                                      const std::vector<usize>& indices,
                                                      std::optional<usize> objective) {
@@ -6770,7 +6848,7 @@ class RvState {
                            const RvOptions& options,
                            const LinkageModelBase& linkage_model) {
     // initialization
-    if (num_clusters != cluster_solutions.size() || num_continuous != problem.num_continuous() ||
+    if (num_clusters != cluster_solutions.size() || static_cast<usize>(num_continuous) != problem.num_continuous() ||
         no_improvement_counts.size() != solution_clusters.size()) {
       num_clusters = cluster_solutions.size();
       num_continuous = problem.num_continuous();
@@ -6785,7 +6863,7 @@ class RvState {
         solutions_to_evaluate.reserve(solution_clusters.size());
       }
 
-      if (cluster_active.size() != num_clusters) {
+      if (static_cast<usize>(cluster_active.size()) != num_clusters) {
         cluster_active.resize(num_clusters);
         ms_active.resize(num_clusters);
         distribution_multipliers.resize(num_clusters);
@@ -6803,7 +6881,8 @@ class RvState {
 
       // enable partial ams only if the linkage model is not the full fos - in that case, we stay as close to what
       // AMaLGaM does as possible...
-      enable_partial_ams = reinterpret_cast<const FullFOS*>(&linkage_model) == nullptr;
+      auto ptr = reinterpret_cast<const FullFOS*>(&linkage_model);
+      enable_partial_ams = ptr == nullptr;
     }
 
     // linkage learning, distribution estimation, ams index assignments per cluster
@@ -6889,7 +6968,7 @@ class RvState {
       for (auto i : by_fitness) {
         if (options.intron_aware) {
           bool any_active = false;
-          for (usize j = 0; j < num_continuous; j++) {
+          for (isize j = 0; j < num_continuous; j++) {
             if (solutions[i].continuous_active()(j)) {
               active_counts[j]++;
               any_active = true;
@@ -6916,7 +6995,7 @@ class RvState {
       {  // selection
         std::vector<usize> selection_sizes(num_continuous, options.selection_percentile * cluster_solutions[k].size());
         if (options.intron_aware) {
-          for (usize i = 0; i < num_continuous; i++) {
+          for (isize i = 0; i < num_continuous; i++) {
             selection_sizes[i] = options.selection_percentile * active_counts[i];
           }
         }
@@ -6930,7 +7009,7 @@ class RvState {
             bool any_left = true;
             for (usize i = 0; i < active_indices[k].size() && any_left; i++) {
               any_left = false;
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (num_left[j] > 0 && solutions[active_indices[k][i]].continuous_active()(j)) {
                   new_mean(j) += solutions[active_indices[k][i]].continuous_values()(j);
                   num_left[j]--;
@@ -6943,7 +7022,7 @@ class RvState {
               new_mean += solutions[active_indices[k][i]].continuous_values();
             }
           }
-          for (usize j = 0; j < num_continuous; j++) {
+          for (isize j = 0; j < num_continuous; j++) {
             if (selection_sizes[j] > 0) {
               new_mean(j) /= static_cast<CType>(selection_sizes[j]);
             }
@@ -6954,7 +7033,7 @@ class RvState {
               (distribution_multipliers[k] < 1.0).all()) {
             const auto& s = archive.so_solution(k);
             if (options.intron_aware) {
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (s.continuous_active()(j)) {
                   new_mean(j) = s.continuous_values()(j);
                 }
@@ -6985,7 +7064,7 @@ class RvState {
           if (options.intron_aware) {
             Vec<CType> tmp(num_continuous);
             Vec<CType> w(num_continuous);
-            for (usize j = 0; j < num_continuous; j++) {
+            for (isize j = 0; j < num_continuous; j++) {
               w(j) = 1.0 / std::sqrt(static_cast<CType>(selection_sizes[j]));
             }
 
@@ -6994,7 +7073,7 @@ class RvState {
             for (usize i = 0; i < active_indices[k].size() && any_left; i++) {
               tmp.setZero();
               any_left = false;
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (num_left[j] > 0 && solutions[active_indices[k][i]].continuous_active()(j)) {
                   tmp(j) += (solutions[active_indices[k][i]].continuous_values()(j) - new_mean(j)) * w(j);
                   num_left[j]--;
@@ -7004,8 +7083,8 @@ class RvState {
               new_cov += tmp * tmp.transpose();
             }
           } else {
-            for (usize l = 0; l < num_continuous; l++) {
-              for (usize r = 0; r <= l; r++) {
+            for (isize l = 0; l < num_continuous; l++) {
+              for (isize r = 0; r <= l; r++) {
                 for (usize i = 0; i < selection_sizes[0]; i++) {
                   new_cov(l, r) += (solutions[active_indices[k][i]].continuous_values()(l) - new_mean(l)) *
                                    (solutions[active_indices[k][i]].continuous_values()(r) - new_mean(r));
@@ -7063,7 +7142,8 @@ class RvState {
 
           // the assumption is that the number of subsets can change, so a 1:1 mapping might not be possible in any case
           // - to avoid any issues, we simply inherit the distribution multiplier from the "closest" previous subset in
-          // O(n2) instead of the hungarian algorithm in O(n3) // TODO test if that is not a regression...
+          // O(n2) instead of the hungarian algorithm in O(n3) // TODO test if that is not a performance regression over
+          // doing the hungarian algorithm - but that does not handle changing numbers of subsets...
           for (usize i = 0; i < new_fos.size(); i++) {
             usize best = 0;
             double similarity = -1.0;
@@ -7121,7 +7201,7 @@ class RvState {
             // L[k][i].resize(0, 0);
 
             Vec<CType> univariate = L[k][i].diagonal();
-            for (usize j = 0; j < univariate.size(); j++) {
+            for (isize j = 0; j < univariate.size(); j++) {
               if (univariate(j) > 0.0) {
                 univariate(j) = std::sqrt(univariate(j));
               } else {
@@ -7163,7 +7243,7 @@ class RvState {
   };
 
   std::tuple<bool, bool> should_accept(Rng& rng,
-                                       const Fitness& fitness,
+                                       const FitnessBase& fitness,
                                        const ArchiveBase& archive,
                                        const RvOptions& options,
                                        const SolutionBase& solution,
@@ -7296,7 +7376,7 @@ class RvState {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
@@ -7454,7 +7534,7 @@ class RvState {
       return 0;
     }
 
-    problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
@@ -7540,7 +7620,7 @@ class RvState {
             alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * closest_elites[_i]->continuous_values();
       }
 
-      problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+      problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
       evaluations += solutions_to_evaluate.size();
 
       for (usize _i = solutions_to_evaluate.size(), i; _i > 0;) {
@@ -7568,7 +7648,7 @@ class RvState {
 
   bool enable_partial_ams;
   usize num_clusters;
-  usize num_continuous;
+  isize num_continuous;
   std::vector<usize> solutions_to_evaluate;
   std::vector<std::vector<usize>> improved_indices;
   std::vector<const Subset*>
@@ -7605,6 +7685,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -7621,7 +7702,7 @@ namespace goblin {
 inline std::tuple<std::vector<usize>, std::vector<std::vector<usize>>, std::vector<std::vector<usize>>>
 create_and_register_clusters(Rng& rng,
                              const ArchiveBase& archive,
-                             const Fitness& fitness,
+                             const FitnessBase& fitness,
                              const SolutionSetBase& solutions,
                              usize num_clusters,
                              usize donor_pool_size,
@@ -7851,8 +7932,6 @@ struct PopulationOptions {
 template <typename SolutionSet>
 class Population {
  public:
-  // TODO linkage model should come from the problem instance - allows custom
-  // structures such as e.g. LT per subtree in GP rather than the full LT...
   Population(InstanceBase& problem,
              ArchiveBase& global_archive,
              LinkageModelBase& discrete_model,
@@ -7925,11 +8004,14 @@ class Population {
     usize max_discrete_subset_count = 0;
     if (is_discrete) {
       // learn per cluster linkage models
-      cluster_FOS.clear();
+      if (cluster_FOS.empty() || !discrete_model.is_static()) {
+        cluster_FOS.clear();
+        for (usize k = 0; k < num_clusters; k++) {
+          cluster_FOS.push_back(discrete_model.subsets(rng, problem, solutions, cluster_solutions[k],
+                                                       VariableSet::Discrete, std::nullopt));
+        }
+      }
       for (usize k = 0; k < num_clusters; k++) {
-        cluster_FOS.push_back(
-            discrete_model.subsets(rng, problem, solutions, cluster_solutions[k], VariableSet::Discrete, std::nullopt));
-
         max_discrete_subset_count = std::max(max_discrete_subset_count, cluster_FOS[k].size());
       }
 
@@ -7938,7 +8020,7 @@ class Population {
 
       // and fix the subset order for each solution
       // (colwise, each column is contiguous and one step)
-      if (subset_orders.cols() < max_discrete_subset_count) {
+      if (static_cast<usize>(subset_orders.cols()) < max_discrete_subset_count) {
         subset_orders.resize(size, max_discrete_subset_count);
       }
       subset_orders.rowwise() =
@@ -7955,15 +8037,23 @@ class Population {
     local_archive->reset_change_count();
 
     // ======= variation/evaluation/selection =======
+    usize subset_idx = 0;
+    // // discrete only variation loop
+    // while(subset_idx < max_discrete_subset_count){
+    //     evaluations += discrete_gom_step(rng, subset_idx++);
+
+    //     if (should_terminate(evaluations).has_value()) {
+    //         return evaluations;
+    //     }
+    // }
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
-
-    usize subset_idx = 0;
     do {
+      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       bool do_discrete_step;
       if (!is_continuous || !rv_options.enabled) {
-        do_discrete_step = true;
-      } else if (!is_discrete) {
+        do_discrete_step = can_do_discrete_step;
+      } else if (!can_do_discrete_step) {
         do_discrete_step = false;
       } else {
         double actual_evaluation_balance =
@@ -7984,6 +8074,8 @@ class Population {
       __assert_fitness_invariant(parents);
 
       u64 evals = 0;
+      // we first do the continuous step - it might not do anything (not enough active variables or already converged),
+      // so we still want to be able to do a discrete step instead
       if (is_continuous && rv_options.enabled && !do_discrete_step) {
         evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
                                             cluster_solutions, rv_options, continuous_model);
@@ -7993,7 +8085,7 @@ class Population {
         continuous_evaluations += evals;
       }
 
-      if (do_discrete_step || evals == 0) {
+      if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
         evals = discrete_gom_step(rng, subset_idx++);
         evaluations += evals;
         discrete_evaluations += evals;
@@ -8028,7 +8120,7 @@ class Population {
 
       // update no improvement stretches
       for (usize i = 0; i < size; i++) {
-        if (problem.fitness().cmp(solutions[i].quality(), donors[i].quality()) == Ordering::Better) {
+        if (problem.fitness().cmp(solutions[i].quality(), donors[i].quality(), std::nullopt) == Ordering::Better) {
           solution_nis[i] = 0;
         } else {
           solution_nis[i]++;
@@ -8209,7 +8301,7 @@ class Population {
     perm.reserve(size);
 
     // This callback is only needed to support learning the linkage
-    // normalization matrix from TODO paper
+    // normalization matrix from https://arxiv.org/pdf/1904.02050
     discrete_model.init(rng, problem, solutions, VariableSet::Discrete);
 
     discrete_evaluations = 0.0;
@@ -8229,7 +8321,8 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
-        // TODO permute instead of rejection sampling?
+        // TODO permute instead of rejection sampling? Possibly having a donor search fraction could be useful (e.g. try
+        // until 0.2 * size different solutions haven't led to something to evaluate)
         std::uniform_int_distribution<usize> donor_inidices(0, cluster_donors[k].size() - 1);
         usize donor_idx;
         do {
@@ -8250,7 +8343,7 @@ class Population {
       return 0;
 
     __assert_fitness_invariant(parents);
-    problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     __assert_fitness_invariant(solutions);
     __assert_fitness_invariant(parents);
 
@@ -8319,7 +8412,7 @@ class Population {
         }
       }
 
-      problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+      problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
       evaluations += solutions_to_evaluate.size();
 
       // accept in a random order and remove the improved solutions from the
@@ -8431,7 +8524,7 @@ class Population {
       return 0;
 
     __assert_fitness_invariant(parents);
-    problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     __assert_fitness_invariant(solutions);
     __assert_fitness_invariant(parents);
 
@@ -8547,11 +8640,8 @@ class Population {
 
 #undef __goblin_dbg_info
 
-// TODO here just get the options, and for running dispatch the ims class with
-// the above population...
 class MixedGOMEA : public MethodBase {
  public:
-  // TODO
   MixedGOMEA(PopulationOptions population_options = PopulationOptions(),
              RvOptions rv_options = RvOptions(),
              IMSOptions ims_options = IMSOptions(),
@@ -8627,6 +8717,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

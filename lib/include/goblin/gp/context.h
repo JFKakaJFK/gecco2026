@@ -235,7 +235,7 @@ class GPContext {
 
       assert(idx < num_discrete);
       usize domain_value = solution.discrete_values()(idx);
-      assert(domain_value < domain2value.cols());
+      assert(domain_value < static_cast<usize>(domain2value.cols()));
       assert(domain_value < domain_sizes[idx]);
       DType value = domain2value(idx, domain_value);
       assert(value < value_idx.size());

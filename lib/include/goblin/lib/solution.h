@@ -291,6 +291,8 @@ class SolutionSetBase {
   virtual ~SolutionSetBase() {};
 };
 
+// TODO possibly convert the runtime to normal asserts if they measurably impact performance
+
 struct AoSSet : public SolutionSetBase {
  public:
   SolutionBase& operator[](usize idx) override final {

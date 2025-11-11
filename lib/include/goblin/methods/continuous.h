@@ -63,7 +63,7 @@ struct RvOptions {
   };
 };
 
-inline std::vector<usize> sort_by_quality_decreasing(const Fitness& fitness,
+inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
                                                      const SolutionSetBase& solutions,
                                                      const std::vector<usize>& indices,
                                                      std::optional<usize> objective) {
@@ -103,7 +103,7 @@ class RvState {
                            const RvOptions& options,
                            const LinkageModelBase& linkage_model) {
     // initialization
-    if (num_clusters != cluster_solutions.size() || num_continuous != problem.num_continuous() ||
+    if (num_clusters != cluster_solutions.size() || static_cast<usize>(num_continuous) != problem.num_continuous() ||
         no_improvement_counts.size() != solution_clusters.size()) {
       num_clusters = cluster_solutions.size();
       num_continuous = problem.num_continuous();
@@ -118,7 +118,7 @@ class RvState {
         solutions_to_evaluate.reserve(solution_clusters.size());
       }
 
-      if (cluster_active.size() != num_clusters) {
+      if (static_cast<usize>(cluster_active.size()) != num_clusters) {
         cluster_active.resize(num_clusters);
         ms_active.resize(num_clusters);
         distribution_multipliers.resize(num_clusters);
@@ -136,7 +136,8 @@ class RvState {
 
       // enable partial ams only if the linkage model is not the full fos - in that case, we stay as close to what
       // AMaLGaM does as possible...
-      enable_partial_ams = reinterpret_cast<const FullFOS*>(&linkage_model) == nullptr;
+      auto ptr = reinterpret_cast<const FullFOS*>(&linkage_model);
+      enable_partial_ams = ptr == nullptr;
     }
 
     // linkage learning, distribution estimation, ams index assignments per cluster
@@ -222,7 +223,7 @@ class RvState {
       for (auto i : by_fitness) {
         if (options.intron_aware) {
           bool any_active = false;
-          for (usize j = 0; j < num_continuous; j++) {
+          for (isize j = 0; j < num_continuous; j++) {
             if (solutions[i].continuous_active()(j)) {
               active_counts[j]++;
               any_active = true;
@@ -249,7 +250,7 @@ class RvState {
       {  // selection
         std::vector<usize> selection_sizes(num_continuous, options.selection_percentile * cluster_solutions[k].size());
         if (options.intron_aware) {
-          for (usize i = 0; i < num_continuous; i++) {
+          for (isize i = 0; i < num_continuous; i++) {
             selection_sizes[i] = options.selection_percentile * active_counts[i];
           }
         }
@@ -263,7 +264,7 @@ class RvState {
             bool any_left = true;
             for (usize i = 0; i < active_indices[k].size() && any_left; i++) {
               any_left = false;
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (num_left[j] > 0 && solutions[active_indices[k][i]].continuous_active()(j)) {
                   new_mean(j) += solutions[active_indices[k][i]].continuous_values()(j);
                   num_left[j]--;
@@ -276,7 +277,7 @@ class RvState {
               new_mean += solutions[active_indices[k][i]].continuous_values();
             }
           }
-          for (usize j = 0; j < num_continuous; j++) {
+          for (isize j = 0; j < num_continuous; j++) {
             if (selection_sizes[j] > 0) {
               new_mean(j) /= static_cast<CType>(selection_sizes[j]);
             }
@@ -287,7 +288,7 @@ class RvState {
               (distribution_multipliers[k] < 1.0).all()) {
             const auto& s = archive.so_solution(k);
             if (options.intron_aware) {
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (s.continuous_active()(j)) {
                   new_mean(j) = s.continuous_values()(j);
                 }
@@ -318,7 +319,7 @@ class RvState {
           if (options.intron_aware) {
             Vec<CType> tmp(num_continuous);
             Vec<CType> w(num_continuous);
-            for (usize j = 0; j < num_continuous; j++) {
+            for (isize j = 0; j < num_continuous; j++) {
               w(j) = 1.0 / std::sqrt(static_cast<CType>(selection_sizes[j]));
             }
 
@@ -327,7 +328,7 @@ class RvState {
             for (usize i = 0; i < active_indices[k].size() && any_left; i++) {
               tmp.setZero();
               any_left = false;
-              for (usize j = 0; j < num_continuous; j++) {
+              for (isize j = 0; j < num_continuous; j++) {
                 if (num_left[j] > 0 && solutions[active_indices[k][i]].continuous_active()(j)) {
                   tmp(j) += (solutions[active_indices[k][i]].continuous_values()(j) - new_mean(j)) * w(j);
                   num_left[j]--;
@@ -337,8 +338,8 @@ class RvState {
               new_cov += tmp * tmp.transpose();
             }
           } else {
-            for (usize l = 0; l < num_continuous; l++) {
-              for (usize r = 0; r <= l; r++) {
+            for (isize l = 0; l < num_continuous; l++) {
+              for (isize r = 0; r <= l; r++) {
                 for (usize i = 0; i < selection_sizes[0]; i++) {
                   new_cov(l, r) += (solutions[active_indices[k][i]].continuous_values()(l) - new_mean(l)) *
                                    (solutions[active_indices[k][i]].continuous_values()(r) - new_mean(r));
@@ -455,7 +456,7 @@ class RvState {
             // L[k][i].resize(0, 0);
 
             Vec<CType> univariate = L[k][i].diagonal();
-            for (usize j = 0; j < univariate.size(); j++) {
+            for (isize j = 0; j < univariate.size(); j++) {
               if (univariate(j) > 0.0) {
                 univariate(j) = std::sqrt(univariate(j));
               } else {
@@ -497,7 +498,7 @@ class RvState {
   };
 
   std::tuple<bool, bool> should_accept(Rng& rng,
-                                       const Fitness& fitness,
+                                       const FitnessBase& fitness,
                                        const ArchiveBase& archive,
                                        const RvOptions& options,
                                        const SolutionBase& solution,
@@ -630,7 +631,7 @@ class RvState {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
@@ -788,7 +789,7 @@ class RvState {
       return 0;
     }
 
-    problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
@@ -874,7 +875,7 @@ class RvState {
             alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * closest_elites[_i]->continuous_values();
       }
 
-      problem.evaluate(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
+      problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
       evaluations += solutions_to_evaluate.size();
 
       for (usize _i = solutions_to_evaluate.size(), i; _i > 0;) {
@@ -902,7 +903,7 @@ class RvState {
 
   bool enable_partial_ams;
   usize num_clusters;
-  usize num_continuous;
+  isize num_continuous;
   std::vector<usize> solutions_to_evaluate;
   std::vector<std::vector<usize>> improved_indices;
   std::vector<const Subset*>

@@ -24,7 +24,7 @@ TEST_CASE("goblin::bench::problem") {
   Philox rng(42, 0);
 
   AoSSet s;
-  s.add(Solution(sphere.fitness().worst(), std::nullopt, Vec<double>::Zero(2)));
+  s.add(Solution(sphere.archive_fitness().worst(), std::nullopt, Vec<double>::Zero(2)));
   std::vector<usize> idxs{0};
 
   sphere.evaluate(rng, s, idxs);

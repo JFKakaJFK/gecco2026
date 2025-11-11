@@ -40,13 +40,14 @@ TEST_CASE("goblin::gp::sr") {
   for (auto& obj : objs) {
     for (usize ls = 0; ls <= 1; ls++) {
       bool linear_scaling = ls > 0;
-      SRProblem srp(ctx, X, Y, X_test, Y_test, obj, linear_scaling);
+      SRProblem srp(ctx, X, Y, X_test, Y_test, obj, /* objectives_to_optimize = */ std::nullopt, linear_scaling);
 
       Rng rng(1, 0);
 
       AoSSet sset;
 
-      Solution s(srp.fitness().worst(), Vec<DType>::Zero(srp.num_discrete()), Vec<CType>::Zero(srp.num_continuous()));
+      Solution s(srp.archive_fitness().worst(), Vec<DType>::Zero(srp.num_discrete()),
+                 Vec<CType>::Zero(srp.num_continuous()));
       sset.add(s);
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -68,8 +69,8 @@ TEST_CASE("goblin::gp::sr") {
 
       REQUIRE(expression_size == 6);
 
-      for (usize i = 0; i < Y.cols(); i++) {
-        for (usize j = 0; j < Y.rows(); j++) {
+      for (isize i = 0; i < Y.cols(); i++) {
+        for (isize j = 0; j < Y.rows(); j++) {
           REQUIRE_MESSAGE(Y_pred(j, i) == doctest::Approx(Y(j, i)), j, i);
         }
       }
@@ -96,8 +97,8 @@ TEST_CASE("goblin::gp::sr") {
 
       Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
 
-      for (usize i = 0; i < Y.cols(); i++) {
-        for (usize j = 0; j < Y.rows(); j++) {
+      for (isize i = 0; i < Y.cols(); i++) {
+        for (isize j = 0; j < Y.rows(); j++) {
           REQUIRE_MESSAGE(Y_pred(j, i) == doctest::Approx(Y(j, i)), j, i);
         }
       }
@@ -127,8 +128,8 @@ TEST_CASE("goblin::gp::sr") {
 
       Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
 
-      for (usize i = 0; i < Y.cols(); i++) {
-        for (usize j = 0; j < Y.rows(); j++) {
+      for (isize i = 0; i < Y.cols(); i++) {
+        for (isize j = 0; j < Y.rows(); j++) {
           REQUIRE_MESSAGE(Y_pred(j, i) == doctest::Approx(Y(j, i) + ls_intercepts[i]), j, i);
         }
       }
@@ -149,7 +150,8 @@ TEST_CASE("goblin::gp::sr") {
 
     CType vtr =
         crep == "edges" ? 1e-6 : 1e-8;  // edges is less numerically stable, but this is just to speed up the test...
-    SRProblem srp(pctx, X, Y, X_test, Y_test, {"nmse"});
+    SRProblem srp(pctx, X, Y, X_test, Y_test, {"nmse"}, /* objectives_to_optimize = */ std::nullopt,
+                  /* linear_scaling = */ true);
     srp.register_target({vtr});
 
     Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);

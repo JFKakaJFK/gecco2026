@@ -29,9 +29,9 @@
 namespace goblin {
 
 class SRProblem : public GPInstanceBase {
-  using Scalar = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can at
-                         // compile time delegate to different scalars (float, double, mpfr, autodiff versions) while
-                         // still having a nice Python API...
+  using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
+                             // at compile time delegate to different ScalarTypes (float, double, mpfr, autodiff
+                             // versions) while still having a nice Python API...
 
  public:
   SRProblem(GPContext ctx,
@@ -40,14 +40,21 @@ class SRProblem : public GPInstanceBase {
             std::optional<Arr2D<CType>> X_test = std::nullopt,
             std::optional<Arr2D<CType>> Y_test = std::nullopt,
             std::variant<std::string, std::vector<std::string>> objectives =
-                "mse",  // TODO I really don't like this API - it is the way it is because this way is convenient for
-                        // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
-                        // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
-                        // objective value") would potentially mean recomputing the output multiple times, and passing a
-                        // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
-                        // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
-                        // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
-                        // do it to see if there are better solutions.
+                "mse",  /// The objectives that should be recorded in the archive, and by default the objectives that
+                        /// are optimized.
+
+            // TODO I really don't like this API - it is the way it is because this way is convenient for
+            // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
+            // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
+            // objective value") would potentially mean recomputing the output multiple times, and passing a
+            // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
+            // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
+            // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
+            // do it to see if there are better solutions.
+
+            std::optional<usize> objectives_to_optimize =
+                std::nullopt,  /// The number of objectives to optimize in case those differ from the `objectives`
+                               /// parameter, corresponds to the first `objectives_to_optimize` entries in `objectives`.
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
@@ -57,12 +64,16 @@ class SRProblem : public GPInstanceBase {
         objectives(std::holds_alternative<std::string>(objectives)
                        ? std::vector<std::string>{std::get<std::string>(objectives)}
                        : std::get<std::vector<std::string>>(objectives)),
-        X_train(X_train.cast<Scalar>()),
-        Y_train(Y_train.cast<Scalar>()),
-        _fitness(MOFitness(this->objectives.size())),
+        X_train(X_train.cast<ScalarType>()),
+        Y_train(Y_train.cast<ScalarType>()),
+        _archive_fitness(MOFitness(this->objectives.size())),
+        _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_fitness) {
+        _target(_archive_fitness) {
     __goblin_runtime_assert(this->objectives.size() > 0);
+    __goblin_runtime_assert(
+        !objectives_to_optimize.has_value() ||
+        (objectives_to_optimize.value() > 0 && objectives_to_optimize.value() <= this->objectives.size()));
 
     _num_continuous = this->ctx.num_continuous;
     if (linear_scaling) {
@@ -84,13 +95,13 @@ class SRProblem : public GPInstanceBase {
     _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
     __goblin_runtime_assert(this->X_train.rows() == this->Y_train.rows());
-    __goblin_runtime_assert(this->X_train.cols() == ctx.num_inputs);
-    __goblin_runtime_assert(this->Y_train.cols() == ctx.num_outputs);
+    __goblin_runtime_assert(static_cast<usize>(this->X_train.cols()) == ctx.num_inputs);
+    __goblin_runtime_assert(static_cast<usize>(this->Y_train.cols()) == ctx.num_outputs);
 
     var_Y_train = (this->Y_train.rowwise() - this->Y_train.colwise().mean()).square().colwise().mean();
     // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
     // normalizing...)
-    for (usize i = 0; i < var_Y_train.size(); i++) {
+    for (isize i = 0; i < var_Y_train.size(); i++) {
       if (std::abs(var_Y_train(i)) < CType(1e-12)) {
         var_Y_train(i) = 1.0;
       }
@@ -98,8 +109,8 @@ class SRProblem : public GPInstanceBase {
 
     if (X_test.has_value()) {
       __goblin_runtime_assert(Y_test.has_value());
-      this->X_test = X_test.value().cast<Scalar>();
-      this->Y_test = Y_test.value().cast<Scalar>();
+      this->X_test = X_test.value().cast<ScalarType>();
+      this->Y_test = Y_test.value().cast<ScalarType>();
 
       __goblin_runtime_assert(this->X_train.cols() == this->X_test.cols());
       __goblin_runtime_assert(this->Y_train.cols() == this->Y_test.cols());
@@ -109,7 +120,7 @@ class SRProblem : public GPInstanceBase {
       var_Y_test = (this->Y_test.rowwise() - this->Y_test.colwise().mean()).square().colwise().mean();
       // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
       // normalizing...)
-      for (usize i = 0; i < var_Y_test.size(); i++) {
+      for (isize i = 0; i < var_Y_test.size(); i++) {
         if (std::abs(var_Y_test(i)) < CType(1e-12)) {
           var_Y_test(i) = 1.0;
         }
@@ -128,7 +139,7 @@ class SRProblem : public GPInstanceBase {
   CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    Array<Scalar> params;
+    Array<ScalarType> params;
     for (auto i : indices) {
       eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, solutions[i].quality());
     }
@@ -138,7 +149,9 @@ class SRProblem : public GPInstanceBase {
     _init->add_random(rng, *this, solutions, count);
   };
 
-  const Fitness& fitness() const override final { return _fitness; };
+  const FitnessBase& fitness() const override final { return _fitness; };
+
+  const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final { return ctx.const_repr != ConstantRepr::Pool; };
 
@@ -153,11 +166,11 @@ class SRProblem : public GPInstanceBase {
   void register_target(CRefS<Vec<CType>> target_objectives) {
     _target.clear();
     Solution s(
-        fitness().worst(),
+        archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
     s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(s.quality().objectives.size() >= fitness().num_objectives());
+    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
     s.quality().constraint_value = 0.0;
     _target.update(s, false);
   };
@@ -199,8 +212,8 @@ class SRProblem : public GPInstanceBase {
       // TODO cache this -> solution gets optional second quality?
       // Then again, one can just call predict using the SKlearn regressor for actual use
       // and for all other experiments the overhead is not an issue yet
-      Quality q_test = fitness().worst();
-      Array<Scalar> params;  // TODO fit FC params...
+      Quality q_test = archive_fitness().worst();
+      Array<ScalarType> params;  // TODO fit FC params...
       eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
       for (usize i = 0; i < objectives.size(); i++) {
         os << q_test.objectives(i) << ',';
@@ -236,32 +249,32 @@ class SRProblem : public GPInstanceBase {
   GPContext ctx;
   bool linear_scaling;
   std::vector<std::string> objectives;
-  Arr2D<Scalar> X_train;
-  Arr2D<Scalar> Y_train;
-  Array<Scalar> var_Y_train;
-  Arr2D<Scalar> X_test;
-  Arr2D<Scalar> Y_test;
-  Array<Scalar> var_Y_test;
+  Arr2D<ScalarType> X_train;
+  Arr2D<ScalarType> Y_train;
+  Array<ScalarType> var_Y_train;
+  Arr2D<ScalarType> X_test;
+  Arr2D<ScalarType> Y_test;
+  Array<ScalarType> var_Y_test;
 
  private:
   // solution, X, Y, train/test, quality to write to
   void eval_one(SolutionBase& solution,
-                const Arr2D<Scalar>& X,
-                const Arr2D<Scalar>& Y,
-                const Array<Scalar>& var_Y,
-                const Array<Scalar>& params,
+                const Arr2D<ScalarType>& X,
+                const Arr2D<ScalarType>& Y,
+                const Array<ScalarType>& var_Y,
+                const Array<ScalarType>& params,
                 bool is_train,
                 Quality& quality) {
     usize expression_size;
-    Arr2D<Scalar> Y_pred = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
+    Arr2D<ScalarType> Y_pred = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
     if (linear_scaling) {
-      Arr2D<Scalar> Y_pred_train;
+      Arr2D<ScalarType> Y_pred_train;
       if (!is_train) {
         Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size);
       }
 
-      Arr2D<Scalar> A_ls = Arr2D<Scalar>::Ones(Y_train.rows(), 2);
+      Arr2D<ScalarType> A_ls = Arr2D<ScalarType>::Ones(Y_train.rows(), 2);
       for (usize o = 0; o < ctx.num_outputs; o++) {
         A_ls.col(1) = (is_train ? Y_pred : Y_pred_train).col(o);
         solution.continuous_values()(Eigen::seqN(ctx.num_continuous + 2 * o, 2)) =
@@ -302,7 +315,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  Fitness _fitness;
+  MOFitness _archive_fitness;
+  MOFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
   usize _num_continuous;
@@ -310,7 +324,7 @@ class SRProblem : public GPInstanceBase {
   Vec<CType> _continuous_upper_bounds;
   Vec<CType> _continuous_init_lower_bounds;
   Vec<CType> _continuous_init_upper_bounds;
-  Arr2D<Scalar> _eval_buffer;
+  Arr2D<ScalarType> _eval_buffer;
 };
 
 };  // namespace goblin

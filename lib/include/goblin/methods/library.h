@@ -73,7 +73,7 @@ class DiscreteGOMEA final : public MethodBase {
       const Budget& budget,
       std::optional<u64> seed = std::nullopt,
       std::optional<usize> population_size = std::nullopt) override final {
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     // copy to make the base options persist over multiple calls
     auto conf = config;
 
@@ -115,7 +115,7 @@ class DiscreteGOMEA final : public MethodBase {
             a(a),
             idxs({0}) {
         initialize();
-        s.add(Solution(p.fitness().worst(), Vec<DType>::Zero(p.num_discrete()), std::nullopt));
+        s.add(Solution(p.archive_fitness().worst(), Vec<DType>::Zero(p.num_discrete()), std::nullopt));
       };
 
       void evaluationFunction(gomea::solution_t<char>* solution) {
@@ -259,7 +259,7 @@ class RvGOMEA final : public MethodBase {
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     // copy to make the base options persist over multiple calls
     auto conf = config;
 
@@ -294,7 +294,7 @@ class RvGOMEA final : public MethodBase {
       Wrapper(Rng& rng, InstanceBase& p, ArchiveBase& a)
           : gomea::fitness::fitness_t<double>(p.num_continuous()), rng(rng), p(p), a(a), idxs({0}) {
         initialize();
-        s.add(Solution(p.fitness().worst(), std::nullopt, Vec<CType>::Zero(p.num_continuous())));
+        s.add(Solution(p.archive_fitness().worst(), std::nullopt, Vec<CType>::Zero(p.num_continuous())));
       };
 
       void evaluationFunction(gomea::solution_t<double>* solution) {

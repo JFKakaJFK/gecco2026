@@ -7,7 +7,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
                                                               const std::span<const usize>& indices,
                                                               usize num_steps) {
   struct LMFunctor {
-    typedef Scalar Scalar;
+    typedef ScalarType Scalar;
     typedef Vec<Scalar> InputType;
     typedef Vec<Scalar> ValueType;
     typedef Mat<Scalar> JacobianType;
@@ -36,7 +36,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
     int values() const { return p->Y_train.size(); }
 
     int operator()(const InputType& x, ValueType& residual) const {
-      for (usize i = 0; i < x.size(); i++) {
+      for (isize i = 0; i < x.size(); i++) {
         solution.continuous_values()(s.continuous[i]) = x(i);
       }
 
@@ -61,7 +61,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       if (mode == Mode::Forward) {
         operator()(perturbed, bwd);
       }
-      for (size_t i = 0; i < x.size(); i++) {
+      for (isize i = 0; i < x.size(); i++) {
         const Scalar d = e + e * std::abs(x(i));
         perturbed(i) += d;
         operator()(perturbed, fwd);
@@ -98,8 +98,8 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       LMFunctor functor{.rng = rng, .p = this, .solution = solutions[i], .s = active, .evaluations = evaluations};
 
       // Eigen::NumericalDiff<LMFunctor, Eigen::NumericalDiffMode::Central> diff(functor);
-      // Eigen::LevenbergMarquardt<decltype(diff), Scalar> lm(diff);
-      Eigen::LevenbergMarquardt<LMFunctor, Scalar> lm(functor);
+      // Eigen::LevenbergMarquardt<decltype(diff), ScalarType> lm(diff);
+      Eigen::LevenbergMarquardt<LMFunctor, ScalarType> lm(functor);
       lm.parameters.maxfev = num_steps * 2 * active.continuous.size();
       // gradient tolerance
       lm.parameters.gtol = 1e-8;
@@ -108,7 +108,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       // parameter tolerance
       lm.parameters.xtol = 1e-8;
 
-      Vec<Scalar> x = solutions[i].continuous_values()(active.continuous).cast<Scalar>();
+      Vec<ScalarType> x = solutions[i].continuous_values()(active.continuous).cast<ScalarType>();
       // Status is enum containing reason for termination, > 0 is ok
       // https://libeigen.gitlab.io/eigen/docs-nightly/unsupported/LevenbergMarquardt_2LevenbergMarquardt_8h_source.html
       /* Eigen::LevenbergMarquardtSpace::Status status = */ lm.minimize(x);

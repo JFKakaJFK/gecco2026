@@ -14,14 +14,14 @@ TEST_CASE("goblin::methods::so::gomea") {
   one_max.register_target({5});
   Budget budget(/* max_evaluations = */ 10000);
 
-  auto f1 = one_max.fitness().worst(), f2 = one_max.fitness().worst();
+  auto f1 = one_max.archive_fitness().worst(), f2 = one_max.archive_fitness().worst();
   f1.objectives(0) = 10.0;
   f1.constraint_value = 0;
-  REQUIRE(one_max.fitness().cmp(f1, f2) == Ordering::Better);  // anything better than worst
+  REQUIRE(one_max.fitness().cmp(f1, f2, std::nullopt) == Ordering::Better);  // anything better than worst
 
   f2.objectives(0) = 1.0;
   f2.constraint_value = 0;
-  REQUIRE(one_max.fitness().cmp(f1, f2) == Ordering::Better);  // is maximisation
+  REQUIRE(one_max.fitness().cmp(f1, f2, std::nullopt) == Ordering::Better);  // is maximisation
 
   auto dgomea = DiscreteGOMEA();
   auto [front, _] = dgomea.run(one_max, budget);

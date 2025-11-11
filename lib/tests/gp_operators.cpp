@@ -100,7 +100,7 @@ TEST_CASE("goblin::gp::operators") {
     if (add.min_arity() <= arity && arity <= add.max_arity()) {
       auto res = add(args);
       auto expected = args.col(0);
-      for (usize i = 1; i < args.cols(); i++) {
+      for (isize i = 1; i < args.cols(); i++) {
         expected += args.col(i);
       }
 
@@ -113,7 +113,7 @@ TEST_CASE("goblin::gp::operators") {
     if (sub.min_arity() <= arity && arity <= sub.max_arity()) {
       auto res = sub(args);
       auto expected = arity > 1 ? args.col(0).eval() : -args.col(0).eval();
-      for (usize i = 1; i < args.cols(); i++) {
+      for (isize i = 1; i < args.cols(); i++) {
         expected -= args.col(i);
       }
 
@@ -126,7 +126,7 @@ TEST_CASE("goblin::gp::operators") {
     if (mul.min_arity() <= arity && arity <= mul.max_arity()) {
       auto res = mul(args);
       auto expected = args.col(0);
-      for (usize i = 1; i < args.cols(); i++) {
+      for (isize i = 1; i < args.cols(); i++) {
         expected *= args.col(i);
       }
 
@@ -139,7 +139,7 @@ TEST_CASE("goblin::gp::operators") {
     if (div.min_arity() <= arity && arity <= div.max_arity()) {
       auto res = div(args);
       auto expected = args.col(0);
-      for (usize i = 1; i < args.cols(); i++) {
+      for (isize i = 1; i < args.cols(); i++) {
         expected /= args.col(i);
       }
 

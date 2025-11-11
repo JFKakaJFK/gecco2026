@@ -23,14 +23,14 @@ class InitBase {
   void add_random(Rng& rng, const InstanceBase& problem, SolutionSetBase& solutions, usize count) const {
     auto [dvals, cvals] = sample(rng, problem, count);
 
-    assert(dvals.rows() == count);
-    assert(dvals.cols() == problem.num_discrete());
-    assert(cvals.rows() == count);
-    assert(cvals.cols() == problem.num_continuous());
+    assert(static_cast<usize>(dvals.rows()) == count);
+    assert(static_cast<usize>(dvals.cols()) == problem.num_discrete());
+    assert(static_cast<usize>(cvals.rows()) == count);
+    assert(static_cast<usize>(cvals.cols()) == problem.num_continuous());
 
     for (usize i = 0; i < count; i++) {
       solutions.add(
-          Solution(problem.fitness().worst(),
+          Solution(problem.archive_fitness().worst(),
                    problem.num_discrete() > 0 ? std::make_optional<Vec<DType>>(dvals.row(i)) : std::nullopt,
                    problem.num_continuous() > 0 ? std::make_optional<Vec<CType>>(cvals.row(i)) : std::nullopt));
     }
@@ -57,7 +57,7 @@ class RandomDInit final : public DiscreteInitBase {
  public:
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
-    for (usize c = 0; c < dvals.cols(); c++) {
+    for (isize c = 0; c < dvals.cols(); c++) {
       std::uniform_int_distribution<DType> d(0, problem.discrete_domain_sizes()(c) - DType(1));
       for (usize i = 0; i < count; i++) {
         dvals(i, c) = d(rng);
@@ -71,7 +71,7 @@ class RandomCInit final : public ContinuousInitBase {
  public:
   Mat<CType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<CType> cvals(count, problem.num_continuous());
-    for (usize c = 0; c < cvals.cols(); c++) {
+    for (isize c = 0; c < cvals.cols(); c++) {
       std::uniform_real_distribution<CType> d(problem.continuous_init_lower_bounds()(c),
                                               problem.continuous_init_upper_bounds()(c));
       for (usize i = 0; i < count; i++) {
@@ -133,7 +133,7 @@ class CompleteInit final : public DiscreteInitBase {
  public:
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
-    for (usize c = 0; c < dvals.cols(); c++) {
+    for (isize c = 0; c < dvals.cols(); c++) {
       std::vector<DType> perm(problem.discrete_domain_sizes()(c));
       std::iota(perm.begin(), perm.end(), 0);
 

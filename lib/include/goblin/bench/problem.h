@@ -23,7 +23,7 @@ class MOFunctionBase {
 
   virtual void evaluate(SolutionBase& solution) = 0;
 
-  virtual void evaluate(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
+  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
     evaluate(solution);
   };
 
@@ -57,16 +57,16 @@ class Objectives final : public MOFunctionBase {
     }
   };
 
-  void evaluate(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
+  void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
     solution.quality().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
-      auto [ov, cv] =
-          objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
-                                  solution.continuous_active(), parent.discrete_values(), parent.continuous_values(),
-                                  parent.discrete_active(), parent.continuous_active(), parent.quality().objectives(i),
-                                  parent.quality().constraint_value, subset.discrete, subset.continuous);
+      auto [ov, cv] = objectives[i]->evaluate_partial(
+          solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
+          solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
+          parent.continuous_active(), parent.quality().objectives(i), parent.quality().constraint_value,
+          subset.discrete, subset.continuous);
       solution.quality().objectives(i) = ov;
       solution.quality().constraint_value += std::max(CType(0.0), cv);
     }
@@ -111,7 +111,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _discrete_domain_sizes = std::get<Vec<DType>>(discrete_domain);
     }
-    __goblin_runtime_assert(_discrete_domain_sizes.size() == _objectives->num_discrete());
+    __goblin_runtime_assert(static_cast<usize>(_discrete_domain_sizes.size()) == _objectives->num_discrete());
 
     if (std::holds_alternative<CType>(continuous_lower_bound)) {
       _continuous_lower_bounds.resize(_objectives->num_continuous());
@@ -119,7 +119,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_lower_bounds = std::get<Vec<CType>>(continuous_lower_bound);
     }
-    __goblin_runtime_assert(_continuous_lower_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_lower_bounds.size()) == _objectives->num_continuous());
 
     if (std::holds_alternative<CType>(continuous_upper_bound)) {
       _continuous_upper_bounds.resize(_objectives->num_continuous());
@@ -127,7 +127,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_upper_bounds = std::get<Vec<CType>>(continuous_upper_bound);
     }
-    __goblin_runtime_assert(_continuous_upper_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_upper_bounds.size()) == _objectives->num_continuous());
 
     set_initial_bounds(continuous_init_lower_bound, continuous_init_upper_bound);
 
@@ -160,7 +160,7 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_init_lower_bounds = std::get<Vec<CType>>(continuous_init_lower_bound);
     }
-    __goblin_runtime_assert(_continuous_init_lower_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_init_lower_bounds.size()) == _objectives->num_continuous());
 
     if (std::holds_alternative<CType>(continuous_init_upper_bound)) {
       _continuous_init_upper_bounds.resize(_objectives->num_continuous());
@@ -168,17 +168,17 @@ class BenchmarkInstance final : public InstanceBase {
     } else {
       _continuous_init_upper_bounds = std::get<Vec<CType>>(continuous_init_upper_bound);
     }
-    __goblin_runtime_assert(_continuous_init_upper_bounds.size() == _objectives->num_continuous());
+    __goblin_runtime_assert(static_cast<usize>(_continuous_init_upper_bounds.size()) == _objectives->num_continuous());
   };
 
   void register_target(CRefS<Vec<CType>> target_objectives) {
     _target.clear();
     Solution s(
-        fitness().worst(),
+        archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
     s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(s.quality().objectives.size() >= fitness().num_objectives());
+    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
     s.quality().constraint_value = 0.0;
     _target.update(s, false);
   };
@@ -197,10 +197,11 @@ class BenchmarkInstance final : public InstanceBase {
   void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
     _target.clear();
     __goblin_runtime_assert(discrete.rows() == continuous.rows());
-    __goblin_runtime_assert(discrete.cols() == num_discrete());
-    __goblin_runtime_assert(continuous.cols() == num_continuous());
-    for (usize i = 0; i < discrete.rows(); i++) {
-      Solution s(fitness().worst(), num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
+    __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
+    __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
+    for (isize i = 0; i < discrete.rows(); i++) {
+      Solution s(archive_fitness().worst(),
+                 num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
                  num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.row(i)) : std::nullopt);
       _objectives->evaluate(s);
       _target.update(s, false);
@@ -234,17 +235,19 @@ class BenchmarkInstance final : public InstanceBase {
     }
   };
 
-  void evaluate(Rng& rng,
-                SolutionSetBase& solutions,
-                SolutionSetBase& parents,
-                const std::vector<const Subset*>& subsets,
-                const std::span<const usize>& indices) override final {
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
     for (auto i : indices) {
-      _objectives->evaluate(solutions[i], parents[i], *(subsets[i]));
+      _objectives->evaluate_partial(solutions[i], parents[i], *(subsets[i]));
     }
   };
 
-  const MOFitness& fitness() const override final { return _fitness; }
+  const FitnessBase& fitness() const override final { return _fitness; }
+
+  const ArchiveFitnessBase& archive_fitness() const override final { return _fitness; }
 
   bool target_reached(const ArchiveBase& archive) const override final {
     if (!_target.empty()) {

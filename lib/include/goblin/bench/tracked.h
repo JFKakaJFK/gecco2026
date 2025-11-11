@@ -112,13 +112,15 @@ class Tracked final : public InstanceBase {
     wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
               indices);
   };
-  void evaluate(Rng& rng,
-                SolutionSetBase& solutions,
-                SolutionSetBase& parents,
-                const std::vector<const Subset*>& subsets,
-                const std::span<const usize>& indices) override final {
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
     wrap_eval(
-        [&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, parents, subsets, _indices); },
+        [&](const std::span<const usize>& _indices) {
+          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+        },
         solutions, indices);
   };
 
@@ -126,7 +128,8 @@ class Tracked final : public InstanceBase {
     return instance.add_random(rng, solutions, count);
   };
 
-  const Fitness& fitness() const override final { return instance.fitness(); };
+  const FitnessBase& fitness() const override final { return instance.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
 
   bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
 
@@ -215,7 +218,7 @@ class Tracked final : public InstanceBase {
         config(config),
         seed(seed),
         status(TerminationStatus::Running),
-        archive(instance.fitness(), config.archive_capacity),
+        archive(instance.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
         evaluations(0),
         evaluations_at_next_report(config.initial_evaluations_until_next_report),
@@ -315,12 +318,12 @@ class Tracked final : public InstanceBase {
   void log_eigen(std::ostream& os, const EigenLike& m) {
     os << "\"[";
     if (m.rows() > 1 && m.cols() > 1) {
-      for (usize r = 0; r < m.rows(); r++) {
+      for (isize r = 0; r < m.rows(); r++) {
         if (r > 0) {
           os << ',';
         }
         os << '[';
-        for (usize c = 0; c < m.cols(); c++) {
+        for (isize c = 0; c < m.cols(); c++) {
           if (c > 0) {
             os << ',';
           }
@@ -342,7 +345,7 @@ class Tracked final : public InstanceBase {
         os << ']';
       }
     } else {
-      for (usize i = 0; i < m.size(); i++) {
+      for (isize i = 0; i < m.size(); i++) {
         if (i > 0) {
           os << ',';
         }

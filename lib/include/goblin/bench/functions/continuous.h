@@ -25,18 +25,18 @@ class Sphere final : public ObjectiveBase {
     return std::make_tuple(continuous_values.array().pow(2).sum(), 0.0);
   };
 
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active,
-                                    CRefS<Vec<DType>> parent_discrete_values,
-                                    CRefS<Vec<CType>> parent_continuous_values,
-                                    CRefS<Active> parent_discrete_active,
-                                    CRefS<Active> parent_continuous_active,
-                                    const CType parent_objective_value,
-                                    const CType parent_constraint_value,
-                                    const std::span<const usize>& discrete_indices,
-                                    const std::span<const usize>& continuous_indices) override final {
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
     continuous_active.fill(true);
     return std::make_tuple(parent_objective_value + continuous_values(continuous_indices).array().pow(2).sum() -
                                parent_continuous_values(continuous_indices).array().pow(2).sum(),

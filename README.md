@@ -113,6 +113,8 @@ make bindings
 
 The `Makefile` also defines other commands to work with the code, so check that out, and how the Python bindings are generated is documented [here](pylib/README.md).
 
+Again use `UV_OFFLINE=1 make <x>` when offline.
+
 ## GP/SR Implementation Details
 
 > [!NOTE]

@@ -41,14 +41,15 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
 
   for (usize ls = 0; ls <= 1; ls++) {
     bool linear_scaling = ls > 0;
-    SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"nmse"}, linear_scaling);
+    SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"nmse"}, std::nullopt, linear_scaling);
     srp.register_target({vtr});
 
     Rng rng(42, 0);
     AoSSet solutions, parents;
     std::vector<usize> indices{0};
 
-    Solution s(srp.fitness().worst(), Vec<DType>::Zero(srp.num_discrete()), Vec<CType>::Zero(srp.num_continuous()));
+    Solution s(srp.archive_fitness().worst(), Vec<DType>::Zero(srp.num_discrete()),
+               Vec<CType>::Zero(srp.num_continuous()));
 
     // x * c0 + c1
     auto n = ctx.output_roots[0];
@@ -77,7 +78,7 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
     srp.evaluate(rng, solutions, indices);
     parents = solutions;
 
-    UnboundedArchive archive(srp.fitness());
+    UnboundedArchive archive(srp.archive_fitness());
     archive.update(solutions[0], false);
 
     REQUIRE(!srp.target_reached(archive));  // the starting point is not good

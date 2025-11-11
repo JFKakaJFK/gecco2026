@@ -52,9 +52,9 @@ TEST_CASE("goblin::lib::fitness") {
   CHECK(f.cmp(qb, qc, 1) == Ordering::Equal);
   CHECK(f.cmp(qb, qc, 2) == Ordering::Better);
 
-  CHECK(f.cmp(qa, qb) == Ordering::NonDominated);
-  CHECK(f.cmp(qa, qb) == Ordering::NonDominated);
+  CHECK(f.cmp(qa, qb, std::nullopt) == Ordering::NonDominated);
+  CHECK(f.cmp(qa, qb, std::nullopt) == Ordering::NonDominated);
 
-  CHECK(f.cmp(qa, qc) == Ordering::NonDominated);
-  CHECK(f.cmp(qb, qc) == Ordering::NonDominated);
+  CHECK(f.cmp(qa, qc, std::nullopt) == Ordering::NonDominated);
+  CHECK(f.cmp(qb, qc, std::nullopt) == Ordering::NonDominated);
 }

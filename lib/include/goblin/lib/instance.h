@@ -29,11 +29,11 @@ class InstanceBase {
   virtual CRef<Vec<CType>> continuous_init_upper_bounds() const = 0;
 
   virtual void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) = 0;
-  virtual void evaluate(Rng& rng,
-                        SolutionSetBase& solutions,
-                        SolutionSetBase& parents,
-                        const std::vector<const Subset*>& subsets,
-                        const std::span<const usize>& indices) {
+  virtual void evaluate_partial(Rng& rng,
+                                SolutionSetBase& solutions,
+                                SolutionSetBase& parents,
+                                const std::vector<const Subset*>& subsets,
+                                const std::span<const usize>& indices) {
     evaluate(rng, solutions, indices);
   };
 
@@ -60,7 +60,13 @@ class InstanceBase {
 
   virtual void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const = 0;
 
-  virtual const Fitness& fitness() const = 0;
+  virtual const FitnessBase& fitness() const = 0;
+
+  /// The fitness the archive should be use, in case the archive should record the front in more objectives than what
+  /// should be optimized (as per https://arxiv.org/abs/2507.03777v1)
+  ///
+  /// Note: What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.
+  virtual const ArchiveFitnessBase& archive_fitness() const = 0;
 
   // corresponds to e.g. ERCs / one constant per edge in GP
   virtual bool always_inherit_continuous() const { return false; };

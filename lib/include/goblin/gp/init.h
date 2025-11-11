@@ -21,7 +21,7 @@ class FullInit final : public DiscreteInitBase {
       const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
 
       Mat<DType> dvals(count, problem.num_discrete());
-      for (usize c = 0; c < dvals.cols(); c++) {
+      for (isize c = 0; c < dvals.cols(); c++) {
         std::vector<usize> idx2domain;
 
         bool is_leaf = ctx.children[c].empty();
@@ -141,7 +141,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
         }
       }
 
-      for (usize c = 0; c < dvals.cols(); c++) {
+      for (isize c = 0; c < dvals.cols(); c++) {
         std::vector<usize> idx2domain;
 
         bool is_leaf = ctx.children[c].empty();

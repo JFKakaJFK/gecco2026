@@ -39,7 +39,7 @@ namespace goblin {
 inline std::tuple<std::vector<usize>, std::vector<std::vector<usize>>, std::vector<std::vector<usize>>>
 create_and_register_clusters(Rng& rng,
                              const ArchiveBase& archive,
-                             const Fitness& fitness,
+                             const FitnessBase& fitness,
                              const SolutionSetBase& solutions,
                              usize num_clusters,
                              usize donor_pool_size,
@@ -357,7 +357,7 @@ class Population {
 
       // and fix the subset order for each solution
       // (colwise, each column is contiguous and one step)
-      if (subset_orders.cols() < max_discrete_subset_count) {
+      if (static_cast<usize>(subset_orders.cols()) < max_discrete_subset_count) {
         subset_orders.resize(size, max_discrete_subset_count);
       }
       subset_orders.rowwise() =
@@ -457,7 +457,7 @@ class Population {
 
       // update no improvement stretches
       for (usize i = 0; i < size; i++) {
-        if (problem.fitness().cmp(solutions[i].quality(), donors[i].quality()) == Ordering::Better) {
+        if (problem.fitness().cmp(solutions[i].quality(), donors[i].quality(), std::nullopt) == Ordering::Better) {
           solution_nis[i] = 0;
         } else {
           solution_nis[i]++;
@@ -680,7 +680,7 @@ class Population {
       return 0;
 
     __assert_fitness_invariant(parents);
-    problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     __assert_fitness_invariant(solutions);
     __assert_fitness_invariant(parents);
 
@@ -749,7 +749,7 @@ class Population {
         }
       }
 
-      problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+      problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
       evaluations += solutions_to_evaluate.size();
 
       // accept in a random order and remove the improved solutions from the
@@ -861,7 +861,7 @@ class Population {
       return 0;
 
     __assert_fitness_invariant(parents);
-    problem.evaluate(rng, solutions, parents, subsets, solutions_to_evaluate);
+    problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     __assert_fitness_invariant(solutions);
     __assert_fitness_invariant(parents);
 

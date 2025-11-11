@@ -171,7 +171,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
     bool is_continuous = variables & VariableSet::Continuous;
 
     // 1. get similarity matrix based on the measure...
-    usize l;
+    isize l;
     Mat<CType> similarity;
     if (variables == VariableSet::Mixed) {
       l = problem.num_discrete() + problem.num_continuous();
@@ -195,8 +195,8 @@ class LinkageTreeFOS final : public LinkageModelBase {
       Mat<CType> cov = covariance.value();
       __goblin_runtime_assert(cov.rows() == l);
       __goblin_runtime_assert(cov.cols() == l);
-      for (usize i = 0; i < l; i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < l; i++) {
+        for (isize j = 0; j < i; j++) {
           // https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
           double r = cov(i, j) / (std::sqrt(cov(i, i)) * std::sqrt(cov(j, j)));
           similarity(i, j) = std::log(std::sqrt(1.0 / (1.0 - r * r)));
@@ -287,16 +287,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
     // entropy -> MI/NMI
     if (metric == "mi") {
       auto& MI = H;
-      for (usize i = 0; i < H.rows(); i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < H.rows(); i++) {
+        for (isize j = 0; j < i; j++) {
           MI(i, j) = H(i, i) + H(j, j) - H(i, j);
           MI(j, i) = MI(i, j);
         }
       }
     } else if (metric == "nmi") {
       auto& NMI = H;
-      for (usize i = 0; i < H.rows(); i++) {
-        for (usize j = 0; j < i; j++) {
+      for (isize i = 0; i < H.rows(); i++) {
+        for (isize j = 0; j < i; j++) {
           NMI(i, j) = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
           NMI(j, i) = NMI(i, j);
         }

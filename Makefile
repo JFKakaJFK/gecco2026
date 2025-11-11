@@ -59,9 +59,9 @@ iwyu:
 
 bindings:
 	cp -f pylib/nanobind/bindings_empty.cpp pylib/nanobind/bindings.cpp \
-	&& uv run --offline scripts/autogenerate_bindings.py \
-	&& uv pip install --offline -v -e .\
-	&& uv pip uninstall --offline -v .
+	&& uv run scripts/autogenerate_bindings.py \
+	&& uv pip install -v -e .\
+	&& uv pip uninstall -v .
 
 docs:
 	@echo "TODO Generate the top-level docs"

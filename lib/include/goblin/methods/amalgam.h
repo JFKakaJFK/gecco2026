@@ -66,7 +66,7 @@ class AMaLGaM final : public MethodBase {
       __goblin_runtime_assert(false);  // Problem not supported
     }
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.fitness());
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     std::random_device rd;
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
@@ -94,7 +94,7 @@ class AMaLGaM final : public MethodBase {
     }
 
     AoSSet s;
-    s.add(Solution(problem.fitness().worst(), std::nullopt, Vec<double>::Zero(problem.num_continuous())));
+    s.add(Solution(problem.archive_fitness().worst(), std::nullopt, Vec<double>::Zero(problem.num_continuous())));
     std::vector<usize> idxs{0};
     std::function<std::tuple<double, double>(const Eigen::Ref<Eigen::VectorXd>& parameters)> fn =
         [&](const Eigen::Ref<Eigen::VectorXd>& parameters) {

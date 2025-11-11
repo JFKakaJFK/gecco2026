@@ -5,7 +5,7 @@
 #include "goblin/bench/problem.h"
 #include "goblin/lib/linkage.h"
 
-using namespace std::chrono_literals;
+// using namespace std::chrono_literals;
 using namespace goblin;
 
 TEST_CASE("goblin::lib::entropy") {
@@ -25,8 +25,8 @@ TEST_CASE("goblin::lib::entropy") {
                             /* merge_continuous = */ false,
                             /* num_continuous_bins = */ std::nullopt);
 
-  for (usize i = 0; i < H.rows(); i++) {
-    for (usize j = 0; j < H.cols(); j++) {
+  for (isize i = 0; i < H.rows(); i++) {
+    for (isize j = 0; j < H.cols(); j++) {
       std::print("{:>4.2f},", H(i, j));
     }
     std::println("");
@@ -77,31 +77,31 @@ TEST_CASE("goblin::lib::entropy") {
                                /* num_continuous_bins = */ std::nullopt);
 
   std::println("");
-  for (usize i = 0; i < H.rows(); i++) {
-    for (usize j = 0; j < H.cols(); j++) {
+  for (isize i = 0; i < H.rows(); i++) {
+    for (isize j = 0; j < H.cols(); j++) {
       std::print("{:>4.2f},", H(i, j));
     }
     std::println("");
   }
   std::println("H any active");
-  for (usize i = 0; i < H_ia.rows(); i++) {
-    for (usize j = 0; j < H_ia.cols(); j++) {
+  for (isize i = 0; i < H_ia.rows(); i++) {
+    for (isize j = 0; j < H_ia.cols(); j++) {
       std::print("{:>4.2f},", H_ia(i, j));
     }
     std::println("");
   }
 
   std::println("H all active");
-  for (usize i = 0; i < H_aa.rows(); i++) {
-    for (usize j = 0; j < H_aa.cols(); j++) {
+  for (isize i = 0; i < H_aa.rows(); i++) {
+    for (isize j = 0; j < H_aa.cols(); j++) {
       std::print("{:>4.2f},", H_aa(i, j));
     }
     std::println("");
   }
 
   std::println("H mask only");
-  for (usize i = 0; i < H_mo.rows(); i++) {
-    for (usize j = 0; j < H_mo.cols(); j++) {
+  for (isize i = 0; i < H_mo.rows(); i++) {
+    for (isize j = 0; j < H_mo.cols(); j++) {
       std::print("{:>4.2f},", H_mo(i, j));
     }
     std::println("");
@@ -124,23 +124,23 @@ TEST_CASE("goblin::lib::entropy_any_active") {
     REQUIRE(actual.cols() == expected.cols());
 
     std::println("actual:");
-    for (usize i = 0; i < actual.rows(); i++) {
-      for (usize j = 0; j < actual.cols(); j++) {
+    for (isize i = 0; i < actual.rows(); i++) {
+      for (isize j = 0; j < actual.cols(); j++) {
         std::print("{:>4.2f},", actual(i, j));
       }
       std::println("");
     }
 
     std::println("expected:");
-    for (usize i = 0; i < expected.rows(); i++) {
-      for (usize j = 0; j < expected.cols(); j++) {
+    for (isize i = 0; i < expected.rows(); i++) {
+      for (isize j = 0; j < expected.cols(); j++) {
         std::print("{:>4.2f},", expected(i, j));
       }
       std::println("");
     }
 
-    for (usize i = 0; i < expected.rows(); i++) {
-      for (usize j = 0; j < expected.cols(); j++) {
+    for (isize i = 0; i < expected.rows(); i++) {
+      for (isize j = 0; j < expected.cols(); j++) {
         REQUIRE_MESSAGE(actual(i, j) == doctest::Approx(expected(i, j)), "Sample: ", sample, ", H(", i, ", ", j, ")");
       }
     }

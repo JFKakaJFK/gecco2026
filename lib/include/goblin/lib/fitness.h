@@ -17,35 +17,61 @@
 
 namespace goblin {
 
-class MOFitness {
+// TODO make quality virtual to allow arbitrary quality types?
+// -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
+// -> performance issue?
+
+/// Something that describes how good a solution is
+class Quality {
  public:
-  // TODO remove fitness type and add the comparison, distance and
-  // num_objectives to the quality
-  // -> Can do runtime polymorphism again
-  // !PROBLEM: how to have different fitneses for the use in the archive, and
-  // how to init?
-  // -> quality could expose multiple comparisons
-  // -> init to empty, and put initializing on the function?
-  class Quality {
-   public:
-    Quality() = delete;
+  Quality() = delete;
 
-    Vec<CType> objectives;
-    CType constraint_value;
+  Vec<CType> objectives;
+  CType constraint_value;
 
-   private:
-    friend class MOFitness;  // Allow constructing qualities
-    Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
-        : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+ private:
+  friend class MOFitness;  // Allow constructing qualities
+  Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
+      : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+};
+
+class FitnessBase {
+ public:
+  virtual usize num_objectives() const = 0;
+
+  virtual Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+
+  virtual CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+
+  virtual void log_header(std::ostream& os) const = 0;
+
+  virtual void log(std::ostream& os, const Quality& quality) const = 0;
+
+  virtual std::string format(const Quality& quality) const {
+    std::stringstream ss;
+    log(ss, quality);
+    return ss.str();
   };
 
+  virtual ~FitnessBase() = default;
+};
+
+class ArchiveFitnessBase : public FitnessBase {
+ public:
+  virtual Quality worst() const = 0;
+
+  virtual ~ArchiveFitnessBase() = default;
+};
+
+class MOFitness final : public ArchiveFitnessBase {
+ public:
   MOFitness() = delete;
   MOFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
       : _num_objectives(num_objectives), _epsilon(epsilon), _minimize(minimize) {};
 
-  void log_header(std::ostream& os) const { os << "objectives,constraint_value"; };
+  void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
-  void log(std::ostream& os, const Quality& quality) const {
+  void log(std::ostream& os, const Quality& quality) const override final {
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -56,16 +82,17 @@ class MOFitness {
     os << "]\"," << quality.constraint_value;
   };
 
-  std::string format(const Quality& quality) const {
+  std::string format(const Quality& quality) const override final {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
   };
 
-  inline usize num_objectives() const { return _num_objectives; };
+  usize num_objectives() const override final { return _num_objectives; };
 
-  [[nodiscard]]
-  inline Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective = std::nullopt) const {
+  Ordering cmp(const Quality& lhs,
+               const Quality& rhs,
+               std::optional<usize> objective = std::nullopt) const override final {
     // Constraints are always minimized
     Ordering o = cmp(lhs.constraint_value, rhs.constraint_value, _epsilon, true);
 
@@ -81,8 +108,9 @@ class MOFitness {
     return o;
   };
 
-  [[nodiscard]]
-  inline CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective = std::nullopt) const {
+  CType distance(const Quality& lhs,
+                 const Quality& rhs,
+                 std::optional<usize> objective = std::nullopt) const override final {
     if (objective.has_value()) {
       return distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
     } else {
@@ -90,7 +118,7 @@ class MOFitness {
     }
   };
 
-  Quality worst() const {
+  Quality worst() const override final {
     return Quality(Vec<CType>::Constant(_num_objectives, (_minimize ? CType(1.0) : CType(-1.0)) *
                                                              std::numeric_limits<CType>().infinity()),
                    std::numeric_limits<CType>().infinity());
@@ -126,11 +154,6 @@ class MOFitness {
   CType _epsilon;
   bool _minimize;
 };
-
-// Shoddy compile time polymorphism - replace these with compatible classes to
-// use different fitnesses
-using Fitness = MOFitness;
-using Quality = Fitness::Quality;
 
 };  // namespace goblin
 

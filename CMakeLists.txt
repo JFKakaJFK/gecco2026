@@ -28,15 +28,34 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
 endif()
 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
+
+if(COMPILER_SUPPORTS_ASAN)
+    set(
+    CMAKE_CXX_FLAGS_DEBUG
+    "-fsanitize=undefined -fsanitize=address" # sanitizers don't work e.g. on arm macos
+)
+endif()
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(
         CMAKE_CXX_FLAGS_DEBUG
-        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g -fsanitize=undefined -fsanitize=address"
+        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
         "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
         )
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    set(
+        CMAKE_CXX_FLAGS_DEBUG
+        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
+    )
+    set(
+        CMAKE_CXX_FLAGS_RELEASE
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
+    )
 endif()
 
 # -flto (link time optimization)
@@ -84,4 +103,7 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
             OpenRAND::OpenRAND
             gomea_library
     )
+
+    # fPIC
+    # set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

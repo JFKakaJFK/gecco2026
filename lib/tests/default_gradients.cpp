@@ -24,7 +24,7 @@ TEST_CASE("goblin::lib::instance_default_gradient") {
   sphere.evaluate(rng, solutions, indices);
   parents = solutions;
 
-  UnboundedArchive archive(sphere.fitness());
+  UnboundedArchive archive(sphere.archive_fitness());
   archive.update(solutions[0], false);
 
   REQUIRE(!sphere.target_reached(archive));  // the starting point is not good

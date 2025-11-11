@@ -71,10 +71,11 @@ class IMS final : public MethodBase {
     std::random_device rd;
     std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
     Rng rng(seed.value_or(seed_dist(rd)), 0);
-    auto archive = opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
-                       ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.fitness()))
-                       : std::static_pointer_cast<ArchiveBase>(
-                             std::make_shared<AdaptiveGridArchive>(problem.fitness(), opts.archive_capacity.value()));
+    auto archive =
+        opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
+            ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.archive_fitness()))
+            : std::static_pointer_cast<ArchiveBase>(
+                  std::make_shared<AdaptiveGridArchive>(problem.archive_fitness(), opts.archive_capacity.value()));
 
     std::vector<P> populations;
     populations.reserve(opts.max_num_populations);
