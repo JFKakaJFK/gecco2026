@@ -368,15 +368,13 @@ class LinkageTreeFOS final : public LinkageModelBase {
 class CombinedFOS final : public LinkageModelBase {
  public:
   CombinedFOS(const std::vector<std::unique_ptr<LinkageModelBase>>& linkage_models) {
-      models.reserve(linkage_models.size());
-      for (usize i = 0; i < linkage_models.size(); i++) {
-        models.push_back(linkage_models[i]->clone());
-      }
+    models.reserve(linkage_models.size());
+    for (usize i = 0; i < linkage_models.size(); i++) {
+      models.push_back(linkage_models[i]->clone());
+    }
   }
 
-  void add_model(const LinkageModelBase& model){
-      models.push_back(model.clone());
-  }
+  void add_model(const LinkageModelBase& model) { models.push_back(model.clone()); }
 
   // Explicitly disallow copies to tell the Python binding generation that
   // a vector of unique pointers cannot be copied
@@ -388,9 +386,7 @@ class CombinedFOS final : public LinkageModelBase {
   CombinedFOS(CombinedFOS&&) = default;
   CombinedFOS& operator=(CombinedFOS&&) = default;
 
-  std::unique_ptr<LinkageModelBase> clone() const override final {
-    return std::make_unique<CombinedFOS>(models);
-  }
+  std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<CombinedFOS>(models); }
 
   void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
     for (usize i = 0; i < models.size(); i++) {
