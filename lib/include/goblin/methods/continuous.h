@@ -374,8 +374,7 @@ class RvState {
 
         // update subsets
         if (subsets[k].empty()) {
-          subsets[k] =
-              linkage_model.subsets(rng, problem, solutions, cluster_solutions[k], VariableSet::Continuous, cov[k]);
+          subsets[k] = linkage_model.subsets(rng, problem, solutions, cluster_solutions[k], cov[k]);
 
           usize ssize = subsets[k].size();
           distribution_multipliers[k] = Array<CType>::Ones(ssize);
@@ -383,8 +382,7 @@ class RvState {
           num_samples[k] = Array<u64>::Zero(ssize);
           L[k].resize(subsets[k].size());
         } else if (!linkage_model.is_static()) {
-          FOS new_fos =
-              linkage_model.subsets(rng, problem, solutions, cluster_solutions[k], VariableSet::Continuous, cov[k]);
+          FOS new_fos = linkage_model.subsets(rng, problem, solutions, cluster_solutions[k], cov[k]);
 
           Array<CType> previous_distribution_multipliers = distribution_multipliers[k];
 

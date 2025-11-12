@@ -1,7 +1,6 @@
+#pragma once
 #ifndef _GOBLIN_LIB_LINKAGE_H
 #define _GOBLIN_LIB_LINKAGE_H
-
-#pragma once
 
 #include <algorithm>
 #include <print>
@@ -30,11 +29,11 @@ inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
 inline Mat<CType> estimate_entropy(const InstanceBase& problem,
                                    const SolutionSetBase& solutions,
                                    const std::span<const usize> indices,
+                                   const std::span<const usize> subset,
                                    const std::string& intron_strategy,
                                    bool merge_continuous,
                                    std::optional<usize> num_continuous_bins) {
-  usize d = problem.num_discrete();
-  __goblin_runtime_assert(d > 0);
+  __goblin_runtime_assert(subset.size() > 0);
 
   auto& domain_sizes = problem.discrete_domain_sizes();
 
@@ -77,16 +76,16 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
       _i = i;
       _j = j;
       j++;
-      if (j >= d) {
+      if (j >= subset.size()) {
         j = 0;
         i++;
       }
 
       // not actively used
-      if (intron_aware && !solutions[indices[_i]].discrete_active()(_j)) {
+      if (intron_aware && !solutions[indices[_i]].discrete_active()(subset[_j])) {
         continue;
       }
-      auto v = problem.as_continuous(solutions[indices[_i]], _j);
+      auto v = problem.as_continuous(solutions[indices[_i]], subset[_j]);
       // not a continuous value
       if (!v.has_value()) {
         continue;
@@ -115,7 +114,7 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
   }
 
   usize offset = max_value_count;
-  max_value_count += domain_sizes.maxCoeff();
+  max_value_count += domain_sizes(subset).maxCoeff();
 
   Mat<usize> counts(max_value_count, max_value_count);
 
@@ -225,11 +224,11 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
     return std::max(e, CType(0.0));
   };
 
-  Mat<CType> H(d, d);
-  for (usize i = 0; i < d; i++) {
-    H(i, i) = entropy(i, i);
+  Mat<CType> H(subset.size(), subset.size());
+  for (usize i = 0; i < subset.size(); i++) {
+    H(i, i) = entropy(subset[i], subset[i]);
     for (usize j = 0; j < i; j++) {
-      H(i, j) = entropy(i, j);
+      H(i, j) = entropy(subset[i], subset[j]);
       H(j, i) = H(i, j);
     }
   }

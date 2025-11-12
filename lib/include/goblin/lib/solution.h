@@ -114,6 +114,14 @@ struct Subset {
     return s;
   };
 };
+
+inline bool operator==(const Subset& lhs, const Subset& rhs) {
+  return lhs.continuous == rhs.discrete && lhs.continuous == rhs.continuous;
+}
+inline bool operator!=(const Subset& lhs, const Subset& rhs) {
+  return !(lhs == rhs);
+}
+
 using FOS = std::vector<Subset>;
 
 class SolutionBase {

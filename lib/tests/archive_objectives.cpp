@@ -39,32 +39,35 @@ TEST_CASE("goblin::gp::archive_objectives") {
   GPContext ctx(
       /* num_inputs = */ X.cols(), tmplate, operators);
 
-  std::vector<CType> vtr = {1e-8, 6.0}; // best size for (x0 + x1), (x1 * x2) is 6
+  std::vector<CType> vtr = {1e-8, 6.0};  // best size for (x0 + x1), (x1 * x2) is 6
 
   std::vector<std::string> objectives{"nmse", "size"};
   for (usize objectives_to_optimize = 1; objectives_to_optimize <= objectives.size(); objectives_to_optimize++) {
-      SRProblem srp(ctx, X, Y, X_test, Y_test, objectives, /* objectives_to_optimize = */ objectives_to_optimize, /* linear_scaling */ true);
-      srp.register_target(vtr);
+    SRProblem srp(ctx, X, Y, X_test, Y_test, objectives, /* objectives_to_optimize = */ objectives_to_optimize,
+                  /* linear_scaling */ true);
+    srp.register_target(vtr);
 
-      Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
-      auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(),
-                              IMSOptions(
-                                  /* initial_population_size = */ 256,
-                                  /* max_num_populations = */ 1),
-                              std::make_shared<LinkageTreeFOS>(
-                                  /* metric = */ "mi",
-                                  /* intron_strategy */ "any_active"));
+    Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
+    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(),
+                            IMSOptions(
+                                /* initial_population_size = */ 256,
+                                /* max_num_populations = */ 1),
+                            std::make_shared<LinkageTreeFOS>(
+                                /* metric = */ "mi",
+                                /* intron_strategy */ "any_active"));
 
-      auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+    auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
 
-      std::println("Status {}: {}", format_as(status), srp.format_solution(front.so_solution(0)));
+    std::println("Status {}: {}", format_as(status), srp.format_solution(front.so_solution(0)));
 
-      REQUIRE(front.empty() == false);
+    REQUIRE(front.empty() == false);
 
-      // ls values are re-computed, so there can be slight differences here, hence 10x
-      REQUIRE_MESSAGE(front.so_solution(0).quality().objectives(0) <= vtr[0] * 10.0, srp.format_solution(front.so_solution(0)));
-      if(objectives_to_optimize > 1){
-          REQUIRE_MESSAGE(front.so_solution(1).quality().objectives(1) <= vtr[1], srp.format_solution(front.so_solution(1)));
-      }
+    // ls values are re-computed, so there can be slight differences here, hence 10x
+    REQUIRE_MESSAGE(front.so_solution(0).quality().objectives(0) <= vtr[0] * 10.0,
+                    srp.format_solution(front.so_solution(0)));
+    if (objectives_to_optimize > 1) {
+      REQUIRE_MESSAGE(front.so_solution(1).quality().objectives(1) <= vtr[1],
+                      srp.format_solution(front.so_solution(1)));
+    }
   }
 }

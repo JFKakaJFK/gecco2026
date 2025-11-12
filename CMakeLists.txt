@@ -102,6 +102,7 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
             Eigen3::Eigen
             OpenRAND::OpenRAND
             gomea_library
+            xyz::polymorphic
     )
 
     # fPIC

@@ -571,22 +571,22 @@ namespace goblin {
 class LinkageModelBase_trampoline : public LinkageModelBase
 {
 public:
-    NB_TRAMPOLINE(LinkageModelBase, 3);
+    NB_TRAMPOLINE(LinkageModelBase, 4);
 
     void init(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & solutions, goblin::VariableSet variables) override
     {
-        NB_OVERRIDE_NAME(
+        NB_OVERRIDE_PURE_NAME(
             "init", // function name (python)
             init, // function name (c++)
             rng, problem, solutions, variables // params
         );
     }
-    FOS subsets(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & solutions, const std::span<const usize> indices, goblin::VariableSet variables, std::optional<std::reference_wrapper<const Mat<CType>>> covariance) const override
+    FOS subsets(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & solutions, const std::span<const usize> indices, std::optional<std::reference_wrapper<const Mat<CType>>> covariance) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "subsets", // function name (python)
             subsets, // function name (c++)
-            rng, problem, solutions, indices, variables, covariance // params
+            rng, problem, solutions, indices, covariance // params
         );
     }
     bool is_static() const override
@@ -594,6 +594,13 @@ public:
         NB_OVERRIDE_NAME(
             "is_static", // function name (python)
             is_static // function name (c++)
+        );
+    }
+    std::unique_ptr<goblin::LinkageModelBase> clone() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "clone", // function name (python)
+            clone // function name (c++)
         );
     }
 };
@@ -1443,7 +1450,7 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   m.def("estimate_entropy",
       goblin::estimate_entropy,
-      nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none(),
+      nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none(),
       " TODO this method does way too much, but where else to put all of the\n modifications of the frequency counts for the entropy?\n - problem shouldn't have to know about the intron related entropy\n modifications\n - continuous stuff interacts with the introns...\n => current tradeoff is having the problem provide info about discrete\n values that actually correspond to a continuous value...");
   // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
@@ -1501,18 +1508,25 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("init",
           &goblin::LinkageModelBase::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
       .def("subsets",
-          &goblin::LinkageModelBase::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("variables"), nb::arg("covariance").none())
+          &goblin::LinkageModelBase::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none())
       .def("is_static",
           &goblin::LinkageModelBase::is_static)
+      .def("clone",
+          &goblin::LinkageModelBase::clone)
       ;
 
 
   auto pyClassUnivariateFOS =
       nb::class_<goblin::UnivariateFOS, goblin::LinkageModelBase>
           (m, "UnivariateFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
+      .def(nb::init<std::optional<goblin::Subset>>(),
+          nb::arg("subset").none() = nb::none())
+      .def("clone",
+          &goblin::UnivariateFOS::clone)
+      .def("init",
+          &goblin::UnivariateFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
       .def("subsets",
-          &goblin::UnivariateFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("variables"), nb::arg("covariance").none() = nb::none())
+          &goblin::UnivariateFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
       .def("is_static",
           &goblin::UnivariateFOS::is_static)
       ;
@@ -1521,9 +1535,14 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassFullFOS =
       nb::class_<goblin::FullFOS, goblin::LinkageModelBase>
           (m, "FullFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
+      .def(nb::init<std::optional<goblin::Subset>>(),
+          nb::arg("subset").none() = nb::none())
+      .def("clone",
+          &goblin::FullFOS::clone)
+      .def("init",
+          &goblin::FullFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
       .def("subsets",
-          &goblin::FullFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("variables"), nb::arg("covariance").none() = nb::none())
+          &goblin::FullFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
       .def("is_static",
           &goblin::FullFOS::is_static)
       ;
@@ -1532,12 +1551,35 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassLinkageTreeFOS =
       nb::class_<goblin::LinkageTreeFOS, goblin::LinkageModelBase>
           (m, "LinkageTreeFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool>(),
-          nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false)
+      .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool, std::optional<goblin::Subset>>(),
+          nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false, nb::arg("subset").none() = nb::none())
+      .def("clone",
+          &goblin::LinkageTreeFOS::clone)
       .def("init",
           &goblin::LinkageTreeFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
       .def("subsets",
-          &goblin::LinkageTreeFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("variables"), nb::arg("covariance").none() = nb::none())
+          &goblin::LinkageTreeFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+      ;
+
+
+  auto pyClassCombinedFOS =
+      nb::class_<goblin::CombinedFOS, goblin::LinkageModelBase>
+          (m, "CombinedFOS", nb::is_final(), "\n(final class)")
+      .def(nb::init<const std::vector<std::unique_ptr<goblin::LinkageModelBase>> &>(),
+          nb::arg("linkage_models"))
+      .def("add_model",
+          &goblin::CombinedFOS::add_model, nb::arg("model"))
+      .def(nb::init<goblin::CombinedFOS &&>(),
+          nb::arg("param_0"),
+          "But moving is allowed")
+      .def("clone",
+          &goblin::CombinedFOS::clone)
+      .def("init",
+          &goblin::CombinedFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
+      .def("subsets",
+          &goblin::CombinedFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+      .def("is_static",
+          &goblin::CombinedFOS::is_static)
       ;
   // #endif
   // #ifndef _GOBLIN_LIB_METHOD_H

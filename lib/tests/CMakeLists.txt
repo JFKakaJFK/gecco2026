@@ -7,6 +7,7 @@ set(deps
     doctest::doctest
     Eigen3::Eigen
     OpenRAND::OpenRAND
+    xyz::polymorphic
     gomea_library
 )
 

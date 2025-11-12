@@ -1,5 +1,6 @@
 find_package(Eigen3 REQUIRED)   # Eigen3::Eigen
 find_package(OpenRAND REQUIRED) # OpenRAND::OpenRAND
+find_package(xyz::polymorphic REQUIRED) # xyz::polymorphic # TODO remove if not needed anymore
 find_package(gomea_library REQUIRED) # gomea_library
 
 file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*.h")
@@ -32,6 +33,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         Eigen3::Eigen
         OpenRAND::OpenRAND
+        xyz::polymorphic
         gomea_library
 )
 

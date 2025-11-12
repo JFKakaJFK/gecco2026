@@ -271,16 +271,16 @@ class Population {
  public:
   Population(InstanceBase& problem,
              ArchiveBase& global_archive,
-             LinkageModelBase& discrete_model,
-             LinkageModelBase& continuous_model,
+             const LinkageModelBase& discrete_model,
+             const LinkageModelBase& continuous_model,
              usize size,
              usize num_clusters,
              const PopulationOptions& options,
              const RvOptions& rv_options)
       : problem(problem),
         global_archive(global_archive),
-        discrete_model(discrete_model),
-        continuous_model(continuous_model),
+        discrete_model(discrete_model.clone()),
+        continuous_model(continuous_model.clone()),
         rv_options(rv_options),
         options(options),
         local_archive(global_archive.clone()),
@@ -341,11 +341,10 @@ class Population {
     usize max_discrete_subset_count = 0;
     if (is_discrete) {
       // learn per cluster linkage models
-      if (cluster_FOS.empty() || !discrete_model.is_static()) {
+      if (cluster_FOS.empty() || !discrete_model->is_static()) {
         cluster_FOS.clear();
         for (usize k = 0; k < num_clusters; k++) {
-          cluster_FOS.push_back(discrete_model.subsets(rng, problem, solutions, cluster_solutions[k],
-                                                       VariableSet::Discrete, std::nullopt));
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
         }
       }
       for (usize k = 0; k < num_clusters; k++) {
@@ -415,9 +414,9 @@ class Population {
       // so we still want to be able to do a discrete step instead
       if (is_continuous && rv_options.enabled && !do_discrete_step) {
         evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
-                                            cluster_solutions, rv_options, continuous_model);
+                                            cluster_solutions, rv_options, *continuous_model);
         // evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
-        // cluster_solutions, rv_options, continuous_model);
+        // cluster_solutions, rv_options, *continuous_model);
         evaluations += evals;
         continuous_evaluations += evals;
       }
@@ -637,9 +636,11 @@ class Population {
     subsets.resize(size);
     perm.reserve(size);
 
-    // This callback is only needed to support learning the linkage
+    // This callback is needed to support learning the linkage
     // normalization matrix from https://arxiv.org/pdf/1904.02050
-    discrete_model.init(rng, problem, solutions, VariableSet::Discrete);
+    // and to tell the linkage model about how many variables there are in case that was not set beforehand
+    discrete_model->init(rng, problem, solutions, VariableSet::Discrete);
+    continuous_model->init(rng, problem, solutions, VariableSet::Continuous);
 
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
@@ -931,8 +932,8 @@ class Population {
 
   InstanceBase& problem;
   ArchiveBase& global_archive;
-  LinkageModelBase& discrete_model;
-  LinkageModelBase& continuous_model;
+  std::unique_ptr<LinkageModelBase> discrete_model;
+  std::unique_ptr<LinkageModelBase> continuous_model;
   const RvOptions& rv_options;
   PopulationOptions options;
   std::unique_ptr<ArchiveBase> local_archive;
