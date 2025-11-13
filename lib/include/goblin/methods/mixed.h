@@ -384,8 +384,9 @@ class Population {
     // }
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
+    bool can_do_discrete_step;
     do {
-      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
+      can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       bool do_discrete_step;
       if (!is_continuous || !rv_options.enabled) {
         do_discrete_step = can_do_discrete_step;
@@ -438,7 +439,7 @@ class Population {
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
       }
-    } while (subset_idx < max_discrete_subset_count);
+    } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
@@ -541,26 +542,6 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
-  /// Tracked running was intended to unify reporting across algorithms
-  /// - this method abuses that functionality to re-use that logging for
-  /// other purposes controlled by the algorithm, not the tracking
-  void debug_log(std::string_view path,
-                 std::string_view headers,
-                 std::string_view values,
-                 std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
-    if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
-      if (population.has_value()) {
-        ti->request_debug_report(path, population.value().get(), headers, values);
-      } else {
-        ti->request_debug_report(path, headers, values);
-      }
-    } else {
-      throw std::runtime_error(
-          "Debug log called on an incompatible problem instance. Try using "
-          "`Tracked::run` to enable logging.");
-    }
-  };
-
   void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
     SolutionSet copy = set;
     std::vector<usize> indices(copy.size());

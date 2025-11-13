@@ -12,10 +12,12 @@
 #include <random>
 #include <type_traits>
 #include <vector>
+#include <string_view>
 #include <print>
 #include <iostream>
 
 #include <Eigen/Cholesky>
+#include <Eigen/QR>
 
 #include "goblin/lib/assert.h"
 #include "goblin/lib/rng.h"
@@ -24,17 +26,19 @@
 #include "goblin/lib/method.h"
 #include "goblin/lib/algorithms/mo.h"
 #include "goblin/lib/linkage_model.h"
+#include "goblin/bench/tracked.h"
 
 namespace goblin {
-
-// Mat<T> -> Eigen::MatrixX<T>
-// Arr2D<T> -> Eigen::ArrayXX<T>
 
 struct RvOptions {
   bool enabled = true;
   bool intron_aware = true;
   bool init_ams_from_population_mean = true;
+  // If randomized, the AMS indices are randomly picked from all active solutions.
+  // Otherwise the first `floor(selection_percentile * 0.5)` active solutions are used.
   bool randomize_ams_indices = false;
+  // Determines whether partial and full AMS are performed when the full FOS is used.
+  bool enable_partial_ams_for_full_fos = true;
   usize num_forced_improvement_tries = 8;  // 8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)
   usize max_nis = 20;
 
@@ -51,6 +55,17 @@ struct RvOptions {
   CType distribution_multiplier_increase = 1.0 / 0.9;
 
   CType min_distribution_multiplier = 1e-10;
+
+  // In the GBO setting with partial evaluations, numerical errors of partial fitness updates
+  // can accumulate and it might be needed to perform full evaluations once in a while
+  //
+  // In that case, the default number of generations until re-evaluation is `50`
+  std::optional<u64> generations_until_full_evaluation = std::nullopt;
+
+  std::optional<std::string> population_logfile = std::nullopt;
+  std::optional<std::string> selection_logfile = std::nullopt;
+  std::optional<std::string> subset_logfile = std::nullopt;
+  std::optional<std::string> sample_logfile = std::nullopt;
 
   void validate() {
     __goblin_runtime_assert(0.0 <= p_accept && p_accept < 1.0);
@@ -137,7 +152,28 @@ class RvState {
       // enable partial ams only if the linkage model is not the full fos - in that case, we stay as close to what
       // AMaLGaM does as possible...
       auto ptr = reinterpret_cast<const FullFOS*>(&linkage_model);
-      enable_partial_ams = ptr == nullptr;
+      enable_partial_ams = options.enable_partial_ams_for_full_fos || ptr == nullptr;
+    }
+
+    // Re-evaluate the whole population if enabled
+    // (for the GBO setting where the partial fitness updates cause numerical drift)
+    if (options.generations_until_full_evaluation.has_value() &&
+        (generation + 1) % options.generations_until_full_evaluation.value() == 0) {
+      solutions_to_evaluate.resize(solutions.size());
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+      problem.evaluate(rng, solutions, solutions_to_evaluate);
+      for (usize i = 0; i < solutions.size(); i++) {
+        parents[i] = solutions[i];
+      }
+    }
+
+    if (options.population_logfile.has_value()) {
+      AoSSet p;
+      p.add(solutions[0]);
+      for (usize i = 0; i < solutions.size(); i++) {
+        p[0] = solutions[i];
+        debug_log(problem, options.population_logfile.value(), "cluster,", std::format("{},", solution_clusters[i]), p);
+      }
     }
 
     // linkage learning, distribution estimation, ams index assignments per cluster
@@ -170,16 +206,20 @@ class RvState {
 
     evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, options, ams_indices);
 
+    // normal RV-GOMEA updates the solution NIS here - but in the intron aware case some solutions might not have been
+    // subject to variation at all, so this is changed into a no improvement count and updated per variation step, so
+    // nothing to do here
+
+    if (options.num_forced_improvement_tries > 0) {
+      evaluations += forced_improvements(rng, archive, problem, solutions, parents, solution_clusters, options);
+    }
+
     for (usize k = 0; k < num_clusters; k++) {
       if (any_improved[k]) {
         no_improvement_stretch[k] = 0;
       } else if ((distribution_multipliers[k] <= 1.0).all()) {
         no_improvement_stretch[k]++;
       }
-    }
-
-    if (options.num_forced_improvement_tries > 0) {
-      evaluations += forced_improvements(rng, archive, problem, solutions, parents, solution_clusters, options);
     }
 
     generation++;
@@ -252,6 +292,15 @@ class RvState {
         if (options.intron_aware) {
           for (isize i = 0; i < num_continuous; i++) {
             selection_sizes[i] = options.selection_percentile * active_counts[i];
+          }
+        }
+
+        if (!options.intron_aware && options.selection_logfile.has_value()) {
+          AoSSet p;
+          p.add(solutions[0]);
+          for (usize i = 0; i < selection_sizes[0]; i++) {
+            p[0] = solutions[active_indices[k][i]];
+            debug_log(problem, options.selection_logfile.value(), "cluster,", std::format("{},", k), p);
           }
         }
 
@@ -427,7 +476,14 @@ class RvState {
         // std::cout << "  mean: \n" << mean[k] << "\n  mean_shift: \n" << mean_shift[k] << std::endl;
 
         for (usize i = 0; i < subsets[k].size(); i++) {
-          L[k][i] = distribution_multipliers[k](i) * cov[k](subsets[k][i].continuous, subsets[k][i].continuous);
+          const auto& s = subsets[k][i].continuous;
+          L[k][i] = distribution_multipliers[k](i) * cov[k](s, s);
+
+          if (options.subset_logfile.has_value()) {
+            debug_log(problem, options.subset_logfile.value(), "cluster,subset,mean,mean_shift,cov,dmul,",
+                      std::format("{},{},{},{},{},{},", k, log_helper(s), log_helper(mean[k](s)),
+                                  log_helper(mean_shift[k](s)), log_helper(L[k][i]), distribution_multipliers[k](i)));
+          }
 
           // std::println("  [{}]: dmul = {}, cov", i, distribution_multipliers[k](i));
           // std::cout << L[k][i] << "\n" << std::endl;
@@ -508,8 +564,8 @@ class RvState {
       // improvement in the extreme direction or sideways improvement in another
       // objective
       Ordering o = fitness.cmp(solution.quality(), parent.quality(), objective);
-      if (o == Ordering::Better ||
-          fitness.cmp(solution.quality(), parent.quality(), std::nullopt) == Ordering::Better) {
+      if (o == Ordering::Better || (fitness.num_objectives() > 1 && fitness.cmp(solution.quality(), parent.quality(),
+                                                                                std::nullopt) == Ordering::Better)) {
         return std::make_tuple(true, fitness.cmp(solution.quality(), archive.so_solution(objective.value()).quality(),
                                                  objective) == Ordering::Better);
       }
@@ -631,6 +687,14 @@ class RvState {
 
     problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
+    if (options.sample_logfile.has_value()) {
+      AoSSet gom_solutions;
+      for (usize i : solutions_to_evaluate) {
+        gom_solutions.add(solutions[i]);
+      }
+      debug_log(problem, options.sample_logfile.value(), "step,", "gom,", gom_solutions);
+    }
+
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
@@ -640,10 +704,10 @@ class RvState {
       auto [accept, improved] =
           should_accept(rng, problem.fitness(), archive, options, solutions[i], parents[i], objective, false);
       if (accept) {
+          no_improvement_counts[i] = 0;
         parents[i] = solutions[i];
 
         if (improved) {
-          no_improvement_counts[i] = 0;
           improved_indices[k].push_back(i);
         }
       } else {
@@ -681,27 +745,31 @@ class RvState {
 
             CType std_deviation_ratio;
             {
+              Mat<CType> L_inv = L[k][fos_idx]  // .triangularView<Eigen::Lower>()
+                                     .completeOrthogonalDecomposition()
+                                     .pseudoInverse();
+
               Array<CType> num_improvements = Array<CType>::Zero(s.size());
               Vec<CType> average_parameters_of_improvement = Array<CType>::Zero(s.size());
-              if (options.intron_aware) {
-                for (usize i : improved_indices[k]) {
+              Vec<CType> tmp(s.size());
+              for (usize i : improved_indices[k]) {
+                if (options.intron_aware) {
                   // If we pay attention to introns, then the improvements count only the changes to active values
                   for (usize j = 0; j < s.size(); j++) {
                     // since there was an improvement, we know there is at least one such case
                     if (solutions[i].continuous_active()(s[j])) {
-                      average_parameters_of_improvement(j) += solutions[i].continuous_values()(s[j]);
+                      tmp(j) = (solutions[i].continuous_values()(s[j]) - mean[k](s[j]));
                       num_improvements(j) += 1.0;
+                    } else {
+                      tmp(j) = 0.0;
                     }
                   }
-                }
-              } else {
-                for (usize i : improved_indices[k]) {
-                  average_parameters_of_improvement += solutions[i].continuous_values()(s);
+                } else {
+                  tmp = solutions[i].continuous_values()(s) - mean[k](s);
                   num_improvements += 1.0;
                 }
+                average_parameters_of_improvement += L_inv * tmp;
               }
-
-              Mat<CType> L_inv = L[k][fos_idx].inverse();
 
               if (options.intron_aware) {
                 // inactive variables will have a deviation of 0 from the mean (i.e. so they don't influence the
@@ -714,7 +782,7 @@ class RvState {
               } else {
                 average_parameters_of_improvement.array() /= num_improvements;
               }
-              std_deviation_ratio = (L_inv * (average_parameters_of_improvement - mean[k](s))).array().abs().maxCoeff();
+              std_deviation_ratio = average_parameters_of_improvement.array().abs().maxCoeff();
             }
 
             if (distribution_multipliers[k](fos_idx) < 1.0) {
@@ -752,33 +820,38 @@ class RvState {
 
     solutions_to_evaluate.clear();
 
-    for (usize i = 0; i < solutions.size(); i++) {
-      auto k = solution_clusters[i];
-      if (cluster_active(k) && ms_active(k) && ams_indices[k].contains(i)) {
-        eval_subsets[i] = &full;
+    for (usize k = 0; k < num_clusters; k++) {
+      if (cluster_active(k) && ms_active(k)) {
+        for (usize i : ams_indices[k]) {
+          eval_subsets[i] = &full;
 
-        CType shift_magnitude = 1.0;
-        bool in_bounds = false;
-        while (shift_magnitude > 1e-10) {
-          solutions[i].continuous_values() =
-              parents[i].continuous_values() + shift_magnitude * options.delta_ams * mean_shift[k];
+          auto values = solutions[i].continuous_values();
 
-          if ((problem.continuous_lower_bounds().array() <= solutions[i].continuous_values().array()).all() &&
-              (solutions[i].continuous_values().array() <= problem.continuous_upper_bounds().array()).all()) {
-            // always true since the ams indices come from a pre-selection of active only indices...
-            // bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active().array().any();
-            // if(evaluation_needed){
-            //     solutions_to_evaluate.push_back(i);
-            // }
-            solutions_to_evaluate.push_back(i);
-            in_bounds = true;
-            break;
+          CType shift_magnitude = 1.0;
+          bool in_bounds = false;
+          while (shift_magnitude > 1e-10) {
+            values = parents[i].continuous_values() + shift_magnitude * options.delta_ams * mean_shift[k];
+
+            if ((problem.continuous_lower_bounds().array() <= values.array()).all() &&
+                (values.array() <= problem.continuous_upper_bounds().array()).all()) {
+              // always true since the ams indices come from a pre-selection of active only indices...
+              // bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active().array().any();
+              // if(evaluation_needed){
+              //     solutions_to_evaluate.push_back(i);
+              // }
+              // std::println("AMS {} in bounds {} -> {}", i, log_helper(parents[i].continuous_values(), /* escape =
+              // */false), log_helper(values, /* escape = */false));
+              solutions_to_evaluate.push_back(i);
+              in_bounds = true;
+              break;
+            }
+
+            shift_magnitude *= 0.5;
           }
-
-          shift_magnitude *= 0.5;
-        }
-        if (!in_bounds) {
-          solutions[i].continuous_values() = parents[i].continuous_values();
+          if (!in_bounds) {
+            // std::println("OOB {}, nothing to do.", i);
+            values = parents[i].continuous_values();
+          }
         }
       }
     }
@@ -789,6 +862,14 @@ class RvState {
 
     problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
+    if (options.sample_logfile.has_value()) {
+      AoSSet ams_solutions;
+      for (usize i : solutions_to_evaluate) {
+        ams_solutions.add(solutions[i]);
+      }
+      debug_log(problem, options.sample_logfile.value(), "step,", "ams,", ams_solutions);
+    }
+
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
@@ -797,13 +878,14 @@ class RvState {
           should_accept(rng, problem.fitness(), archive, options, solutions[i], parents[i], objective, false);
 
       if (accept) {
+          no_improvement_counts[i] = 0;
         parents[i] = solutions[i];
-        no_improvement_counts[i] = 0;
 
         if (improved) {
           archive.update(solutions[i], false);
         }
       } else {
+        no_improvement_counts[i]++;
         solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
@@ -930,10 +1012,12 @@ class RvState {
   //         // ims go brr
   //     }
 
-  // std::optional<usize> current_generation() const override final {
-  //   return generation;
-  // };
+  std::optional<usize> current_generation() const  // override final
+  {
+    return generation;
+  };
 };
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */

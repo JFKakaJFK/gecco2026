@@ -1099,9 +1099,15 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def("continuous_upper_bounds", &goblin::InstanceBase::continuous_upper_bounds)
           .def("continuous_init_lower_bounds", &goblin::InstanceBase::continuous_init_lower_bounds)
           .def("continuous_init_upper_bounds", &goblin::InstanceBase::continuous_init_upper_bounds)
-          .def("evaluate", &goblin::InstanceBase::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+          .def("evaluate",
+               nb::overload_cast<Rng&, goblin::SolutionSetBase&, const std::span<const usize>&>(
+                   &goblin::InstanceBase::evaluate),
+               nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
           .def("evaluate_partial", &goblin::InstanceBase::evaluate_partial, nb::arg("rng"), nb::arg("solutions"),
                nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
+          .def("evaluate",
+               nb::overload_cast<goblin::SolutionSetBase&, std::optional<u64>>(&goblin::InstanceBase::evaluate),
+               nb::arg("solutions"), nb::arg("seed").none() = nb::none())
           .def("gradients", &goblin::InstanceBase::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"),
                nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"),
                "/ Returns the gradient for each index of indices (row) and continuous variable (column) with respect "
@@ -2074,6 +2080,11 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_static("run", &goblin::Tracked::run, nb::arg("instance"), nb::arg("method"), nb::arg("budget"),
                       nb::arg("config"), nb::arg("seed").none() = nb::none(),
                       nb::arg("population_size").none() = nb::none());
+
+  m.def("debug_log", goblin::debug_log, nb::arg("problem"), nb::arg("path"), nb::arg("headers"), nb::arg("values"),
+        nb::arg("population").none() = nb::none(),
+        "/ Tracked running was intended to unify reporting across algorithms\n/ - this method abuses that "
+        "functionality to re-use that logging for\n/ other purposes controlled by the algorithm, not the tracking");
   // #endif
   // #ifndef _GOBLIN_AMALGAM_H
   //
@@ -2151,16 +2162,23 @@ void py_init_module_pygoblin(nb::module_& m) {
               "__init__",
               [](goblin::RvOptions* self, bool enabled = true, bool intron_aware = true,
                  bool init_ams_from_population_mean = true, bool randomize_ams_indices = false,
-                 usize num_forced_improvement_tries = 8, usize max_nis = 20, double selection_percentile = 0.35,
-                 double p_accept = 0.05, CType delta_ams = 2.0, CType eta_ams = 1.0, CType eta_cov = 1.0,
-                 CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9,
-                 CType distribution_multiplier_increase = 1.0 / 0.9, CType min_distribution_multiplier = 1e-10) {
+                 bool enable_partial_ams_for_full_fos = true, usize num_forced_improvement_tries = 8,
+                 usize max_nis = 20, double selection_percentile = 0.35, double p_accept = 0.05, CType delta_ams = 2.0,
+                 CType eta_ams = 1.0, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0,
+                 CType distribution_multiplier_decrease = 0.9, CType distribution_multiplier_increase = 1.0 / 0.9,
+                 CType min_distribution_multiplier = 1e-10,
+                 std::optional<u64> generations_until_full_evaluation = std::nullopt,
+                 std::optional<std::string> population_logfile = std::nullopt,
+                 std::optional<std::string> selection_logfile = std::nullopt,
+                 std::optional<std::string> subset_logfile = std::nullopt,
+                 std::optional<std::string> sample_logfile = std::nullopt) {
                 new (self) goblin::RvOptions();  // placement new
                 auto r_ctor_ = self;
                 r_ctor_->enabled = enabled;
                 r_ctor_->intron_aware = intron_aware;
                 r_ctor_->init_ams_from_population_mean = init_ams_from_population_mean;
                 r_ctor_->randomize_ams_indices = randomize_ams_indices;
+                r_ctor_->enable_partial_ams_for_full_fos = enable_partial_ams_for_full_fos;
                 r_ctor_->num_forced_improvement_tries = num_forced_improvement_tries;
                 r_ctor_->max_nis = max_nis;
                 r_ctor_->selection_percentile = selection_percentile;
@@ -2172,18 +2190,29 @@ void py_init_module_pygoblin(nb::module_& m) {
                 r_ctor_->distribution_multiplier_decrease = distribution_multiplier_decrease;
                 r_ctor_->distribution_multiplier_increase = distribution_multiplier_increase;
                 r_ctor_->min_distribution_multiplier = min_distribution_multiplier;
+                r_ctor_->generations_until_full_evaluation = generations_until_full_evaluation;
+                r_ctor_->population_logfile = population_logfile;
+                r_ctor_->selection_logfile = selection_logfile;
+                r_ctor_->subset_logfile = subset_logfile;
+                r_ctor_->sample_logfile = sample_logfile;
               },
               nb::arg("enabled") = true, nb::arg("intron_aware") = true,
               nb::arg("init_ams_from_population_mean") = true, nb::arg("randomize_ams_indices") = false,
-              nb::arg("num_forced_improvement_tries") = 8, nb::arg("max_nis") = 20,
-              nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05, nb::arg("delta_ams") = 2.0,
-              nb::arg("eta_ams") = 1.0, nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0,
-              nb::arg("distribution_multiplier_decrease") = 0.9,
-              nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10)
+              nb::arg("enable_partial_ams_for_full_fos") = true, nb::arg("num_forced_improvement_tries") = 8,
+              nb::arg("max_nis") = 20, nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05,
+              nb::arg("delta_ams") = 2.0, nb::arg("eta_ams") = 1.0, nb::arg("eta_cov") = 1.0,
+              nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9,
+              nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10,
+              nb::arg("generations_until_full_evaluation").none() = nb::none(),
+              nb::arg("population_logfile").none() = nb::none(), nb::arg("selection_logfile").none() = nb::none(),
+              nb::arg("subset_logfile").none() = nb::none(), nb::arg("sample_logfile").none() = nb::none())
           .def_rw("enabled", &goblin::RvOptions::enabled, "")
           .def_rw("intron_aware", &goblin::RvOptions::intron_aware, "")
           .def_rw("init_ams_from_population_mean", &goblin::RvOptions::init_ams_from_population_mean, "")
-          .def_rw("randomize_ams_indices", &goblin::RvOptions::randomize_ams_indices, "")
+          .def_rw("randomize_ams_indices", &goblin::RvOptions::randomize_ams_indices,
+                  " If randomized, the AMS indices are randomly picked from all active solutions.\n Otherwise the "
+                  "first `floor(selection_percentile * 0.5)` active solutions are used.")
+          .def_rw("enable_partial_ams_for_full_fos", &goblin::RvOptions::enable_partial_ams_for_full_fos, "")
           .def_rw("num_forced_improvement_tries", &goblin::RvOptions::num_forced_improvement_tries,
                   "8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)")
           .def_rw("max_nis", &goblin::RvOptions::max_nis, "")
@@ -2196,6 +2225,14 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("distribution_multiplier_decrease", &goblin::RvOptions::distribution_multiplier_decrease, "")
           .def_rw("distribution_multiplier_increase", &goblin::RvOptions::distribution_multiplier_increase, "")
           .def_rw("min_distribution_multiplier", &goblin::RvOptions::min_distribution_multiplier, "")
+          .def_rw("generations_until_full_evaluation", &goblin::RvOptions::generations_until_full_evaluation,
+                  " In the GBO setting with partial evaluations, numerical errors of partial fitness updates\n can "
+                  "accumulate and it might be needed to perform full evaluations once in a while\n\n In that case, the "
+                  "default number of generations until re-evaluation is `50`")
+          .def_rw("population_logfile", &goblin::RvOptions::population_logfile, "")
+          .def_rw("selection_logfile", &goblin::RvOptions::selection_logfile, "")
+          .def_rw("subset_logfile", &goblin::RvOptions::subset_logfile, "")
+          .def_rw("sample_logfile", &goblin::RvOptions::sample_logfile, "")
           .def("validate", &goblin::RvOptions::validate);
 
   m.def("sort_by_quality_decreasing", goblin::sort_by_quality_decreasing, nb::arg("fitness"), nb::arg("solutions"),
@@ -2245,7 +2282,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("no_improvement_stretch", &goblin::RvState::no_improvement_stretch, "per cluster")
           .def_rw("no_improvement_counts", &goblin::RvState::no_improvement_counts,
                   "per solution (count to not penalize inactive solutions)")
-          .def_rw("generation", &goblin::RvState::generation, "");
+          .def_rw("generation", &goblin::RvState::generation, "")
+          .def("current_generation", &goblin::RvState::current_generation, "// override final");
   // #endif
 
   m.def("create_and_register_clusters", goblin::create_and_register_clusters, nb::arg("rng"), nb::arg("archive"),

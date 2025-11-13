@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <sstream>
+#include <span>
 
 #include "goblin/bench/timer.h"
 #include "goblin/lib/assert.h"
@@ -23,6 +25,98 @@
 #include "goblin/lib/method.h"
 
 namespace goblin {
+
+template <typename T>
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  usize i = 0;
+  for (const auto& e : span) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
+#ifdef __cpp_lib_print
+      std::print(os,
+#else
+      os << std::format(
+#endif
+                 "{:d}", e);
+    } else {
+      os << e;
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename EigenLike>
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  if (m.rows() > 1 && m.cols() > 1) {
+    for (isize r = 0; r < m.rows(); r++) {
+      if (r > 0) {
+        os << ',';
+      }
+      os << '[';
+      for (isize c = 0; c < m.cols(); c++) {
+        if (c > 0) {
+          os << ',';
+        }
+
+        // fmt to alwyas use the decimal instead of the ascii byte value for
+        // (unsigned) chars
+        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", m(r, c));
+        } else {
+          os << m(r, c);
+        }
+      }
+      os << ']';
+    }
+  } else {
+    for (isize i = 0; i < m.size(); i++) {
+      if (i > 0) {
+        os << ',';
+      }
+      // fmt to alwyas use the decimal instead of the ascii byte value for
+      // (unsigned) chars
+      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+        std::print(os,
+#else
+        os << std::format(
+#endif
+                   "{:d}", m(i));
+      } else {
+        os << m(i);
+      }
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename T>
+inline std::string log_helper(const T& t, bool escape = true) {
+  std::ostringstream os;
+  log_helper(os, t, escape);
+  return os.str();
+};
 
 class TrackingOptions {
  public:
@@ -148,9 +242,12 @@ class Tracked final : public InstanceBase {
     }
 
     // temporarily change the logpath
+    auto tracked_generation = generation;
+    generation = method.current_generation();
     std::swap(debug_logpath, config.logpath);
     report(solutions, debug_headers, debug_values);
     std::swap(debug_logpath, config.logpath);
+    generation = tracked_generation;
 
     // close the debug logfile to open up the actual logpath again next
     if (logfile.is_open()) {
@@ -314,57 +411,58 @@ class Tracked final : public InstanceBase {
     return report_needed;
   };
 
-  template <typename EigenLike>
-  void log_eigen(std::ostream& os, const EigenLike& m) {
-    os << "\"[";
-    if (m.rows() > 1 && m.cols() > 1) {
-      for (isize r = 0; r < m.rows(); r++) {
-        if (r > 0) {
-          os << ',';
-        }
-        os << '[';
-        for (isize c = 0; c < m.cols(); c++) {
-          if (c > 0) {
-            os << ',';
-          }
+  //   template <typename EigenLike>
+  //   void log_eigen(std::ostream& os, const EigenLike& m) {
+  //     os << "\"[";
+  //     if (m.rows() > 1 && m.cols() > 1) {
+  //       for (isize r = 0; r < m.rows(); r++) {
+  //         if (r > 0) {
+  //           os << ',';
+  //         }
+  //         os << '[';
+  //         for (isize c = 0; c < m.cols(); c++) {
+  //           if (c > 0) {
+  //             os << ',';
+  //           }
 
-          // fmt to alwyas use the decimal instead of the ascii byte value for
-          // (unsigned) chars
-          if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
-                        std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-            std::print(os,
-#else
-            os << std::format(
-#endif
-                       "{:d}", m(r, c));
-          } else {
-            os << m(r, c);
-          }
-        }
-        os << ']';
-      }
-    } else {
-      for (isize i = 0; i < m.size(); i++) {
-        if (i > 0) {
-          os << ',';
-        }
-        // fmt to alwyas use the decimal instead of the ascii byte value for
-        // (unsigned) chars
-        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-          std::print(os,
-#else
-          os << std::format(
-#endif
-                     "{:d}", m(i));
-        } else {
-          os << m(i);
-        }
-      }
-    }
-    os << "]\"";
-  };
+  //           // fmt to alwyas use the decimal instead of the ascii byte value for
+  //           // (unsigned) chars
+  //           if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
+  //                         std::same_as<typename EigenLike::Scalar, u8>) {
+  // #ifdef __cpp_lib_print
+  //             std::print(os,
+  // #else
+  //             os << std::format(
+  // #endif
+  //                        "{:d}", m(r, c));
+  //           } else {
+  //             os << m(r, c);
+  //           }
+  //         }
+  //         os << ']';
+  //       }
+  //     } else {
+  //       for (isize i = 0; i < m.size(); i++) {
+  //         if (i > 0) {
+  //           os << ',';
+  //         }
+  //         // fmt to alwyas use the decimal instead of the ascii byte value for
+  //         // (unsigned) chars
+  //         if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar,
+  //         u8>) {
+  // #ifdef __cpp_lib_print
+  //           std::print(os,
+  // #else
+  //           os << std::format(
+  // #endif
+  //                      "{:d}", m(i));
+  //         } else {
+  //           os << m(i);
+  //         }
+  //       }
+  //     }
+  //     os << "]\"";
+  //   };
 
   // A can annoyingly not be const since in the SR case an evaluation on the
   // test set might be necessary - shouldn't change the solution, but is not
@@ -423,16 +521,21 @@ class Tracked final : public InstanceBase {
                               alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase& s = solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test"
-                                                 // evaluation, and evaluations require mutable solutions
+      SolutionBase* s;
+      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
+        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
+                                      // evaluations require mutable solutions
+      } else {
+        s = &solutions[i];
+      }
       // clang-format off
                 logfile << common;
-                log_eigen(logfile,   s.discrete_values()); logfile << ',';
-                log_eigen(logfile,   s.discrete_active()); logfile << ',';
-                log_eigen(logfile, s.continuous_values()); logfile << ',';
-                log_eigen(logfile, s.continuous_active()); logfile << ',';
+                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+                log_helper(logfile, s->continuous_values(), true); logfile << ',';
+                log_helper(logfile, s->continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, s);
+      instance.log(logfile, *s);
       logfile << "\n";
     }
     logfile << std::flush;
@@ -461,6 +564,43 @@ class Tracked final : public InstanceBase {
   std::ofstream logfile;
   std::set<std::filesystem::path> truncated_files;
 };
+
+/// Tracked running was intended to unify reporting across algorithms
+/// - this method abuses that functionality to re-use that logging for
+/// other purposes controlled by the algorithm, not the tracking
+inline void debug_log(InstanceBase& problem,
+                      std::string_view path,
+                      std::string_view headers,
+                      std::string_view values,
+                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
+    if (population.has_value()) {
+      ti->request_debug_report(path, population.value().get(), headers, values);
+    } else {
+      ti->request_debug_report(path, headers, values);
+    }
+  } else {
+    throw std::runtime_error(
+        "Debug log called on an incompatible problem instance. Try using "
+        "`Tracked::run` to enable logging.");
+  }
+};
+
+template <typename T>
+inline std::string iterator2str(T&& it) {
+  std::ostringstream os;
+  os << '[';
+  usize i = 0;
+  for (const auto& e : it) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    os << e;
+  }
+  os << ']';
+  return os.str();
+};
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */

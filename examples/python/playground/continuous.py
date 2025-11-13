@@ -169,7 +169,10 @@ def methods():
         '"Mixed (Full)"',
         c.MixedGOMEA(
             rv_options=c.RvOptions(
-                max_nis=100, init_ams_from_population_mean=False, intron_aware=False
+                max_nis=100,
+                init_ams_from_population_mean=False,
+                intron_aware=False,
+                generations_until_full_evaluation=50,
             ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
@@ -187,6 +190,7 @@ def methods():
                 init_ams_from_population_mean=False,
                 intron_aware=False,
                 randomize_ams_indices=True,
+                generations_until_full_evaluation=50,
             ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
@@ -199,7 +203,11 @@ def methods():
     yield (
         '"Mixed (Full, IA)"',
         c.MixedGOMEA(
-            rv_options=c.RvOptions(max_nis=100, init_ams_from_population_mean=False),
+            rv_options=c.RvOptions(
+                max_nis=100,
+                init_ams_from_population_mean=False,
+                generations_until_full_evaluation=50,
+            ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
                 max_num_populations=max_num_populations,

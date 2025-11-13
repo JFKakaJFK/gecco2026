@@ -1458,6 +1458,13 @@ class InstanceBase {
     evaluate(rng, solutions, indices);
   };
 
+  void evaluate(SolutionSetBase& solutions, std::optional<u64> seed = std::nullopt){
+      Rng rng(seed.value_or(42), 0);
+      std::vector<usize> indices(solutions.size());
+      std::iota(indices.begin(), indices.end(), 0);
+      evaluate(rng, solutions, indices);
+  };
+
   /// Returns the gradient for each index of indices (row) and continuous variable (column) with respect to the
   /// optimization goal. The number of evaluations performed to calculate the gradients are added to `evaluations`;
   ///
@@ -2485,15 +2492,13 @@ class LinkageTreeFOS final : public LinkageModelBase {
 class CombinedFOS final : public LinkageModelBase {
  public:
   CombinedFOS(const std::vector<std::unique_ptr<LinkageModelBase>>& linkage_models) {
-      models.reserve(linkage_models.size());
-      for (usize i = 0; i < linkage_models.size(); i++) {
-        models.push_back(linkage_models[i]->clone());
-      }
+    models.reserve(linkage_models.size());
+    for (usize i = 0; i < linkage_models.size(); i++) {
+      models.push_back(linkage_models[i]->clone());
+    }
   }
 
-  void add_model(const LinkageModelBase& model){
-      models.push_back(model.clone());
-  }
+  void add_model(const LinkageModelBase& model) { models.push_back(model.clone()); }
 
   // Explicitly disallow copies to tell the Python binding generation that
   // a vector of unique pointers cannot be copied
@@ -2505,9 +2510,7 @@ class CombinedFOS final : public LinkageModelBase {
   CombinedFOS(CombinedFOS&&) = default;
   CombinedFOS& operator=(CombinedFOS&&) = default;
 
-  std::unique_ptr<LinkageModelBase> clone() const override final {
-    return std::make_unique<CombinedFOS>(models);
-  }
+  std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<CombinedFOS>(models); }
 
   void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
     for (usize i = 0; i < models.size(); i++) {
@@ -2725,6 +2728,7 @@ class IMS final : public MethodBase {
       generations[i]++;  // this needs to always be increased, no matter if we do
                          // a step or not
       if (running[i]) {
+          std::println("Total generations before step: {}", total_generations);
         archive->reset_change_count();
         evaluations += populations[i].perform_generation(rng, should_terminate);
         total_generations++;
@@ -5853,6 +5857,92 @@ class Timer {
 
 namespace goblin {
 
+template<typename T>
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true) {
+    if(escape){os << '"';}
+    os << '[';
+    usize i = 0;
+    for(const auto& e: span){
+        if(i++ > 0){
+            os << ',';
+        }
+        if constexpr (std::same_as<T, char> ||
+                      std::same_as<T, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", e);
+        } else {
+          os << e;
+        }
+    }
+    os << ']';
+    if(escape){os << '"';}
+};
+
+template <typename EigenLike>
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true) {
+  if(escape){os << '"';}
+  os << '[';
+  if (m.rows() > 1 && m.cols() > 1) {
+    for (isize r = 0; r < m.rows(); r++) {
+      if (r > 0) {
+        os << ',';
+      }
+      os << '[';
+      for (isize c = 0; c < m.cols(); c++) {
+        if (c > 0) {
+          os << ',';
+        }
+
+        // fmt to alwyas use the decimal instead of the ascii byte value for
+        // (unsigned) chars
+        if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
+                      std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", m(r, c));
+        } else {
+          os << m(r, c);
+        }
+      }
+      os << ']';
+    }
+  } else {
+    for (isize i = 0; i < m.size(); i++) {
+      if (i > 0) {
+        os << ',';
+      }
+      // fmt to alwyas use the decimal instead of the ascii byte value for
+      // (unsigned) chars
+      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+        std::print(os,
+#else
+        os << std::format(
+#endif
+                   "{:d}", m(i));
+      } else {
+        os << m(i);
+      }
+    }
+  }
+  os << ']';
+  if(escape){os << '"';}
+};
+
+template<typename T>
+inline std::string log_helper(const T& t, bool escape = true) {
+    std::ostringstream os;
+    log_helper(os, t, escape);
+    return os.str();
+};
+
 class TrackingOptions {
  public:
   TrackingOptions() = delete;
@@ -5977,9 +6067,12 @@ class Tracked final : public InstanceBase {
     }
 
     // temporarily change the logpath
+    auto tracked_generation = generation;
+    generation = method.current_generation();
     std::swap(debug_logpath, config.logpath);
     report(solutions, debug_headers, debug_values);
     std::swap(debug_logpath, config.logpath);
+    generation = tracked_generation;
 
     // close the debug logfile to open up the actual logpath again next
     if (logfile.is_open()) {
@@ -6143,57 +6236,57 @@ class Tracked final : public InstanceBase {
     return report_needed;
   };
 
-  template <typename EigenLike>
-  void log_eigen(std::ostream& os, const EigenLike& m) {
-    os << "\"[";
-    if (m.rows() > 1 && m.cols() > 1) {
-      for (isize r = 0; r < m.rows(); r++) {
-        if (r > 0) {
-          os << ',';
-        }
-        os << '[';
-        for (isize c = 0; c < m.cols(); c++) {
-          if (c > 0) {
-            os << ',';
-          }
+//   template <typename EigenLike>
+//   void log_eigen(std::ostream& os, const EigenLike& m) {
+//     os << "\"[";
+//     if (m.rows() > 1 && m.cols() > 1) {
+//       for (isize r = 0; r < m.rows(); r++) {
+//         if (r > 0) {
+//           os << ',';
+//         }
+//         os << '[';
+//         for (isize c = 0; c < m.cols(); c++) {
+//           if (c > 0) {
+//             os << ',';
+//           }
 
-          // fmt to alwyas use the decimal instead of the ascii byte value for
-          // (unsigned) chars
-          if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
-                        std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-            std::print(os,
-#else
-            os << std::format(
-#endif
-                       "{:d}", m(r, c));
-          } else {
-            os << m(r, c);
-          }
-        }
-        os << ']';
-      }
-    } else {
-      for (isize i = 0; i < m.size(); i++) {
-        if (i > 0) {
-          os << ',';
-        }
-        // fmt to alwyas use the decimal instead of the ascii byte value for
-        // (unsigned) chars
-        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-          std::print(os,
-#else
-          os << std::format(
-#endif
-                     "{:d}", m(i));
-        } else {
-          os << m(i);
-        }
-      }
-    }
-    os << "]\"";
-  };
+//           // fmt to alwyas use the decimal instead of the ascii byte value for
+//           // (unsigned) chars
+//           if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
+//                         std::same_as<typename EigenLike::Scalar, u8>) {
+// #ifdef __cpp_lib_print
+//             std::print(os,
+// #else
+//             os << std::format(
+// #endif
+//                        "{:d}", m(r, c));
+//           } else {
+//             os << m(r, c);
+//           }
+//         }
+//         os << ']';
+//       }
+//     } else {
+//       for (isize i = 0; i < m.size(); i++) {
+//         if (i > 0) {
+//           os << ',';
+//         }
+//         // fmt to alwyas use the decimal instead of the ascii byte value for
+//         // (unsigned) chars
+//         if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+// #ifdef __cpp_lib_print
+//           std::print(os,
+// #else
+//           os << std::format(
+// #endif
+//                      "{:d}", m(i));
+//         } else {
+//           os << m(i);
+//         }
+//       }
+//     }
+//     os << "]\"";
+//   };
 
   // A can annoyingly not be const since in the SR case an evaluation on the
   // test set might be necessary - shouldn't change the solution, but is not
@@ -6252,16 +6345,21 @@ class Tracked final : public InstanceBase {
                               alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase& s = solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test"
-                                                 // evaluation, and evaluations require mutable solutions
+      SolutionBase* s;
+      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
+        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
+                                      // evaluations require mutable solutions
+      } else {
+        s = &solutions[i];
+      }
       // clang-format off
                 logfile << common;
-                log_eigen(logfile,   s.discrete_values()); logfile << ',';
-                log_eigen(logfile,   s.discrete_active()); logfile << ',';
-                log_eigen(logfile, s.continuous_values()); logfile << ',';
-                log_eigen(logfile, s.continuous_active()); logfile << ',';
+                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+                log_helper(logfile, s->continuous_values(), true); logfile << ',';
+                log_helper(logfile, s->continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, s);
+      instance.log(logfile, *s);
       logfile << "\n";
     }
     logfile << std::flush;
@@ -6290,6 +6388,43 @@ class Tracked final : public InstanceBase {
   std::ofstream logfile;
   std::set<std::filesystem::path> truncated_files;
 };
+
+/// Tracked running was intended to unify reporting across algorithms
+/// - this method abuses that functionality to re-use that logging for
+/// other purposes controlled by the algorithm, not the tracking
+inline void debug_log(InstanceBase& problem,
+                      std::string_view path,
+                      std::string_view headers,
+                      std::string_view values,
+                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
+    if (population.has_value()) {
+      ti->request_debug_report(path, population.value().get(), headers, values);
+    } else {
+      ti->request_debug_report(path, headers, values);
+    }
+  } else {
+    throw std::runtime_error(
+        "Debug log called on an incompatible problem instance. Try using "
+        "`Tracked::run` to enable logging.");
+  }
+};
+
+template <typename T>
+inline std::string iterator2str(T&& it) {
+  std::ostringstream os;
+  os << '[';
+  usize i = 0;
+  for (const auto& e : it) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    os << e;
+  }
+  os << ']';
+  return os.str();
+};
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
@@ -6887,17 +7022,19 @@ class MOBinaryGOMEA final : public MethodBase {
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
 #include <Eigen/Cholesky>
+#include <Eigen/QR>
 
 namespace goblin {
-
-// Mat<T> -> Eigen::MatrixX<T>
-// Arr2D<T> -> Eigen::ArrayXX<T>
 
 struct RvOptions {
   bool enabled = true;
   bool intron_aware = true;
   bool init_ams_from_population_mean = true;
+  // If randomized, the AMS indices are randomly picked from all active solutions.
+  // Otherwise the first `floor(selection_percentile * 0.5)` active solutions are used.
   bool randomize_ams_indices = false;
+  // Determines whether partial and full AMS are performed when the full FOS is used.
+  bool enable_partial_ams_for_full_fos = true;
   usize num_forced_improvement_tries = 8;  // 8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)
   usize max_nis = 20;
 
@@ -6914,6 +7051,17 @@ struct RvOptions {
   CType distribution_multiplier_increase = 1.0 / 0.9;
 
   CType min_distribution_multiplier = 1e-10;
+
+  // In the GBO setting with partial evaluations, numerical errors of partial fitness updates
+  // can accumulate and it might be needed to perform full evaluations once in a while
+  //
+  // In that case, the default number of generations until re-evaluation is `50`
+  std::optional<u64> generations_until_full_evaluation = std::nullopt;
+
+  std::optional<std::string> population_logfile = std::nullopt;
+  std::optional<std::string> selection_logfile = std::nullopt;
+  std::optional<std::string> subset_logfile = std::nullopt;
+  std::optional<std::string> sample_logfile = std::nullopt;
 
   void validate() {
     __goblin_runtime_assert(0.0 <= p_accept && p_accept < 1.0);
@@ -7000,7 +7148,28 @@ class RvState {
       // enable partial ams only if the linkage model is not the full fos - in that case, we stay as close to what
       // AMaLGaM does as possible...
       auto ptr = reinterpret_cast<const FullFOS*>(&linkage_model);
-      enable_partial_ams = ptr == nullptr;
+      enable_partial_ams = options.enable_partial_ams_for_full_fos || ptr == nullptr;
+    }
+
+    // Re-evaluate the whole population if enabled
+    // (for the GBO setting where the partial fitness updates cause numerical drift)
+    if (options.generations_until_full_evaluation.has_value() &&
+        (generation + 1) % options.generations_until_full_evaluation.value() == 0) {
+      solutions_to_evaluate.resize(solutions.size());
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+      problem.evaluate(rng, solutions, solutions_to_evaluate);
+      for (usize i = 0; i < solutions.size(); i++) {
+        parents[i] = solutions[i];
+      }
+    }
+
+    if (options.population_logfile.has_value()) {
+      AoSSet p;
+      p.add(solutions[0]);
+      for (usize i = 0; i < solutions.size(); i++) {
+        p[0] = solutions[i];
+        debug_log(problem, options.population_logfile.value(), "cluster,", std::format("{},", solution_clusters[i]), p);
+      }
     }
 
     // linkage learning, distribution estimation, ams index assignments per cluster
@@ -7033,16 +7202,20 @@ class RvState {
 
     evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, options, ams_indices);
 
+    // normal RV-GOMEA updates the solution NIS here - but in the intron aware case some solutions might not have been
+    // subject to variation at all, so this is changed into a no improvement count and updated per variation step, so
+    // nothing to do here
+
+    if (options.num_forced_improvement_tries > 0) {
+      evaluations += forced_improvements(rng, archive, problem, solutions, parents, solution_clusters, options);
+    }
+
     for (usize k = 0; k < num_clusters; k++) {
       if (any_improved[k]) {
         no_improvement_stretch[k] = 0;
       } else if ((distribution_multipliers[k] <= 1.0).all()) {
         no_improvement_stretch[k]++;
       }
-    }
-
-    if (options.num_forced_improvement_tries > 0) {
-      evaluations += forced_improvements(rng, archive, problem, solutions, parents, solution_clusters, options);
     }
 
     generation++;
@@ -7115,6 +7288,15 @@ class RvState {
         if (options.intron_aware) {
           for (isize i = 0; i < num_continuous; i++) {
             selection_sizes[i] = options.selection_percentile * active_counts[i];
+          }
+        }
+
+        if (!options.intron_aware && options.selection_logfile.has_value()) {
+          AoSSet p;
+          p.add(solutions[0]);
+          for (usize i = 0; i < selection_sizes[0]; i++) {
+            p[0] = solutions[active_indices[k][i]];
+            debug_log(problem, options.selection_logfile.value(), "cluster,", std::format("{},", k), p);
           }
         }
 
@@ -7290,7 +7472,14 @@ class RvState {
         // std::cout << "  mean: \n" << mean[k] << "\n  mean_shift: \n" << mean_shift[k] << std::endl;
 
         for (usize i = 0; i < subsets[k].size(); i++) {
-          L[k][i] = distribution_multipliers[k](i) * cov[k](subsets[k][i].continuous, subsets[k][i].continuous);
+          const auto& s = subsets[k][i].continuous;
+          L[k][i] = distribution_multipliers[k](i) * cov[k](s, s);
+
+          if (options.subset_logfile.has_value()) {
+            debug_log(problem, options.subset_logfile.value(), "cluster,subset,mean,mean_shift,cov,dmul,",
+                      std::format("{},{},{},{},{},{},", k, log_helper(s), log_helper(mean[k](s)),
+                                  log_helper(mean_shift[k](s)), log_helper(L[k][i]), distribution_multipliers[k](i)));
+          }
 
           // std::println("  [{}]: dmul = {}, cov", i, distribution_multipliers[k](i));
           // std::cout << L[k][i] << "\n" << std::endl;
@@ -7371,8 +7560,8 @@ class RvState {
       // improvement in the extreme direction or sideways improvement in another
       // objective
       Ordering o = fitness.cmp(solution.quality(), parent.quality(), objective);
-      if (o == Ordering::Better ||
-          fitness.cmp(solution.quality(), parent.quality(), std::nullopt) == Ordering::Better) {
+      if (o == Ordering::Better || (fitness.num_objectives() > 1 && fitness.cmp(solution.quality(), parent.quality(),
+                                                                                std::nullopt) == Ordering::Better)) {
         return std::make_tuple(true, fitness.cmp(solution.quality(), archive.so_solution(objective.value()).quality(),
                                                  objective) == Ordering::Better);
       }
@@ -7494,6 +7683,14 @@ class RvState {
 
     problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
+    if (options.sample_logfile.has_value()) {
+      AoSSet gom_solutions;
+      for (usize i : solutions_to_evaluate) {
+        gom_solutions.add(solutions[i]);
+      }
+      debug_log(problem, options.sample_logfile.value(), "step,", "gom,", gom_solutions);
+    }
+
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
@@ -7544,27 +7741,31 @@ class RvState {
 
             CType std_deviation_ratio;
             {
+              Mat<CType> L_inv = L[k][fos_idx]  // .triangularView<Eigen::Lower>()
+                                     .completeOrthogonalDecomposition()
+                                     .pseudoInverse();
+
               Array<CType> num_improvements = Array<CType>::Zero(s.size());
               Vec<CType> average_parameters_of_improvement = Array<CType>::Zero(s.size());
-              if (options.intron_aware) {
-                for (usize i : improved_indices[k]) {
+              Vec<CType> tmp(s.size());
+              for (usize i : improved_indices[k]) {
+                if (options.intron_aware) {
                   // If we pay attention to introns, then the improvements count only the changes to active values
                   for (usize j = 0; j < s.size(); j++) {
                     // since there was an improvement, we know there is at least one such case
                     if (solutions[i].continuous_active()(s[j])) {
-                      average_parameters_of_improvement(j) += solutions[i].continuous_values()(s[j]);
+                      tmp(j) = (solutions[i].continuous_values()(s[j]) - mean[k](s[j]));
                       num_improvements(j) += 1.0;
+                    } else {
+                      tmp(j) = 0.0;
                     }
                   }
-                }
-              } else {
-                for (usize i : improved_indices[k]) {
-                  average_parameters_of_improvement += solutions[i].continuous_values()(s);
+                } else {
+                  tmp = solutions[i].continuous_values()(s) - mean[k](s);
                   num_improvements += 1.0;
                 }
+                average_parameters_of_improvement += L_inv * tmp;
               }
-
-              Mat<CType> L_inv = L[k][fos_idx].inverse();
 
               if (options.intron_aware) {
                 // inactive variables will have a deviation of 0 from the mean (i.e. so they don't influence the
@@ -7577,7 +7778,7 @@ class RvState {
               } else {
                 average_parameters_of_improvement.array() /= num_improvements;
               }
-              std_deviation_ratio = (L_inv * (average_parameters_of_improvement - mean[k](s))).array().abs().maxCoeff();
+              std_deviation_ratio = average_parameters_of_improvement.array().abs().maxCoeff();
             }
 
             if (distribution_multipliers[k](fos_idx) < 1.0) {
@@ -7615,33 +7816,39 @@ class RvState {
 
     solutions_to_evaluate.clear();
 
-    for (usize i = 0; i < solutions.size(); i++) {
-      auto k = solution_clusters[i];
-      if (cluster_active(k) && ms_active(k) && ams_indices[k].contains(i)) {
-        eval_subsets[i] = &full;
+    for (usize k = 0; k < num_clusters; k++) {
+      if (cluster_active(k) && ms_active(k)) {
+        for (usize i : ams_indices[k]) {
+          eval_subsets[i] = &full;
 
-        CType shift_magnitude = 1.0;
-        bool in_bounds = false;
-        while (shift_magnitude > 1e-10) {
-          solutions[i].continuous_values() =
-              parents[i].continuous_values() + shift_magnitude * options.delta_ams * mean_shift[k];
+          auto values = solutions[i].continuous_values();
 
-          if ((problem.continuous_lower_bounds().array() <= solutions[i].continuous_values().array()).all() &&
-              (solutions[i].continuous_values().array() <= problem.continuous_upper_bounds().array()).all()) {
-            // always true since the ams indices come from a pre-selection of active only indices...
-            // bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active().array().any();
-            // if(evaluation_needed){
-            //     solutions_to_evaluate.push_back(i);
-            // }
-            solutions_to_evaluate.push_back(i);
-            in_bounds = true;
-            break;
+          CType shift_magnitude = 1.0;
+          bool in_bounds = false;
+          while (shift_magnitude > 1e-10) {
+            values = parents[i].continuous_values() + shift_magnitude * options.delta_ams * mean_shift[k];
+
+            if ((problem.continuous_lower_bounds().array() <= values.array()).all() &&
+                (values.array() <= problem.continuous_upper_bounds().array()).all()) {
+              // always true since the ams indices come from a pre-selection of active only indices...
+              // bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active().array().any();
+              // if(evaluation_needed){
+              //     solutions_to_evaluate.push_back(i);
+              // }
+              std::println("AMS {} in bounds {} -> {}", i,
+                           log_helper(parents[i].continuous_values(), /* escape = */ false),
+                           log_helper(values, /* escape = */ false));
+              solutions_to_evaluate.push_back(i);
+              in_bounds = true;
+              break;
+            }
+
+            shift_magnitude *= 0.5;
           }
-
-          shift_magnitude *= 0.5;
-        }
-        if (!in_bounds) {
-          solutions[i].continuous_values() = parents[i].continuous_values();
+          if (!in_bounds) {
+            std::println("OOB {}, nothing to do.", i);
+            values = parents[i].continuous_values();
+          }
         }
       }
     }
@@ -7652,6 +7859,14 @@ class RvState {
 
     problem.evaluate_partial(rng, solutions, parents, eval_subsets, solutions_to_evaluate);
 
+    if (options.sample_logfile.has_value()) {
+      AoSSet ams_solutions;
+      for (usize i : solutions_to_evaluate) {
+        ams_solutions.add(solutions[i]);
+      }
+      debug_log(problem, options.sample_logfile.value(), "step,", "ams,", ams_solutions);
+    }
+
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
@@ -7660,6 +7875,7 @@ class RvState {
           should_accept(rng, problem.fitness(), archive, options, solutions[i], parents[i], objective, false);
 
       if (accept) {
+        std::println("AMS accept {}", i);
         parents[i] = solutions[i];
         no_improvement_counts[i] = 0;
 
@@ -7667,6 +7883,8 @@ class RvState {
           archive.update(solutions[i], false);
         }
       } else {
+        no_improvement_counts[i]++;
+        std::println("AMS reject {}", i);
         solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
@@ -7793,10 +8011,12 @@ class RvState {
   //         // ims go brr
   //     }
 
-  // std::optional<usize> current_generation() const override final {
-  //   return generation;
-  // };
+  std::optional<usize> current_generation() const  // override final
+  {
+    return generation;
+  };
 };
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
@@ -8162,8 +8382,9 @@ class Population {
     // }
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
+    bool can_do_discrete_step;
     do {
-      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
+      can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       bool do_discrete_step;
       if (!is_continuous || !rv_options.enabled) {
         do_discrete_step = can_do_discrete_step;
@@ -8191,6 +8412,7 @@ class Population {
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
       if (is_continuous && rv_options.enabled && !do_discrete_step) {
+        std::println("RV Step {} ({})", rv_state.current_generation().value_or(0), evaluations);
         evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
                                             cluster_solutions, rv_options, *continuous_model);
         // evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
@@ -8216,7 +8438,7 @@ class Population {
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
       }
-    } while (subset_idx < max_discrete_subset_count);
+    } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
@@ -8319,26 +8541,6 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
-  /// Tracked running was intended to unify reporting across algorithms
-  /// - this method abuses that functionality to re-use that logging for
-  /// other purposes controlled by the algorithm, not the tracking
-  void debug_log(std::string_view path,
-                 std::string_view headers,
-                 std::string_view values,
-                 std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
-    if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
-      if (population.has_value()) {
-        ti->request_debug_report(path, population.value().get(), headers, values);
-      } else {
-        ti->request_debug_report(path, headers, values);
-      }
-    } else {
-      throw std::runtime_error(
-          "Debug log called on an incompatible problem instance. Try using "
-          "`Tracked::run` to enable logging.");
-    }
-  };
-
   void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
     SolutionSet copy = set;
     std::vector<usize> indices(copy.size());
