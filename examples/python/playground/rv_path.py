@@ -14,7 +14,7 @@ sns.set_theme(style="whitegrid")
 from pygom import *
 
 METHOD_NAME = "Mixed"
-METHOD_NAME = "RvGOMEA"
+# METHOD_NAME = "RvGOMEA"
 
 RESULTS = pathlib.Path("results") / "rv_path" / METHOD_NAME
 POPULATION_LOGFILE = RESULTS / "population.csv"
@@ -25,7 +25,7 @@ STATS_LOGFILE = RESULTS / "stats.csv"
 
 PLOT_DIR = pathlib.Path("plots") / "rv_path" / METHOD_NAME
 
-DIMS = 2
+DIMS = 5
 VTR = 1e-10
 INIT_BOUNDS = (100.0, 125.0)
 
@@ -39,15 +39,17 @@ Y_VAR = 1
 X_LIM = (-10.0, INIT_BOUNDS[1])
 Y_LIM = (-10.0, INIT_BOUNDS[1])
 ZOOM_IN = True
-ZOOM_IN = False
+# ZOOM_IN = False
 
-MAX_NUM_FRAMES = 100
+MAX_NUM_FRAMES = np.inf
 
 NUM_LANDSCAPE_SAMPLES = 100
 
 FPS = 1
 PLOT_STEPS = True
-PLOT_STEPS = False
+# PLOT_STEPS = False
+
+NO_VIDEO = True
 
 
 def run(clean: bool = True):
@@ -174,6 +176,12 @@ def plot_steps(problem):
         c: h for c, h in zip(clusters, sns.color_palette(n_colors=len(clusters)))
     }
 
+    subset_kinds = sorted(subsets["kind"].unique())
+    subset_palette = {
+        c: h
+        for c, h in zip(subset_kinds, sns.color_palette(n_colors=len(subset_kinds)))
+    }
+
     frame = -1
     for g in tqdm(sorted(populations["generation"].unique())):
         frame += 1
@@ -260,7 +268,7 @@ def plot_steps(problem):
                 pass  # TODO?
             elif len(indices) == 2:
                 mean = np.array(literal_eval(subset["mean"]))[indices]
-                cov = np.array(literal_eval(subset["cov"]))[indices][indices]
+                L = np.array(literal_eval(subset["L"]))[np.ix_(indices, indices)]
 
                 ax.scatter([mean[0]], [mean[1]], marker="*", color="orange", zorder=100)
                 if g > 0:
@@ -272,7 +280,7 @@ def plot_steps(problem):
                     )
 
                 try:
-                    L_inv = np.linalg.pinv(np.linalg.cholesky(cov, upper=False))
+                    L_inv = np.linalg.pinv(L)
 
                     # https://en.wikipedia.org/wiki/Mahalanobis_distance
                     distances = np.zeros(
@@ -284,19 +292,25 @@ def plot_steps(problem):
                             # After "unscaling" with L_inv, the remaining covariance here is the identity and hence not needed anymore for computing the Mahalanobis distance
                             distances[j, i] = np.sqrt(z.T @ z)
 
+                    label = subset["kind"]
+                    color = subset_palette[label]
+
                     # cmap = sns.light_palette(kwargs.get("color", "black"), as_cmap=True).reversed()
-                    ax.contour(
+                    c = ax.contour(
                         x,
                         y,
                         distances,
-                        # cmap=cmap,
-                        levels=[1.0],  # standard deviations
+                        colors=color,
+                        levels=[1.0, 2.0],  # standard deviations
                         antialiased=True,
                         algorithm="serial",
                         zorder=1,
                     )
                 except Exception as e:
                     print("Skipping distribution contour: ", e)
+
+        for l, c in subset_palette.items():
+            ax.plot([], [], color=c, label=l)
 
         ax.set_title(f"Generation {g}")
         fig.suptitle(METHOD_NAME)
@@ -312,9 +326,10 @@ def plot_steps(problem):
         fig.savefig(PLOT_DIR / f"frame_{frame:05d}.png", bbox_inches="tight", dpi=300)
         plt.close(fig)
 
-    os.system(
-        f"ffmpeg -y -i {PLOT_DIR}/frame_%5d.png -framerate {FPS} -s 1920x1080 -c:v libx264 -crf 18 -pix_fmt yuv420p {PLOT_DIR.parent / (METHOD_NAME + '.mp4')}"
-    )
+    if not NO_VIDEO:
+        os.system(
+            f"ffmpeg -y -i {PLOT_DIR}/frame_%5d.png -framerate {FPS} -s 1920x1080 -c:v libx264 -crf 18 -pix_fmt yuv420p {PLOT_DIR.parent / (METHOD_NAME + '.mp4')}"
+        )
 
 
 def plot_path(problem):

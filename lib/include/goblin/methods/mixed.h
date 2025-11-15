@@ -280,8 +280,7 @@ class Population {
       : problem(problem),
         global_archive(global_archive),
         discrete_model(discrete_model.clone()),
-        continuous_model(continuous_model.clone()),
-        rv_options(rv_options),
+        rv_state(rv_options, continuous_model),
         options(options),
         local_archive(global_archive.clone()),
         size(size),
@@ -321,7 +320,7 @@ class Population {
     }
 
     {  // ======= clustering =======
-      bool perform_cluster_registration = is_continuous && rv_options.enabled;
+      bool perform_cluster_registration = is_continuous && rv_state.options.enabled;
       // the local archive is used since the elites from that should be in this
       // population
       if (!perform_cluster_registration) {
@@ -388,7 +387,7 @@ class Population {
     do {
       can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       bool do_discrete_step;
-      if (!is_continuous || !rv_options.enabled) {
+      if (!is_continuous || !rv_state.options.enabled) {
         do_discrete_step = can_do_discrete_step;
       } else if (!can_do_discrete_step) {
         do_discrete_step = false;
@@ -413,11 +412,11 @@ class Population {
       u64 evals = 0;
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
-      if (is_continuous && rv_options.enabled && !do_discrete_step) {
+      if (is_continuous && rv_state.options.enabled && !do_discrete_step) {
         evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
-                                            cluster_solutions, rv_options, *continuous_model);
+                                            cluster_solutions);
         // evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
-        // cluster_solutions, rv_options, *continuous_model);
+        // cluster_solutions);
         evaluations += evals;
         continuous_evaluations += evals;
       }
@@ -488,7 +487,7 @@ class Population {
         return true;
       }
       // since we only have relative comparisons, this roughly is equal to the usual fitness variance == 0.0 condition
-      if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged(rv_options))) {
+      if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged())) {
         return true;
       }
     }
@@ -621,7 +620,6 @@ class Population {
     // normalization matrix from https://arxiv.org/pdf/1904.02050
     // and to tell the linkage model about how many variables there are in case that was not set beforehand
     discrete_model->init(rng, problem, solutions, VariableSet::Discrete);
-    continuous_model->init(rng, problem, solutions, VariableSet::Continuous);
 
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
@@ -914,8 +912,7 @@ class Population {
   InstanceBase& problem;
   ArchiveBase& global_archive;
   std::unique_ptr<LinkageModelBase> discrete_model;
-  std::unique_ptr<LinkageModelBase> continuous_model;
-  const RvOptions& rv_options;
+  RvState rv_state;
   PopulationOptions options;
   std::unique_ptr<ArchiveBase> local_archive;
 
@@ -928,7 +925,6 @@ class Population {
 
   // state that is required across generations (absolutely needs to be stored)
 
-  RvState rv_state;
   double discrete_evaluations = 0.0;
   double continuous_evaluations = 0.0;
   usize no_improvement_stretch;

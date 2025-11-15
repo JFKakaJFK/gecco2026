@@ -2162,11 +2162,11 @@ void py_init_module_pygoblin(nb::module_& m) {
               "__init__",
               [](goblin::RvOptions* self, bool enabled = true, bool intron_aware = true,
                  bool init_ams_from_population_mean = true, bool randomize_ams_indices = false,
-                 bool enable_partial_ams_for_full_fos = true, usize num_forced_improvement_tries = 8,
-                 usize max_nis = 20, double selection_percentile = 0.35, double p_accept = 0.05, CType delta_ams = 2.0,
-                 CType eta_ams = 1.0, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0,
-                 CType distribution_multiplier_decrease = 0.9, CType distribution_multiplier_increase = 1.0 / 0.9,
-                 CType min_distribution_multiplier = 1e-10,
+                 bool enable_partial_ams_for_full_fos = true, bool use_no_improvement_counts = false,
+                 usize num_forced_improvement_tries = 8, usize max_nis = 20, double selection_percentile = 0.35,
+                 double p_accept = 0.05, CType delta_ams = 2.0, CType eta_ams = 1.0, CType eta_cov = 1.0,
+                 CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9,
+                 CType distribution_multiplier_increase = 1.0 / 0.9, CType min_distribution_multiplier = 1e-10,
                  std::optional<u64> generations_until_full_evaluation = std::nullopt,
                  std::optional<std::string> population_logfile = std::nullopt,
                  std::optional<std::string> selection_logfile = std::nullopt,
@@ -2179,6 +2179,7 @@ void py_init_module_pygoblin(nb::module_& m) {
                 r_ctor_->init_ams_from_population_mean = init_ams_from_population_mean;
                 r_ctor_->randomize_ams_indices = randomize_ams_indices;
                 r_ctor_->enable_partial_ams_for_full_fos = enable_partial_ams_for_full_fos;
+                r_ctor_->use_no_improvement_counts = use_no_improvement_counts;
                 r_ctor_->num_forced_improvement_tries = num_forced_improvement_tries;
                 r_ctor_->max_nis = max_nis;
                 r_ctor_->selection_percentile = selection_percentile;
@@ -2198,10 +2199,11 @@ void py_init_module_pygoblin(nb::module_& m) {
               },
               nb::arg("enabled") = true, nb::arg("intron_aware") = true,
               nb::arg("init_ams_from_population_mean") = true, nb::arg("randomize_ams_indices") = false,
-              nb::arg("enable_partial_ams_for_full_fos") = true, nb::arg("num_forced_improvement_tries") = 8,
-              nb::arg("max_nis") = 20, nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05,
-              nb::arg("delta_ams") = 2.0, nb::arg("eta_ams") = 1.0, nb::arg("eta_cov") = 1.0,
-              nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9,
+              nb::arg("enable_partial_ams_for_full_fos") = true, nb::arg("use_no_improvement_counts") = false,
+              nb::arg("num_forced_improvement_tries") = 8, nb::arg("max_nis") = 20,
+              nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05, nb::arg("delta_ams") = 2.0,
+              nb::arg("eta_ams") = 1.0, nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0,
+              nb::arg("distribution_multiplier_decrease") = 0.9,
               nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10,
               nb::arg("generations_until_full_evaluation").none() = nb::none(),
               nb::arg("population_logfile").none() = nb::none(), nb::arg("selection_logfile").none() = nb::none(),
@@ -2213,6 +2215,7 @@ void py_init_module_pygoblin(nb::module_& m) {
                   " If randomized, the AMS indices are randomly picked from all active solutions.\n Otherwise the "
                   "first `floor(selection_percentile * 0.5)` active solutions are used.")
           .def_rw("enable_partial_ams_for_full_fos", &goblin::RvOptions::enable_partial_ams_for_full_fos, "")
+          .def_rw("use_no_improvement_counts", &goblin::RvOptions::use_no_improvement_counts, "")
           .def_rw("num_forced_improvement_tries", &goblin::RvOptions::num_forced_improvement_tries,
                   "8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)")
           .def_rw("max_nis", &goblin::RvOptions::max_nis, "")
@@ -2240,26 +2243,26 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   auto pyClassRvState =
       nb::class_<goblin::RvState>(m, "RvState", "")
-          .def(nb::init<>())  // implicit default constructor
+          .def(nb::init<goblin::RvOptions>(), nb::arg("options"))
           .def("perform_generation", &goblin::RvState::perform_generation, nb::arg("rng"), nb::arg("archive"),
                nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"),
-               nb::arg("cluster_solutions"), nb::arg("options"), nb::arg("linkage_model"))
-          .def("converged", &goblin::RvState::converged, nb::arg("options"))
+               nb::arg("cluster_solutions"), nb::arg("linkage_model"))
+          .def("converged", &goblin::RvState::converged)
+          .def("estimate_mean", &goblin::RvState::estimate_mean, nb::arg("solutions"), nb::arg("active_indices"),
+               nb::arg("active_counts"))
           .def("select_and_learn_linkage", &goblin::RvState::select_and_learn_linkage, nb::arg("rng"),
                nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("cluster_solutions"),
-               nb::arg("options"), nb::arg("linkage_model"))
+               nb::arg("linkage_model"))
           .def("should_accept", &goblin::RvState::should_accept, nb::arg("rng"), nb::arg("fitness"), nb::arg("archive"),
-               nb::arg("options"), nb::arg("solution"), nb::arg("parent"), nb::arg("objective").none(),
-               nb::arg("strict"))
+               nb::arg("solution"), nb::arg("parent"), nb::arg("objective").none(), nb::arg("strict"))
           .def("gom_step", &goblin::RvState::gom_step, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"),
                nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("cluster_solutions"),
-               nb::arg("options"), nb::arg("subset_orders"), nb::arg("subset_idx"), nb::arg("ams_indices"))
+               nb::arg("subset_orders"), nb::arg("subset_idx"), nb::arg("ams_indices"))
           .def("full_ams", &goblin::RvState::full_ams, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"),
-               nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("options"),
-               nb::arg("ams_indices"))
+               nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("ams_indices"))
           .def("forced_improvements", &goblin::RvState::forced_improvements, nb::arg("rng"), nb::arg("archive"),
-               nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"),
-               nb::arg("options"))
+               nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"))
+          .def_rw("options", &goblin::RvState::options, "")
           .def_rw("enable_partial_ams", &goblin::RvState::enable_partial_ams, "")
           .def_rw("num_clusters", &goblin::RvState::num_clusters, "")
           .def_rw("num_continuous", &goblin::RvState::num_continuous, "")
@@ -2280,6 +2283,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("cov", &goblin::RvState::cov, "")
           .def_rw("any_improved", &goblin::RvState::any_improved, "")
           .def_rw("no_improvement_stretch", &goblin::RvState::no_improvement_stretch, "per cluster")
+          .def_rw("solution_nis", &goblin::RvState::solution_nis, "per solution")
+          .def_rw("solution_improved", &goblin::RvState::solution_improved, "")
           .def_rw("no_improvement_counts", &goblin::RvState::no_improvement_counts,
                   "per solution (count to not penalize inactive solutions)")
           .def_rw("generation", &goblin::RvState::generation, "")

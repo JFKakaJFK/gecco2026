@@ -27,7 +27,7 @@
 namespace goblin {
 
 template <typename T>
-inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true) {
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
   if (escape) {
     os << '"';
   }
@@ -55,7 +55,7 @@ inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape
 };
 
 template <typename EigenLike>
-inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true) {
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
   if (escape) {
     os << '"';
   }
@@ -64,6 +64,9 @@ inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true)
     for (isize r = 0; r < m.rows(); r++) {
       if (r > 0) {
         os << ',';
+      }
+      if (indent) {
+        os << "\n  ";
       }
       os << '[';
       for (isize c = 0; c < m.cols(); c++) {
@@ -85,6 +88,9 @@ inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true)
         }
       }
       os << ']';
+    }
+    if (indent) {
+      os << '\n';
     }
   } else {
     for (isize i = 0; i < m.size(); i++) {
@@ -112,9 +118,9 @@ inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true)
 };
 
 template <typename T>
-inline std::string log_helper(const T& t, bool escape = true) {
+inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
   std::ostringstream os;
-  log_helper(os, t, escape);
+  log_helper(os, t, escape, indent);
   return os.str();
 };
 
