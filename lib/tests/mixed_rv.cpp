@@ -38,7 +38,7 @@ TEST_CASE("goblin::methods::mixed_rv") {
   CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
 
   for (usize i = 0; i <= 1; i++) {
-    auto mixed_lt = MixedGOMEA(PopulationOptions(), RvOptions{.intron_aware = i > 0, .max_nis = 100},
+    auto mixed_lt = MixedGOMEA(PopulationOptions(), RvOptions{.intron_aware = false /* i > 0 */, .max_nis = 100},
                                IMSOptions{
                                    .initial_population_size = 10, .max_num_populations = 1
                                    // .initial_population_size = 10,

@@ -273,6 +273,7 @@ class Population {
              ArchiveBase& global_archive,
              const LinkageModelBase& discrete_model,
              const LinkageModelBase& continuous_model,
+             const RvSamplingModelBase& sampling_model,
              usize size,
              usize num_clusters,
              const PopulationOptions& options,
@@ -280,7 +281,7 @@ class Population {
       : problem(problem),
         global_archive(global_archive),
         discrete_model(discrete_model.clone()),
-        rv_state(rv_options, continuous_model),
+        rv_state(rv_options, continuous_model, sampling_model),
         options(options),
         local_archive(global_archive.clone()),
         size(size),
@@ -412,11 +413,12 @@ class Population {
       u64 evals = 0;
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
-      if (is_continuous && rv_state.options.enabled && !do_discrete_step) {
-        evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
+      if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+        // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
+        // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
+        // solution_clusters, cluster_solutions);
+        evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                             cluster_solutions);
-        // evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
-        // cluster_solutions);
         evaluations += evals;
         continuous_evaluations += evals;
       }
@@ -962,6 +964,7 @@ class MixedGOMEA : public MethodBase {
              IMSOptions ims_options = IMSOptions(),
              std::shared_ptr<LinkageModelBase> discrete_model = std::make_shared<LinkageTreeFOS>(),
              std::shared_ptr<LinkageModelBase> continuous_model = std::make_shared<FullFOS>(),
+             std::shared_ptr<RvSamplingModelBase> sampling_model = std::make_shared<AMaLGaMSamplingModel>(),
              std::string repr = "aos")
       : population_options(population_options),
         rv_options(rv_options),
@@ -969,6 +972,7 @@ class MixedGOMEA : public MethodBase {
         ims_runner(std::nullopt),
         discrete_model(discrete_model),
         continuous_model(continuous_model),
+        sampling_model(sampling_model),
         repr(repr) {};
 
   std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
@@ -1014,8 +1018,8 @@ class MixedGOMEA : public MethodBase {
                                             ArchiveBase& global_archive,
                                             usize size,
                                             usize num_clusters) {
-    return Population<SolutionSet>(problem, global_archive, *discrete_model, *continuous_model, size, num_clusters,
-                                   population_options, rv_options);
+    return Population<SolutionSet>(problem, global_archive, *discrete_model, *continuous_model, *sampling_model, size,
+                                   num_clusters, population_options, rv_options);
   };
 
   PopulationOptions population_options;
@@ -1027,6 +1031,7 @@ class MixedGOMEA : public MethodBase {
       ims_runner;
   std::shared_ptr<LinkageModelBase> discrete_model;
   std::shared_ptr<LinkageModelBase> continuous_model;
+  std::shared_ptr<RvSamplingModelBase> sampling_model;
   std::string repr;
 };
 };  // namespace goblin

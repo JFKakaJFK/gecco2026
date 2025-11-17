@@ -51,7 +51,8 @@ TEST_CASE("goblin::methods::mixed") {
     usize i = 0;
     for (auto& lm : linkage_models) {
       for (auto& iopt : ims_options) {
-        auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(), iopt, lm, std::make_shared<FullFOS>(), repr);
+        auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(), iopt, lm, std::make_shared<FullFOS>(),
+                                std::make_shared<AMaLGaMSamplingModel>(), repr);
         auto [front, status] =
             Tracked::run(instance, gomea, budget, TrackingOptions(repr + "_mixed.csv"), /* seed = */ 42);
 

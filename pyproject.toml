@@ -5,7 +5,7 @@ build-backend = "scikit_build_core.build"
 
 [project]
 name = "pygom"
-version = "0.1.0"
+version = "0.1.1"
 description="pygom, goblin C++ library interface"
 readme = "README.md"
 authors = [ { name = "Johannes Koch", email = "johannes.koch@cwi.nl" } ]
@@ -31,8 +31,8 @@ dependencies = [
 ]
 
 [tool.scikit-build]
-cmake.build-type = "Release"
-# cmake.build-type = "RelWithDebInfo"
+# cmake.build-type = "Release"
+cmake.build-type = "RelWithDebInfo"
 # cmake.verbose = true
 build.targets = ["_pygoblin"] # cmake target to build...
 build-dir = "build/{wheel_tag}"

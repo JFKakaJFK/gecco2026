@@ -48,15 +48,19 @@ struct Subset {
   CType similarity(const Subset& other) const {
     usize matches = 0;
 
-    for(usize i: discrete){
-        for(usize j: other.discrete){
-            if(i == j){matches++;}
+    for (usize i : discrete) {
+      for (usize j : other.discrete) {
+        if (i == j) {
+          matches++;
         }
+      }
     }
-    for(usize i: continuous){
-        for(usize j: other.continuous){
-            if(i == j){matches++;}
+    for (usize i : continuous) {
+      for (usize j : other.continuous) {
+        if (i == j) {
+          matches++;
         }
+      }
     }
 
     /* // should be correct, but for now let's keep it simple

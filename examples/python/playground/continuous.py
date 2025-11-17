@@ -1,6 +1,7 @@
 import pathlib
 
 from pygom import *
+
 from src.config import Config, c
 from src.plots import plot_scalability
 from src.postprocessing import load_results
@@ -10,7 +11,7 @@ REPEATS = 30
 
 budget = c.Budget(max_evaluations=int(1e6))
 
-VTR = 1e-10
+VTR = 1e-20
 
 # http://hydra.nat.uni-magdeburg.de/packing/csq/csq.html#Download
 # let tbody = document.querySelector(".results > table:nth-child(1) > tbody:nth-child(1)")
@@ -144,12 +145,12 @@ def problems():
 
 
 def methods():
-    initial_population_size = 50  # 100
-    max_num_populations = 1
+    initial_population_size = 10  # 100
+    max_num_populations = 25
     restart_stale_populations = True
     # restart_stale_populations = False
-    distribution_multiplier_decrease = 0.9
-    # distribution_multiplier_decrease = 1.0
+
+    use_mahalanobis_distance_for_sdr = False  # True
 
     max_nis = 100  # 00
     # display name, actual method
@@ -168,7 +169,6 @@ def methods():
             max_nis=max_nis,
             selection_during_gom=False,
             update_elitist_during_gom=False,
-            distribution_multiplier_decrease=distribution_multiplier_decrease,
         ),
     )
     # yield '"RV-GOMEA (LT)"', c.RvGOMEA(linkage_model="LinkageTree")
@@ -180,14 +180,15 @@ def methods():
                 init_ams_from_population_mean=False,
                 intron_aware=False,
                 generations_until_full_evaluation=50,
-                distribution_multiplier_decrease=distribution_multiplier_decrease,
-                distribution_multiplier_increase=1.0 / distribution_multiplier_decrease,
             ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
                 max_num_populations=max_num_populations,
                 subgeneration_factor=8,
                 restart_stale_populations=restart_stale_populations,
+            ),
+            sampling_model=c.AMaLGaMSamplingModel(
+                # use_mahalanobis_distance_for_sdr=use_mahalanobis_distance_for_sdr,
             ),
         ),
     )
@@ -200,14 +201,15 @@ def methods():
                 intron_aware=False,
                 randomize_ams_indices=True,
                 generations_until_full_evaluation=50,
-                distribution_multiplier_decrease=distribution_multiplier_decrease,
-                distribution_multiplier_increase=1.0 / distribution_multiplier_decrease,
             ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
                 max_num_populations=max_num_populations,
                 subgeneration_factor=8,
                 restart_stale_populations=restart_stale_populations,
+            ),
+            sampling_model=c.AMaLGaMSamplingModel(
+                use_mahalanobis_distance_for_sdr=use_mahalanobis_distance_for_sdr,
             ),
         ),
     )
