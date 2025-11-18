@@ -96,7 +96,7 @@ params = {
             max_evaluations=max_evals, termination_callback=termination_callback
         ),
         ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-        rv_kwargs=dict(enabled=False),
+        rv_kwargs=dict(enabled=True),
         population_kwargs=dict(),
         discrete_model_kwargs=dict(
             metric="nmi",

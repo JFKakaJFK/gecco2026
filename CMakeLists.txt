@@ -59,12 +59,12 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
 endif()
 
 # -flto (link time optimization)
-# include(CheckIPOSupported)
-# check_ipo_supported(RESULT ipo_supported OUTPUT error)
-# if(ipo_supported)
-#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
-# endif()
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT error)
+if(ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+endif()
 
 add_subdirectory(lib)
 
@@ -105,5 +105,5 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
     )
 
     # fPIC
-    # set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

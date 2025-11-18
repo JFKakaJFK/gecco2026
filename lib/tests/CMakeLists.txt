@@ -30,6 +30,7 @@ set(
     mixed
     mo_mixed
     mixed_rv
+    mixed_mixed
     gp_operators
     sr
     sr_gradient_step
@@ -46,4 +47,5 @@ endforeach()
 target_compile_options(lib_test_mixed PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_sr PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g) # -march=native
+target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g) # -march=native

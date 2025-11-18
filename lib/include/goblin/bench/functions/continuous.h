@@ -4,6 +4,7 @@
 
 #include <cassert>
 #include <numbers>
+#include <algorithm>
 
 #include "goblin/bench/functions.h"
 #include "goblin/lib/assert.h"

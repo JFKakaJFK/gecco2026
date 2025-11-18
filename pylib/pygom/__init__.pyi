@@ -2082,367 +2082,6 @@ class ObjectiveBase:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/bench/functions/discrete.h included by goblin.h                                 //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
-#
-
-# TODO
-# - [x] OneMax
-# - [x] ZeroMax
-# - [ ] DeceptiveTrap
-# - [ ] BimodalDTrap
-# - [ ] Leading Ones
-# - [ ] Trailing Zeroes
-
-class OneMax(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-    def evaluate_partial(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-        parent_discrete_values: CRefS[Vec[int]],
-        parent_continuous_values: CRefS[Vec[float]],
-        parent_discrete_active: CRefS[np.ndarray],
-        parent_continuous_active: CRefS[np.ndarray],
-        parent_objective_value: float,
-        parent_constraint_value: float,
-        discrete_indices: std.span[int],
-        continuous_indices: std.span[int],
-    ) -> Tuple[float, float]:
-        pass
-
-class ZeroMax(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-    def evaluate_partial(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-        parent_discrete_values: CRefS[Vec[int]],
-        parent_continuous_values: CRefS[Vec[float]],
-        parent_discrete_active: CRefS[np.ndarray],
-        parent_continuous_active: CRefS[np.ndarray],
-        parent_objective_value: float,
-        parent_constraint_value: float,
-        discrete_indices: std.span[int],
-        continuous_indices: std.span[int],
-    ) -> Tuple[float, float]:
-        pass
-
-class LeadingOnes(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class TrailingZeros(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class DeceptiveTrap(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    @overload
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    @overload
-    def __init__(self, ndims: int, block_size: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class BimodalTrap(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    @overload
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    @overload
-    def __init__(self, ndims: int, block_size: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/bench/functions/continuous.h included by goblin.h                               //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
-#
-
-class Sphere(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-    def evaluate_partial(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-        parent_discrete_values: CRefS[Vec[int]],
-        parent_continuous_values: CRefS[Vec[float]],
-        parent_discrete_active: CRefS[np.ndarray],
-        parent_continuous_active: CRefS[np.ndarray],
-        parent_objective_value: float,
-        parent_constraint_value: float,
-        discrete_indices: std.span[int],
-        continuous_indices: std.span[int],
-    ) -> Tuple[float, float]:
-        pass
-
-class Rosenbrock(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class Rastrigin(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class Griewank(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class Ellipsoid(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-class CirclesInASquare(ObjectiveBase):
-    """
-    (final class)
-    """
-
-    def __init__(self, ndims: int) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def evaluate(
-        self,
-        discrete_values: RefS[Vec[int]],
-        continuous_values: RefS[Vec[float]],
-        discrete_active: RefS[np.ndarray],
-        continuous_active: RefS[np.ndarray],
-    ) -> Tuple[float, float]:
-        pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/bench/functions/combinators.h included by goblin.h                              //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
@@ -2824,6 +2463,398 @@ class Repeat(ObjectiveBase):
         parent_constraint_value: float,
         discrete_indices: std.span[int],
         continuous_indices: std.span[int],
+    ) -> Tuple[float, float]:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/bench/functions/discrete.h included by goblin.h                                 //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
+#
+
+# TODO
+# - [x] OneMax
+# - [x] ZeroMax
+# - [ ] DeceptiveTrap
+# - [ ] BimodalDTrap
+# - [ ] Leading Ones
+# - [ ] Trailing Zeroes
+
+class OneMax(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+    def evaluate_partial(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+        parent_discrete_values: CRefS[Vec[int]],
+        parent_continuous_values: CRefS[Vec[float]],
+        parent_discrete_active: CRefS[np.ndarray],
+        parent_continuous_active: CRefS[np.ndarray],
+        parent_objective_value: float,
+        parent_constraint_value: float,
+        discrete_indices: std.span[int],
+        continuous_indices: std.span[int],
+    ) -> Tuple[float, float]:
+        pass
+
+class ZeroMax(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+    def evaluate_partial(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+        parent_discrete_values: CRefS[Vec[int]],
+        parent_continuous_values: CRefS[Vec[float]],
+        parent_discrete_active: CRefS[np.ndarray],
+        parent_continuous_active: CRefS[np.ndarray],
+        parent_objective_value: float,
+        parent_constraint_value: float,
+        discrete_indices: std.span[int],
+        continuous_indices: std.span[int],
+    ) -> Tuple[float, float]:
+        pass
+
+class LeadingOnes(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class TrailingZeros(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class DeceptiveTrap(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    @overload
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    @overload
+    def __init__(self, ndims: int, block_size: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class BimodalTrap(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    @overload
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    @overload
+    def __init__(self, ndims: int, block_size: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/bench/functions/continuous.h included by goblin.h                               //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
+#
+
+class Sphere(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+    def evaluate_partial(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+        parent_discrete_values: CRefS[Vec[int]],
+        parent_continuous_values: CRefS[Vec[float]],
+        parent_discrete_active: CRefS[np.ndarray],
+        parent_continuous_active: CRefS[np.ndarray],
+        parent_objective_value: float,
+        parent_constraint_value: float,
+        discrete_indices: std.span[int],
+        continuous_indices: std.span[int],
+    ) -> Tuple[float, float]:
+        pass
+
+class Rosenbrock(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class Rastrigin(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class Griewank(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class Ellipsoid(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class CirclesInASquare(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/bench/functions/mixed.h included by goblin.h                                    //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
+#
+
+class LeadingSpheres(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
     ) -> Tuple[float, float]:
         pass
 
@@ -3303,6 +3334,27 @@ class MOBinaryGOMEA(MethodBase):
 # #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #
 
+def estimate_mean(
+    solutions: SolutionSetBase,
+    active_indices: std.span[int],
+    active_counts: std.span[int],
+    selection_percentile: float,
+    indices: std.span[int],
+    intron_aware: bool,
+) -> Vec[float]:
+    pass
+
+def estimate_cov(
+    solutions: SolutionSetBase,
+    active_indices: std.span[int],
+    active_counts: std.span[int],
+    selection_percentile: float,
+    mean: Vec[float],
+    indices: std.span[int],
+    intron_aware: bool,
+) -> Mat[float]:
+    pass
+
 class RvSubsetStateBase:
     distribution_multiplier: float = 1.0
 
@@ -3311,6 +3363,10 @@ class RvSubsetStateBase:
         pass
 
 class RvSamplingModelBase:
+    """/ Separate sampling models roughly as per https://ir.cwi.nl/pub/30344/30344.pdf
+    / TODO ask anton about API - feels still a bit crude...
+    """
+
     def init(self, subset: Subset) -> RvSubsetStateBase:  # overridable (pure virtual)
         pass
 
@@ -3450,6 +3506,9 @@ class RvOptions:
     # can accumulate and it might be needed to perform full evaluations once in a while
     #
     # In that case, the default number of generations until re-evaluation is `50`
+    #
+    # Note that in this setting all archive solutions should be re-evaluated in case the target seems to have been
+    # reached to ensure that this is not due to numeric errors. This does not happen in this version.
     generations_until_full_evaluation: Optional[int] = None
 
     population_logfile: Optional[str] = None
@@ -3514,23 +3573,6 @@ class RvState:
     def converged(self) -> bool:
         pass
     # private:
-
-    def estimate_mean(
-        self,
-        solutions: SolutionSetBase,
-        active_indices: List[int],
-        active_counts: List[int],
-    ) -> Vec[float]:
-        pass
-
-    def estimate_cov(
-        self,
-        solutions: SolutionSetBase,
-        active_indices: List[int],
-        active_counts: List[int],
-        mean: Vec[float],
-    ) -> Mat[float]:
-        pass
 
     def select_and_learn_linkage(
         self,

@@ -31,6 +31,112 @@
 
 namespace goblin {
 
+static Vec<CType> estimate_mean(const SolutionSetBase& solutions,
+                                const std::span<const usize> active_indices,
+                                const std::span<const usize> active_counts,
+                                double selection_percentile,
+                                const std::span<const usize> indices,
+                                bool intron_aware) {
+  Vec<CType> mean = Vec<CType>::Zero(indices.size());
+  usize selection_size = 0;
+  if (intron_aware) {
+    for (usize i : indices) {
+      selection_size = std::max(selection_size, static_cast<usize>(selection_percentile * active_counts[i]));
+    }
+
+    if (selection_size > 0) {
+      bool any_left = true;
+      std::vector<usize> num_left(indices.size(), selection_size);
+      for (usize i : active_indices) {
+        any_left = false;
+        for (usize j = 0; j < indices.size(); j++) {
+          if (num_left[j] > 0 &&
+              (solutions[i].continuous_active()(
+                   indices[j])                    // index is active -> we use the value under selection pressure
+               || active_counts[indices[j]] == 0  // index is not active -> we still want a non-zero mean to hopefully
+                                                  // make the cholesky decomposition work (= we want to keep diversity)
+               )) {
+            mean(j) += solutions[i].continuous_values()(indices[j]);
+            num_left[j]--;
+            any_left |= num_left[j] > 0;
+          }
+        }
+        if (!any_left) {
+          break;
+        }
+      }
+      for (usize j = 0; j < indices.size(); j++) {
+        mean(j) /= static_cast<CType>(selection_size - num_left[j]);
+      }
+    }
+  }
+
+  if (selection_size == 0) {
+    selection_size = selection_percentile * active_indices.size();
+    for (usize i = 0; i < selection_size; i++) {
+      mean += solutions[active_indices[i]].continuous_values()(indices);
+    }
+    mean /= static_cast<CType>(selection_size);
+  }
+  return mean;
+};
+
+static Mat<CType> estimate_cov(const SolutionSetBase& solutions,
+                               const std::span<const usize> active_indices,
+                               const std::span<const usize> active_counts,
+                               double selection_percentile,
+                               const Vec<CType>& mean,
+                               const std::span<const usize> indices,
+                               bool intron_aware) {
+  assert(static_cast<usize>(mean.size()) == indices.size());
+  Mat<CType> cov = Mat<CType>::Zero(indices.size(), indices.size());
+  if (intron_aware) {
+    for (usize i = 0; i < indices.size(); i++) {
+      if (active_counts[indices[i]] == 0) {
+        // estimate the full univariate covariance if there are no active variables to keep diversity (no selection)
+        for (usize l : active_indices) {
+          cov(i, i) += std::pow(solutions[l].continuous_values()(indices[i]) - mean(i), 2);
+        }
+        cov(i, i) /= static_cast<CType>(active_indices.size());
+      } else {
+        // otherwise estimate the covariance between active variables
+        for (usize j = i; j < indices.size(); j++) {
+          if (active_counts[indices[j]] > 0) {
+            usize selection_size =
+                selection_percentile * std::max(active_counts[indices[i]], active_counts[indices[j]]);
+            usize actual_size = 0;
+
+            for (usize l : active_indices) {
+              if (solutions[l].continuous_active()(indices[i]) && solutions[l].continuous_active()(indices[j])) {
+                cov(i, j) += (solutions[l].continuous_values()(indices[i]) - mean(i)) *
+                             (solutions[l].continuous_values()(indices[j]) - mean(j));
+                actual_size++;
+                if (actual_size >= selection_size) {
+                  break;
+                }
+              }
+            }
+            if (actual_size > 0) {
+              // this is fine - that just means that i != j and i and j never appear together so the covariance should
+              // be 0
+              cov(i, j) /= static_cast<CType>(actual_size);
+              cov(j, i) = cov(i, j);
+            }
+          }
+        }
+      }
+    }
+  } else {
+    usize selection_size = selection_percentile * active_indices.size();
+    for (usize i = 0; i < selection_size; i++) {
+      Vec<CType> v = solutions[active_indices[i]].continuous_values()(indices) - mean;
+      cov.noalias() += v * v.transpose();
+    }
+    cov /= static_cast<CType>(selection_size);
+  }
+  return cov;
+};
+
 // Performs an inplace cholesky decomposition. If the decomposition fails, jitter is added to the diagonal to increase
 // the rank until finally the univariate diagonal is used.
 template <typename Derived>
@@ -68,7 +174,7 @@ inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out) {
 #endif
   } else {
     // std::println("!!! CHOLESKY FAILED !!!\n{}", log_helper(out, /* escape = */ false, /* indent = */ true));
-    std::println("!!! CHOLESKY FAILED !!!");
+    // std::println("!!! CHOLESKY FAILED !!!");
 
     // covariance diagonal without jitter, made positive and sqrt to match the expecation that out * out.T = input
     Vec<S> univariate = (out.diagonal().array() - jitter_added);
@@ -95,6 +201,9 @@ class RvSubsetStateBase {
 
   virtual ~RvSubsetStateBase() = default;
 };
+
+/// Separate sampling models roughly as per https://ir.cwi.nl/pub/30344/30344.pdf
+/// TODO ask anton about API - feels still a bit crude...
 class RvSamplingModelBase {
  public:
   virtual std::unique_ptr<RvSubsetStateBase> init(const Subset& subset) const = 0;
@@ -217,16 +326,10 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     const auto& cs = subset.continuous;
     auto& s = static_cast<AMaLGaMSubsetState&>(state);
 
-    usize selection_size = selection_percentile * by_fitness_decreasing.size();
+    // usize selection_size = selection_percentile * by_fitness_decreasing.size();
 
     assert(static_cast<usize>(s.mean.size()) == cs.size());
-    s.mean.setZero();
-
-    // TODO intron aware ...
-    for (usize i = 0; i < selection_size; i++) {
-      s.mean += solutions[by_fitness_decreasing[i]].continuous_values()(cs);
-    }
-    s.mean /= static_cast<CType>(selection_size);
+    s.mean = estimate_mean(solutions, by_fitness_decreasing, active_counts, selection_percentile, cs, intron_aware);
 
     // Change the focus of the search to the best solution
     if (s.distribution_multiplier < 1.0) {
@@ -237,13 +340,8 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
       }
     }
 
-    // TODO intron aware ...
-    Mat<CType> new_cov = Mat<CType>::Zero(cs.size(), cs.size());
-    for (usize i = 0; i < selection_size; i++) {
-      Vec<CType> v = solutions[by_fitness_decreasing[i]].continuous_values()(cs) - s.mean;
-      new_cov.noalias() += v * v.transpose();
-    }
-    new_cov /= static_cast<CType>(selection_size);
+    Mat<CType> new_cov =
+        estimate_cov(solutions, by_fitness_decreasing, active_counts, selection_percentile, s.mean, cs, intron_aware);
 
     if (!s.enable_smoothing) {
       s.cov = new_cov;
@@ -256,13 +354,13 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
 
     // // if we don't have enough solutions we fall back to the univariate diagonal
     // if (selection_size < static_cast<usize>(cs.size()) + 1) {
-    //     s.L.setZero();
-    //     s.L.diagonal() = (s.cov * s.distribution_multiplier).diagonal(); // .array().max(1e-10).sqrt();
-    // for(isize i = 0; i < s.L.diagonal().size(); i++){
+    //   s.L.setZero();
+    //   s.L.diagonal() = (s.cov * s.distribution_multiplier).diagonal();
+    //   for (isize i = 0; i < s.L.diagonal().size(); i++) {
     //     s.L.diagonal()(i) = s.L.diagonal()(i) > 0.0 ? std::sqrt(s.L.diagonal()(i)) : 0.0;
-    // }
+    //   }
     // } else {
-    //     cholesky_inplace(s.L);
+    //   cholesky_inplace(s.L);
     // }
 
     cholesky_inplace(s.L);
@@ -331,12 +429,29 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     const auto& s = subset.continuous;
 
     Vec<CType> avg_params = Vec<CType>::Zero(s.size());
-    // TODO intron aware
-    for (usize i : improved_indices) {
-      avg_params += solutions[i].continuous_values()(s);
+    if (intron_aware) {
+      Array<CType> num_active = Array<CType>::Zero(s.size());
+      for (usize i : improved_indices) {
+        for (usize j = 0; j < s.size(); j++) {
+          if (solutions[i].continuous_active()(s[j])) {
+            avg_params(j) += solutions[i].continuous_values()(s[j]);
+            num_active(j) += 1.0;
+          }
+        }
+      }
+      for (usize j = 0; j < s.size(); j++) {
+        if (num_active(j) > 0.0) {
+          avg_params(j) /= num_active(j);
+        }
+      }
+    } else {
+      for (usize i : improved_indices) {
+        avg_params += solutions[i].continuous_values()(s);
+      }
+      avg_params /= static_cast<CType>(improved_indices.size());
     }
-    avg_params /= static_cast<CType>(improved_indices.size());
 
+    // ? L.triangularView<Eigen::Lower>().solve(avg_params - mean);
     Mat<CType> L_inv = L.completeOrthogonalDecomposition().pseudoInverse();
 
     avg_params = ((L_inv * avg_params) - mean);
@@ -378,6 +493,9 @@ struct RvOptions {
   // can accumulate and it might be needed to perform full evaluations once in a while
   //
   // In that case, the default number of generations until re-evaluation is `50`
+  //
+  // Note that in this setting all archive solutions should be re-evaluated in case the target seems to have been
+  // reached to ensure that this is not due to numeric errors. This does not happen in this version.
   std::optional<u64> generations_until_full_evaluation = std::nullopt;
 
   std::optional<std::string> population_logfile = std::nullopt;
@@ -590,63 +708,6 @@ class RvState {
 
   // private:
 
-  Vec<CType> estimate_mean(const SolutionSetBase& solutions,
-                           std::vector<usize>& active_indices,
-                           std::vector<usize>& active_counts) {
-    Vec<CType> new_mean = Vec<CType>::Zero(num_continuous);
-    if (options.intron_aware) {
-      // TODO
-      std::unreachable();
-      // std::vector<usize> selection_sizes(num_continuous);
-      // for (isize i = 0; i < num_continuous; i++) {
-      //   selection_sizes[i] = options.selection_percentile * active_counts[i];
-      // }
-      // std::vector<usize> num_left = selection_sizes;
-      // bool any_left = true;
-      // for (usize i = 0; i < active_indices.size() && any_left; i++) {
-      //   any_left = false;
-      //   for (isize j = 0; j < num_continuous; j++) {
-      //     if (num_left[j] > 0 && solutions[active_indices[i]].continuous_active()(j)) {
-      //       new_mean(j) += solutions[active_indices[i]].continuous_values()(j);
-      //       num_left[j]--;
-      //       any_left |= num_left[j] > 0;
-      //     }
-      //   }
-      // }
-      // for (isize j = 0; j < num_continuous; j++) {
-      //   if (selection_sizes[j] > 0) {
-      //     new_mean(j) /= static_cast<CType>(selection_sizes[j]);
-      //   }
-      // }
-    } else {
-      usize selection_size = options.selection_percentile * active_indices.size();
-      for (usize i = 0; i < selection_size; i++) {
-        new_mean += solutions[active_indices[i]].continuous_values();
-      }
-      new_mean /= static_cast<CType>(selection_size);
-    }
-    return new_mean;
-  };
-
-  Mat<CType> estimate_cov(const SolutionSetBase& solutions,
-                          std::vector<usize>& active_indices,
-                          std::vector<usize>& active_counts,
-                          const Vec<CType>& mean) {
-    Mat<CType> cov = Mat<CType>::Zero(num_continuous, num_continuous);
-    if (options.intron_aware) {
-      // TODO
-      std::unreachable();
-    } else {
-      usize selection_size = options.selection_percentile * active_indices.size();
-      for (usize i = 0; i < selection_size; i++) {
-        Vec<CType> v = solutions[active_indices[i]].continuous_values() - mean;
-        cov.noalias() += v * v.transpose();
-      }
-      cov /= static_cast<CType>(selection_size);
-    }
-    return cov;
-  };
-
   std::vector<std::set<usize>> select_and_learn_linkage(Rng& rng,
                                                         ArchiveBase& archive,
                                                         InstanceBase& problem,
@@ -699,7 +760,8 @@ class RvState {
         }
       }
 
-      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts);
+      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                          full.continuous, options.intron_aware);
 
       // initialize the (previous) cluster mean
       if (mean[k].size() != num_continuous) {
@@ -717,14 +779,16 @@ class RvState {
 
       // update subsets
       if (subsets[k].empty()) {  // init if empty
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, mean[k]);
+        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                      mean[k], full.continuous, options.intron_aware);
         subsets[k] = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         for (usize i = 0; i < subsets[k].size(); i++) {
           subset_states[k].push_back(sampling_model.init(subsets[k][i]));
         }
       } else if (!linkage_model->is_static()) {  // update only if the fos is not static
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, mean[k]);
+        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                      mean[k], full.continuous, options.intron_aware);
         FOS new_fos = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         std::vector<std::unique_ptr<RvSubsetStateBase>> new_subset_states;
@@ -841,9 +905,9 @@ class RvState {
     }
 
     // otherwise we sample uniformally in the init bounds
-    for (usize j = 0; j < subsets[k][fos_idx].size(); j++) {
-      out(j) = U(rng) * (problem.continuous_init_upper_bounds()(j) - problem.continuous_init_lower_bounds()(j)) +
-               problem.continuous_init_lower_bounds()(j);
+    for (usize j = 0; j < s.size(); j++) {
+      out(j) *= U(rng) * (problem.continuous_init_upper_bounds()(s[j]) - problem.continuous_init_lower_bounds()(s[j])) +
+                problem.continuous_init_lower_bounds()(s[j]);
     }
   };
 
@@ -1003,8 +1067,8 @@ class RvState {
               //     solutions_to_evaluate.push_back(i);
               // }
 
-              // solutions[i].continuous_values() = values; // not needed since values already is a reference, this just
-              // is a self assignment...
+              // solutions[i].continuous_values() = values; // not needed since values already is a reference, this
+              // just is a self assignment...
               solutions_to_evaluate.push_back(i);
               in_bounds = true;
               break;
@@ -1132,12 +1196,22 @@ class RvState {
           // due to filtering/max_subset_size, some clusters might have more
           // subsets...
           if (fos_idx < subsets[k].size()) {
-            eval_subsets[i] = &subsets[k][fos_idx];
             const auto& s = subsets[k][fos_idx].continuous;
-            solutions[i].continuous_values() = alpha * parents[i].continuous_values()(s) +
-                                               (CType(1.0) - alpha) * closest_elites[j]->continuous_values()(s);
-            solutions_to_evaluate.push_back(i);
-            eval2improve_idx.push_back(j);
+            bool active_overlap = false;
+            for (usize l : s) {
+              if (solutions[i].continuous_active()(l)) {
+                active_overlap = true;
+                break;
+              }
+            }
+            if (active_overlap) {
+              eval_subsets[i] = &subsets[k][fos_idx];
+
+              solutions[i].continuous_values()(s) = alpha * parents[i].continuous_values()(s) +
+                                                    (CType(1.0) - alpha) * closest_elites[j]->continuous_values()(s);
+              solutions_to_evaluate.push_back(i);
+              eval2improve_idx.push_back(j);
+            }
           }
         }
 

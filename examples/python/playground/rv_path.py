@@ -25,9 +25,10 @@ STATS_LOGFILE = RESULTS / "stats.csv"
 
 PLOT_DIR = pathlib.Path("plots") / "rv_path" / METHOD_NAME
 
-DIMS = 20
+DIMS = 2
 VTR = 1e-10
 INIT_BOUNDS = (100.0, 125.0)
+
 
 INITIAL_POPULATION_SIZE = 25
 MAX_NUM_POPULATIONS = 1
@@ -39,7 +40,7 @@ Y_VAR = 1
 X_LIM = (-10.0, INIT_BOUNDS[1])
 Y_LIM = (-10.0, INIT_BOUNDS[1])
 ZOOM_IN = True
-# ZOOM_IN = False
+ZOOM_IN = False
 
 MAX_NUM_FRAMES = 200  # np.inf
 
@@ -50,6 +51,7 @@ PLOT_STEPS = True
 # PLOT_STEPS = False
 
 NO_VIDEO = True
+NO_VIDEO = False
 
 
 def run(clean: bool = True):

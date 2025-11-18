@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -4597,399 +4598,13 @@ class ObjectiveBase {
 #endif /* _GOBLIN_BENCH_FUNCTIONS_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/functions/discrete.h included by goblin.h                                 //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
-#define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
-
-
-
-// TODO
-// - [x] OneMax
-// - [x] ZeroMax
-// - [ ] DeceptiveTrap
-// - [ ] BimodalDTrap
-// - [ ] Leading Ones
-// - [ ] Trailing Zeroes
-
-namespace goblin {
-
-class OneMax final : public ObjectiveBase {
- public:
-  OneMax(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    discrete_active.fill(true);
-    return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
-  };
-
-  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
-                                            RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
-                                            CRefS<Vec<DType>> parent_discrete_values,
-                                            CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
-                                            const CType parent_objective_value,
-                                            const CType parent_constraint_value,
-                                            const std::span<const usize>& discrete_indices,
-                                            const std::span<const usize>& continuous_indices) override final {
-    discrete_active.fill(true);
-    return std::make_tuple(parent_objective_value + discrete_values(discrete_indices).array().cast<double>().sum() -
-                               parent_discrete_values(discrete_indices).array().cast<double>().sum(),
-                           0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class ZeroMax final : public ObjectiveBase {
- public:
-  ZeroMax(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    discrete_active.fill(true);
-    return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
-  };
-
-  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
-                                            RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
-                                            CRefS<Vec<DType>> parent_discrete_values,
-                                            CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
-                                            const CType parent_objective_value,
-                                            const CType parent_constraint_value,
-                                            const std::span<const usize>& discrete_indices,
-                                            const std::span<const usize>& continuous_indices) override final {
-    discrete_active.fill(true);
-    return std::make_tuple(parent_objective_value - discrete_values(discrete_indices).array().cast<double>().sum() +
-                               parent_discrete_values(discrete_indices).array().cast<double>().sum(),
-                           0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class LeadingOnes final : public ObjectiveBase {
- public:
-  LeadingOnes(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    CType ov = CType(0.0);
-    for (usize i = 0; i < dims; i++) {
-      discrete_active(i) = true;
-      if (discrete_values(i) != DType(1)) {
-        break;
-      }
-      ov += CType(1.0);
-    }
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class TrailingZeros final : public ObjectiveBase {
- public:
-  TrailingZeros(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    CType ov = CType(0.0);
-    for (usize i = dims; i > 0;) {
-      i--;
-      discrete_active(i) = true;
-      if (discrete_values(i) != DType(0)) {
-        break;
-      }
-      ov += CType(1.0);
-    }
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class DeceptiveTrap final : public ObjectiveBase {
- public:
-  DeceptiveTrap(usize ndims) : DeceptiveTrap(ndims, ndims) {};
-  DeceptiveTrap(usize ndims, usize block_size) : dims(ndims), block_size(block_size) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    discrete_active.fill(true);
-
-    CType ov = CType(0.0);
-    for (usize i = 0; i < dims; i += block_size) {
-      int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
-      ov += unitation == static_cast<isize>(block_size) ? block_size : static_cast<isize>(block_size) - unitation - 1;
-    }
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-  usize block_size;
-};
-
-class BimodalTrap final : public ObjectiveBase {
- public:
-  BimodalTrap(usize ndims) : BimodalTrap(ndims, ndims) {};
-  BimodalTrap(usize ndims, usize block_size) : dims(ndims), block_size(block_size) {};
-
-  usize num_discrete() const override final { return dims; };
-  usize num_continuous() const override final { return 0; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    discrete_active.fill(true);
-
-    CType ov = CType(0.0);
-    for (usize i = 0; i < dims; i += block_size) {
-      isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
-      ov += unitation == 0 || unitation == static_cast<isize>(block_size)
-                ? static_cast<isize>(block_size)
-                : std::abs<isize>(2 * unitation - block_size - 2);
-    }
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-  usize block_size;
-};
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/functions/continuous.h included by goblin.h                               //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
-#define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
-
-#include <numbers>
-
-
-namespace goblin {
-
-class Sphere final : public ObjectiveBase {
- public:
-  Sphere(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-    return std::make_tuple(continuous_values.array().pow(2).sum(), 0.0);
-  };
-
-  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
-                                            RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
-                                            CRefS<Vec<DType>> parent_discrete_values,
-                                            CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
-                                            const CType parent_objective_value,
-                                            const CType parent_constraint_value,
-                                            const std::span<const usize>& discrete_indices,
-                                            const std::span<const usize>& continuous_indices) override final {
-    continuous_active.fill(true);
-    return std::make_tuple(parent_objective_value + continuous_values(continuous_indices).array().pow(2).sum() -
-                               parent_continuous_values(continuous_indices).array().pow(2).sum(),
-                           0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class Rosenbrock final : public ObjectiveBase {
- public:
-  Rosenbrock(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-    CType ov = 0.0;
-    for (usize i = 0; i < dims - 1; i++) {
-      auto x = continuous_values(i);
-      auto y = continuous_values(i + 1);
-      ov += 100 * (y - x * x) * (y - x * x) + (1.0 - x) * (1.0 - x);
-    }
-
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class Rastrigin final : public ObjectiveBase {
- public:
-  Rastrigin(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-    CType ov = CType(10.0) * static_cast<CType>(dims)
-
-               + continuous_values.norm() -
-               CType(10.0) * (continuous_values.array() * CType(2.0 * std::numbers::pi)).cos().sum();
-
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class Griewank final : public ObjectiveBase {
- public:
-  Griewank(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-
-    CType prod = 1.0;
-    for (usize i = 0; i < dims; i++) {
-      prod *= std::cos(continuous_values(i) / std::sqrt(static_cast<CType>(i + 1)));
-    }
-    CType ov = continuous_values.norm() / CType(4000.0) - prod + CType(1.0);
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class Ellipsoid final : public ObjectiveBase {
- public:
-  Ellipsoid(usize ndims) : dims(ndims) {};
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-
-    CType ov = 0.0;
-    for (usize i = 0; i < dims; i++) {
-      ov += std::pow(10.0, 6.0 * static_cast<CType>(i) / static_cast<CType>(dims - 1)) * continuous_values(i) *
-            continuous_values(i);
-    }
-    return std::make_tuple(ov, 0.0);
-  };
-
- private:
-  usize dims;
-};
-
-class CirclesInASquare final : public ObjectiveBase {
- public:
-  CirclesInASquare(usize ndims) : dims(ndims) { __goblin_runtime_assert(ndims > 2 && ndims % 2 == 0); };
-
-  usize num_discrete() const override final { return 0; };
-  usize num_continuous() const override final { return dims; };
-
-  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
-                                    RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
-    continuous_active.fill(true);
-    CType min_dist = 1e308, cv = 0;
-    for (usize i = 0; i < dims; i += 2) {
-      auto circle_i = continuous_values(Eigen::seqN(i, 2));
-      cv += (circle_i.array().max(1.0) - 1).sum() - circle_i.array().min(0.0).sum();
-      for (usize j = i + 2; j < dims; j += 2) {
-        auto circle_j = continuous_values(Eigen::seqN(j, 2));
-        CType dist = (circle_i - circle_j).norm();
-        min_dist = std::min(min_dist, dist);
-      }
-    }
-
-    return std::make_tuple(-min_dist, cv);
-  };
-
- private:
-  usize dims;
-};
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions/combinators.h included by goblin.h                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
 
+#include <numbers>
 
 
 // TODO
@@ -5556,6 +5171,446 @@ class Repeat final : public ObjectiveBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/functions/discrete.h included by goblin.h                                 //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
+#define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
+
+
+
+// TODO
+// - [x] OneMax
+// - [x] ZeroMax
+// - [ ] DeceptiveTrap
+// - [ ] BimodalDTrap
+// - [ ] Leading Ones
+// - [ ] Trailing Zeroes
+
+namespace goblin {
+
+class OneMax final : public ObjectiveBase {
+ public:
+  OneMax(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    discrete_active.fill(true);
+    return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
+  };
+
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
+    discrete_active.fill(true);
+    return std::make_tuple(parent_objective_value + discrete_values(discrete_indices).array().cast<double>().sum() -
+                               parent_discrete_values(discrete_indices).array().cast<double>().sum(),
+                           0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class ZeroMax final : public ObjectiveBase {
+ public:
+  ZeroMax(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    discrete_active.fill(true);
+    return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
+  };
+
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
+    discrete_active.fill(true);
+    return std::make_tuple(parent_objective_value - discrete_values(discrete_indices).array().cast<double>().sum() +
+                               parent_discrete_values(discrete_indices).array().cast<double>().sum(),
+                           0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class LeadingOnes final : public ObjectiveBase {
+ public:
+  LeadingOnes(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    CType ov = CType(0.0);
+    for (usize i = 0; i < dims; i++) {
+      discrete_active(i) = true;
+      if (discrete_values(i) != DType(1)) {
+        break;
+      }
+      ov += CType(1.0);
+    }
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class TrailingZeros final : public ObjectiveBase {
+ public:
+  TrailingZeros(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    CType ov = CType(0.0);
+    for (usize i = dims; i > 0;) {
+      i--;
+      discrete_active(i) = true;
+      if (discrete_values(i) != DType(0)) {
+        break;
+      }
+      ov += CType(1.0);
+    }
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class DeceptiveTrap final : public ObjectiveBase {
+ public:
+  DeceptiveTrap(usize ndims) : DeceptiveTrap(ndims, ndims) {};
+  DeceptiveTrap(usize ndims, usize block_size) : dims(ndims), block_size(block_size) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    discrete_active.fill(true);
+
+    CType ov = CType(0.0);
+    for (usize i = 0; i < dims; i += block_size) {
+      int unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<int>().sum();
+      ov += unitation == static_cast<isize>(block_size) ? block_size : static_cast<isize>(block_size) - unitation - 1;
+    }
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+  usize block_size;
+};
+
+class BimodalTrap final : public ObjectiveBase {
+ public:
+  BimodalTrap(usize ndims) : BimodalTrap(ndims, ndims) {};
+  BimodalTrap(usize ndims, usize block_size) : dims(ndims), block_size(block_size) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    discrete_active.fill(true);
+
+    CType ov = CType(0.0);
+    for (usize i = 0; i < dims; i += block_size) {
+      isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
+      ov += unitation == 0 || unitation == static_cast<isize>(block_size)
+                ? static_cast<isize>(block_size)
+                : std::abs<isize>(2 * unitation - block_size - 2);
+    }
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+  usize block_size;
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/functions/continuous.h included by goblin.h                               //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
+#define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
+
+
+
+namespace goblin {
+
+class Sphere final : public ObjectiveBase {
+ public:
+  Sphere(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+    return std::make_tuple(continuous_values.array().pow(2).sum(), 0.0);
+  };
+
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Active> discrete_active,
+                                            RefS<Active> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Active> parent_discrete_active,
+                                            CRefS<Active> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
+    continuous_active.fill(true);
+    return std::make_tuple(parent_objective_value + continuous_values(continuous_indices).array().pow(2).sum() -
+                               parent_continuous_values(continuous_indices).array().pow(2).sum(),
+                           0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class Rosenbrock final : public ObjectiveBase {
+ public:
+  Rosenbrock(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+    CType ov = 0.0;
+    for (usize i = 0; i < dims - 1; i++) {
+      auto x = continuous_values(i);
+      auto y = continuous_values(i + 1);
+      ov += 100 * (y - x * x) * (y - x * x) + (1.0 - x) * (1.0 - x);
+    }
+
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class Rastrigin final : public ObjectiveBase {
+ public:
+  Rastrigin(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+    CType ov = CType(10.0) * static_cast<CType>(dims)
+
+               + continuous_values.norm() -
+               CType(10.0) * (continuous_values.array() * CType(2.0 * std::numbers::pi)).cos().sum();
+
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class Griewank final : public ObjectiveBase {
+ public:
+  Griewank(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+
+    CType prod = 1.0;
+    for (usize i = 0; i < dims; i++) {
+      prod *= std::cos(continuous_values(i) / std::sqrt(static_cast<CType>(i + 1)));
+    }
+    CType ov = continuous_values.norm() / CType(4000.0) - prod + CType(1.0);
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class Ellipsoid final : public ObjectiveBase {
+ public:
+  Ellipsoid(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+
+    CType ov = 0.0;
+    for (usize i = 0; i < dims; i++) {
+      ov += std::pow(10.0, 6.0 * static_cast<CType>(i) / static_cast<CType>(dims - 1)) * continuous_values(i) *
+            continuous_values(i);
+    }
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  usize dims;
+};
+
+class CirclesInASquare final : public ObjectiveBase {
+ public:
+  CirclesInASquare(usize ndims) : dims(ndims) { __goblin_runtime_assert(ndims > 2 && ndims % 2 == 0); };
+
+  usize num_discrete() const override final { return 0; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    continuous_active.fill(true);
+    CType min_dist = 1e308, cv = 0;
+    for (usize i = 0; i < dims; i += 2) {
+      auto circle_i = continuous_values(Eigen::seqN(i, 2));
+      cv += (circle_i.array().max(1.0) - 1).sum() - circle_i.array().min(0.0).sum();
+      for (usize j = i + 2; j < dims; j += 2) {
+        auto circle_j = continuous_values(Eigen::seqN(j, 2));
+        CType dist = (circle_i - circle_j).norm();
+        min_dist = std::min(min_dist, dist);
+      }
+    }
+
+    return std::make_tuple(-min_dist, cv);
+  };
+
+ private:
+  usize dims;
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/functions/mixed.h included by goblin.h                                    //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
+#define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
+
+
+
+namespace goblin {
+
+class LeadingSpheres final : public ObjectiveBase {
+ public:
+  LeadingSpheres(usize ndims) : dims(ndims) {};
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return dims; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    CType ov = CType(0.0);
+    CType cv = CType(0.0);
+    bool active = true;
+    for (usize i = 0; i < dims; i++) {
+      if (active) {
+        discrete_active(i) = true;
+        if (discrete_values(i) != DType(1)) {
+          active = false;
+        }
+
+        continuous_active(i) = true;
+
+        // use a scaled sigmoid to map from [0, oo) to [0, 1)
+        auto scaled = 2.0 / (1.0 + std::exp(-continuous_values(i))) - 1.0;
+        if (isna(scaled)) {
+          cv = 1.0;
+        }
+        ov += scaled * scaled;
+      } else {
+        ov += 1.0;
+      }
+    }
+    return std::make_tuple(ov, cv);
+  };
+
+ private:
+  usize dims;
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_FUNCTIONS_MIXED_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/problem.h included by goblin.h                                            //
@@ -6459,11 +6514,15 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -6587,11 +6646,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -6948,6 +7010,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -7045,16 +7110,126 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
 
+
 namespace goblin {
+
+static Vec<CType> estimate_mean(const SolutionSetBase& solutions,
+                                const std::span<const usize> active_indices,
+                                const std::span<const usize> active_counts,
+                                double selection_percentile,
+                                const std::span<const usize> indices,
+                                bool intron_aware) {
+  Vec<CType> mean = Vec<CType>::Zero(indices.size());
+  usize selection_size = 0;
+  if (intron_aware) {
+    for (usize i : indices) {
+      selection_size = std::max(selection_size, static_cast<usize>(selection_percentile * active_counts[i]));
+    }
+
+    if (selection_size > 0) {
+      bool any_left = true;
+      std::vector<usize> num_left(indices.size(), selection_size);
+      for (usize i : active_indices) {
+        any_left = false;
+        for (usize j = 0; j < indices.size(); j++) {
+          if (num_left[j] > 0 &&
+              (solutions[i].continuous_active()(
+                   indices[j])                    // index is active -> we use the value under selection pressure
+               || active_counts[indices[j]] == 0  // index is not active -> we still want a non-zero mean to hopefully
+                                                  // make the cholesky decomposition work (= we want to keep diversity)
+               )) {
+            mean(j) += solutions[i].continuous_values()(indices[j]);
+            num_left[j]--;
+            any_left |= num_left[j] > 0;
+          }
+        }
+        if (!any_left) {
+          break;
+        }
+      }
+      for (usize j = 0; j < indices.size(); j++) {
+        mean(j) /= static_cast<CType>(selection_size - num_left[j]);
+      }
+    }
+  }
+
+  if (selection_size == 0) {
+    selection_size = selection_percentile * active_indices.size();
+    for (usize i = 0; i < selection_size; i++) {
+      mean += solutions[active_indices[i]].continuous_values()(indices);
+    }
+    mean /= static_cast<CType>(selection_size);
+  }
+  return mean;
+};
+
+static Mat<CType> estimate_cov(const SolutionSetBase& solutions,
+                               const std::span<const usize> active_indices,
+                               const std::span<const usize> active_counts,
+                               double selection_percentile,
+                               const Vec<CType>& mean,
+                               const std::span<const usize> indices,
+                               bool intron_aware) {
+  assert(static_cast<usize>(mean.size()) == indices.size());
+  Mat<CType> cov = Mat<CType>::Zero(indices.size(), indices.size());
+  if (intron_aware) {
+    for (usize i = 0; i < indices.size(); i++) {
+      if (active_counts[indices[i]] == 0) {
+        // estimate the full univariate covariance if there are no active variables to keep diversity (no selection)
+        for (usize l : active_indices) {
+          cov(i, i) += std::pow(solutions[l].continuous_values()(indices[i]) - mean(i), 2);
+        }
+        cov(i, i) /= static_cast<CType>(active_indices.size());
+      } else {
+        // otherwise estimate the covariance between active variables
+        for (usize j = i; j < indices.size(); j++) {
+          if (active_counts[indices[j]] > 0) {
+            usize selection_size =
+                selection_percentile * std::max(active_counts[indices[i]], active_counts[indices[j]]);
+            usize actual_size = 0;
+
+            for (usize l : active_indices) {
+              if (solutions[l].continuous_active()(indices[i]) && solutions[l].continuous_active()(indices[j])) {
+                cov(i, j) += (solutions[l].continuous_values()(indices[i]) - mean(i)) *
+                             (solutions[l].continuous_values()(indices[j]) - mean(j));
+                actual_size++;
+                if (actual_size >= selection_size) {
+                  break;
+                }
+              }
+            }
+            if (actual_size > 0) {
+              // this is fine - that just means that i != j and i and j never appear together so the covariance should
+              // be 0
+              cov(i, j) /= static_cast<CType>(actual_size);
+              cov(j, i) = cov(i, j);
+            }
+          }
+        }
+      }
+    }
+  } else {
+    usize selection_size = selection_percentile * active_indices.size();
+    for (usize i = 0; i < selection_size; i++) {
+      Vec<CType> v = solutions[active_indices[i]].continuous_values()(indices) - mean;
+      cov.noalias() += v * v.transpose();
+    }
+    cov /= static_cast<CType>(selection_size);
+  }
+  return cov;
+};
 
 // Performs an inplace cholesky decomposition. If the decomposition fails, jitter is added to the diagonal to increase
 // the rank until finally the univariate diagonal is used.
@@ -7093,10 +7268,13 @@ inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out) {
 #endif
   } else {
     // std::println("!!! CHOLESKY FAILED !!!\n{}", log_helper(out, /* escape = */ false, /* indent = */ true));
-    std::println("!!! CHOLESKY FAILED !!!");
+    // std::println("!!! CHOLESKY FAILED !!!");
 
     // covariance diagonal without jitter, made positive and sqrt to match the expecation that out * out.T = input
-    Vec<S> univariate = (out.diagonal().array() - jitter_added).max(1e-10).sqrt();
+    Vec<S> univariate = (out.diagonal().array() - jitter_added);
+    for (isize i = 0; i < univariate.size(); i++) {
+      univariate(i) = univariate(i) > 0.0 ? std::sqrt(univariate(i)) : 0.0;
+    }
     out.setZero();
     out.diagonal() = univariate;
 
@@ -7117,6 +7295,9 @@ class RvSubsetStateBase {
 
   virtual ~RvSubsetStateBase() = default;
 };
+
+/// Separate sampling models roughly as per https://ir.cwi.nl/pub/30344/30344.pdf
+/// TODO ask anton about API - feels still a bit crude...
 class RvSamplingModelBase {
  public:
   virtual std::unique_ptr<RvSubsetStateBase> init(const Subset& subset) const = 0;
@@ -7239,16 +7420,10 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     const auto& cs = subset.continuous;
     auto& s = static_cast<AMaLGaMSubsetState&>(state);
 
-    usize selection_size = selection_percentile * by_fitness_decreasing.size();
+    // usize selection_size = selection_percentile * by_fitness_decreasing.size();
 
     assert(static_cast<usize>(s.mean.size()) == cs.size());
-    s.mean.setZero();
-
-    // TODO intron aware ...
-    for (usize i = 0; i < selection_size; i++) {
-      s.mean += solutions[by_fitness_decreasing[i]].continuous_values()(cs);
-    }
-    s.mean /= static_cast<CType>(selection_size);
+    s.mean = estimate_mean(solutions, by_fitness_decreasing, active_counts, selection_percentile, cs, intron_aware);
 
     // Change the focus of the search to the best solution
     if (s.distribution_multiplier < 1.0) {
@@ -7259,13 +7434,8 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
       }
     }
 
-    // TODO intron aware ...
-    Mat<CType> new_cov = Mat<CType>::Zero(cs.size(), cs.size());
-    for (usize i = 0; i < selection_size; i++) {
-      Vec<CType> v = solutions[by_fitness_decreasing[i]].continuous_values()(cs) - s.mean;
-      new_cov.noalias() += v * v.transpose();
-    }
-    new_cov /= static_cast<CType>(selection_size);
+    Mat<CType> new_cov =
+        estimate_cov(solutions, by_fitness_decreasing, active_counts, selection_percentile, s.mean, cs, intron_aware);
 
     if (!s.enable_smoothing) {
       s.cov = new_cov;
@@ -7278,10 +7448,13 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
 
     // // if we don't have enough solutions we fall back to the univariate diagonal
     // if (selection_size < static_cast<usize>(cs.size()) + 1) {
-    //     s.L.setZero();
-    //     s.L.diagonal() = (s.cov * s.distribution_multiplier).diagonal().array().max(1e-10).sqrt();
+    //   s.L.setZero();
+    //   s.L.diagonal() = (s.cov * s.distribution_multiplier).diagonal();
+    //   for (isize i = 0; i < s.L.diagonal().size(); i++) {
+    //     s.L.diagonal()(i) = s.L.diagonal()(i) > 0.0 ? std::sqrt(s.L.diagonal()(i)) : 0.0;
+    //   }
     // } else {
-    //     cholesky_inplace(s.L);
+    //   cholesky_inplace(s.L);
     // }
 
     cholesky_inplace(s.L);
@@ -7350,12 +7523,29 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     const auto& s = subset.continuous;
 
     Vec<CType> avg_params = Vec<CType>::Zero(s.size());
-    // TODO intron aware
-    for (usize i : improved_indices) {
-      avg_params += solutions[i].continuous_values()(s);
+    if (intron_aware) {
+      Array<CType> num_active = Array<CType>::Zero(s.size());
+      for (usize i : improved_indices) {
+        for (usize j = 0; j < s.size(); j++) {
+          if (solutions[i].continuous_active()(s[j])) {
+            avg_params(j) += solutions[i].continuous_values()(s[j]);
+            num_active(j) += 1.0;
+          }
+        }
+      }
+      for (usize j = 0; j < s.size(); j++) {
+        if (num_active(j) > 0.0) {
+          avg_params(j) /= num_active(j);
+        }
+      }
+    } else {
+      for (usize i : improved_indices) {
+        avg_params += solutions[i].continuous_values()(s);
+      }
+      avg_params /= static_cast<CType>(improved_indices.size());
     }
-    avg_params /= static_cast<CType>(improved_indices.size());
 
+    // ? L.triangularView<Eigen::Lower>().solve(avg_params - mean);
     Mat<CType> L_inv = L.completeOrthogonalDecomposition().pseudoInverse();
 
     avg_params = ((L_inv * avg_params) - mean);
@@ -7397,6 +7587,9 @@ struct RvOptions {
   // can accumulate and it might be needed to perform full evaluations once in a while
   //
   // In that case, the default number of generations until re-evaluation is `50`
+  //
+  // Note that in this setting all archive solutions should be re-evaluated in case the target seems to have been
+  // reached to ensure that this is not due to numeric errors. This does not happen in this version.
   std::optional<u64> generations_until_full_evaluation = std::nullopt;
 
   std::optional<std::string> population_logfile = std::nullopt;
@@ -7609,63 +7802,6 @@ class RvState {
 
   // private:
 
-  Vec<CType> estimate_mean(const SolutionSetBase& solutions,
-                           std::vector<usize>& active_indices,
-                           std::vector<usize>& active_counts) {
-    Vec<CType> new_mean = Vec<CType>::Zero(num_continuous);
-    if (options.intron_aware) {
-      // TODO
-      std::unreachable();
-      // std::vector<usize> selection_sizes(num_continuous);
-      // for (isize i = 0; i < num_continuous; i++) {
-      //   selection_sizes[i] = options.selection_percentile * active_counts[i];
-      // }
-      // std::vector<usize> num_left = selection_sizes;
-      // bool any_left = true;
-      // for (usize i = 0; i < active_indices.size() && any_left; i++) {
-      //   any_left = false;
-      //   for (isize j = 0; j < num_continuous; j++) {
-      //     if (num_left[j] > 0 && solutions[active_indices[i]].continuous_active()(j)) {
-      //       new_mean(j) += solutions[active_indices[i]].continuous_values()(j);
-      //       num_left[j]--;
-      //       any_left |= num_left[j] > 0;
-      //     }
-      //   }
-      // }
-      // for (isize j = 0; j < num_continuous; j++) {
-      //   if (selection_sizes[j] > 0) {
-      //     new_mean(j) /= static_cast<CType>(selection_sizes[j]);
-      //   }
-      // }
-    } else {
-      usize selection_size = options.selection_percentile * active_indices.size();
-      for (usize i = 0; i < selection_size; i++) {
-        new_mean += solutions[active_indices[i]].continuous_values();
-      }
-      new_mean /= static_cast<CType>(selection_size);
-    }
-    return new_mean;
-  };
-
-  Mat<CType> estimate_cov(const SolutionSetBase& solutions,
-                          std::vector<usize>& active_indices,
-                          std::vector<usize>& active_counts,
-                          const Vec<CType>& mean) {
-    Mat<CType> cov = Mat<CType>::Zero(num_continuous, num_continuous);
-    if (options.intron_aware) {
-      // TODO
-      std::unreachable();
-    } else {
-      usize selection_size = options.selection_percentile * active_indices.size();
-      for (usize i = 0; i < selection_size; i++) {
-        Vec<CType> v = solutions[active_indices[i]].continuous_values() - mean;
-        cov.noalias() += v * v.transpose();
-      }
-      cov /= static_cast<CType>(selection_size);
-    }
-    return cov;
-  };
-
   std::vector<std::set<usize>> select_and_learn_linkage(Rng& rng,
                                                         ArchiveBase& archive,
                                                         InstanceBase& problem,
@@ -7718,7 +7854,8 @@ class RvState {
         }
       }
 
-      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts);
+      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                          full.continuous, options.intron_aware);
 
       // initialize the (previous) cluster mean
       if (mean[k].size() != num_continuous) {
@@ -7736,14 +7873,16 @@ class RvState {
 
       // update subsets
       if (subsets[k].empty()) {  // init if empty
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, mean[k]);
+        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                      mean[k], full.continuous, options.intron_aware);
         subsets[k] = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         for (usize i = 0; i < subsets[k].size(); i++) {
           subset_states[k].push_back(sampling_model.init(subsets[k][i]));
         }
       } else if (!linkage_model->is_static()) {  // update only if the fos is not static
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, mean[k]);
+        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
+                                      mean[k], full.continuous, options.intron_aware);
         FOS new_fos = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         std::vector<std::unique_ptr<RvSubsetStateBase>> new_subset_states;
@@ -7860,9 +7999,9 @@ class RvState {
     }
 
     // otherwise we sample uniformally in the init bounds
-    for (usize j = 0; j < subsets[k][fos_idx].size(); j++) {
-      out(j) = U(rng) * (problem.continuous_init_upper_bounds()(j) - problem.continuous_init_lower_bounds()(j)) +
-               problem.continuous_init_lower_bounds()(j);
+    for (usize j = 0; j < s.size(); j++) {
+      out(j) *= U(rng) * (problem.continuous_init_upper_bounds()(s[j]) - problem.continuous_init_lower_bounds()(s[j])) +
+                problem.continuous_init_lower_bounds()(s[j]);
     }
   };
 
@@ -8022,8 +8161,8 @@ class RvState {
               //     solutions_to_evaluate.push_back(i);
               // }
 
-              // solutions[i].continuous_values() = values; // not needed since values already is a reference, this just
-              // is a self assignment...
+              // solutions[i].continuous_values() = values; // not needed since values already is a reference, this
+              // just is a self assignment...
               solutions_to_evaluate.push_back(i);
               in_bounds = true;
               break;
@@ -8151,12 +8290,22 @@ class RvState {
           // due to filtering/max_subset_size, some clusters might have more
           // subsets...
           if (fos_idx < subsets[k].size()) {
-            eval_subsets[i] = &subsets[k][fos_idx];
             const auto& s = subsets[k][fos_idx].continuous;
-            solutions[i].continuous_values() = alpha * parents[i].continuous_values()(s) +
-                                               (CType(1.0) - alpha) * closest_elites[j]->continuous_values()(s);
-            solutions_to_evaluate.push_back(i);
-            eval2improve_idx.push_back(j);
+            bool active_overlap = false;
+            for (usize l : s) {
+              if (solutions[i].continuous_active()(l)) {
+                active_overlap = true;
+                break;
+              }
+            }
+            if (active_overlap) {
+              eval_subsets[i] = &subsets[k][fos_idx];
+
+              solutions[i].continuous_values()(s) = alpha * parents[i].continuous_values()(s) +
+                                                    (CType(1.0) - alpha) * closest_elites[j]->continuous_values()(s);
+              solutions_to_evaluate.push_back(i);
+              eval2improve_idx.push_back(j);
+            }
           }
         }
 
@@ -8260,6 +8409,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -9275,6 +9425,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
