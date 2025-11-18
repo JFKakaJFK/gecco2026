@@ -48,7 +48,7 @@ TEST_CASE("goblin::gp::archive_objectives") {
     srp.register_target(vtr);
 
     Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
-    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(),
+    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled=false},
                             IMSOptions(
                                 /* initial_population_size = */ 256,
                                 /* max_num_populations = */ 1),

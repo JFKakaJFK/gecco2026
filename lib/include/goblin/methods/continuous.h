@@ -972,6 +972,8 @@ class RvState {
         bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active()(s).array().any();
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
+        } else {
+            parents[i] = solutions[i];
         }
       }
     }

@@ -134,14 +134,17 @@ class TrackingOptions {
   TrackingOptions(std::filesystem::path logpath,
                   std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
                   usize archive_capacity = 100,
-                  usize max_evaluations_until_archive_adaption = 100000,
+                  u64 max_evaluations_until_archive_adaption = 100000,
                   bool consider_evaluation_time = true,
                   bool report_intermediate_results = true,
-                  usize initial_evaluations_until_next_report = 10,
-                  usize eval_factor = 2,
-                  usize max_evaluations_until_next_report = 1000000,
+                  u64 initial_evaluations_until_next_report = 10,
+                  u64 eval_factor = 2,
+                  u64 max_evaluations_until_next_report = 1000000,
+                  u64 initial_generations_until_next_report = 1,
+                  u64 generation_factor = 2,
+                  u64 max_generations_until_next_report = 100,
                   std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
-                  usize time_factor = 2,
+                  u64 time_factor = 2,
                   std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
       : archive_capacity(archive_capacity),
         max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
@@ -150,6 +153,9 @@ class TrackingOptions {
         initial_evaluations_until_next_report(initial_evaluations_until_next_report),
         eval_factor(eval_factor),
         max_evaluations_until_next_report(max_evaluations_until_next_report),
+        initial_generations_until_next_report(initial_generations_until_next_report),
+        generation_factor(generation_factor),
+        max_generations_until_next_report(max_generations_until_next_report),
         initial_time_until_next_report(initial_time_until_next_report),
         time_factor(time_factor),
         max_time_until_next_report(max_time_until_next_report),
@@ -164,16 +170,20 @@ class TrackingOptions {
   };
 
   usize archive_capacity;
-  usize max_evaluations_until_archive_adaption;
+  u64 max_evaluations_until_archive_adaption;
   bool consider_evaluation_time;
   bool report_intermediate_results;
 
-  usize initial_evaluations_until_next_report;
-  usize eval_factor;  // 1 is linear, >= 2 is exponential spacing
-  usize max_evaluations_until_next_report;
+  u64 initial_evaluations_until_next_report;
+  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_evaluations_until_next_report;
+
+  u64 initial_generations_until_next_report;
+  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_generations_until_next_report;
 
   std::chrono::nanoseconds initial_time_until_next_report;
-  usize time_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
   std::chrono::nanoseconds max_time_until_next_report;
 
  private:
@@ -323,6 +333,8 @@ class Tracked final : public InstanceBase {
         status(TerminationStatus::Running),
         archive(instance.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
+        last_generation(0),
+        generations_at_next_report(config.initial_generations_until_next_report),
         evaluations(0),
         evaluations_at_next_report(config.initial_evaluations_until_next_report),
         time_elapsed_at_next_report(config.initial_time_until_next_report) {};
@@ -399,9 +411,19 @@ class Tracked final : public InstanceBase {
     if (evaluations >= evaluations_at_next_report) {
       report_needed = true;
       evaluations_at_next_report = std::min(
-          config.eval_factor > 1 ? evaluations * static_cast<u64>(config.eval_factor)
-                                 : evaluations + static_cast<u64>(config.initial_evaluations_until_next_report),
+          config.eval_factor > 1 ? evaluations * config.eval_factor
+                                 : evaluations + config.initial_evaluations_until_next_report,
           evaluations + config.max_evaluations_until_next_report);
+    }
+
+    u64 g = generation.value_or(0);
+    if (g >= generations_at_next_report && g != last_generation) {
+      last_generation = g;
+      report_needed = true;
+      generations_at_next_report = std::min(
+          config.generation_factor > 1 ? g * config.generation_factor
+                                 : g + config.initial_generations_until_next_report,
+          g + config.max_generations_until_next_report);
     }
 
     auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
@@ -416,59 +438,6 @@ class Tracked final : public InstanceBase {
 
     return report_needed;
   };
-
-  //   template <typename EigenLike>
-  //   void log_eigen(std::ostream& os, const EigenLike& m) {
-  //     os << "\"[";
-  //     if (m.rows() > 1 && m.cols() > 1) {
-  //       for (isize r = 0; r < m.rows(); r++) {
-  //         if (r > 0) {
-  //           os << ',';
-  //         }
-  //         os << '[';
-  //         for (isize c = 0; c < m.cols(); c++) {
-  //           if (c > 0) {
-  //             os << ',';
-  //           }
-
-  //           // fmt to alwyas use the decimal instead of the ascii byte value for
-  //           // (unsigned) chars
-  //           if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
-  //                         std::same_as<typename EigenLike::Scalar, u8>) {
-  // #ifdef __cpp_lib_print
-  //             std::print(os,
-  // #else
-  //             os << std::format(
-  // #endif
-  //                        "{:d}", m(r, c));
-  //           } else {
-  //             os << m(r, c);
-  //           }
-  //         }
-  //         os << ']';
-  //       }
-  //     } else {
-  //       for (isize i = 0; i < m.size(); i++) {
-  //         if (i > 0) {
-  //           os << ',';
-  //         }
-  //         // fmt to alwyas use the decimal instead of the ascii byte value for
-  //         // (unsigned) chars
-  //         if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar,
-  //         u8>) {
-  // #ifdef __cpp_lib_print
-  //           std::print(os,
-  // #else
-  //           os << std::format(
-  // #endif
-  //                      "{:d}", m(i));
-  //         } else {
-  //           os << m(i);
-  //         }
-  //       }
-  //     }
-  //     os << "]\"";
-  //   };
 
   // A can annoyingly not be const since in the SR case an evaluation on the
   // test set might be necessary - shouldn't change the solution, but is not
@@ -556,10 +525,12 @@ class Tracked final : public InstanceBase {
   TerminationStatus status;
   AdaptiveGridArchive archive;
 
-  std::optional<usize> generation;
-
   Timer alg_timer;
   Timer eval_timer;
+
+  std::optional<u64> generation;
+  u64 last_generation;
+  u64 generations_at_next_report;
 
   u64 evaluations;
   u64 evaluations_at_next_report;
