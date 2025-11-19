@@ -26,7 +26,7 @@ def run_one(task_path: str, logfile: str, loginfo: list[tuple[str, str]]):
             instance=task["instance"],
             method=task["method"],
             budget=task["budget"],
-            config=TrackingOptions(logfile, loginfo),
+            config=TrackingOptions(logfile, loginfo, report_intermediate_results=False),
             seed=task.get("seed", None),
             population_size=task.get("population_size", None),
         )

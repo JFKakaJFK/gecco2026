@@ -354,7 +354,7 @@ if __name__ == "__main__":
         num_repeats=REPEATS,
         clean=True,
         # limit=1,
-        # max_workers=1,
+        max_workers=44,
     )
 
     preprocess = True

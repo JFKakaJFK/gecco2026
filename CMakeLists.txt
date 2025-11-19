@@ -54,7 +54,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3" # -march=native"
     )
 endif()
 
@@ -81,7 +81,13 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
     #     _pygoblin.cpython-312-darwin.so on macOS
     #     _pygoblin.cpython-312-x86_64-linux-gnu.so on Linux
     #     _pygoblin.cp312-win_amd64.pyd on Windows)
-    nanobind_add_module(_pygoblin ${python_module_sources})
+    nanobind_add_module(_pygoblin
+        NB_STATIC
+        # STABLE_ABI # https://nanobind.readthedocs.io/en/latest/api_cmake.html
+        LTO
+        NB_DOMAIN cwi_goblin
+        ${python_module_sources}
+    )
 
     litgen_setup_module(
         # The C++ library for which we are building bindings
