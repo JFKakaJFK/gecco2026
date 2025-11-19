@@ -3058,6 +3058,9 @@ class TrackingOptions:
         initial_evaluations_until_next_report: int = 10,
         eval_factor: int = 2,
         max_evaluations_until_next_report: int = 1000000,
+        initial_generations_until_next_report: int = 1,
+        generation_factor: int = 2,
+        max_generations_until_next_report: int = 100,
         initial_time_until_next_report: datetime.timedelta = std.chrono.seconds(1),
         time_factor: int = 2,
         max_time_until_next_report: datetime.timedelta = std.chrono.minutes(10),
@@ -3076,6 +3079,10 @@ class TrackingOptions:
     initial_evaluations_until_next_report: int
     eval_factor: int  # 1 is linear, >= 2 is exponential spacing
     max_evaluations_until_next_report: int
+
+    initial_generations_until_next_report: int
+    generation_factor: int  # 1 is linear, >= 2 is exponential spacing
+    max_generations_until_next_report: int
 
     initial_time_until_next_report: datetime.timedelta
     time_factor: int  # 1 is linear, >= 2 is exponential spacing

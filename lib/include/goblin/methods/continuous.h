@@ -973,7 +973,7 @@ class RvState {
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
         } else {
-            parents[i] = solutions[i];
+          parents[i] = solutions[i];
         }
       }
     }

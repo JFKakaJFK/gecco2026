@@ -410,20 +410,20 @@ class Tracked final : public InstanceBase {
     bool report_needed = false;
     if (evaluations >= evaluations_at_next_report) {
       report_needed = true;
-      evaluations_at_next_report = std::min(
-          config.eval_factor > 1 ? evaluations * config.eval_factor
-                                 : evaluations + config.initial_evaluations_until_next_report,
-          evaluations + config.max_evaluations_until_next_report);
+      evaluations_at_next_report =
+          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
+                                          : evaluations + config.initial_evaluations_until_next_report,
+                   evaluations + config.max_evaluations_until_next_report);
     }
 
     u64 g = generation.value_or(0);
     if (g >= generations_at_next_report && g != last_generation) {
       last_generation = g;
       report_needed = true;
-      generations_at_next_report = std::min(
-          config.generation_factor > 1 ? g * config.generation_factor
-                                 : g + config.initial_generations_until_next_report,
-          g + config.max_generations_until_next_report);
+      generations_at_next_report =
+          std::min(config.generation_factor > 1 ? g * config.generation_factor
+                                                : g + config.initial_generations_until_next_report,
+                   g + config.max_generations_until_next_report);
     }
 
     auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();

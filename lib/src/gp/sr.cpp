@@ -76,7 +76,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
         fjac.col(i) = (fwd - bwd).array() / (d + d);
       }
 
-      return 2 * x.size();  // = number of evaluations done
+      return mode == Mode::Forward ? 1 + x.size() : 2 * x.size();  // = number of evaluations done
     }
   };
 

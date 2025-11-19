@@ -2766,8 +2766,8 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::TrackingOptions>
           (m, "TrackingOptions", "")
       // (default constructor explicitly deleted)
-      .def(nb::init<std::filesystem::path, std::optional<std::vector<std::tuple<std::string, std::string>>>, usize, usize, bool, bool, usize, usize, usize, std::chrono::nanoseconds, usize, std::chrono::nanoseconds>(),
-          nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100, nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true, nb::arg("report_intermediate_results") = true, nb::arg("initial_evaluations_until_next_report") = 10, nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000, nb::arg("initial_time_until_next_report") = std::chrono::seconds(1), nb::arg("time_factor") = 2, nb::arg("max_time_until_next_report") = std::chrono::minutes(10),
+      .def(nb::init<std::filesystem::path, std::optional<std::vector<std::tuple<std::string, std::string>>>, usize, u64, bool, bool, u64, u64, u64, u64, u64, u64, std::chrono::nanoseconds, u64, std::chrono::nanoseconds>(),
+          nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100, nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true, nb::arg("report_intermediate_results") = true, nb::arg("initial_evaluations_until_next_report") = 10, nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000, nb::arg("initial_generations_until_next_report") = 1, nb::arg("generation_factor") = 2, nb::arg("max_generations_until_next_report") = 100, nb::arg("initial_time_until_next_report") = std::chrono::seconds(1), nb::arg("time_factor") = 2, nb::arg("max_time_until_next_report") = std::chrono::minutes(10),
           " TODO at some point think about enabling dynamically setting the logging\n precision for floating points\n TODO at some point allow these params on Tracked::run to reduce the amount\n of config object nesting?")
       .def_rw("archive_capacity", &goblin::TrackingOptions::archive_capacity, "")
       .def_rw("max_evaluations_until_archive_adaption", &goblin::TrackingOptions::max_evaluations_until_archive_adaption, "")
@@ -2776,6 +2776,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("initial_evaluations_until_next_report", &goblin::TrackingOptions::initial_evaluations_until_next_report, "")
       .def_rw("eval_factor", &goblin::TrackingOptions::eval_factor, "1 is linear, >= 2 is exponential spacing")
       .def_rw("max_evaluations_until_next_report", &goblin::TrackingOptions::max_evaluations_until_next_report, "")
+      .def_rw("initial_generations_until_next_report", &goblin::TrackingOptions::initial_generations_until_next_report, "")
+      .def_rw("generation_factor", &goblin::TrackingOptions::generation_factor, "1 is linear, >= 2 is exponential spacing")
+      .def_rw("max_generations_until_next_report", &goblin::TrackingOptions::max_generations_until_next_report, "")
       .def_rw("initial_time_until_next_report", &goblin::TrackingOptions::initial_time_until_next_report, "")
       .def_rw("time_factor", &goblin::TrackingOptions::time_factor, "1 is linear, >= 2 is exponential spacing")
       .def_rw("max_time_until_next_report", &goblin::TrackingOptions::max_time_until_next_report, "")

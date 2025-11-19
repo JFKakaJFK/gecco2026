@@ -72,6 +72,9 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             continuous_model=vars(pygom)[
                 self.kwargs.get("continuous_model", "FullFOS")
             ](**self.kwargs.get("continuous_model_kwargs", {})),
+            sampling_model=vars(pygom)[
+                self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
+            ](**self.kwargs.get("sampling_model_kwargs", {})),
             repr=self.kwargs.get("repr", "aos"),
         )
         budget_kwargs = self.kwargs.get("budget_kwargs", {})
@@ -121,7 +124,19 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         )
 
         seed = self.kwargs.get("random_state", self.kwargs.get("seed"))
-        archive, _status = alg.run(problem, budget, seed=seed)
+
+        tracking_kwargs = self.kwargs.get("tracking_kwargs", {})
+        if "logpath" in tracking_kwargs:
+            tracking_kwargs["logpath"] = str(tracking_kwargs["logpath"])
+            archive, _status = pygom.Tracked.run(
+                problem,
+                alg,
+                budget,
+                pygom.TrackingOptions(**tracking_kwargs),
+                seed=seed,
+            )
+        else:
+            archive, _status = alg.run(problem, budget, seed=seed)
 
         def str2expr(e: str):
             # format is expr1,expr2,...

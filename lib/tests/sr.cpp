@@ -184,7 +184,7 @@ TEST_CASE("goblin::gp::sr") {
           /* subset = */ Subset{.discrete = ctx.nodes[i]}));
     }
 
-    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled=false},
+    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled = false},
                             IMSOptions(
                                 /* initial_population_size = */ 256,
                                 /* max_num_populations = */ 1),
