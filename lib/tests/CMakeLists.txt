@@ -34,6 +34,7 @@ set(
     gp_operators
     sr
     sr_gradient_step
+    sr_subfunction
     archive_objectives
 )
 

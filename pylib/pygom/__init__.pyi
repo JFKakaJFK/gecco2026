@@ -1851,16 +1851,45 @@ class GPContext:
 
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
+    # std::string to_dot(const SolutionBase &solution) const {
+    #   std::unreachable();
+    # };
 
-# std::string to_dot(const SolutionBase &solution) const {
-#   std::unreachable();
-# };
+    const_repr: ConstantRepr
 
-# ignoring inactive values
+    num_inputs: int
+    num_outputs: int
+    num_subexpressions: int
+    num_discrete: int
+    num_continuous: int
+    max_expression_size: int
+    num_parameters: int
 
-# node (without subtrees)
+    operators: List[OperatorBase]
+    op_idx2value: List[int]
 
-# namespace goblin
+    value_kind: List[ValueKind]
+    value_min_arity: List[int]
+    value_max_arity: List[int]
+    value_idx: List[int]
+
+    subtree_roots: List[int]  # indices of all subtree root nodes
+    output_roots: List[int]  # indices of all output root nodes
+
+    domain_sizes: Vec[int]  # node -> domain size
+    domain2value: Arr2D[int]  # node domain -> value
+
+    root: List[int]  # node -> current tree root
+    sizes: List[int]  # node -> size of subtree starting at node,
+    # ignoring inactive values
+    depth: List[int]  # node -> node depth
+    height: List[int]  # node -> node height
+    children: List[List[int]]  # node -> child node indices
+
+    nodes: List[
+        List[int]
+    ]  # node -> indices corresponding to the subtree starting at this
+    # node (without subtrees)
 
 # #endif
 

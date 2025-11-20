@@ -2492,7 +2492,7 @@ wheels = [
 
 [[package]]
 name = "pygom"
-version = "0.1.0"
+version = "0.1.1"
 source = { directory = "../../../" }
 dependencies = [
     { name = "numpy", version = "1.21.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8'" },

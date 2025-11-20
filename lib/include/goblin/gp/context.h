@@ -139,18 +139,21 @@ class GPContext {
     _value2domain = Arr2D<DType>::Constant(num_discrete, num_values, num_values);
 
     usize index = 0;
-    for (usize i = 0; i < expression_template.subexpressions.size() + expression_template.outputs.size(); i++) {
-      usize tree_root = index;
-      bool is_subtree = expression_template.subexpressions.size();
+    usize nsubtrees = expression_template.subexpressions.size();
+    usize ntrees = nsubtrees + expression_template.outputs.size();
+    for (usize i = 0; i < ntrees; i++) {
+      usize tree_root = index++;
+      bool is_subtree = i < nsubtrees;
 
       if (is_subtree) {
         subtree_roots[i] = tree_root;
       } else {
-        output_roots[i] = tree_root;
+        output_roots[i - nsubtrees] = tree_root;
       }
 
       std::vector<std::tuple<const TemplateNode*, usize>> queue{std::make_tuple(
-          is_subtree ? &expression_template.subexpressions[i] : &expression_template.outputs[i], index++)};
+          (is_subtree ? &expression_template.subexpressions[i] : &expression_template.outputs[i - nsubtrees]),
+          tree_root)};
       while (!queue.empty()) {
         auto [nptr, idx] = queue.back();
         queue.pop_back();
@@ -163,16 +166,18 @@ class GPContext {
         height[idx] = 1;
         nodes[idx] = {idx};
 
-        auto p_idx = parent(idx);
-        if (p_idx.has_value()) {
+        if (idx == tree_root) {
+          depth[idx] = 0;
+        } else {
+          auto p_idx = parent(idx);
+          assert(p_idx.has_value());
+
           depth[idx] = depth[p_idx.value()] + 1;
 
           while (p_idx.has_value()) {
             nodes[p_idx.value()].push_back(idx);
             p_idx = parent(p_idx.value());
           }
-        } else {
-          depth[idx] = 0;
         }
 
         for (const auto& c : nptr->children) {
@@ -189,8 +194,11 @@ class GPContext {
         // references that could lead to cycles)
         domain_sizes[idx] = 0;
         for (usize value = 0, domain_value; value < num_values; value++) {
+            // output trees cannot have arguments
           bool is_invalid_subtree_arg = !is_subtree && value_kind[value] == ValueKind::Arg;
-          bool is_invalid_subfunction_index = value_kind[value] == ValueKind::Subtree && value_idx[value] >= i;
+          // subtrees can only call previous subtrees to prevent cycles
+          bool is_invalid_subfunction_index =
+              is_subtree && value_kind[value] == ValueKind::Subtree && value_idx[value] >= i;
           bool is_arity_mismatch = value_min_arity[value] > children[idx].size();
           if (!(is_invalid_subtree_arg || is_invalid_subfunction_index || is_arity_mismatch)) {
             domain_value = domain_sizes[idx]++;
@@ -225,7 +233,7 @@ class GPContext {
     // TODO remove recursion & call stack copying by doing it iteratively
     usize size = 0;
 
-    std::function<std::string(usize, std::vector<usize>)> helper = [&](usize idx, std::vector<usize> call_stack) {
+    std::function<std::string(usize, std::vector<usize>&)> helper = [&](usize idx, std::vector<usize>& call_stack) {
       std::string res;
       if (size >= max_expression_size) {
         res = "SIZE OVERFLOW";
@@ -248,13 +256,17 @@ class GPContext {
       } else if (value_kind[value] == ValueKind::Constant) {
         res = std::format("{}", solution.continuous_values()(const_repr == ConstantRepr::Pool ? v_idx : idx));
       } else if (value_kind[value] == ValueKind::Arg) {
+          assert(!call_stack.empty());
         size--;  // arg node is transparent
         usize calling_node = call_stack.back();
         call_stack.pop_back();
         res = helper(children[calling_node][v_idx % children[calling_node].size()], call_stack);
+        call_stack.push_back(calling_node);
       } else if (value_kind[value] == ValueKind::Subtree) {
         size--;  // subtree call is transparent
+        call_stack.push_back(idx);
         res = helper(subtree_roots[v_idx], call_stack);
+        call_stack.pop_back();
       } else if (value_kind[value] == ValueKind::Operator) {
         usize arity = std::min(children[idx].size(), value_max_arity[value]);
         std::vector<std::string> args;
@@ -278,7 +290,8 @@ class GPContext {
     outputs.reserve(num_outputs);
     for (usize i = 0; i < num_outputs; i++) {
       // Works
-      auto repr = helper(output_roots[i], {});
+      std::vector<usize> call_stack;
+      auto repr = helper(output_roots[i], call_stack);
       outputs.push_back(repr);
 
       // This causes a container-overflow - apparently
@@ -307,7 +320,8 @@ class GPContext {
     eval_buffer.resize(X.rows(), max_expression_size);
 
     size = 0;
-    std::function<void(usize, std::vector<usize>)> helper = [&](usize idx, std::vector<usize> call_stack) {
+    std::function<void(usize, std::vector<usize>&)> helper = [&](usize idx, std::vector<usize>& call_stack) {
+
       if (buffer_idx >= max_expression_size) {
         eval_buffer.col(0).array() = std::numeric_limits<Scalar>::quiet_NaN();
         return;
@@ -334,10 +348,13 @@ class GPContext {
         usize calling_node = call_stack.back();
         call_stack.pop_back();
         helper(children[calling_node][v_idx % children[calling_node].size()], call_stack);
+        call_stack.push_back(calling_node);
       } else if (value_kind[value] == ValueKind::Subtree) {
         // subtree call is transparent - no need to change the buffer idx
         size--;
+        call_stack.push_back(idx);
         helper(subtree_roots[v_idx], call_stack);
+        call_stack.pop_back();
       } else if (value_kind[value] == ValueKind::Operator) {
         usize arity = std::min(children[idx].size(), operators[v_idx]->max_arity());
         std::vector<usize> child_indices(arity);
@@ -356,12 +373,13 @@ class GPContext {
       }
     };
 
-    solution.discrete_active() = false;
-    solution.continuous_active() = false;
+    solution.discrete_active().array() = false;
+    solution.continuous_active().array() = false;
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
     for (usize i = 0; i < num_outputs; i++) {
       buffer_idx = 0;
-      helper(output_roots[i], {});
+      std::vector<usize> call_stack;
+      helper(output_roots[i], call_stack);
       outputs.col(i) = eval_buffer.col(0);
 
       // std::cout << eval_buffer << std::endl;
@@ -370,16 +388,16 @@ class GPContext {
     return outputs;
   };
 
-  // TODO allow gradients w.r.t. specific continuous indices OR parameter
-  // indices
-  template <typename Scalar>
-  Arr2D<Scalar> compute_outputs_grad(SolutionBase& solution, Arr2D<Scalar>& X, Array<Scalar>& params) const {
-    std::unreachable();
-  };
-
-  // std::string to_dot(const SolutionBase &solution) const {
+  // // TODO allow gradients w.r.t. specific continuous indices OR parameter
+  // // indices
+  // template <typename Scalar>
+  // Arr2D<Scalar> compute_outputs_grad(SolutionBase& solution, Arr2D<Scalar>& X, Array<Scalar>& params) const {
   //   std::unreachable();
   // };
+
+  // // std::string to_dot(const SolutionBase &solution) const {
+  // //   std::unreachable();
+  // // };
 
   ConstantRepr const_repr;
 

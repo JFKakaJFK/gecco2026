@@ -52,6 +52,15 @@ termination_callback = default_termination_callback
 termination_callback = None  # comment this to make Ctrl+C work while the algorithm is running, otherwise it takes until the C++ code under the hood returns (can take a while, the other alternative is to manually kill the python process)
 # TODO currently the overhead of the python callback is considerable - check that less often
 params = {
+    "GOMEA": lambda ls, max_evals: dict(
+        algorithm="DiscreteGOMEA",
+        algorithm_kwargs=dict(
+            base_population_size=1024,
+            max_number_of_populations=1,
+        ),
+        linear_scaling=ls,
+        constant_representation="none",
+    ),
     # the default, compares to the original version
     "Mixed": lambda ls, max_evals: dict(
         linear_scaling=ls,
@@ -71,44 +80,44 @@ params = {
         ),
     ),
     # with intron awareness, compares to GP-RV (which already has intron awareness)
-    "Mixed IA": lambda ls, max_evals: dict(
-        linear_scaling=ls,
-        budget_kwargs=dict(
-            max_evaluations=max_evals, termination_callback=termination_callback
-        ),
-        ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-        rv_kwargs=dict(enabled=False),
-        population_kwargs=dict(),
-        discrete_model_kwargs=dict(
-            metric="mi",
-            intron_strategy="any_active",
-            filter_root=True,
-            merge_continuous=False,
-            num_continuous_bins=25,
-            normalize_initial_linkage_bias=True,
-        ),
-    ),
-    # with quite a few differences, just to see if some of the newer additions help
-    "Mixed++": lambda ls, max_evals: dict(
-        init="RecursiveCompleteInit",
-        linear_scaling=ls,
-        budget_kwargs=dict(
-            max_evaluations=max_evals, termination_callback=termination_callback
-        ),
-        ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-        rv_kwargs=dict(enabled=True),
-        population_kwargs=dict(),
-        discrete_model_kwargs=dict(
-            metric="nmi",
-            intron_strategy="any_active",
-            filter_root=True,
-            filter_parent_threshold=1e-6,
-            filter_children_threshold=1.0 - 1e-6,
-            merge_continuous=False,
-            num_continuous_bins=25,
-            normalize_initial_linkage_bias=False,
-        ),
-    ),
+    # "Mixed IA": lambda ls, max_evals: dict(
+    #     linear_scaling=ls,
+    #     budget_kwargs=dict(
+    #         max_evaluations=max_evals, termination_callback=termination_callback
+    #     ),
+    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
+    #     rv_kwargs=dict(enabled=False),
+    #     population_kwargs=dict(),
+    #     discrete_model_kwargs=dict(
+    #         metric="mi",
+    #         intron_strategy="any_active",
+    #         filter_root=True,
+    #         merge_continuous=False,
+    #         num_continuous_bins=25,
+    #         normalize_initial_linkage_bias=True,
+    #     ),
+    # ),
+    # # with quite a few differences, just to see if some of the newer additions help
+    # "Mixed++": lambda ls, max_evals: dict(
+    #     init="RecursiveCompleteInit",
+    #     linear_scaling=ls,
+    #     budget_kwargs=dict(
+    #         max_evaluations=max_evals, termination_callback=termination_callback
+    #     ),
+    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
+    #     rv_kwargs=dict(enabled=True),
+    #     population_kwargs=dict(),
+    #     discrete_model_kwargs=dict(
+    #         metric="nmi",
+    #         intron_strategy="any_active",
+    #         filter_root=True,
+    #         filter_parent_threshold=1e-6,
+    #         filter_children_threshold=1.0 - 1e-6,
+    #         merge_continuous=False,
+    #         num_continuous_bins=25,
+    #         normalize_initial_linkage_bias=False,
+    #     ),
+    # ),
 }
 
 # globals bad
