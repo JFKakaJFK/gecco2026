@@ -65,7 +65,7 @@ TEST_CASE("goblin::gp::sr") {
       Arr2D<CType> buffer;
       Array<CType> params;
       usize expression_size;
-      auto Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      auto Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       REQUIRE(expression_size == 6);
 
@@ -95,7 +95,7 @@ TEST_CASE("goblin::gp::sr") {
         std::println("{}", rep);
       }
 
-      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       for (isize i = 0; i < Y.cols(); i++) {
         for (isize j = 0; j < Y.rows(); j++) {
@@ -126,7 +126,7 @@ TEST_CASE("goblin::gp::sr") {
         std::println("{}", rep);
       }
 
-      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       for (isize i = 0; i < Y.cols(); i++) {
         for (isize j = 0; j < Y.rows(); j++) {

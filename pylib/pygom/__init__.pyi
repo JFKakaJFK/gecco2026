@@ -1851,9 +1851,16 @@ class GPContext:
 
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
-    # std::string to_dot(const SolutionBase &solution) const {
+    # // TODO allow gradients w.r.t. specific continuous indices OR parameter
+    # / indices
+    # template <typename Scalar>
+    # Arr2D<Scalar> compute_outputs_grad(SolutionBase& solution, Arr2D<Scalar>& X, Array<Scalar>& params) const {
     #   std::unreachable();
     # };
+
+    # // std::string to_dot(const SolutionBase &solution) const {
+    # /   std::unreachable();
+    # / };
 
     const_repr: ConstantRepr
 
@@ -1864,6 +1871,7 @@ class GPContext:
     num_continuous: int
     max_expression_size: int
     num_parameters: int
+    max_num_children: int
 
     operators: List[OperatorBase]
     op_idx2value: List[int]
