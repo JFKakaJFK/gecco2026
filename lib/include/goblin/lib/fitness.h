@@ -111,11 +111,13 @@ class MOFitness final : public ArchiveFitnessBase {
   CType distance(const Quality& lhs,
                  const Quality& rhs,
                  std::optional<usize> objective = std::nullopt) const override final {
+    CType dist;
     if (objective.has_value()) {
-      return distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
+      dist = distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
     } else {
-      return (lhs.objectives - rhs.objectives).norm();
+      dist = (lhs.objectives - rhs.objectives).norm();
     }
+    return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
 
   Quality worst() const override final {

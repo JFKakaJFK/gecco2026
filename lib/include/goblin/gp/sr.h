@@ -268,10 +268,10 @@ class SRProblem : public GPInstanceBase {
     usize expression_size;
     auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
-    if(!out.has_value()){
-        solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
-        solution.quality().constraint_value = 1.0;
-        return;
+    if (!out.has_value()) {
+      solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
+      solution.quality().constraint_value = 1.0;
+      return;
     }
 
     Arr2D<ScalarType> Y_pred = out.value();

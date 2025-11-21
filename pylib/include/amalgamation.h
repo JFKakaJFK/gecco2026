@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -41,6 +42,7 @@ namespace goblin {
 
 using u8 = std::uint8_t;
 using u16 = std::uint16_t;
+using u32 = std::uint32_t;
 using u64 = std::uint64_t;
 using usize = std::size_t;     // STL index type
 using isize = std::ptrdiff_t;  // ~= Eigen::Index
@@ -2979,8 +2981,8 @@ class CompleteInit final : public DiscreteInitBase {
 #define _GOBLIN_GP_CONTEXT_H
 
 #include <string>
-#include <ranges>
 #include <iterator>
+#include <ranges>
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3195,7 +3197,7 @@ class OperatorBase {
     return out;
   };
 
-  virtual std::string format(const std::vector<std::string>& args) const = 0;
+  virtual std::string format(const std::span<const std::string>& args) const = 0;
 
   virtual ~OperatorBase() = default;
 };
@@ -3218,7 +3220,7 @@ class OpAdd : public OperatorBase {
     d_out = d_args.rowwise().sum();
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
     for (usize i = 0; i < args.size(); i++) {
@@ -3263,7 +3265,7 @@ class OpSub : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     if (args.size() == 1) {
       ss << "(-" << args[0] << ')';
@@ -3309,7 +3311,7 @@ class OpMul : public OperatorBase {
         args(Eigen::placeholders::all, Eigen::seq(0, args.cols() - 2)).rowwise().prod() * d_args.col(d_args.cols() - 1);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
     for (usize i = 0; i < args.size(); i++) {
@@ -3353,7 +3355,7 @@ class OpDiv : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(' << args[0] << '/';
     if (args.size() > 2) {
@@ -3392,7 +3394,7 @@ class OpSin : public OperatorBase {
     d_out = args.col(0).cos() * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sin({})", args[0]);
   };
 };
@@ -3416,7 +3418,7 @@ class OpCos : public OperatorBase {
     d_out = -args.col(0).sin() * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("cos({})", args[0]);
   };
 };
@@ -3440,7 +3442,7 @@ class OpExp : public OperatorBase {
     d_out = out * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("exp({})", args[0]);
   };
 };
@@ -3464,7 +3466,7 @@ class OpLog : public OperatorBase {
     d_out = d_args.col(0) / args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("log({})", args[0]);
   };
 };
@@ -3488,7 +3490,7 @@ class OpSquare : public OperatorBase {
     d_out = CType(2.0) * args.col(0) * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, 2)", args[0]);
   };
 };
@@ -3512,7 +3514,7 @@ class OpSqrt : public OperatorBase {
     d_out = d_args.col(0) / (out + out);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sqrt({})", args[0]);
   };
 };
@@ -3539,7 +3541,7 @@ class OpPow : public OperatorBase {
             (args.col(0) * d_args.col(1) * args.col(0).log() + args.col(1) * d_args.col(0));
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, {})", args[0], args[1]);
   };
 };
@@ -3563,7 +3565,7 @@ class OpAbs : public OperatorBase {
     d_out = args.col(0) * d_args.col(0) / out;
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("abs({})", args[0]);
   };
 };
@@ -3589,7 +3591,7 @@ class OpMin : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << "min(";
     for (usize i = 0; i < args.size(); i++) {
@@ -3624,7 +3626,7 @@ class OpMax : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << "max(";
     for (usize i = 0; i < args.size(); i++) {
@@ -3856,381 +3858,401 @@ class GPContext {
     return std::nullopt;
   };
 
-  std::vector<std::string> to_sympy(const SolutionBase& solution) const {
-    // TODO remove recursion & call stack copying by doing it iteratively
-    usize size = 0;
-
-    std::function<std::string(usize, std::vector<usize>&)> helper = [&](usize idx, std::vector<usize>& call_stack) {
-      std::string res;
-      if (size >= max_expression_size) {
-        res = "SIZE OVERFLOW";
-        return res;
-      }
-      size++;
-
-      assert(idx < num_discrete);
-      usize domain_value = solution.discrete_values()(idx);
-      assert(domain_value < static_cast<usize>(domain2value.cols()));
-      assert(domain_value < domain_sizes[idx]);
-      DType value = domain2value(idx, domain_value);
-      assert(value < value_idx.size());
-      usize v_idx = value_idx[value];
-
-      if (value_kind[value] == ValueKind::Input) {
-        res = std::format("x{:d}", v_idx);
-      } else if (value_kind[value] == ValueKind::Parameter) {
-        res = std::format("c{:d}", v_idx);
-      } else if (value_kind[value] == ValueKind::Constant) {
-        res = std::format("{}", solution.continuous_values()(const_repr == ConstantRepr::Pool ? v_idx : idx));
-      } else if (value_kind[value] == ValueKind::Arg) {
-        assert(!call_stack.empty());
-        size--;  // arg node is transparent
-        usize calling_node = call_stack.back();
-        call_stack.pop_back();
-        res = helper(children[calling_node][v_idx % children[calling_node].size()], call_stack);
-        call_stack.push_back(calling_node);
-      } else if (value_kind[value] == ValueKind::Subtree) {
-        size--;  // subtree call is transparent
-        call_stack.push_back(idx);
-        res = helper(subtree_roots[v_idx], call_stack);
-        call_stack.pop_back();
-      } else if (value_kind[value] == ValueKind::Operator) {
-        usize arity = std::min(children[idx].size(), value_max_arity[value]);
-        std::vector<std::string> args;
-        args.reserve(arity);
-        for (usize i = 0; i < arity; i++) {
-          std::string arg = helper(children[idx][i], call_stack);
-          args.push_back(arg);
-        }
-        res = operators[v_idx]->format(args);
-      } else {
-        std::unreachable();
-      }
-
-      if (const_repr == ConstantRepr::Edges) {
-        res = std::format("({} * {})", solution.continuous_values()(idx), res);
-      }
-      return res;
-    };
-
-    std::vector<std::string> outputs;
-    outputs.reserve(num_outputs);
-    for (usize i = 0; i < num_outputs; i++) {
-      // Works
-      std::vector<usize> call_stack;
-      auto repr = helper(output_roots[i], call_stack);
-      outputs.push_back(repr);
-
-      // This causes a container-overflow - apparently
-      // recursive lambdas that capture by reference have rough edges...
-      // outputs.push_back(helper(output_roots[i], {}));
-    }
-
-    return outputs;
-  };
-
-  template <typename Scalar>
-  Arr2D<Scalar> compute_outputs(SolutionBase& solution, const Arr2D<Scalar>& X, const Array<Scalar>& params) const {
-    Arr2D<Scalar> eval_buffer;
-    usize size;
-    return compute_outputs(eval_buffer, solution, X, params, size);
-  }
-
-  template <typename Scalar>
-  Arr2D<Scalar> compute_outputs2(Arr2D<Scalar>& eval_buffer,
-                                 SolutionBase& solution,
-                                 const Arr2D<Scalar>& X,
-                                 const Array<Scalar>& params,
-                                 usize& size) const {
-    // TODO remove recursion & call stack copying by doing it iteratively
-    usize buffer_idx;
-    eval_buffer.resize(X.rows(), max_expression_size);
-
-    size = 0;
-    std::function<void(usize, std::vector<usize>&)> helper = [&](usize idx, std::vector<usize>& call_stack) {
-      if (buffer_idx >= max_expression_size) {
-        eval_buffer.col(0).array() = std::numeric_limits<Scalar>::quiet_NaN();
-        return;
-      }
-
-      DType value = domain2value(idx, solution.discrete_values()(idx));
-      solution.discrete_active()(idx) = true;
-      usize v_idx = value_idx[value];
-
-      usize buf_idx = buffer_idx;
-
-      size++;
-      if (value_kind[value] == ValueKind::Input) {
-        eval_buffer.col(buffer_idx++) = X.col(v_idx);
-      } else if (value_kind[value] == ValueKind::Parameter) {
-        eval_buffer.col(buffer_idx++) = params[v_idx];
-      } else if (value_kind[value] == ValueKind::Constant) {
-        usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
-        solution.continuous_active()(ci) = true;
-        eval_buffer.col(buffer_idx++) = solution.continuous_values()(ci);
-      } else if (value_kind[value] == ValueKind::Arg) {
-        // arg node is transparent - no need to change the buffer idx
-        size--;
-        usize calling_node = call_stack.back();
-        call_stack.pop_back();
-        helper(children[calling_node][v_idx % children[calling_node].size()], call_stack);
-        call_stack.push_back(calling_node);
-      } else if (value_kind[value] == ValueKind::Subtree) {
-        // subtree call is transparent - no need to change the buffer idx
-        size--;
-        call_stack.push_back(idx);
-        helper(subtree_roots[v_idx], call_stack);
-        call_stack.pop_back();
-      } else if (value_kind[value] == ValueKind::Operator) {
-        usize arity = std::min(children[idx].size(), operators[v_idx]->max_arity());
-        std::vector<usize> child_indices(arity);
-        for (usize i = 0; i < arity; i++) {
-          child_indices[i] = ++buffer_idx;
-          helper(children[idx][i], call_stack);
-        }
-        operators[v_idx]->apply(eval_buffer.col(buf_idx), eval_buffer(Eigen::placeholders::all, child_indices));
-      } else {
-        std::unreachable();
-      }
-
-      if (const_repr == ConstantRepr::Edges) {
-        solution.continuous_active()(idx) = true;
-        eval_buffer.col(buf_idx) *= solution.continuous_values()(idx);
-      }
-    };
-
-    solution.discrete_active().array() = false;
-    solution.continuous_active().array() = false;
-    Arr2D<Scalar> outputs(X.rows(), num_outputs);
-    for (usize i = 0; i < num_outputs; i++) {
-      buffer_idx = 0;
-      std::vector<usize> call_stack;
-      helper(output_roots[i], call_stack);
-      outputs.col(i) = eval_buffer.col(0);
-
-      // std::cout << eval_buffer << std::endl;
-    }
-
-    return outputs;
-  };
-
-  // Returns all non-reference nodes almost in-order (argument order is reversed) and the output indices.
+  // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
+  // without references if the total number of nodes exceeds the `max_expression_size` or `std::nullopt` otherwise.
   //
-  // The variables are marked active/inactive only if the solution is not const. This also returns the node indices, not
-  // the values directly since some information like arity/constant lookups still need more information.
+  // The variables are marked active/inactive only if the solution is not const.
+  // Note that the reason why it's `nodes_post_order` and not `values_post_order` is that for constants/operator calls
+  // the corresponding index/arity isn't fully determined by the value alone.
   template <typename S>
-  std::tuple<std::vector<usize>, std::vector<usize>> nodes_in_order(S& solution,
-                                                                    bool discount_size,
-                                                                    bool& size_overflow,
-                                                                    usize& size) const {
+  std::optional<std::vector<std::vector<usize>>> nodes_post_order(S& solution, bool discount_size, usize& size) const {
     // initially we haven't visited anything, so we set everything to be inactive
     if constexpr (!std::is_const<S>()) {
       solution.discrete_active().array() = false;
       solution.continuous_active().array() = false;
     }
-    size_overflow = false;
 
-    std::vector<usize> nodes;
-    nodes.reserve(max_expression_size);
-    std::vector<usize> output_indices;
-    output_indices.reserve(output_roots.size());
+    std::vector<std::vector<usize>> nodes;
+    nodes.reserve(num_outputs);
 
-    // in the modular GP-GOMEA paper there is this concept of "discounted" size to not punish re-using subfunctions by
-    // only counting the subfunction nodes once.
-    Array<usize> visited = Array<usize>::Zero(num_discrete);
+    // in the modular GP-GOMEA paper (https://arxiv.org/pdf/2505.01262v1) there is this concept of "discounted" size to
+    // not punish re-using subfunctions by only counting the subfunction nodes once.
+    Array<u32> visited = Array<u32>::Zero(num_discrete);
 
     // to resolve subfunction arguments, we need to know the calling node
     // (this stack only increases, to avoid revisiting nodes and more importantly to not invalidate stack indices)
     std::vector<usize> call_stack;
     call_stack.reserve(max_expression_size);
 
-    // for each we need to visit, we need the node index and the call stack idx
-    std::vector<std::tuple<usize, usize>> node_stack;
+    // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
+    // (for functions the first time is in-order, and the second time is post-order)
+    std::vector<std::tuple<usize, usize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
 
-    // for each output, walk the tree in order and add the nodes to `values`
+    // for each output, walk the tree in post-order
+    size = 0;  // initially the size is 0 (size in GP is somewhat arbitary - even without subftrees/args which are not
+               // counted, simplification typically also has an effect and it's not necessarily a good proxy for
+               // "interpretability" in the first place)
     for (usize n : output_roots) {
+      // add and allocate for the output
+      nodes.emplace_back();
+      auto& tree = nodes.back();
+      tree.reserve(max_expression_size - size);
+
       // housekeeping: reset the call stack and node_stack per output
       call_stack.clear();
       node_stack.clear();
-      node_stack.emplace_back(n, 0);
+      node_stack.emplace_back(n, 0, false);
 
-      // Since all subtrees are added to nodes here, we need to have some way to know
-      // when one tree ends and another starts (not sure if this is the best choice - doing all trees at once makes
-      // tracking the size easier but the evaluation more complex; in the end it matters that there is a size bound for
-      // pre-allocation, but not really if that bound is per tree or for all trees together...)
-      output_indices.push_back(nodes.size());
-
+      // nodes are visited up to twice - once in-order, and once post-order after the children have been taken care of
       while (!node_stack.empty()) {
         // we hit the max size, but have a next node since this is inside the loop
-        if (nodes.size() == max_expression_size) {
-          size_overflow = true;
-          size = max_expression_size + 1;
-          return std::make_tuple(nodes, output_indices);
+        if (size + tree.size() == max_expression_size) {
+          return std::nullopt;
         }
 
         // get the node and mark it as active
-        auto [idx, call_stack_idx] = node_stack.back();
-        node_stack.pop_back();
+        auto [idx, call_stack_idx, is_post_order] = node_stack.back();
+        usize node_stack_idx = node_stack.size() - 1;
+
         if constexpr (!std::is_const<S>()) {
           solution.discrete_active()(idx) = true;
-        }
-
-        // track the size (repeat visits don't count in the "discounted" setting)
-        if (discount_size) {
-          visited(idx) = 1;
-        } else {
-          visited(idx) += 1;
         }
 
         // lookup the value of the current node
         DType value = domain2value(idx, solution.discrete_values()(idx));
         usize v_idx = value_idx[value];
 
-        if (value_kind[value] == ValueKind::Arg) {
-          // we need to replace the argument with the corresponding child of the caller
-          usize calling_node = call_stack[call_stack_idx];
-          auto& cnodes = children[calling_node];
-          std::println("{}: Arg[{}] -> {}", idx, v_idx, cnodes[v_idx % cnodes.size()]);
-          node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                             call_stack_idx - 1  // use the stack index of the caller
-          );
-        } else if (value_kind[value] == ValueKind::Subtree) {
-          // we need to replace the actual subtree with the called subtree
-          call_stack.push_back(idx);
-          node_stack.emplace_back(subtree_roots[v_idx],
-                             call_stack.size() - 1  // a call always needs to use the top of the stack, no matter where
-                                                    // the current call_stack_idx is (!)
-          );
-        } else if (value_kind[value] == ValueKind::Operator) {
-          // add the operator
-          nodes.push_back(idx);
+        // since this only a traversal without any evaluation, we only have to
+        // check if this is an actual value or if we need to resolve arguments or other indirections
+        bool is_leaf = false;
 
-          // then the arguments
-          usize arity = std::min(children[idx].size(), value_max_arity[value]);
-          for (usize i = 0; i < arity; i++) {
-            // the child's calling node/call_stack_idx is the same as the parents
-            node_stack.emplace_back(children[idx][i], call_stack_idx);
+        // we only need to look at the node if this is the first time we see it - in the post-order visit all we have to
+        // do is add it to the tree
+        if (!is_post_order) {
+          // In the reference modular GP-GOMEA implementation, the "discounted size" is defined
+          // here:
+          // https://github.com/matigekunstintelligentie/MultiGPG/blob/21094c016f93457df173935a1ec702568c6c2b24/src/individual.hpp#L98
+          // and here:
+          // https://github.com/matigekunstintelligentie/MultiGPG/blob/21094c016f93457df173935a1ec702568c6c2b24/src/node.hpp#L90
+          // - in no case are references counted, i.e. the visit count for arg/fn nodes needs to be reset to 0 later on
+          // track the size (repeat visits don't count in the "discounted" setting)
+          if (discount_size) {
+            visited(idx) = 1;
           }
-        } else if (value_min_arity[value] > 0) {
-          // for anything that is not a leaf, we need to resolve the arguments, so another branch is needed if
-          // non-terminal kinds are added
-          throw std::runtime_error("Encountered unhandled non-leaf node.");
-        } else {
-          if constexpr (!std::is_const<S>()) {
-            if (value_kind[value] == ValueKind::Constant) {
-              solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+
+          if (value_kind[value] == ValueKind::Arg) {
+            visited(idx) = 0;
+
+            // we need to replace the argument with the corresponding child of the caller
+            usize calling_node = call_stack[call_stack_idx];
+            auto& cnodes = children[calling_node];
+
+            // and replace the stack entry with with the actual argument
+            node_stack.pop_back();
+            node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
+                                    call_stack_idx - 1,  // use the stack index of the caller
+                                    false);
+          } else if (value_kind[value] == ValueKind::Subtree) {
+            visited(idx) = 0;
+            // we need to replace the actual subtree with the called subtree
+
+            // first update the call stack
+            call_stack.push_back(idx);
+
+            // then replace the stack entry with the called subtree
+            node_stack.pop_back();
+            node_stack.emplace_back(subtree_roots[v_idx],
+                                    call_stack.size() - 1,  // a call always needs to use the top of the stack, no
+                                                            // matter where the current call_stack_idx is (!)
+                                    false);
+          } else if (value_kind[value] == ValueKind::Operator) {
+            // the operator stays on the stack, but the next visit is post-order
+            std::get<2>(node_stack[node_stack_idx]) = true;
+
+            // all the arguments need to be added (the stack reverses the order, so this is in reverse)
+            usize arity = std::min(children[idx].size(), value_max_arity[value]);
+            for (usize i = arity; i > 0;) {
+              // the child's calling node/call_stack_idx is the same as the parents
+              node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
+            }
+          } else if (value_min_arity[value] > 0) {
+            // for anything that is not a leaf, we need to resolve the arguments, so another branch is needed if
+            // non-terminal kinds are added
+            throw std::runtime_error("Encountered unhandled non-leaf node.");
+          } else {
+            if constexpr (!std::is_const<S>()) {
+              if (value_kind[value] == ValueKind::Constant) {
+                solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+              }
+            }
+            is_leaf = true;
+          }
+        }
+
+        // if this is a leaf or if this is the post-order visit, then we remove it from the stack and add it to the tree
+        if (is_post_order || is_leaf) {
+          // Indirections like Subtree/Arg calls are not kept, so only the constants for actual "values", not
+          // "references" are used
+          if (const_repr == ConstantRepr::Edges) {
+            if constexpr (!std::is_const<S>()) {
+              solution.continuous_active()(idx) = true;
             }
           }
-          // for leafs we only have to add the node
-          nodes.push_back(idx);
+
+          node_stack.pop_back();
+          tree.push_back(idx);
+        }
+      }
+
+      size += tree.size();
+    }
+
+    if (discount_size) {
+      size = visited.sum();
+    }
+
+    return nodes;
+  }
+
+  std::vector<std::string> to_sympy(const SolutionBase& solution) const {
+    // extract the expression in post-order
+    usize _size;
+    auto nodes = nodes_post_order(solution, false, _size);
+
+    std::vector<std::string> exprs(num_outputs, "SIZE OVERFLOW");
+
+    // check if we are done already
+    if (!nodes.has_value()) {
+      return exprs;
+    }
+
+    // keep a stack for the arguments
+    std::vector<std::string> arg_stack;
+    arg_stack.reserve(max_expression_size);
+
+    const auto trees = nodes.value();
+    for (usize i = 0; i < trees.size(); i++) {
+      const auto& tree = trees[i];
+
+      // housekeeping: initially, there are no arguments
+      arg_stack.clear();
+
+      // the nodes are in postfix notation, so we evaluate from left to right
+      for (usize j = 0; j < tree.size(); j++) {
+        usize idx = tree[j];
+
+        // lookup the value of the current node
+        usize value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
+
+        // at this point, all references have been resolved
+        assert(value_kind[value] != ValueKind::Arg);
+        assert(value_kind[value] != ValueKind::Subtree);
+
+        // resolve value lookups / function calls
+        if (value_kind[value] == ValueKind::Input) {
+          arg_stack.push_back(std::format("x{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Parameter) {
+          arg_stack.push_back(std::format("c{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          arg_stack.push_back(std::format("{}", solution.continuous_values()(ci)));
+        } else if (value_kind[value] == ValueKind::Operator) {
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          usize arg_stack_idx = arg_stack.size() - arity;
+
+          // the arguments are in the correct order on the stack, so we just need to get the last arity indices on the
+          // arg_stack
+          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
+          arg_stack[arg_stack_idx] = operators[v_idx]->format(args);
+
+          // pop the now used arguments from the stack, but keep the op result
+          arg_stack.resize(arg_stack_idx + 1);
+        } else {
+          std::unreachable();  // if this triggers, either not all reference types have been removed or a non-reference
+                               // value kind has been added...
         }
 
         if (const_repr == ConstantRepr::Edges) {
-          if constexpr (!std::is_const<S>()) {
-            solution.continuous_active()(idx) = true;
-          }
+          arg_stack.back() = std::format("({} * ({}))", solution.continuous_values()(idx), arg_stack.back());
         }
       }
+
+      // at the end the stack only contains the tree output
+      exprs[i] = arg_stack.back();
     }
 
-    // TODO check with Peter if Joe counts the fn/arg nodes in https://arxiv.org/pdf/2505.01262v1 (I don't count them
-    // here) size = visited.sum();
-    size = discount_size ? visited.sum() : nodes.size();
+    return exprs;
 
-    return std::make_tuple(nodes, output_indices);
+    // // TODO remove recursion & call stack copying by doing it iteratively
+    // usize size = 0;
+
+    // std::function<std::string(usize, std::vector<usize>&)> helper = [&](usize idx, std::vector<usize>& call_stack) {
+    //   std::string res;
+    //   if (size >= max_expression_size) {
+    //     res = "SIZE OVERFLOW";
+    //     return res;
+    //   }
+    //   size++;
+
+    //   assert(idx < num_discrete);
+    //   usize domain_value = solution.discrete_values()(idx);
+    //   assert(domain_value < static_cast<usize>(domain2value.cols()));
+    //   assert(domain_value < domain_sizes[idx]);
+    //   DType value = domain2value(idx, domain_value);
+    //   assert(value < value_idx.size());
+    //   usize v_idx = value_idx[value];
+
+    //   if (value_kind[value] == ValueKind::Input) {
+    //     res = std::format("x{:d}", v_idx);
+    //   } else if (value_kind[value] == ValueKind::Parameter) {
+    //     res = std::format("c{:d}", v_idx);
+    //   } else if (value_kind[value] == ValueKind::Constant) {
+    //     res = std::format("{}", solution.continuous_values()(const_repr == ConstantRepr::Pool ? v_idx : idx));
+    //   } else if (value_kind[value] == ValueKind::Arg) {
+    //     assert(!call_stack.empty());
+    //     size--;  // arg node is transparent
+    //     usize calling_node = call_stack.back();
+    //     call_stack.pop_back();
+    //     res = helper(children[calling_node][v_idx % children[calling_node].size()], call_stack);
+    //     call_stack.push_back(calling_node);
+    //   } else if (value_kind[value] == ValueKind::Subtree) {
+    //     size--;  // subtree call is transparent
+    //     call_stack.push_back(idx);
+    //     res = helper(subtree_roots[v_idx], call_stack);
+    //     call_stack.pop_back();
+    //   } else if (value_kind[value] == ValueKind::Operator) {
+    //     usize arity = std::min(children[idx].size(), value_max_arity[value]);
+    //     std::vector<std::string> args;
+    //     args.reserve(arity);
+    //     for (usize i = 0; i < arity; i++) {
+    //       std::string arg = helper(children[idx][i], call_stack);
+    //       args.push_back(arg);
+    //     }
+    //     res = operators[v_idx]->format(args);
+    //   } else {
+    //     std::unreachable();
+    //   }
+
+    //   if (const_repr == ConstantRepr::Edges) {
+    //     res = std::format("({} * {})", solution.continuous_values()(idx), res);
+    //   }
+    //   return res;
+    // };
+
+    // std::vector<std::string> outputs;
+    // outputs.reserve(num_outputs);
+    // for (usize i = 0; i < num_outputs; i++) {
+    //   // Works
+    //   std::vector<usize> call_stack;
+    //   auto repr = helper(output_roots[i], call_stack);
+    //   outputs.push_back(repr);
+
+    //   // This causes a container-overflow - apparently
+    //   // recursive lambdas that capture by reference have rough edges...
+    //   // outputs.push_back(helper(output_roots[i], {}));
+    // }
+
+    // return outputs;
+  };
+
+  template <typename Scalar>
+  std::optional<Arr2D<Scalar>> compute_outputs(SolutionBase& solution,
+                                               const Arr2D<Scalar>& X,
+                                               const Array<Scalar>& params) const {
+    Arr2D<Scalar> eval_buffer;
+    usize size;
+    return compute_outputs(eval_buffer, solution, X, params, size);
   }
 
   template <typename Scalar>
-  Arr2D<Scalar> compute_outputs(Arr2D<Scalar>& eval_buffer,
-                                SolutionBase& solution,
-                                const Arr2D<Scalar>& X,
-                                const Array<Scalar>& params,
-                                usize& size) const {
+  std::optional<Arr2D<Scalar>> compute_outputs(Arr2D<Scalar>& eval_buffer,
+                                               SolutionBase& solution,
+                                               const Arr2D<Scalar>& X,
+                                               const Array<Scalar>& params,
+                                               usize& size) const {
     // the expression is evaluated in two steps:
     // 1. the actual expression is extracted from the template in-order
     // 2. the operations are interpreted in reverse
 
-    // Node indices are used here to not loose the last bit of information we still need - how should we interpret the
-    // node?
-    bool size_overflow;
-    auto [nodes, output_indices] = nodes_in_order(solution, /* TODO discount_size = */ false, size_overflow, size);
+    auto nodes = nodes_post_order(solution, /* TODO discount_size = */ true, size);
 
-    std::println("RPN: {}", nodes);
-    std::println("Outputs: {}", output_indices);
-
-    // check if we even have to evaluate (but right now we still need )
-    Arr2D<Scalar> outputs(X.rows(), num_outputs);
-    if (size_overflow) {
-      outputs.array() = std::numeric_limits<Scalar>::quiet_NaN();
-      return outputs;
+    // check if we even have to evaluate
+    if (!nodes.has_value()) {
+      return std::nullopt;
     }
 
     // ensure the buffer is allocated
     eval_buffer.resize(X.rows(), max_expression_size);
 
+    // evaluation of postfix expressions assumes a stack model, i.e. results are pushed onto as stack, arguments
+    // retrieved from the stack and at the end, the single stack entry is the result. Since arguments might be consist
+    // of nested operations, the buffer indices corresponding to the actual results are needed somewhere.
     std::vector<usize> arg_stack;
-    arg_stack.reserve(nodes.size());
+    arg_stack.reserve(max_expression_size);
 
-    // actually evaluate each active node in reverse (from leaf to root)
-    for (usize i = nodes.size(), o = output_indices.size() - 1; i > 0;) {
-      usize idx = nodes[--i];
+    // for each output, evaluate the tree
+    Arr2D<Scalar> outputs(X.rows(), num_outputs);
+    const auto trees = nodes.value();
+    for (usize i = 0; i < trees.size(); i++) {
+      const auto& tree = trees[i];
 
-      std::println("Args: {}", arg_stack);
+      // housekeeping: initially, there are no arguments
+      arg_stack.clear();
 
-      // lookup the value of the current node
-      usize value = domain2value(idx, solution.discrete_values()(idx));
-      usize v_idx = value_idx[value];
+      // the nodes are in postfix notation, so we evaluate from left to right
+      for (usize j = 0; j < tree.size(); j++) {
+        usize idx = tree[j];
 
-      // at this point, all references have been resolved
-      assert(value_kind[value] != ValueKind::Arg);
-      assert(value_kind[value] != ValueKind::Subtree);
+        // lookup the value of the current node
+        usize value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
 
-      // then resolve value lookups / function calls
-      if (value_kind[value] == ValueKind::Input) {
-        std::println("{}: x{}", idx, v_idx);
-        eval_buffer.col(i) = X.col(v_idx);
-        arg_stack.push_back(i);
-      } else if (value_kind[value] == ValueKind::Parameter) {
-        eval_buffer.col(i) = params(v_idx);
-        arg_stack.push_back(i);
-      } else if (value_kind[value] == ValueKind::Constant) {
-        usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
-        std::println("{}: c{}", idx, ci);
-        eval_buffer.col(i) = solution.continuous_values()(ci);
-        arg_stack.push_back(i);
-      } else if (value_kind[value] == ValueKind::Operator) {
-        usize arity = std::min(children[idx].size(), value_max_arity[value]);
-        assert(arg_stack.size() >= arity);
+        // at this point, all references have been resolved
+        assert(value_kind[value] != ValueKind::Arg);
+        assert(value_kind[value] != ValueKind::Subtree);
 
-        std::span<const usize> child_indices{arg_stack.end() - arity, arg_stack.end()};
-        std::println("{}: op{}({})", idx, v_idx, child_indices);
-        operators[v_idx]->apply(eval_buffer.col(i), eval_buffer(Eigen::placeholders::all, child_indices));
+        // resolve value lookups / function calls
+        if (value_kind[value] == ValueKind::Input) {
+          eval_buffer.col(j) = X.col(v_idx);
+        } else if (value_kind[value] == ValueKind::Parameter) {
+          eval_buffer.col(j) = params(v_idx);
+        } else if (value_kind[value] == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          eval_buffer.col(j) = solution.continuous_values()(ci);
+        } else if (value_kind[value] == ValueKind::Operator) {
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
 
-        // after we compute the function, we need to remove the arguments and add the result to the argument stack
-        for (usize j = 0; j < arity; j++) {
-          arg_stack.pop_back();
+          // the arguments are in the correct order on the stack, so we just need to get the last arity indices on the
+          // arg_stack
+          std::span<const usize> child_indices{arg_stack.end() - arity, arg_stack.end()};
+
+          operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+
+          // pop the now used arguments from the stack
+          arg_stack.resize(arg_stack.size() - arity);
+        } else {
+          std::unreachable();  // if this triggers, either not all reference types have been removed or a non-reference
+                               // value kind has been added...
         }
-        arg_stack.push_back(i);
-      } else {
-        std::unreachable();
+
+        if (const_repr == ConstantRepr::Edges) {
+          eval_buffer.col(j) *= solution.continuous_values()(idx);
+        }
+
+        // since there are no more references, each node output is
+        arg_stack.push_back(j);
       }
 
-      if (const_repr == ConstantRepr::Edges) {
-        eval_buffer.col(i) *= solution.continuous_values()(idx);
-      }
-
-      // Since all subtrees are in nodes, we need the output indices to know when a subexpression is done
-      // If that's the case, we need to reset the arg stack and might as well already copy the output from the buffer
-      if (i == output_indices[o]) {
-        std::println("O[{}]: {}", o, arg_stack);
-        outputs.col(o--) = eval_buffer.col(i);
-        arg_stack.clear();
-      }
+      // at the end the stack only contains the tree output, and that is at the buffer position for the last tree node
+      assert(arg_stack.size() == 1);
+      assert(arg_stack.back() == tree.size() - 1);
+      outputs.col(i) = eval_buffer.col(tree.size() - 1);
     }
 
     return outputs;
-  };
+  }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices
@@ -4726,12 +4748,20 @@ class SRProblem : public GPInstanceBase {
                 bool is_train,
                 Quality& quality) {
     usize expression_size;
-    Arr2D<ScalarType> Y_pred = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
+    auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
+
+    if (!out.has_value()) {
+      solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
+      solution.quality().constraint_value = 1.0;
+      return;
+    }
+
+    Arr2D<ScalarType> Y_pred = out.value();
 
     if (linear_scaling) {
       Arr2D<ScalarType> Y_pred_train;
       if (!is_train) {
-        Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size);
+        Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size).value();
       }
 
       Arr2D<ScalarType> A_ls = Arr2D<ScalarType>::Ones(Y_train.rows(), 2);
@@ -6721,11 +6751,15 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -6849,11 +6883,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -7210,6 +7247,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -7307,14 +7347,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -8605,6 +8649,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -9619,6 +9664,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

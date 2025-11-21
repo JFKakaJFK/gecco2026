@@ -1344,7 +1344,7 @@ class OperatorBase:
     def __call__(self, args: CRef[Arr2D[float]]) -> Array[float]:
         pass
 
-    def format(self, args: List[str]) -> str:  # overridable (pure virtual)
+    def format(self, args: std.span[str]) -> str:  # overridable (pure virtual)
         pass
 
     def __init__(self) -> None:
@@ -1376,7 +1376,7 @@ class OpAdd(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1408,7 +1408,7 @@ class OpSub(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1440,7 +1440,7 @@ class OpMul(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1472,7 +1472,7 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1504,7 +1504,7 @@ class OpSin(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1536,7 +1536,7 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1568,7 +1568,7 @@ class OpExp(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1600,7 +1600,7 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1632,7 +1632,7 @@ class OpSquare(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1664,7 +1664,7 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1696,7 +1696,7 @@ class OpPow(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1728,7 +1728,7 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1760,7 +1760,7 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1792,7 +1792,7 @@ class OpMax(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
