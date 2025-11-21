@@ -30,7 +30,7 @@ DATASETS = [
 ]
 
 
-def all_runs():
+def all_runs(enable_ls: bool = True):
     for ds in DATASETS:
         X, y = fetch_data(ds, return_X_y=True, local_cache_dir=PLMB_CACHE_DIR)
         X, y = X[:MAX_NUM_ROWS], y[:MAX_NUM_ROWS]
@@ -44,7 +44,7 @@ def all_runs():
             )
 
             for max_evals in MAX_EVALUATIONS:
-                for ls in [False, True]:
+                for ls in [False, True] if enable_ls else [False]:
                     yield max_evals, ls, ds, run, X_train, X_test, y_train, y_test
 
 
@@ -52,33 +52,33 @@ termination_callback = default_termination_callback
 termination_callback = None  # comment this to make Ctrl+C work while the algorithm is running, otherwise it takes until the C++ code under the hood returns (can take a while, the other alternative is to manually kill the python process)
 # TODO currently the overhead of the python callback is considerable - check that less often
 params = {
-    # "GOMEA": lambda ls, max_evals: dict(
-    #     algorithm="DiscreteGOMEA",
-    #     algorithm_kwargs=dict(
-    #         base_population_size=1024,
-    #         max_number_of_populations=1,
-    #     ),
-    #     linear_scaling=ls,
-    #     constant_representation="none",
-    # ),
+    "GOMEA": lambda ls, max_evals: dict(
+        algorithm="DiscreteGOMEA",
+        algorithm_kwargs=dict(
+            base_population_size=1024,
+            max_number_of_populations=1,
+        ),
+        linear_scaling=ls,
+        constant_representation="none",
+    ),
     # the default, compares to the original version
-    # "Mixed": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="mi",
-    #         intron_strategy="none",
-    #         filter_root=True,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=True,
-    #     ),
-    # ),
+    "Mixed": lambda ls, max_evals: dict(
+        linear_scaling=ls,
+        budget_kwargs=dict(
+            max_evaluations=max_evals, termination_callback=termination_callback
+        ),
+        ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
+        rv_kwargs=dict(enabled=False),
+        population_kwargs=dict(),
+        discrete_model_kwargs=dict(
+            metric="mi",
+            intron_strategy="none",
+            filter_root=True,
+            merge_continuous=False,
+            num_continuous_bins=25,
+            normalize_initial_linkage_bias=True,
+        ),
+    ),
     # with intron awareness, compares to GP-RV (which already has intron awareness)
     "Mixed IA": lambda ls, max_evals: dict(
         linear_scaling=ls,
@@ -170,7 +170,7 @@ def run(max_workers=None):
                 "alg_name,max_evals,time_seconds,problem_name,run,linear_scaling,sympy_expr,r2_train,r2_test\n"
             )
         if max_workers == 1:
-            runs = [(version, *r) for r in all_runs()]
+            runs = [(version, *r) for r in all_runs(version != "GOMEA")]
             for i, run in enumerate(runs):
                 (
                     alg,
@@ -190,7 +190,10 @@ def run(max_workers=None):
                     f.write(cols + "\n")
         else:
             with ProcessPoolExecutor(max_workers=max_workers) as pool:
-                scheduled = [pool.submit(run_one, version, *run) for run in all_runs()]
+                scheduled = [
+                    pool.submit(run_one, version, *run)
+                    for run in all_runs(version != "GOMEA")
+                ]
                 total, completed = len(scheduled), 0
                 for future in as_completed(scheduled):
                     e = future.exception()
