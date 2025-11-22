@@ -55,7 +55,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3" # -march=native"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3  -march=native"
     )
 endif()
 

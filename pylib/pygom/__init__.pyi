@@ -1344,7 +1344,7 @@ class OperatorBase:
     def __call__(self, args: CRef[Arr2D[float]]) -> Array[float]:
         pass
 
-    def format(self, args: List[str]) -> str:  # overridable (pure virtual)
+    def format(self, args: std.span[str]) -> str:  # overridable (pure virtual)
         pass
 
     def __init__(self) -> None:
@@ -1376,7 +1376,7 @@ class OpAdd(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1408,7 +1408,7 @@ class OpSub(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1440,7 +1440,7 @@ class OpMul(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1472,7 +1472,7 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1504,7 +1504,7 @@ class OpSin(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1536,7 +1536,7 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1568,7 +1568,7 @@ class OpExp(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1600,7 +1600,7 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1632,7 +1632,7 @@ class OpSquare(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1664,7 +1664,7 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1696,7 +1696,7 @@ class OpPow(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1728,7 +1728,7 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1760,7 +1760,7 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1792,7 +1792,7 @@ class OpMax(OperatorBase):
     ) -> None:
         pass
 
-    def format(self, args: List[str]) -> str:
+    def format(self, args: std.span[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1851,16 +1851,53 @@ class GPContext:
 
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
+    # // TODO allow gradients w.r.t. specific continuous indices OR parameter
+    # / indices
+    # template <typename Scalar>
+    # Arr2D<Scalar> compute_outputs_grad(SolutionBase& solution, Arr2D<Scalar>& X, Array<Scalar>& params) const {
+    #   std::unreachable();
+    # };
 
-# std::string to_dot(const SolutionBase &solution) const {
-#   std::unreachable();
-# };
+    # // std::string to_dot(const SolutionBase &solution) const {
+    # /   std::unreachable();
+    # / };
 
-# ignoring inactive values
+    const_repr: ConstantRepr
 
-# node (without subtrees)
+    num_inputs: int
+    num_outputs: int
+    num_subexpressions: int
+    num_discrete: int
+    num_continuous: int
+    max_expression_size: int
+    num_parameters: int
+    max_num_children: int
 
-# namespace goblin
+    operators: List[OperatorBase]
+    op_idx2value: List[int]
+
+    value_kind: List[ValueKind]
+    value_min_arity: List[int]
+    value_max_arity: List[int]
+    value_idx: List[int]
+
+    subtree_roots: List[int]  # indices of all subtree root nodes
+    output_roots: List[int]  # indices of all output root nodes
+
+    domain_sizes: Vec[int]  # node -> domain size
+    domain2value: Arr2D[int]  # node domain -> value
+
+    root: List[int]  # node -> current tree root
+    sizes: List[int]  # node -> size of subtree starting at node,
+    # ignoring inactive values
+    depth: List[int]  # node -> node depth
+    height: List[int]  # node -> node height
+    children: List[List[int]]  # node -> child node indices
+
+    nodes: List[
+        List[int]
+    ]  # node -> indices corresponding to the subtree starting at this
+    # node (without subtrees)
 
 # #endif
 

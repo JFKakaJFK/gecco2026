@@ -35,6 +35,8 @@ set(
     sr
     sr_gradient_step
     archive_objectives
+    ctx_subfunction
+    ctx_introns
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)

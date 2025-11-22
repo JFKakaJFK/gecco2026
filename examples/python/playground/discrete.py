@@ -80,10 +80,10 @@ def methods():
             max_number_of_populations=max_num_populations,
         ),
     )
-    # yield (
-    #     '"Library (GIGA, U)"',
-    #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
-    # )
+    yield (
+        '"Library (GIGA, U)"',
+        c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
+    )
 
     for metric in ["mi", "nmi"]:
         for intron_strategy in ["none", "any_active"]:
