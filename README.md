@@ -138,8 +138,6 @@ conda create -n goblin python=3.12 \
     conda-forge::gxx">=15" \
     conda-forge::clang">=20" \
     conda-forge::clangxx">=20" \
-    conda-forge::libcxx \
-    conda-forge::libcxxabi \
     conda-forge::clang-tools">=20" \
     conda-forge::mold \
     conda-forge::lld \
@@ -149,7 +147,6 @@ conda create -n goblin python=3.12 \
     conda-forge::libxslt \
     --solver=libmamba
     
-# libcxx/libcxxabi are for the libc++ standard library (avoids an error where clang tries to mix libc++ and libstdc++)
 # libxslt is needed by srcml, the C++ parser used by litgen to generate the Python bindings
 
 # activate the environment
@@ -172,11 +169,13 @@ dependencies:
   - conda-forge::ccache
   - conda-forge::clang-tools[version='>=20']
   - conda-forge::clang[version='>=20']
+  - conda-forge::clangxx[version='>=20']
   - conda-forge::cmake
   - conda-forge::gcc[version='>=15']
   - conda-forge::gxx[version='>=15']
   - conda-forge::libxslt
   - conda-forge::lld
+  - conda-forge::mold
   - conda-forge::ninja
   - python=3.12
 ```
