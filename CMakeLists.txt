@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15...4.0)
 project(goblin VERSION "0.1.0")
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # -std=c++xx instead of -std=g++xx
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -111,5 +112,9 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
     )
 
     # fPIC
+    set_target_properties(Eigen PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(OpenRAND PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(gomea_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
     set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

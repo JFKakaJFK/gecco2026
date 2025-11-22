@@ -98,7 +98,7 @@ Also, either changing the version in `pyproject.toml` or running `uv cache clean
 
 # C++ Quickstart
 
-First, ensure `make`, `cmake` and C/C++ compilers supporting C++23 (for `std::span` and `std::unreachable`) are installed. The tools `ninja`, `ccache`, `clang-format`, `clang-tidy`, `include-what-you-use` are also recommended.
+First, ensure `make`, `cmake` and C/C++ compilers supporting C++23 (for `std::span` and `std::unreachable`) are installed. The tools `ninja`, `ccache`, `mold`, `clang-format`, `clang-tidy`, `include-what-you-use` are also recommended.
 
 For code examples see `lib/tests` for now.
 
@@ -111,6 +111,16 @@ make test
 
 # updates the Python bindings (needed when the C++ api changes)
 make bindings
+
+# run all tests, but this time use another compiler/linker combination (currently the default linker and compilers are used, ninja and ccache are automatically detected and preferred)
+# ! you will have to do a clean build when changing the linker again !
+CC=clang CXX=clang++ LDFLAGS="-fuse-ld=mold" make clean test
+# readelf -p .comment ./build/lib/tests/lib_test_amalgam | grep -i 'ld'
+#   [    a0]  mold 2.40.4 (compatible with GNU ld)
+CC=clang CXX=clang++ LDFLAGS="-fuse-ld=lld" make clean test
+# readelf -p .comment ./build/lib/tests/lib_test_amalgam | grep -i 'ld'
+#   [    72]  Linker: LLD 21.1.6 (https://github.com/conda-forge/llvmdev-feedstock 9995b55f2772fa2c2d48102a3ac35919050fed84)
+CC=gcc CXX=g++ LDFLAGS="-fuse-ld=mold" make clean test
 ```
 
 The `Makefile` also defines other commands to work with the code, so check that out, and how the Python bindings are generated is documented [here](pylib/README.md).
@@ -127,7 +137,11 @@ conda create -n goblin python=3.12 \
     conda-forge::gcc">=15" \
     conda-forge::gxx">=15" \
     conda-forge::clang">=20" \
+    conda-forge::clangxx">=20" \
+    conda-forge::libcxx \
+    conda-forge::libcxxabi \
     conda-forge::clang-tools">=20" \
+    conda-forge::mold \
     conda-forge::lld \
     conda-forge::ninja \
     conda-forge::cmake \
@@ -135,6 +149,7 @@ conda create -n goblin python=3.12 \
     conda-forge::libxslt \
     --solver=libmamba
     
+# libcxx/libcxxabi are for the libc++ standard library (avoids an error where clang tries to mix libc++ and libstdc++)
 # libxslt is needed by srcml, the C++ parser used by litgen to generate the Python bindings
 
 # activate the environment

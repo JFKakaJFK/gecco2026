@@ -12,7 +12,7 @@ set(deps
 
 set(test_target ${PROJECT_NAME}_test_main)
 add_library(${test_target} test_main.cpp)
-target_link_libraries(${test_target} PUBLIC ${deps})
+target_link_libraries(${test_target} PRIVATE ${deps})
 
 set(
     LIB_TEST_SOURCES

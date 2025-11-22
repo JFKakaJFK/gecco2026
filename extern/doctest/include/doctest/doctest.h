@@ -496,7 +496,8 @@ DOCTEST_GCC_SUPPRESS_WARNING_POP
 // https://github.com/doctest/doctest/issues/126
 // https://github.com/doctest/doctest/issues/356
 #if DOCTEST_CLANG
-#include <ciso646>
+// #include <ciso646> // was removed in C++ 20 (and the update with the fix is not released yet...)
+#include <iso646.h>   // still there...
 #endif // clang
 
 #ifdef _LIBCPP_VERSION
@@ -3904,7 +3905,7 @@ const char* skipPathFromFilename(const char* file) {
         {
             const auto prefix_start = pos;
             pos = std::min(prefixes.find(separator, prefix_start), prefixes.size());
-            
+
             const auto prefix_size = pos - prefix_start;
             if(prefix_size > longest_match)
             {
