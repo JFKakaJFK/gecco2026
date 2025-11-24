@@ -1,6 +1,9 @@
+enable_language(CUDA)
+
 find_package(Eigen3 REQUIRED)   # Eigen3::Eigen
 find_package(OpenRAND REQUIRED) # OpenRAND::OpenRAND
 find_package(gomea_library REQUIRED) # gomea_library
+find_package(CUDAToolkit REQUIRED)
 
 file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*.h")
 
@@ -10,6 +13,7 @@ add_library(${PROJECT_NAME}
     gp/sr.cpp
     methods/amalgam.cpp
     methods/mo_gomea.cpp
+    ga-gp/eval_kernel.cu
 )
 # disable any warnings in the amalgam code
 # also there is a memory bug in initializePopulationsAndFitnessValues() amalgam.cpp:1915...

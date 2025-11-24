@@ -34,6 +34,7 @@ set(
     sr
     sr_gradient_step
     archive_objectives
+    eval_kernel
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
