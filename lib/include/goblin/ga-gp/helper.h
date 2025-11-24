@@ -1,6 +1,6 @@
 #pragma once
-#ifndef _GOBLIN_GP_HELPER_CU
-#define _GOBLIN_GP_HELPER_CU
+#ifndef _GOBLIN_GA_GP_HELPER_H
+#define _GOBLIN_GA_GP_HELPER_H
 
 #include <iostream>
 
@@ -60,4 +60,4 @@ static int compute_block_size(int num_data_points) {
 
 
 
-#endif /* _GOBLIN_GP_HELPER_CU */
+#endif /* _GOBLIN_GA_GP_HELPER_H */

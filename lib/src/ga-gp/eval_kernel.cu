@@ -1,6 +1,7 @@
 #include <vector>
 
 #include "goblin/ga-gp/helper.h"
+#include "goblin/ga-gp/types.h"
 
 // Defines the number of elements in the stack that holds temporary values for the current thread
 // Depends on the maximum tree depth (e.g. depth = 2 -> 7 temp values, depth = 3 -> 15 temp values)
@@ -46,7 +47,7 @@ __global__
 void eval(
     const float* X, 
     const float* Y, 
-    const int* v_type, 
+    const NodeType* v_type, 
     const float* v_value, 
     int solution_length, 
     int num_datapoints,
@@ -62,7 +63,7 @@ void eval(
     int solution_offset = solution_index * solution_length;
 
     // Pointers to first element of solution
-    const int* type = v_type + solution_offset;
+    const NodeType* type = v_type + solution_offset;
     const float* value = v_value + solution_offset;
 
     // Evaluation stack (per thread)
@@ -72,22 +73,22 @@ void eval(
     // Traverse through solution from left to right
     for (int index = 0; index < solution_length; index++) {
         // Get type of current element
-        int t = type[index];
+        NodeType t = static_cast<NodeType>(type[index]);
 
-        if (t == 0) { // ValueKind::Input
+        if (t == NodeType::Input) {
             int input_index = int(value[index]);
             // Push input variable onto stack and increase stack pointer
             stack[sp++] = X[datapoint_index + input_index * num_datapoints];
-        } else if (t == 1) { // ValueKind::Constant
+        } else if (t == NodeType::Constant) {
             // Push constant value onto stack and increase stack pointer
             stack[sp++] = value[index];
-        } else if (t == 2) { // ValueKind::Operator
+        } else if (t == NodeType::Operator) { // ValueKind::Operator
             // TODO improve
-            int op_value = int(value[index]);
+            Operator op_value = static_cast<Operator>(static_cast<int>(value[index]));
             
             // Get operands from stack depending on arity of operator
+            int arity = 2; // Currently only arity of 2 is supported
             float args[2];
-            int arity = (op_value == 4) ? 1 : 2; // sin is only operator with arity = 1
             for (int j = 0; j < arity; j++) {
                 args[j] = stack[--sp];
             }
@@ -95,24 +96,13 @@ void eval(
             float res = 0.0f;
 
             switch (op_value) {
-                case 0: res = args[0] + args[1]; break;
-                case 1: res = args[0] - args[1]; break;
-                case 2: res = args[0] * args[1]; break;
-                case 3: res = (args[1] == 0.0f) ? 0.0f : args[0] / args[1]; break;
-                case 4: res = sinf(args[0]); break;
+                case Operator::Add: res = args[0] + args[1]; break;
+                case Operator::Sub: res = args[0] - args[1]; break;
+                case Operator::Mul: res = args[0] * args[1]; break;
+                case Operator::Div: res = (args[1] == 0.0f) ? 0.0f : args[0] / args[1]; break;
             }
 
-            stack[sp++] = res;
-            
-        } else if (t == 3) { // ValueKind::Arg
-            // TODO
-            continue;
-        } else if (t == 4) { // ValueKind::Subtree
-            // TODO
-            continue;
-        } else if (t == 5) { // ValueKind::Parameter
-            // TODO
-            continue;
+            stack[sp++] = res;   
         }
     }
 
@@ -127,7 +117,7 @@ void eval(
 void test_eval_kernel(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<int> h_type,
+    std::vector<NodeType> h_type,
     std::vector<float> h_value,
     int num_solutions,
     int num_datapoints,
@@ -143,7 +133,7 @@ void test_eval_kernel(
     
     float* d_X;
     float* d_Y;
-    int* d_type;
+    NodeType* d_type;
     float* d_value;
     float* d_out;
 
