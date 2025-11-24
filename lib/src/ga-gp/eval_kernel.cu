@@ -34,12 +34,12 @@ namespace goblin {
  * 
  * 
  * Evaluation
- * - The nodes of a solution are stored in a preorder. The evaluation should be done iteratively, which can be done
- *   by evaluation the nodes from the bottom up. This is easiest done by traversing the memory corresponding to the
- *   solution in from right to left (or reverse). 
- * - Numerical values such as constants and inputs are pushed onto the stock when encountered. For operators, the arity
+ * - The nodes of a solution are stored in a reverse preorder. So the right most child is the first element, and the root 
+ *   is the last element. The expression tree should be evaluated bottom up, which can be done by traversing the elements
+ *   in order (from left to right).
+ * - Numerical values such as constants and inputs are pushed onto the stack when encountered. For operators, the arity
  *   is determined, and that amount of values are popped from the stack. The result of the operation is pushed onto 
- *   the stack again.
+ *   the stack again. This is process continues until there are no more nodes to evaluate.
 */
 
 __global__
@@ -54,7 +54,7 @@ void eval(
 ) {
     // Calculate datapoint index
     int datapoint_index = blockIdx.y * blockDim.x + threadIdx.x;
-    // Early exit if thread does not correspond to datapoint
+    // Early exit if thread does not correspond to datapoint (redundant thread)
     if (datapoint_index >= num_datapoints) return;
     
     // Calculate offset for first solution element
@@ -69,8 +69,8 @@ void eval(
     float stack[MAX_STACK_DEPTH];
     int sp = 0;
 
-    // Traverse through solution from right to left
-    for (int index = solution_length - 1; index >= 0; index--) {
+    // Traverse through solution from left to right
+    for (int index = 0; index < solution_length; index++) {
         // Get type of current element
         int t = type[index];
 
