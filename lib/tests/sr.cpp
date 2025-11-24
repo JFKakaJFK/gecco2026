@@ -65,7 +65,7 @@ TEST_CASE("goblin::gp::sr") {
       Arr2D<CType> buffer;
       Array<CType> params;
       usize expression_size;
-      auto Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      auto Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       REQUIRE(expression_size == 6);
 
@@ -95,7 +95,7 @@ TEST_CASE("goblin::gp::sr") {
         std::println("{}", rep);
       }
 
-      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       for (isize i = 0; i < Y.cols(); i++) {
         for (isize j = 0; j < Y.rows(); j++) {
@@ -126,7 +126,7 @@ TEST_CASE("goblin::gp::sr") {
         std::println("{}", rep);
       }
 
-      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size);
+      Y_pred = ctx.compute_outputs(buffer, sset[0], X, params, expression_size).value();
 
       for (isize i = 0; i < Y.cols(); i++) {
         for (isize j = 0; j < Y.rows(); j++) {
@@ -155,13 +155,40 @@ TEST_CASE("goblin::gp::sr") {
     srp.register_target({vtr});
 
     Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
-    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(),
+
+    std::vector<std::unique_ptr<LinkageModelBase>> models;
+    for (usize i : srp.ctx.subtree_roots) {
+      models.push_back(std::make_unique<LinkageTreeFOS>(
+          /* metric = */ "mi",
+          /* intron_strategy = */ "any_active",
+          /* merge_continuous = */ true,
+          /* num_continuous_bins = */ std::nullopt,
+          /* filter_parent_threshold = */ 1e-6,
+          /* filter_children_threshold = */ 1.0 - 1e-6,
+          /* filter_root = */ true,
+          /* max_subset_size = */ std::nullopt,
+          /* normalize_initial_linkage_bias = */ true,
+          /* subset = */ Subset{.discrete = ctx.nodes[i]}));
+    }
+    for (usize i : srp.ctx.output_roots) {
+      models.push_back(std::make_unique<LinkageTreeFOS>(
+          /* metric = */ "mi",
+          /* intron_strategy = */ "any_active",
+          /* merge_continuous = */ true,
+          /* num_continuous_bins = */ std::nullopt,
+          /* filter_parent_threshold = */ 1e-6,
+          /* filter_children_threshold = */ 1.0 - 1e-6,
+          /* filter_root = */ true,
+          /* max_subset_size = */ std::nullopt,
+          /* normalize_initial_linkage_bias = */ true,
+          /* subset = */ Subset{.discrete = ctx.nodes[i]}));
+    }
+
+    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled = false},
                             IMSOptions(
                                 /* initial_population_size = */ 256,
                                 /* max_num_populations = */ 1),
-                            std::make_shared<LinkageTreeFOS>(
-                                /* metric = */ "mi",
-                                /* intron_strategy */ "any_active"));
+                            std::make_shared<CombinedFOS>(models));
 
     auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
 

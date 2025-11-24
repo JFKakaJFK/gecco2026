@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <variant>
 #include <vector>
+#include <span>
+#include <iostream>
 
 #include "goblin/gp/template.h"
 #include "goblin/lib/assert.h"
@@ -73,7 +75,7 @@ class OperatorBase {
     return out;
   };
 
-  virtual std::string format(const std::vector<std::string>& args) const = 0;
+  virtual std::string format(const std::span<const std::string>& args) const = 0;
 
   virtual ~OperatorBase() = default;
 };
@@ -96,7 +98,7 @@ class OpAdd : public OperatorBase {
     d_out = d_args.rowwise().sum();
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
     for (usize i = 0; i < args.size(); i++) {
@@ -141,7 +143,7 @@ class OpSub : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     if (args.size() == 1) {
       ss << "(-" << args[0] << ')';
@@ -187,7 +189,7 @@ class OpMul : public OperatorBase {
         args(Eigen::placeholders::all, Eigen::seq(0, args.cols() - 2)).rowwise().prod() * d_args.col(d_args.cols() - 1);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
     for (usize i = 0; i < args.size(); i++) {
@@ -231,7 +233,7 @@ class OpDiv : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(' << args[0] << '/';
     if (args.size() > 2) {
@@ -270,7 +272,7 @@ class OpSin : public OperatorBase {
     d_out = args.col(0).cos() * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sin({})", args[0]);
   };
 };
@@ -294,7 +296,7 @@ class OpCos : public OperatorBase {
     d_out = -args.col(0).sin() * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("cos({})", args[0]);
   };
 };
@@ -318,7 +320,7 @@ class OpExp : public OperatorBase {
     d_out = out * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("exp({})", args[0]);
   };
 };
@@ -342,7 +344,7 @@ class OpLog : public OperatorBase {
     d_out = d_args.col(0) / args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("log({})", args[0]);
   };
 };
@@ -366,7 +368,7 @@ class OpSquare : public OperatorBase {
     d_out = CType(2.0) * args.col(0) * d_args.col(0);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, 2)", args[0]);
   };
 };
@@ -390,7 +392,7 @@ class OpSqrt : public OperatorBase {
     d_out = d_args.col(0) / (out + out);
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sqrt({})", args[0]);
   };
 };
@@ -417,7 +419,7 @@ class OpPow : public OperatorBase {
             (args.col(0) * d_args.col(1) * args.col(0).log() + args.col(1) * d_args.col(0));
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, {})", args[0], args[1]);
   };
 };
@@ -441,7 +443,7 @@ class OpAbs : public OperatorBase {
     d_out = args.col(0) * d_args.col(0) / out;
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     return std::format("abs({})", args[0]);
   };
 };
@@ -467,7 +469,7 @@ class OpMin : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << "min(";
     for (usize i = 0; i < args.size(); i++) {
@@ -502,7 +504,7 @@ class OpMax : public OperatorBase {
     }
   };
 
-  std::string format(const std::vector<std::string>& args) const override final {
+  std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << "max(";
     for (usize i = 0; i < args.size(); i++) {

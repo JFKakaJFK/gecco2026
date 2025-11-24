@@ -16,6 +16,8 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <sstream>
+#include <span>
 
 #include "goblin/bench/timer.h"
 #include "goblin/lib/assert.h"
@@ -23,6 +25,104 @@
 #include "goblin/lib/method.h"
 
 namespace goblin {
+
+template <typename T>
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  usize i = 0;
+  for (const auto& e : span) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
+#ifdef __cpp_lib_print
+      std::print(os,
+#else
+      os << std::format(
+#endif
+                 "{:d}", e);
+    } else {
+      os << e;
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename EigenLike>
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  if (m.rows() > 1 && m.cols() > 1) {
+    for (isize r = 0; r < m.rows(); r++) {
+      if (r > 0) {
+        os << ',';
+      }
+      if (indent) {
+        os << "\n  ";
+      }
+      os << '[';
+      for (isize c = 0; c < m.cols(); c++) {
+        if (c > 0) {
+          os << ',';
+        }
+
+        // fmt to alwyas use the decimal instead of the ascii byte value for
+        // (unsigned) chars
+        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", m(r, c));
+        } else {
+          os << m(r, c);
+        }
+      }
+      os << ']';
+    }
+    if (indent) {
+      os << '\n';
+    }
+  } else {
+    for (isize i = 0; i < m.size(); i++) {
+      if (i > 0) {
+        os << ',';
+      }
+      // fmt to alwyas use the decimal instead of the ascii byte value for
+      // (unsigned) chars
+      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+        std::print(os,
+#else
+        os << std::format(
+#endif
+                   "{:d}", m(i));
+      } else {
+        os << m(i);
+      }
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename T>
+inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
+  std::ostringstream os;
+  log_helper(os, t, escape, indent);
+  return os.str();
+};
 
 class TrackingOptions {
  public:
@@ -34,14 +134,17 @@ class TrackingOptions {
   TrackingOptions(std::filesystem::path logpath,
                   std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
                   usize archive_capacity = 100,
-                  usize max_evaluations_until_archive_adaption = 100000,
+                  u64 max_evaluations_until_archive_adaption = 100000,
                   bool consider_evaluation_time = true,
                   bool report_intermediate_results = true,
-                  usize initial_evaluations_until_next_report = 10,
-                  usize eval_factor = 2,
-                  usize max_evaluations_until_next_report = 1000000,
+                  u64 initial_evaluations_until_next_report = 10,
+                  u64 eval_factor = 2,
+                  u64 max_evaluations_until_next_report = 1000000,
+                  u64 initial_generations_until_next_report = 1,
+                  u64 generation_factor = 2,
+                  u64 max_generations_until_next_report = 100,
                   std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
-                  usize time_factor = 2,
+                  u64 time_factor = 2,
                   std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
       : archive_capacity(archive_capacity),
         max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
@@ -50,6 +153,9 @@ class TrackingOptions {
         initial_evaluations_until_next_report(initial_evaluations_until_next_report),
         eval_factor(eval_factor),
         max_evaluations_until_next_report(max_evaluations_until_next_report),
+        initial_generations_until_next_report(initial_generations_until_next_report),
+        generation_factor(generation_factor),
+        max_generations_until_next_report(max_generations_until_next_report),
         initial_time_until_next_report(initial_time_until_next_report),
         time_factor(time_factor),
         max_time_until_next_report(max_time_until_next_report),
@@ -64,16 +170,20 @@ class TrackingOptions {
   };
 
   usize archive_capacity;
-  usize max_evaluations_until_archive_adaption;
+  u64 max_evaluations_until_archive_adaption;
   bool consider_evaluation_time;
   bool report_intermediate_results;
 
-  usize initial_evaluations_until_next_report;
-  usize eval_factor;  // 1 is linear, >= 2 is exponential spacing
-  usize max_evaluations_until_next_report;
+  u64 initial_evaluations_until_next_report;
+  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_evaluations_until_next_report;
+
+  u64 initial_generations_until_next_report;
+  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_generations_until_next_report;
 
   std::chrono::nanoseconds initial_time_until_next_report;
-  usize time_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
   std::chrono::nanoseconds max_time_until_next_report;
 
  private:
@@ -148,9 +258,12 @@ class Tracked final : public InstanceBase {
     }
 
     // temporarily change the logpath
+    auto tracked_generation = generation;
+    generation = method.current_generation();
     std::swap(debug_logpath, config.logpath);
     report(solutions, debug_headers, debug_values);
     std::swap(debug_logpath, config.logpath);
+    generation = tracked_generation;
 
     // close the debug logfile to open up the actual logpath again next
     if (logfile.is_open()) {
@@ -220,6 +333,8 @@ class Tracked final : public InstanceBase {
         status(TerminationStatus::Running),
         archive(instance.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
+        last_generation(0),
+        generations_at_next_report(config.initial_generations_until_next_report),
         evaluations(0),
         evaluations_at_next_report(config.initial_evaluations_until_next_report),
         time_elapsed_at_next_report(config.initial_time_until_next_report) {};
@@ -295,10 +410,20 @@ class Tracked final : public InstanceBase {
     bool report_needed = false;
     if (evaluations >= evaluations_at_next_report) {
       report_needed = true;
-      evaluations_at_next_report = std::min(
-          config.eval_factor > 1 ? evaluations * static_cast<u64>(config.eval_factor)
-                                 : evaluations + static_cast<u64>(config.initial_evaluations_until_next_report),
-          evaluations + config.max_evaluations_until_next_report);
+      evaluations_at_next_report =
+          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
+                                          : evaluations + config.initial_evaluations_until_next_report,
+                   evaluations + config.max_evaluations_until_next_report);
+    }
+
+    u64 g = generation.value_or(0);
+    if (g >= generations_at_next_report && g != last_generation) {
+      last_generation = g;
+      report_needed = true;
+      generations_at_next_report =
+          std::min(config.generation_factor > 1 ? g * config.generation_factor
+                                                : g + config.initial_generations_until_next_report,
+                   g + config.max_generations_until_next_report);
     }
 
     auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
@@ -312,58 +437,6 @@ class Tracked final : public InstanceBase {
     }
 
     return report_needed;
-  };
-
-  template <typename EigenLike>
-  void log_eigen(std::ostream& os, const EigenLike& m) {
-    os << "\"[";
-    if (m.rows() > 1 && m.cols() > 1) {
-      for (isize r = 0; r < m.rows(); r++) {
-        if (r > 0) {
-          os << ',';
-        }
-        os << '[';
-        for (isize c = 0; c < m.cols(); c++) {
-          if (c > 0) {
-            os << ',';
-          }
-
-          // fmt to alwyas use the decimal instead of the ascii byte value for
-          // (unsigned) chars
-          if constexpr (std::same_as<typename EigenLike::Scalar, char> ||
-                        std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-            std::print(os,
-#else
-            os << std::format(
-#endif
-                       "{:d}", m(r, c));
-          } else {
-            os << m(r, c);
-          }
-        }
-        os << ']';
-      }
-    } else {
-      for (isize i = 0; i < m.size(); i++) {
-        if (i > 0) {
-          os << ',';
-        }
-        // fmt to alwyas use the decimal instead of the ascii byte value for
-        // (unsigned) chars
-        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-          std::print(os,
-#else
-          os << std::format(
-#endif
-                     "{:d}", m(i));
-        } else {
-          os << m(i);
-        }
-      }
-    }
-    os << "]\"";
   };
 
   // A can annoyingly not be const since in the SR case an evaluation on the
@@ -423,16 +496,21 @@ class Tracked final : public InstanceBase {
                               alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase& s = solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test"
-                                                 // evaluation, and evaluations require mutable solutions
+      SolutionBase* s;
+      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
+        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
+                                      // evaluations require mutable solutions
+      } else {
+        s = &solutions[i];
+      }
       // clang-format off
                 logfile << common;
-                log_eigen(logfile,   s.discrete_values()); logfile << ',';
-                log_eigen(logfile,   s.discrete_active()); logfile << ',';
-                log_eigen(logfile, s.continuous_values()); logfile << ',';
-                log_eigen(logfile, s.continuous_active()); logfile << ',';
+                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+                log_helper(logfile, s->continuous_values(), true); logfile << ',';
+                log_helper(logfile, s->continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, s);
+      instance.log(logfile, *s);
       logfile << "\n";
     }
     logfile << std::flush;
@@ -447,10 +525,12 @@ class Tracked final : public InstanceBase {
   TerminationStatus status;
   AdaptiveGridArchive archive;
 
-  std::optional<usize> generation;
-
   Timer alg_timer;
   Timer eval_timer;
+
+  std::optional<u64> generation;
+  u64 last_generation;
+  u64 generations_at_next_report;
 
   u64 evaluations;
   u64 evaluations_at_next_report;
@@ -461,6 +541,43 @@ class Tracked final : public InstanceBase {
   std::ofstream logfile;
   std::set<std::filesystem::path> truncated_files;
 };
+
+/// Tracked running was intended to unify reporting across algorithms
+/// - this method abuses that functionality to re-use that logging for
+/// other purposes controlled by the algorithm, not the tracking
+inline void debug_log(InstanceBase& problem,
+                      std::string_view path,
+                      std::string_view headers,
+                      std::string_view values,
+                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
+    if (population.has_value()) {
+      ti->request_debug_report(path, population.value().get(), headers, values);
+    } else {
+      ti->request_debug_report(path, headers, values);
+    }
+  } else {
+    throw std::runtime_error(
+        "Debug log called on an incompatible problem instance. Try using "
+        "`Tracked::run` to enable logging.");
+  }
+};
+
+template <typename T>
+inline std::string iterator2str(T&& it) {
+  std::ostringstream os;
+  os << '[';
+  usize i = 0;
+  for (const auto& e : it) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    os << e;
+  }
+  os << ']';
+  return os.str();
+};
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */

@@ -55,6 +55,7 @@ struct TemplateNode {
       if (visited.contains(current)) {
         return false;
       }
+      visited.insert(current);
       for (auto& c : current->children) {
         queue.push_back(&c);
       }

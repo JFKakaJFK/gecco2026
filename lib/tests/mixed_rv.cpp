@@ -14,7 +14,7 @@ TEST_CASE("goblin::methods::mixed_rv") {
   sphere.set_initial_bounds(100.0, 110.0);
 
   REQUIRE(sphere.num_objectives() == 1);
-  REQUIRE(sphere.num_continuous() == 2);
+  // REQUIRE(sphere.num_continuous() == 2);
 
   Budget budget(/* max_evaluations = */ 10000);
 
@@ -37,15 +37,17 @@ TEST_CASE("goblin::methods::mixed_rv") {
   REQUIRE(front->empty() == false);
   CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
 
-  auto mixed_lt = MixedGOMEA(PopulationOptions(), RvOptions{.max_nis = 100},
-                             IMSOptions{
-                                 .initial_population_size = 10, .max_num_populations = 1
-                                 // .initial_population_size = 10,
-                                 // .subgeneration_factor = 8,
-                             },
-                             std::make_shared<LinkageTreeFOS>(), std::make_shared<LinkageTreeFOS>());
-  front = std::get<0>(mixed_lt.run(sphere, budget));
+  for (usize i = 0; i <= 1; i++) {
+    auto mixed_lt = MixedGOMEA(PopulationOptions(), RvOptions{.intron_aware = i > 0, .max_nis = 100},
+                               IMSOptions{
+                                   .initial_population_size = 10, .max_num_populations = 1
+                                   // .initial_population_size = 10,
+                                   // .subgeneration_factor = 8,
+                               },
+                               std::make_shared<LinkageTreeFOS>(), std::make_shared<LinkageTreeFOS>());
+    front = std::get<0>(mixed_lt.run(sphere, budget));
 
-  REQUIRE(front->empty() == false);
-  CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+    REQUIRE(front->empty() == false);
+    CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+  }
 }

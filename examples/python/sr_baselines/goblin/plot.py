@@ -10,16 +10,19 @@ from tqdm import tqdm
 sns.set_theme(style="whitegrid")
 
 RESULT_DIR = "../results"
+# RESULT_DIR = "../raw"
+
+PLOT_DIR = "../plots"
 
 if __name__ == "__main__":
-    os.makedirs("../plots", exist_ok=True)
+    os.makedirs(PLOT_DIR, exist_ok=True)
 
     # load data
     with duckdb.connect(":memory:") as conn:
         conn.sql(
-            """
+            f"""
             CREATE OR REPLACE VIEW results AS SELECT * FROM
-                read_csv('../results/*.csv', union_by_name=true)
+                read_csv('{RESULT_DIR}/*.csv', union_by_name=true)
             """
         )
 
@@ -108,7 +111,8 @@ if __name__ == "__main__":
                             lw=0.75,
                             alpha=0.5,
                         )
-                        ax.set_xlim(-1.0, 1.0)
+                        # ax.set_xlim(-1.0, 1.0)
+                        ax.set_xlim(0.0, 1.0)
 
                     ax.xaxis.grid(False)
                     ax.yaxis.grid(True)
@@ -128,7 +132,7 @@ if __name__ == "__main__":
 
             for fmt in ["pdf", "png"]:
                 fig.savefig(
-                    f"../plots/{max_evals}evals.{fmt}",
+                    f"{PLOT_DIR}/{max_evals}evals.{fmt}",
                     dpi=600,
                     bbox_inches="tight",
                     # transparent=True,

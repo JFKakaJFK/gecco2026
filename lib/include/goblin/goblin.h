@@ -31,9 +31,10 @@
 #include "goblin/gp/sr.h"
 
 #include "goblin/bench/functions.h"
+#include "goblin/bench/functions/combinators.h"
 #include "goblin/bench/functions/discrete.h"
 #include "goblin/bench/functions/continuous.h"
-#include "goblin/bench/functions/combinators.h"
+#include "goblin/bench/functions/mixed.h"
 #include "goblin/bench/problem.h"
 #include "goblin/bench/timer.h"
 #include "goblin/bench/tracked.h"

@@ -45,8 +45,26 @@ struct Subset {
 
   inline bool empty() const noexcept { return discrete.empty() && continuous.empty(); }
 
-  CType distance(const Subset& other) const {
-    usize matches = 0, i = 0, j = 0;
+  CType similarity(const Subset& other) const {
+    usize matches = 0;
+
+    for (usize i : discrete) {
+      for (usize j : other.discrete) {
+        if (i == j) {
+          matches++;
+        }
+      }
+    }
+    for (usize i : continuous) {
+      for (usize j : other.continuous) {
+        if (i == j) {
+          matches++;
+        }
+      }
+    }
+
+    /* // should be correct, but for now let's keep it simple
+    usize i = 0, j = 0;
     // subset indices are sorted, so we only need to check until the next index
     // in the other set is higher
     while (i < discrete.size() && j < other.discrete.size()) {
@@ -72,7 +90,7 @@ struct Subset {
         j++;
         matches++;
       }
-    }
+    } */
     return static_cast<CType>(matches) / static_cast<CType>(std::max(size(), other.size()));
   };
 
@@ -114,6 +132,14 @@ struct Subset {
     return s;
   };
 };
+
+inline bool operator==(const Subset& lhs, const Subset& rhs) {
+  return lhs.continuous == rhs.discrete && lhs.continuous == rhs.continuous;
+}
+inline bool operator!=(const Subset& lhs, const Subset& rhs) {
+  return !(lhs == rhs);
+}
+
 using FOS = std::vector<Subset>;
 
 class SolutionBase {

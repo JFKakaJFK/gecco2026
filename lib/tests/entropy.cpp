@@ -15,12 +15,14 @@ TEST_CASE("goblin::lib::entropy") {
   instance.add_random(rng, solutions, 8);
   std::vector<usize> indices{0, 1, 2, 3};
 
+  std::vector<usize> subset{0, 1, 2, 3};
+
   solutions[0].discrete_values() << 0, 0, 1, 1;
   solutions[1].discrete_values() << 1, 1, 0, 0;
   solutions[2].discrete_values() << 1, 1, 1, 1;
   solutions[3].discrete_values() << 0, 0, 0, 0;
 
-  auto H = estimate_entropy(instance, solutions, indices,
+  auto H = estimate_entropy(instance, solutions, indices, subset,
                             /* intron_strategy = */ "none",
                             /* merge_continuous = */ false,
                             /* num_continuous_bins = */ std::nullopt);
@@ -59,19 +61,19 @@ TEST_CASE("goblin::lib::entropy") {
   solutions[2].discrete_active() << 1, 0, 1, 1;
   solutions[3].discrete_active() << 1, 1, 0, 0;
 
-  H = estimate_entropy(instance, solutions, indices,
+  H = estimate_entropy(instance, solutions, indices, subset,
                        /* intron_strategy = */ "none",
                        /* merge_continuous = */ false,
                        /* num_continuous_bins = */ std::nullopt);
-  auto H_ia = estimate_entropy(instance, solutions, indices,
+  auto H_ia = estimate_entropy(instance, solutions, indices, subset,
                                /* intron_strategy = */ "any_active",
                                /* merge_continuous = */ false,
                                /* num_continuous_bins = */ std::nullopt);
-  auto H_aa = estimate_entropy(instance, solutions, indices,
+  auto H_aa = estimate_entropy(instance, solutions, indices, subset,
                                /* intron_strategy = */ "all_active",
                                /* merge_continuous = */ false,
                                /* num_continuous_bins = */ std::nullopt);
-  auto H_mo = estimate_entropy(instance, solutions, indices,
+  auto H_mo = estimate_entropy(instance, solutions, indices, subset,
                                /* intron_strategy = */ "mask_only",
                                /* merge_continuous = */ false,
                                /* num_continuous_bins = */ std::nullopt);
@@ -118,6 +120,7 @@ TEST_CASE("goblin::lib::entropy_any_active") {
   Rng rng(1, 0);
   instance.add_random(rng, solutions, 8);
   std::vector<usize> indices{0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<usize> subset{0, 1, 2, 3};
 
   auto check = [](const Mat<CType>& actual, const Mat<CType>& expected, usize sample) {
     REQUIRE(actual.rows() == expected.rows());
@@ -168,7 +171,7 @@ TEST_CASE("goblin::lib::entropy_any_active") {
   solutions[6].discrete_active() << 1, 0, 1, 1;
   solutions[7].discrete_active() << 1, 1, 0, 1;
 
-  H = estimate_entropy(instance, solutions, indices,
+  H = estimate_entropy(instance, solutions, indices, subset,
                        /* intron_strategy = */ "any_active",
                        /* merge_continuous = */ false,
                        /* num_continuous_bins = */ std::nullopt);
@@ -197,7 +200,7 @@ TEST_CASE("goblin::lib::entropy_any_active") {
   solutions[6].discrete_active() << 0, 1, 1, 0;
   solutions[7].discrete_active() << 1, 1, 0, 1;
 
-  H = estimate_entropy(instance, solutions, indices,
+  H = estimate_entropy(instance, solutions, indices, subset,
                        /* intron_strategy = */ "any_active",
                        /* merge_continuous = */ false,
                        /* num_continuous_bins = */ std::nullopt);
@@ -226,7 +229,7 @@ TEST_CASE("goblin::lib::entropy_any_active") {
   solutions[6].discrete_active() << 0, 0, 0, 0;
   solutions[7].discrete_active() << 0, 0, 1, 1;
 
-  H = estimate_entropy(instance, solutions, indices,
+  H = estimate_entropy(instance, solutions, indices, subset,
                        /* intron_strategy = */ "any_active",
                        /* merge_continuous = */ false,
                        /* num_continuous_bins = */ std::nullopt);
@@ -255,7 +258,7 @@ TEST_CASE("goblin::lib::entropy_any_active") {
   solutions[6].discrete_active() << 1, 0, 0, 0;
   solutions[7].discrete_active() << 0, 0, 1, 0;
 
-  H = estimate_entropy(instance, solutions, indices,
+  H = estimate_entropy(instance, solutions, indices, subset,
                        /* intron_strategy = */ "any_active",
                        /* merge_continuous = */ false,
                        /* num_continuous_bins = */ std::nullopt);

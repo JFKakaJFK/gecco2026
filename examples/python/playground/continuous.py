@@ -1,6 +1,7 @@
 import pathlib
 
 from pygom import *
+
 from src.config import Config, c
 from src.plots import plot_scalability
 from src.postprocessing import load_results
@@ -10,7 +11,7 @@ REPEATS = 30
 
 budget = c.Budget(max_evaluations=int(1e5))
 
-VTR = 1e-8
+VTR = 1e-10
 
 # http://hydra.nat.uni-magdeburg.de/packing/csq/csq.html#Download
 # let tbody = document.querySelector(".results > table:nth-child(1) > tbody:nth-child(1)")
@@ -77,8 +78,7 @@ def problems():
         5,
         10,
         20,
-        40,
-        # 80
+        40,  # , 80
     ]:
         # display name, instance info, actual instance
         yield (
@@ -103,17 +103,27 @@ def problems():
                     continuous_init_upper_bound=init_ub,
                 ),
             )
-    for d in [4, 10, 20, 30]:
-        yield (
-            "CirclesInASquare",
-            d,
-            c.BenchmarkInstance(
-                c.CirclesInASquare(d),
-                target=[d * VTR - cias_optima[d]],
-                continuous_init_lower_bound=0.0,
-                continuous_init_upper_bound=1.0,
-            ),
-        )
+    for d in [
+        4,
+        10,
+        20,
+        30,
+        # , 40
+    ]:
+        if d <= 30:
+            yield (
+                "CirclesInASquare",
+                d,
+                c.BenchmarkInstance(
+                    c.CirclesInASquare(d),
+                    target=[  # d *
+                        VTR - cias_optima[d]
+                    ],
+                    continuous_init_lower_bound=0.0,
+                    continuous_init_upper_bound=1.0,
+                ),
+            )
+    # need LT/univariate model...
     # for d in [
     #     2,
     #     4,
@@ -144,9 +154,11 @@ def problems():
 
 def methods():
     initial_population_size = 10  # 100
-    max_num_populations = 1  # 25
+    max_num_populations = 25
     restart_stale_populations = True
-    restart_stale_populations = False
+    # restart_stale_populations = False
+
+    max_nis = 100  # 00
     # display name, actual method
     yield (
         "AMaLGaM",
@@ -160,33 +172,41 @@ def methods():
         c.RvGOMEA(
             base_population_size=initial_population_size,
             max_number_of_populations=max_num_populations,
-            max_nis=100,
+            max_nis=max_nis,
             selection_during_gom=False,
+            update_elitist_during_gom=False,
         ),
     )
-    # yield '"RV-GOMEA (LT)"', c.RvGOMEA(linkage_model="LinkageTree")
+    yield (
+        '"RV-GOMEA (LT)"',
+        c.RvGOMEA(
+            linkage_model="LinkageTree",
+            base_population_size=initial_population_size,
+            max_number_of_populations=max_num_populations,
+            max_nis=max_nis,
+            selection_during_gom=False,
+            update_elitist_during_gom=False,
+        ),
+    )
+    yield (
+        '"RV-GOMEA (U)"',
+        c.RvGOMEA(
+            linkage_model="Univariate",
+            base_population_size=initial_population_size,
+            max_number_of_populations=max_num_populations,
+            max_nis=max_nis,
+            selection_during_gom=False,
+            update_elitist_during_gom=False,
+        ),
+    )
     yield (
         '"Mixed (Full)"',
         c.MixedGOMEA(
             rv_options=c.RvOptions(
-                max_nis=100, init_ams_from_population_mean=False, intron_aware=False
-            ),
-            ims_options=c.IMSOptions(
-                initial_population_size=initial_population_size,
-                max_num_populations=max_num_populations,
-                subgeneration_factor=8,
-                restart_stale_populations=restart_stale_populations,
-            ),
-        ),
-    )
-    yield (
-        '"Mixed (Full, RAMS)"',
-        c.MixedGOMEA(
-            rv_options=c.RvOptions(
-                max_nis=100,
+                max_nis=max_nis,
                 init_ams_from_population_mean=False,
                 intron_aware=False,
-                randomize_ams_indices=True,
+                generations_until_full_evaluation=50,
             ),
             ims_options=c.IMSOptions(
                 initial_population_size=initial_population_size,
@@ -194,30 +214,129 @@ def methods():
                 subgeneration_factor=8,
                 restart_stale_populations=restart_stale_populations,
             ),
-        ),
-    )
-    yield (
-        '"Mixed (Full, IA)"',
-        c.MixedGOMEA(
-            rv_options=c.RvOptions(max_nis=100, init_ams_from_population_mean=False),
-            ims_options=c.IMSOptions(
-                initial_population_size=initial_population_size,
-                max_num_populations=max_num_populations,
-                subgeneration_factor=8,
-                restart_stale_populations=restart_stale_populations,
-            ),
+            sampling_model=c.AMaLGaMSamplingModel(),
         ),
     )
     # yield (
-    #     '"Mixed (LT)"',
+    #     '"Mixed (Full, MD)"',
     #     c.MixedGOMEA(
-    #         rv_options=c.RvOptions(max_nis=100, init_ams_from_population_mean=False),
+    #         rv_options=c.RvOptions(
+    #             max_nis=max_nis,
+    #             init_ams_from_population_mean=False,
+    #             intron_aware=False,
+    #             generations_until_full_evaluation=50,
+    #         ),
     #         ims_options=c.IMSOptions(
     #             initial_population_size=initial_population_size,
-    # max_num_populations=max_num_populations,
-    # subgeneration_factor=8,
+    #             max_num_populations=max_num_populations,
+    #             subgeneration_factor=8,
+    #             restart_stale_populations=restart_stale_populations,
     #         ),
-    #         continuous_model=c.LinkageTreeFOS(),
+    #         sampling_model=c.AMaLGaMSamplingModel(
+    #             use_mahalanobis_distance_for_sdr=True
+    #         ),
+    #     ),
+    # )
+    # yield (
+    #     '"Mixed (Full, RAMS)"',
+    #     c.MixedGOMEA(
+    #         rv_options=c.RvOptions(
+    #             max_nis=max_nis,
+    #             init_ams_from_population_mean=False,
+    #             intron_aware=False,
+    #             randomize_ams_indices=True,
+    #             generations_until_full_evaluation=50,
+    #         ),
+    #         ims_options=c.IMSOptions(
+    #             initial_population_size=initial_population_size,
+    #             max_num_populations=max_num_populations,
+    #             subgeneration_factor=8,
+    #             restart_stale_populations=restart_stale_populations,
+    #         ),
+    #         sampling_model=c.AMaLGaMSamplingModel(),
+    #     ),
+    # )
+    yield (
+        '"Mixed (Full, IA)"',
+        c.MixedGOMEA(
+            rv_options=c.RvOptions(
+                max_nis=max_nis,
+                init_ams_from_population_mean=False,
+                generations_until_full_evaluation=50,
+                intron_aware=True,
+            ),
+            ims_options=c.IMSOptions(
+                initial_population_size=initial_population_size,
+                max_num_populations=max_num_populations,
+                subgeneration_factor=8,
+                restart_stale_populations=restart_stale_populations,
+            ),
+            sampling_model=c.AMaLGaMSamplingModel(),
+            discrete_model=c.LinkageTreeFOS(
+                intron_strategy="any_active",
+                # filter_root=True,
+            ),
+        ),
+    )
+    yield (
+        '"Mixed (LT)"',
+        c.MixedGOMEA(
+            rv_options=c.RvOptions(
+                max_nis=max_nis,
+                init_ams_from_population_mean=False,
+                intron_aware=True,
+                randomize_ams_indices=True,
+                generations_until_full_evaluation=50,
+            ),
+            ims_options=c.IMSOptions(
+                initial_population_size=initial_population_size,
+                max_num_populations=max_num_populations,
+                subgeneration_factor=8,
+                restart_stale_populations=restart_stale_populations,
+            ),
+            sampling_model=c.AMaLGaMSamplingModel(),
+            continuous_model=c.LinkageTreeFOS(),
+        ),
+    )
+    yield (
+        '"Mixed (U)"',
+        c.MixedGOMEA(
+            rv_options=c.RvOptions(
+                max_nis=max_nis,
+                init_ams_from_population_mean=False,
+                intron_aware=False,
+                generations_until_full_evaluation=50,
+            ),
+            ims_options=c.IMSOptions(
+                initial_population_size=initial_population_size,
+                max_num_populations=max_num_populations,
+                subgeneration_factor=8,
+                restart_stale_populations=restart_stale_populations,
+            ),
+            sampling_model=c.AMaLGaMSamplingModel(),
+            continuous_model=c.UnivariateFOS(),
+        ),
+    )
+    # yield (
+    #     '"Mixed (U, IA)"',
+    #     c.MixedGOMEA(
+    #         rv_options=c.RvOptions(
+    #             max_nis=max_nis,
+    #             init_ams_from_population_mean=False,
+    #             intron_aware=True,
+    #             randomize_ams_indices=True,
+    #             generations_until_full_evaluation=50,
+    #         ),
+    #         ims_options=c.IMSOptions(
+    #             initial_population_size=initial_population_size,
+    #             max_num_populations=max_num_populations,
+    #             subgeneration_factor=8,
+    #             restart_stale_populations=restart_stale_populations,
+    #         ),
+    #         sampling_model=c.AMaLGaMSamplingModel(
+    #             use_mahalanobis_distance_for_sdr=use_mahalanobis_distance_for_sdr,
+    #         ),
+    #         continuous_model=c.UnivariateFOS(),
     #     ),
     # )
 
@@ -235,7 +354,7 @@ if __name__ == "__main__":
         num_repeats=REPEATS,
         clean=True,
         # limit=1,
-        # max_workers=1,
+        max_workers=44,
     )
 
     preprocess = True

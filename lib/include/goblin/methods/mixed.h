@@ -271,17 +271,17 @@ class Population {
  public:
   Population(InstanceBase& problem,
              ArchiveBase& global_archive,
-             LinkageModelBase& discrete_model,
-             LinkageModelBase& continuous_model,
+             const LinkageModelBase& discrete_model,
+             const LinkageModelBase& continuous_model,
+             const RvSamplingModelBase& sampling_model,
              usize size,
              usize num_clusters,
              const PopulationOptions& options,
              const RvOptions& rv_options)
       : problem(problem),
         global_archive(global_archive),
-        discrete_model(discrete_model),
-        continuous_model(continuous_model),
-        rv_options(rv_options),
+        discrete_model(discrete_model.clone()),
+        rv_state(rv_options, continuous_model, sampling_model),
         options(options),
         local_archive(global_archive.clone()),
         size(size),
@@ -321,7 +321,7 @@ class Population {
     }
 
     {  // ======= clustering =======
-      bool perform_cluster_registration = is_continuous && rv_options.enabled;
+      bool perform_cluster_registration = is_continuous && rv_state.options.enabled;
       // the local archive is used since the elites from that should be in this
       // population
       if (!perform_cluster_registration) {
@@ -341,11 +341,10 @@ class Population {
     usize max_discrete_subset_count = 0;
     if (is_discrete) {
       // learn per cluster linkage models
-      if (cluster_FOS.empty() || !discrete_model.is_static()) {
+      if (cluster_FOS.empty() || !discrete_model->is_static()) {
         cluster_FOS.clear();
         for (usize k = 0; k < num_clusters; k++) {
-          cluster_FOS.push_back(discrete_model.subsets(rng, problem, solutions, cluster_solutions[k],
-                                                       VariableSet::Discrete, std::nullopt));
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
         }
       }
       for (usize k = 0; k < num_clusters; k++) {
@@ -385,10 +384,11 @@ class Population {
     // }
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
+    bool can_do_discrete_step;
     do {
-      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
+      can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       bool do_discrete_step;
-      if (!is_continuous || !rv_options.enabled) {
+      if (!is_continuous || !rv_state.options.enabled) {
         do_discrete_step = can_do_discrete_step;
       } else if (!can_do_discrete_step) {
         do_discrete_step = false;
@@ -413,11 +413,12 @@ class Population {
       u64 evals = 0;
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
-      if (is_continuous && rv_options.enabled && !do_discrete_step) {
-        evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents, solution_clusters,
-                                            cluster_solutions, rv_options, continuous_model);
-        // evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
-        // cluster_solutions, rv_options, continuous_model);
+      if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+        // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
+        // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
+        // solution_clusters, cluster_solutions);
+        evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
+                                            cluster_solutions);
         evaluations += evals;
         continuous_evaluations += evals;
       }
@@ -439,7 +440,7 @@ class Population {
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
       }
-    } while (subset_idx < max_discrete_subset_count);
+    } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
@@ -488,7 +489,7 @@ class Population {
         return true;
       }
       // since we only have relative comparisons, this roughly is equal to the usual fitness variance == 0.0 condition
-      if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged(rv_options))) {
+      if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged())) {
         return true;
       }
     }
@@ -542,26 +543,6 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
-  /// Tracked running was intended to unify reporting across algorithms
-  /// - this method abuses that functionality to re-use that logging for
-  /// other purposes controlled by the algorithm, not the tracking
-  void debug_log(std::string_view path,
-                 std::string_view headers,
-                 std::string_view values,
-                 std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
-    if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
-      if (population.has_value()) {
-        ti->request_debug_report(path, population.value().get(), headers, values);
-      } else {
-        ti->request_debug_report(path, headers, values);
-      }
-    } else {
-      throw std::runtime_error(
-          "Debug log called on an incompatible problem instance. Try using "
-          "`Tracked::run` to enable logging.");
-    }
-  };
-
   void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
     SolutionSet copy = set;
     std::vector<usize> indices(copy.size());
@@ -637,9 +618,10 @@ class Population {
     subsets.resize(size);
     perm.reserve(size);
 
-    // This callback is only needed to support learning the linkage
+    // This callback is needed to support learning the linkage
     // normalization matrix from https://arxiv.org/pdf/1904.02050
-    discrete_model.init(rng, problem, solutions, VariableSet::Discrete);
+    // and to tell the linkage model about how many variables there are in case that was not set beforehand
+    discrete_model->init(rng, problem, solutions, VariableSet::Discrete);
 
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
@@ -931,9 +913,8 @@ class Population {
 
   InstanceBase& problem;
   ArchiveBase& global_archive;
-  LinkageModelBase& discrete_model;
-  LinkageModelBase& continuous_model;
-  const RvOptions& rv_options;
+  std::unique_ptr<LinkageModelBase> discrete_model;
+  RvState rv_state;
   PopulationOptions options;
   std::unique_ptr<ArchiveBase> local_archive;
 
@@ -946,7 +927,6 @@ class Population {
 
   // state that is required across generations (absolutely needs to be stored)
 
-  RvState rv_state;
   double discrete_evaluations = 0.0;
   double continuous_evaluations = 0.0;
   usize no_improvement_stretch;
@@ -984,6 +964,7 @@ class MixedGOMEA : public MethodBase {
              IMSOptions ims_options = IMSOptions(),
              std::shared_ptr<LinkageModelBase> discrete_model = std::make_shared<LinkageTreeFOS>(),
              std::shared_ptr<LinkageModelBase> continuous_model = std::make_shared<FullFOS>(),
+             std::shared_ptr<RvSamplingModelBase> sampling_model = std::make_shared<AMaLGaMSamplingModel>(),
              std::string repr = "aos")
       : population_options(population_options),
         rv_options(rv_options),
@@ -991,6 +972,7 @@ class MixedGOMEA : public MethodBase {
         ims_runner(std::nullopt),
         discrete_model(discrete_model),
         continuous_model(continuous_model),
+        sampling_model(sampling_model),
         repr(repr) {};
 
   std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
@@ -1036,8 +1018,8 @@ class MixedGOMEA : public MethodBase {
                                             ArchiveBase& global_archive,
                                             usize size,
                                             usize num_clusters) {
-    return Population<SolutionSet>(problem, global_archive, *discrete_model, *continuous_model, size, num_clusters,
-                                   population_options, rv_options);
+    return Population<SolutionSet>(problem, global_archive, *discrete_model, *continuous_model, *sampling_model, size,
+                                   num_clusters, population_options, rv_options);
   };
 
   PopulationOptions population_options;
@@ -1049,6 +1031,7 @@ class MixedGOMEA : public MethodBase {
       ims_runner;
   std::shared_ptr<LinkageModelBase> discrete_model;
   std::shared_ptr<LinkageModelBase> continuous_model;
+  std::shared_ptr<RvSamplingModelBase> sampling_model;
   std::string repr;
 };
 };  // namespace goblin

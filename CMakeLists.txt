@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.15...4.0)
 project(goblin VERSION "0.1.0" LANGUAGES CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # -std=c++xx instead of -std=g++xx
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -58,17 +59,17 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3  -march=native"
     )
 endif()
 
 # -flto (link time optimization)
-# include(CheckIPOSupported)
-# check_ipo_supported(RESULT ipo_supported OUTPUT error)
-# if(ipo_supported)
-#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-#     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
-# endif()
+include(CheckIPOSupported)
+check_ipo_supported(RESULT ipo_supported OUTPUT error)
+if(ipo_supported)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+    # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+endif()
 
 add_subdirectory(lib)
 
@@ -85,7 +86,13 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
     #     _pygoblin.cpython-312-darwin.so on macOS
     #     _pygoblin.cpython-312-x86_64-linux-gnu.so on Linux
     #     _pygoblin.cp312-win_amd64.pyd on Windows)
-    nanobind_add_module(_pygoblin ${python_module_sources})
+    nanobind_add_module(_pygoblin
+        NB_STATIC
+        # STABLE_ABI # https://nanobind.readthedocs.io/en/latest/api_cmake.html
+        LTO
+        NB_DOMAIN cwi_goblin
+        ${python_module_sources}
+    )
 
     litgen_setup_module(
         # The C++ library for which we are building bindings
@@ -109,5 +116,9 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
     )
 
     # fPIC
-    # set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(Eigen PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(OpenRAND PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(gomea_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

@@ -37,6 +37,13 @@ class InstanceBase {
     evaluate(rng, solutions, indices);
   };
 
+  void evaluate(SolutionSetBase& solutions, std::optional<u64> seed = std::nullopt) {
+    Rng rng(seed.value_or(42), 0);
+    std::vector<usize> indices(solutions.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    evaluate(rng, solutions, indices);
+  };
+
   /// Returns the gradient for each index of indices (row) and continuous variable (column) with respect to the
   /// optimization goal. The number of evaluations performed to calculate the gradients are added to `evaluations`;
   ///

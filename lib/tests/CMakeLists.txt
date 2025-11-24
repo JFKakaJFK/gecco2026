@@ -12,7 +12,7 @@ set(deps
 
 set(test_target ${PROJECT_NAME}_test_main)
 add_library(${test_target} test_main.cpp)
-target_link_libraries(${test_target} PUBLIC ${deps})
+target_link_libraries(${test_target} PRIVATE ${deps})
 
 set(
     LIB_TEST_SOURCES
@@ -30,11 +30,14 @@ set(
     mixed
     mo_mixed
     mixed_rv
+    mixed_mixed
     gp_operators
     sr
     sr_gradient_step
     archive_objectives
     eval_kernel
+    ctx_subfunction
+    ctx_introns
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
@@ -47,4 +50,5 @@ endforeach()
 target_compile_options(lib_test_mixed PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_sr PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g) # -march=native
+target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g) # -march=native
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g) # -march=native

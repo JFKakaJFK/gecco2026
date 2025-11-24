@@ -94,9 +94,11 @@ Run with `uv run example.py` - this should automatically resolve all dependencie
 
 Note that after the initial installation of the dependencies (implicitly done when running any script), you can pass the `--offline` flag or set the envirnment variable `UV_OFFLINE=1` to avoid network requests when working offline.
 
+Also, either changing the version in `pyproject.toml` or running `uv cache clean` forces `uv` to reinstall the bindings (if the C++ code changed, `make bindings` might also be needed).
+
 # C++ Quickstart
 
-First, ensure `make`, `cmake` and C/C++ compilers supporting C++23 (for `std::span` and `std::unreachable`) are installed. The tools `ninja`, `ccache`, `clang-format`, `clang-tidy`, `include-what-you-use` are also recommended.
+First, ensure `make`, `cmake` and C/C++ compilers supporting C++23 (for `std::span` and `std::unreachable`) are installed. The tools `ninja`, `ccache`, `mold`, `clang-format`, `clang-tidy`, `include-what-you-use` are also recommended.
 
 For code examples see `lib/tests` for now.
 
@@ -109,11 +111,74 @@ make test
 
 # updates the Python bindings (needed when the C++ api changes)
 make bindings
+
+# run all tests, but this time use another compiler/linker combination (currently the default linker and compilers are used, ninja and ccache are automatically detected and preferred)
+# ! you will have to do a clean build when changing the linker again !
+CC=clang CXX=clang++ LDFLAGS="-fuse-ld=mold" make clean test
+# readelf -p .comment ./build/lib/tests/lib_test_amalgam | grep -i 'ld'
+#   [    a0]  mold 2.40.4 (compatible with GNU ld)
+CC=clang CXX=clang++ LDFLAGS="-fuse-ld=lld" make clean test
+# readelf -p .comment ./build/lib/tests/lib_test_amalgam | grep -i 'ld'
+#   [    72]  Linker: LLD 21.1.6 (https://github.com/conda-forge/llvmdev-feedstock 9995b55f2772fa2c2d48102a3ac35919050fed84)
+CC=gcc CXX=g++ LDFLAGS="-fuse-ld=mold" make clean test
 ```
 
 The `Makefile` also defines other commands to work with the code, so check that out, and how the Python bindings are generated is documented [here](pylib/README.md).
 
 Again use `UV_OFFLINE=1 make <x>` when offline.
+
+### Environment setup using `conda`
+
+Turns out relying on C++20/23 features isn't very portable yet, especially on systems without sudo rights. A workaround is to use [`conda`](https://www.anaconda.com/docs/getting-started/miniconda/install#linux-2) to setup an environment containing everything needed to work with the project:
+
+```bash
+# create an environment with the recommended toolchain
+conda create -n goblin python=3.12 \
+    conda-forge::gcc">=15" \
+    conda-forge::gxx">=15" \
+    conda-forge::clang">=20" \
+    conda-forge::clangxx">=20" \
+    conda-forge::clang-tools">=20" \
+    conda-forge::mold \
+    conda-forge::lld \
+    conda-forge::ninja \
+    conda-forge::cmake \
+    conda-forge::ccache \
+    conda-forge::libxslt \
+    --solver=libmamba
+    
+# libxslt is needed by srcml, the C++ parser used by litgen to generate the Python bindings
+
+# activate the environment
+conda activate goblin
+
+# now everything should work
+
+# deactivate the environment
+conda deactivate
+```
+
+Alternatively, here is the `environment.yaml`
+
+```yaml
+name: goblin
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - conda-forge::ccache
+  - conda-forge::clang-tools[version='>=20']
+  - conda-forge::clang[version='>=20']
+  - conda-forge::clangxx[version='>=20']
+  - conda-forge::cmake
+  - conda-forge::gcc[version='>=15']
+  - conda-forge::gxx[version='>=15']
+  - conda-forge::libxslt
+  - conda-forge::lld
+  - conda-forge::mold
+  - conda-forge::ninja
+  - python=3.12
+```
 
 ## GP/SR Implementation Details
 

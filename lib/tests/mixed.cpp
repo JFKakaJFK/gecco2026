@@ -29,7 +29,8 @@ TEST_CASE("goblin::methods::mixed") {
 
   std::vector<IMSOptions> ims_options{
       IMSOptions(),
-      // IMSOptions(/* initial_population_size */ 10, /* max_num_populations */ 1) // too flaky across compilers - this is a test of some method options, not a performance baseline comparison...
+      // IMSOptions(/* initial_population_size */ 10, /* max_num_populations */ 1) // too flaky across compilers - this
+      // is a test of some method options, not a performance baseline comparison...
   };
   std::vector<std::string> reprs{"aos", "soa_cols", "soa_rows"};
   std::vector<std::shared_ptr<LinkageModelBase>> linkage_models{// std::make_shared<UnivariateFOS>(),
@@ -50,7 +51,8 @@ TEST_CASE("goblin::methods::mixed") {
     usize i = 0;
     for (auto& lm : linkage_models) {
       for (auto& iopt : ims_options) {
-        auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(), iopt, lm, std::make_shared<FullFOS>(), repr);
+        auto gomea = MixedGOMEA(PopulationOptions(), RvOptions(), iopt, lm, std::make_shared<FullFOS>(),
+                                std::make_shared<AMaLGaMSamplingModel>(), repr);
         auto [front, status] =
             Tracked::run(instance, gomea, budget, TrackingOptions(repr + "_mixed.csv"), /* seed = */ 42);
 

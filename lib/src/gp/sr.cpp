@@ -41,7 +41,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       }
 
       usize _;
-      Arr2D<Scalar> pred = p->ctx.compute_outputs(p->_eval_buffer, solution, p->X_train, params, _);
+      Arr2D<Scalar> pred = p->ctx.compute_outputs(p->_eval_buffer, solution, p->X_train, params, _).value();
 
       for (usize i = 0; i < p->ctx.num_outputs; i++) {
         residual(Eigen::seqN(i * p->Y_train.rows(), p->Y_train.rows())).array() = p->Y_train.col(i) - pred.col(i);
@@ -76,7 +76,7 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
         fjac.col(i) = (fwd - bwd).array() / (d + d);
       }
 
-      return 2 * x.size();  // = number of evaluations done
+      return mode == Mode::Forward ? 1 + x.size() : 2 * x.size();  // = number of evaluations done
     }
   };
 
