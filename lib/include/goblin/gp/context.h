@@ -217,7 +217,7 @@ class GPContext {
     assert(index == num_discrete);
   };
 
-  inline std::optional<DType> value2domain(usize index, DType value) {
+  inline std::optional<DType> value2domain(usize index, DType value) const {
     auto dval = _value2domain(index, value);
     if (dval < domain_sizes[index]) {
       return dval;
@@ -225,13 +225,67 @@ class GPContext {
     return std::nullopt;
   };
 
-  inline std::optional<usize> parent(usize index) {
+  inline std::optional<usize> parent(usize index) const {
     auto p_idx = _parent[index];
     if (p_idx < num_discrete) {
       return p_idx;
     }
     return std::nullopt;
   };
+
+  // A helper that prints the expression in a human readable format
+  void debug_log_expressions(std::ostream& os,
+                             const SolutionBase& solution,
+                             std::optional<usize> node = std::nullopt,
+                             std::string indent = "") const {
+    // abuse default parameters to not have to declare a helper...
+    if (node.has_value()) {  // a node
+      usize idx = node.value();
+
+      for (usize i = 0; i < indent.size(); i++) {
+        indent[i] = ' ';
+      }
+      indent += "└─ ";
+
+      // lookup the value of the current node
+      DType value = domain2value(idx, solution.discrete_values()(idx));
+      usize v_idx = value_idx[value];
+
+      os << indent << idx << " (V = " << static_cast<usize>(value) << ", "
+         << (solution.discrete_active()(idx) ? "active" : "inactive") << "): ";
+
+      if (value_kind[value] == ValueKind::Input) {
+        os << "Input[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+        os << "Constant[" << v_idx << "] -> " << solution.continuous_values()(ci) << "\n";
+      } else if (value_kind[value] == ValueKind::Parameter) {
+        os << "Parameter[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Arg) {
+        os << "Arg[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Subtree) {
+        os << "Fn[" << v_idx << "] -> node " << subtree_roots[v_idx] << '\n';
+      } else if (value_kind[value] == ValueKind::Operator) {
+        os << "Op[" << v_idx << "] (arity = " << std::min(children[idx].size(), value_max_arity[value]) << ")\n";
+      } else {
+        std::unreachable();
+      }
+
+      for (usize c : children[idx]) {
+        debug_log_expressions(os, solution, c, std::string{indent});
+      }
+    } else {  // the base case - just print all subtrees and outputs
+      for (usize n : subtree_roots) {
+        os << "Subtree\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      for (usize n : output_roots) {
+        os << "Output\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      os << std::flush;
+    }
+  }
 
   // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
   // without references if the total number of nodes exceeds the `max_expression_size` or `std::nullopt` otherwise.
@@ -255,13 +309,13 @@ class GPContext {
     Array<u32> visited = Array<u32>::Zero(num_discrete);
 
     // to resolve subfunction arguments, we need to know the calling node
-    // (this stack only increases, to avoid revisiting nodes and more importantly to not invalidate stack indices)
+    // (and if that is another argument, we need the calling node of that tree and so on...)
     std::vector<usize> call_stack;
     call_stack.reserve(max_expression_size);
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
-    std::vector<std::tuple<usize, usize, bool>> node_stack;
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
 
     // for each output, walk the tree in post-order
@@ -300,7 +354,7 @@ class GPContext {
 
         // since this only a traversal without any evaluation, we only have to
         // check if this is an actual value or if we need to resolve arguments or other indirections
-        bool is_leaf = false;
+        bool update_tree = false;
 
         // we only need to look at the node if this is the first time we see it - in the post-order visit all we have to
         // do is add it to the tree
@@ -320,27 +374,58 @@ class GPContext {
             visited(idx) = 0;
 
             // we need to replace the argument with the corresponding child of the caller
-            usize calling_node = call_stack[call_stack_idx];
-            auto& cnodes = children[calling_node];
+            // and then replace the stack entry with with the actual argument
+            //
+            // but the caller might need some resolving if it is not the root of a tree
+            // (every function call adds to the call_stack, so it is not necessarily true that the previous call stack
+            // entry corresponds to the caller of the current subtree - it might just be an ancestor in the current tree
+            // that also calls another subfunction...)
 
-            // and replace the stack entry with with the actual argument
+            // get the previous call stack entry
+            usize calling_node = call_stack[call_stack_idx];
+
+            // since we move up the call chain, we need to go at least one call/frame backward, but maybe more
+            isize num_frames = 1;
+
+            // check if the calling node is an ancestor of the current node - if so, we need to move up the hierarchy to
+            // find the ancestor clostest to the root that is on the call_stack... (the first call into this subtree
+            // must have the actual caller)
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                // note: this works since we don't allow cycles by restricting the domain, i.e. there can only ever be
+                // one "active" call to this subfunction, guaranteeing that the calling node of the highest ancestor is
+                // the actual calling node.
+                calling_node = call_stack[call_stack_idx - num_frames++];
+              }
+              pidx = parent(pidx.value());
+            }
+
+            // now that we have the caller, we can finally replace the stack entry with with the actual argument
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()]);  // no self references
+
             node_stack.pop_back();
             node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                    call_stack_idx - 1,  // use the stack index of the caller
+                                    call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             visited(idx) = 0;
+            assert(root[idx] != subtree_roots[v_idx]);  // no loops allowed
             // we need to replace the actual subtree with the called subtree
 
             // first update the call stack
             call_stack.push_back(idx);
 
             // then replace the stack entry with the called subtree
-            node_stack.pop_back();
-            node_stack.emplace_back(subtree_roots[v_idx],
-                                    call_stack.size() - 1,  // a call always needs to use the top of the stack, no
-                                                            // matter where the current call_stack_idx is (!)
-                                    false);
+            std::get<2>(node_stack[node_stack_idx]) =
+                true;  // this is a reference type, but we need the post-order visit to keep the call stack in sync
+            node_stack.emplace_back(
+                subtree_roots[v_idx],
+                call_stack.size() - 1,  // a call always needs to use the top of the stack, no
+                                        // matter where the current call_stack_idx is (!there might be a chain of calls
+                                        // between the root containing the actual caller of this node!)
+                false);
           } else if (value_kind[value] == ValueKind::Operator) {
             // the operator stays on the stack, but the next visit is post-order
             std::get<2>(node_stack[node_stack_idx]) = true;
@@ -361,12 +446,26 @@ class GPContext {
                 solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
               }
             }
-            is_leaf = true;
+
+            // this is a leaf, so the in-order is the post-order visit
+            update_tree = true;
+            node_stack.pop_back();  // this is the post-order visit, so no need to visit again
           }
+        } else {
+            if (value_kind[value] == ValueKind::Subtree) {
+          // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
+          call_stack.pop_back();
+        } else {
+          // this is a non-reference post-order visit, so we need to update the tree
+          update_tree = true;
         }
 
-        // if this is a leaf or if this is the post-order visit, then we remove it from the stack and add it to the tree
-        if (is_post_order || is_leaf) {
+            // remove post order nodes from the stack
+            node_stack.pop_back();
+        }
+
+        // finally, if this is a leaf or if this is a non-reference post-order visit, then we add it to the tree
+        if (update_tree) {
           // Indirections like Subtree/Arg calls are not kept, so only the constants for actual "values", not
           // "references" are used
           if (const_repr == ConstantRepr::Edges) {
@@ -375,7 +474,6 @@ class GPContext {
             }
           }
 
-          node_stack.pop_back();
           tree.push_back(idx);
         }
       }

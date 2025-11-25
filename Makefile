@@ -1,7 +1,7 @@
 .PHONY: all tidy iwyu fmt configure reconfigure build test docs clean
 
 GENERATOR ?=
-NPROC ?= 1
+NPROC ?= auto
 OS:=$(shell uname -s)
 
 # use ninja if available
@@ -13,12 +13,14 @@ ifeq ($(GENERATOR),)
 	endif
 endif
 
-# use the number of CPUs to parallelize builds and tests
-ifeq ($(OS),Linux)
-	NPROC := $(shell grep -c ^processor /proc/cpuinfo)
-endif
-ifeq ($(OS),Darwin)
-	NPROC := $(shell sysctl -n hw.ncpu)
+ifeq ($(NPROC),auto)
+	# use the number of CPUs to parallelize builds and tests
+	ifeq ($(OS),Linux)
+		NPROC := $(shell grep -c ^processor /proc/cpuinfo)
+	endif
+	ifeq ($(OS),Darwin)
+		NPROC := $(shell sysctl -n hw.ncpu)
+	endif
 endif
 
 all: fmt configure build test

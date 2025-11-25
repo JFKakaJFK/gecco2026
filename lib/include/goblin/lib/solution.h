@@ -200,9 +200,16 @@ class SolutionBase {
           any_active_changed |= discrete_active()(di);
           discrete_values()(di) = donor.discrete_values()(di);
         }
+
+        // yes, the indices here should be from the discrete subset!
+        if (!is_continuous && always_inherit_continuous) {
+          if (continuous_values()(di) != donor.continuous_values()(di)) {
+            any_active_changed |= continuous_active()(di);
+            continuous_values()(di) = donor.continuous_values()(di);
+          }
+        }
       }
     }
-
     if (is_continuous) {
       for (usize ci, i = 0; i < subset.continuous.size(); i++) {
         ci = subset.continuous[i];
@@ -213,10 +220,12 @@ class SolutionBase {
           continuous_values()(ci) = donor.continuous_values()(ci);
         }
       }
-    } else if (always_inherit_continuous) {
-      // yes, the indices here should be from the discrete subset!
-      continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
     }
+    // else if (always_inherit_continuous) {
+    //   // yes, the indices here should be from the discrete subset!
+    //   // TODO do I need to mark anything as active here? - i.e. if the constant is active and this leads to a change,
+    //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
+    // }
 
     return any_active_changed;
   };
