@@ -47,8 +47,9 @@ foreach(testcase IN LISTS LIB_TEST_SOURCES)
     add_test(NAME ${_target} COMMAND ${_target})
 endforeach()
 
-target_compile_options(lib_test_mixed PRIVATE -O2 -g) # -march=native
-target_compile_options(lib_test_sr PRIVATE -O2 -g) # -march=native
-target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g) # -march=native
-target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g) # -march=native
-target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g) # -march=native
+target_compile_options(lib_test_mixed PRIVATE -O2 -g)
+target_compile_options(lib_test_sr PRIVATE -O2 -g)
+target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
+target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
+target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)
+target_compile_options(lib_test_ctx_introns PRIVATE -O2 -g)

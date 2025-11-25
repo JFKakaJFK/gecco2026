@@ -41,7 +41,7 @@ check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
 if(COMPILER_SUPPORTS_ASAN)
     set(
     CMAKE_CXX_FLAGS_DEBUG
-    "-fsanitize=undefined -fsanitize=address" # sanitizers don't work e.g. on arm macos
+    "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=address" # sanitizers don't work e.g. on arm macos
 )
 endif()
 
