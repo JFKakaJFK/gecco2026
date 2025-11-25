@@ -58,16 +58,16 @@ TEST_CASE("goblin::gp::archive_objectives") {
 
     auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
 
-    std::println("Status {}: {}", format_as(status), srp.format_solution(front.so_solution(0)));
+    std::println("Status {}: {}", format_as(status), srp.format_solution(front->so_solution(0)));
 
-    REQUIRE(front.empty() == false);
+    REQUIRE(front->empty() == false);
 
     // ls values are re-computed, so there can be slight differences here, hence 10x
-    REQUIRE_MESSAGE(front.so_solution(0).quality().objectives(0) <= vtr[0] * 10.0,
-                    srp.format_solution(front.so_solution(0)));
+    REQUIRE_MESSAGE(front->so_solution(0).quality().objectives(0) <= vtr[0] * 10.0,
+                    srp.format_solution(front->so_solution(0)));
     if (objectives_to_optimize > 1) {
-      REQUIRE_MESSAGE(front.so_solution(1).quality().objectives(1) <= vtr[1],
-                      srp.format_solution(front.so_solution(1)));
+      REQUIRE_MESSAGE(front->so_solution(1).quality().objectives(1) <= vtr[1],
+                      srp.format_solution(front->so_solution(1)));
     }
   }
 }

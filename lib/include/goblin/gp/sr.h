@@ -1,4 +1,5 @@
 #pragma once
+#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -153,7 +154,9 @@ class SRProblem : public GPInstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final { return ctx.const_repr != ConstantRepr::Pool; };
+  bool always_inherit_continuous() const override final {
+    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
+  };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));

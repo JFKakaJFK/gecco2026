@@ -274,7 +274,7 @@ class SolutionBase:
 
     def inherit(  # overridable
         self, donor: SolutionBase, subset: Subset, always_inherit_continuous: bool
-    ) -> bool:
+    ) -> Tuple[bool, bool]:
         """/ Inherits a subset of the decision variables from the donor, returning True
         / if there was a change to the active variables and an evaluation is needed.
         /
@@ -1849,6 +1849,16 @@ class GPContext:
     def parent(self, index: int) -> Optional[int]:
         pass
 
+    def debug_log_expressions(
+        self,
+        os: io.IOBase,
+        solution: SolutionBase,
+        node: Optional[int] = None,
+        indent: str = "",
+    ) -> None:
+        """A helper that prints the expression in a human readable format"""
+        pass
+
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -1963,9 +1973,6 @@ class RecursiveCompleteInit(DiscreteInitBase):
 
 # #endif
 
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/sr.h included by goblin.h                                                    //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_SR_H
 #
 
@@ -3189,7 +3196,7 @@ class Tracked(InstanceBase):
         config: TrackingOptions,
         seed: Optional[int] = None,
         population_size: Optional[int] = None,
-    ) -> Tuple[AdaptiveGridArchive, TerminationStatus]:
+    ) -> Tuple[ArchiveBase, TerminationStatus]:
         pass
 
 def debug_log(

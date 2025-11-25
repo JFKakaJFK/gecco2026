@@ -183,10 +183,16 @@ class SolutionBase {
   ///
   /// The `always_inherit_continuous` determines if the corresponding continuous
   /// variables are also inherited for discrete only subsets.
-  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor, const Subset& subset, bool always_inherit_continuous) {
+  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
+                                         const Subset& subset,
+                                         bool always_inherit_continuous) {
     bool any_active_changed = false, anything_changed = false;
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
+
+    assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+                                             "All discrete indices must be valid continuous indices if the continuous "
+                                             "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
       for (usize di, i = 0; i < subset.discrete.size(); i++) {

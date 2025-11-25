@@ -52,15 +52,15 @@ termination_callback = default_termination_callback
 termination_callback = None  # comment this to make Ctrl+C work while the algorithm is running, otherwise it takes until the C++ code under the hood returns (can take a while, the other alternative is to manually kill the python process)
 # TODO currently the overhead of the python callback is considerable - check that less often
 params = {
-    "GOMEA": lambda ls, max_evals: dict(
-        algorithm="DiscreteGOMEA",
-        algorithm_kwargs=dict(
-            base_population_size=1024,
-            max_number_of_populations=1,
-        ),
-        linear_scaling=ls,
-        constant_representation="none",
-    ),
+    # "GOMEA": lambda ls, max_evals: dict(
+    #     algorithm="DiscreteGOMEA",
+    #     algorithm_kwargs=dict(
+    #         base_population_size=1024,
+    #         max_number_of_populations=1,
+    #     ),
+    #     linear_scaling=ls,
+    #     constant_representation="none",
+    # ),
     # the default, compares to the original version
     "Mixed": lambda ls, max_evals: dict(
         linear_scaling=ls,

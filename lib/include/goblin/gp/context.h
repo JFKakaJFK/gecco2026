@@ -122,7 +122,7 @@ class GPContext {
       value_max_arity.push_back(0);
       value_idx.push_back(i);
     }
-    assert(value_kind.size() == num_values);
+    assert(value_kind.size() == num_values && "Not all values have been assigned.");
 
     // template structure lookup tables
     subtree_roots.resize(expression_template.subexpressions.size());
@@ -174,7 +174,7 @@ class GPContext {
           depth[idx] = 0;
         } else {
           auto p_idx = parent(idx);
-          assert(p_idx.has_value());
+          assert(p_idx.has_value() && "Nodes that are not tree roots must have a parent.");
 
           depth[idx] = depth[p_idx.value()] + 1;
 
@@ -214,7 +214,7 @@ class GPContext {
       }
     }
 
-    assert(index == num_discrete);
+    assert(index == num_discrete && "The domain has not been defined for all discrete variables.");
   };
 
   inline std::optional<DType> value2domain(usize index, DType value) const {
@@ -403,7 +403,7 @@ class GPContext {
 
             // now that we have the caller, we can finally replace the stack entry with with the actual argument
             auto& cnodes = children[calling_node];
-            assert(idx != cnodes[v_idx % cnodes.size()]);  // no self references
+            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
 
             node_stack.pop_back();
             node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
@@ -411,7 +411,7 @@ class GPContext {
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             visited(idx) = 0;
-            assert(root[idx] != subtree_roots[v_idx]);  // no loops allowed
+            assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
             // first update the call stack
@@ -452,16 +452,16 @@ class GPContext {
             node_stack.pop_back();  // this is the post-order visit, so no need to visit again
           }
         } else {
-            if (value_kind[value] == ValueKind::Subtree) {
-          // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
-          call_stack.pop_back();
-        } else {
-          // this is a non-reference post-order visit, so we need to update the tree
-          update_tree = true;
-        }
+          if (value_kind[value] == ValueKind::Subtree) {
+            // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
+            call_stack.pop_back();
+          } else {
+            // this is a non-reference post-order visit, so we need to update the tree
+            update_tree = true;
+          }
 
-            // remove post order nodes from the stack
-            node_stack.pop_back();
+          // remove post order nodes from the stack
+          node_stack.pop_back();
         }
 
         // finally, if this is a leaf or if this is a non-reference post-order visit, then we add it to the tree
@@ -520,8 +520,8 @@ class GPContext {
         usize v_idx = value_idx[value];
 
         // at this point, all references have been resolved
-        assert(value_kind[value] != ValueKind::Arg);
-        assert(value_kind[value] != ValueKind::Subtree);
+        assert(value_kind[value] != ValueKind::Arg && "Unresolved argument.");
+        assert(value_kind[value] != ValueKind::Subtree && "Unresolved subtree call.");
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
@@ -612,8 +612,8 @@ class GPContext {
         usize v_idx = value_idx[value];
 
         // at this point, all references have been resolved
-        assert(value_kind[value] != ValueKind::Arg);
-        assert(value_kind[value] != ValueKind::Subtree);
+        assert(value_kind[value] != ValueKind::Arg && "Unresolved argument.");
+        assert(value_kind[value] != ValueKind::Subtree && "Unresolved subtree call.");
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {

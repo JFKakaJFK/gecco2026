@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <variant>
+#include <sstream>
 
 #include "goblin/lib/algorithms/subset_selection.h"
 #include "goblin/lib/ims.h"
@@ -27,11 +28,18 @@
 #include "goblin/bench/tracked.h"
 #include "goblin/methods/continuous.h"
 
-#define __goblin_dbg_info() std::format("{}:{}", __FILE__, __LINE__)
-#ifdef DEBUG
-#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, __goblin_dbg_info())
+#ifndef NDEBUG
+#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_gom_backup_invariant() check_gom_backups(std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_invariants()            \
+  __assert_fitness_invariant(solutions); \
+  __assert_fitness_invariant(parents);   \
+  __assert_fitness_invariant(donors);    \
+  __assert_gom_backup_invariant()
 #else
 #define __assert_fitness_invariant(s)
+#define __assert_gom_backup_invariant()
+#define __assert_invariants()
 #endif
 
 namespace goblin {
@@ -372,16 +380,9 @@ class Population {
     local_archive->reset_change_count();
 
     // ======= variation/evaluation/selection =======
+    __assert_invariants();
+
     usize subset_idx = 0;
-    // // discrete only variation loop
-    // while(subset_idx < max_discrete_subset_count){
-    //     evaluations += discrete_gom_step(rng, subset_idx++);
-
-    //     if (should_terminate(evaluations).has_value()) {
-    //         return evaluations;
-    //     }
-    // }
-
     std::uniform_real_distribution<double> U(0.0, 1.0);
     bool can_do_discrete_step;
     do {
@@ -405,10 +406,6 @@ class Population {
         do_discrete_step = U(rng) < p_discrete;
       }
 
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
-
       u64 evals = 0;
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
@@ -418,23 +415,22 @@ class Population {
         // solution_clusters, cluster_solutions);
         evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                             cluster_solutions);
+        __assert_invariants();
         evaluations += evals;
         continuous_evaluations += evals;
       }
 
       if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
         evals = discrete_gom_step(rng, subset_idx++);
+        __assert_invariants();
         evaluations += evals;
         discrete_evaluations += evals;
       }
 
       if (is_continuous && options.continuous_mutation_probability > 0.0) {
         evaluations += continuous_mutation_step(rng);
+        __assert_invariants();
       }
-
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
 
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
@@ -444,16 +440,12 @@ class Population {
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
       evaluations += gradient_step(rng);
+      __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
+      __assert_invariants();
 
       // update no improvement stretches
       for (usize i = 0; i < size; i++) {
@@ -542,20 +534,75 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
+  void check_gom_backups(std::string_view info) {
+    assert(solutions.size() == parents.size());
+    for (usize i = 0; i < solutions.size(); i++) {
+      std::string s_discrete = log_helper(solutions[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  s_dactive = log_helper(solutions[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  s_continuous =
+                      log_helper(solutions[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  s_cactive = log_helper(solutions[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  p_discrete = log_helper(parents[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  p_dactive = log_helper(parents[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  p_continuous = log_helper(parents[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  p_cactive = log_helper(parents[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  s_quality = problem.fitness().format(solutions[i].quality()),
+                  p_quality = problem.fitness().format(parents[i].quality());
+
+      // we expect an exact match - after all, the values should have been copied over without a re-evaluation...
+      bool discrete_ok = s_discrete == p_discrete;
+      bool dactive_ok = s_dactive == p_dactive;
+      bool continuous_ok = s_continuous == p_continuous;
+      bool cactive_ok = s_cactive == p_cactive;
+      bool quality_ok = s_quality == p_quality;
+      if (!(discrete_ok && dactive_ok && continuous_ok && cactive_ok && quality_ok)) {
+        std::println("{}", info);
+        std::println("GOM backup/parent does not match solution {}: ", i);
+        std::println("Discrete: ({})", discrete_ok);
+        std::println("  Solution: {}", s_discrete);
+        std::println("  Parent:   {}", p_discrete);
+        std::println("Discrete Active: ({})", dactive_ok);
+        std::println("  Solution: {}", s_dactive);
+        std::println("  Parent:   {}", p_dactive);
+        std::println("Continuous: ({})", continuous_ok);
+        std::println("  Solution: {}", s_continuous);
+        std::println("  Parent:   {}", p_continuous);
+        std::println("Continuous Active: ({})", cactive_ok);
+        std::println("  Solution: {}", s_cactive);
+        std::println("  Parent:   {}", p_cactive);
+        std::println("Quality: ({})", quality_ok);
+        std::println("  Solution: {}", s_quality);
+        std::println("  Parent:   {}", p_quality);
+        std::abort();
+      }
+    }
+  };
+
+  // checks that the fitness matches the solution
   void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
-    SolutionSet copy = set;
+    SolutionSet copy;
+    for (usize i = 0; i < set.size(); i++) {
+      copy.add(set[i]);
+    }
     std::vector<usize> indices(copy.size());
     std::iota(indices.begin(), indices.end(), 0);
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      Ordering o = problem.fitness().cmp(copy[i].quality(), set[i].quality(), std::nullopt);
-      if (o != Ordering::Equal) {
+      auto expected = copy[i].quality(), actual = set[i].quality();
+      bool definitely_different =
+          (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
+      if (expected.objectives.array().isFinite().all()) {
+        definitely_different |= ((expected.objectives - actual.objectives).array().abs() >= 1e-6).any();
+      }
+      definitely_different |=
+          isna(expected.constraint_value) != isna(actual.constraint_value) ||
+          (!isna(expected.constraint_value) && std::abs(expected.constraint_value - actual.constraint_value) >= 1e-6);
+      if (definitely_different) {
         std::println("{}", info);
         std::println("Fitness invariant violated at index {}: ", i);
-        std::println("Expected: {} / {}", problem.format_solution(copy[i]),
-                     problem.fitness().format(copy[i].quality()));
-        std::println("Actual:   {} / {}", problem.format_solution(set[i]), problem.fitness().format(set[i].quality()));
+        std::println("Expected: {} / '{}'", problem.format_solution(copy[i]), problem.fitness().format(expected));
+        std::println("Actual:   {} / '{}'", problem.format_solution(set[i]), problem.fitness().format(actual));
         std::abort();
       }
     }
@@ -651,10 +698,10 @@ class Population {
         auto [evaluation_needed, anything_changed] =
             solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
-        if (evaluation_needed) { // parent will be updated during acceptance
+        if (evaluation_needed) {  // parent will be updated during acceptance
           solutions_to_evaluate.push_back(i);
-        } else if(anything_changed){ // no acceptance, parent has to be updated now
-            parents[i] = solutions[i];
+        } else if (anything_changed) {  // no acceptance, parent has to be updated now
+          parents[i] = solutions[i];
         }
       }
     }
@@ -662,10 +709,7 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     // acceptance happens after one step for all solutions rather than the
     // default of all steps for one solution after the other
@@ -676,7 +720,9 @@ class Population {
 
       if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        solutions[i].reject(
+            parents[i], problem.always_inherit_continuous(),
+            std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
       } else {
         solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -725,11 +771,11 @@ class Population {
               solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
                                                                           : global_archive.random_solution(rng),
                                    *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) { // parent will be updated during acceptance
+          if (evaluation_needed) {  // parent will be updated during acceptance
             eval2improve_idx.push_back(j);
             solutions_to_evaluate.push_back(i);
-          } else if(anything_changed){ // no acceptance, so we need to update the parent
-              parents[i] = solutions[i];
+          } else if (anything_changed) {  // no acceptance, so we need to update the parent
+            parents[i] = solutions[i];
           }
         }
       }
@@ -755,7 +801,9 @@ class Population {
 
           if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                          /* strict */ true)) {
-            solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+            solutions[i].reject(parents[i], problem.always_inherit_continuous(),
+                                std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
+                                                // are handled better
           } else {
             solution_changed[i] = true;
             parents[i] = solutions[i];
@@ -845,10 +893,7 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     std::shuffle(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), rng);
     for (usize i : solutions_to_evaluate) {
@@ -857,7 +902,9 @@ class Population {
 
       if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        solutions[i].reject(
+            parents[i], problem.always_inherit_continuous(),
+            std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -888,11 +935,8 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     auto [changed_indices, evaluations] =
         problem.gradient_steps(rng, solutions, parents, solutions_to_evaluate, options.gradient_step_count);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     // yes acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
@@ -957,8 +1001,6 @@ class Population {
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
 };
-
-#undef __goblin_dbg_info
 
 class MixedGOMEA : public MethodBase {
  public:

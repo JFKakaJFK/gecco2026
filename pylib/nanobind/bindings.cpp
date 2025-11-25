@@ -224,7 +224,7 @@ public:
             continuous_active // function name (c++)
         );
     }
-    bool inherit(const goblin::SolutionBase & donor, const goblin::Subset & subset, bool always_inherit_continuous) override
+    std::tuple<bool, bool> inherit(const goblin::SolutionBase & donor, const goblin::Subset & subset, bool always_inherit_continuous) override
     {
         NB_OVERRIDE_NAME(
             "inherit", // function name (python)
@@ -2182,6 +2182,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
       .def("parent",
           &goblin::GPContext::parent, nb::arg("index"))
+      .def("debug_log_expressions",
+          &goblin::GPContext::debug_log_expressions,
+          nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
+          "A helper that prints the expression in a human readable format")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")

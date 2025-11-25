@@ -1,6 +1,7 @@
 import pathlib
 
 from pygom import *
+
 from src.config import Config, c
 from src.plots import plot_scalability
 from src.postprocessing import load_results
@@ -8,7 +9,7 @@ from src.run import run_all
 
 REPEATS = 50
 
-budget = c.Budget(max_evaluations=int(1e6))
+budget = c.Budget(max_evaluations=int(1e5))
 
 
 def problems():
@@ -72,6 +73,14 @@ def methods():
             max_number_of_populations=max_num_populations,
         ),
     )
+    # yield (
+    #     '"Library (MI, U)"',
+    #     c.DiscreteGOMEA(
+    #         base_population_size=initial_population_size,
+    #         max_number_of_populations=max_num_populations,
+    #         linkage_model="Univariate",
+    #     ),
+    # )
     yield (
         '"Library (NMI, LT)"',
         c.DiscreteGOMEA(
@@ -80,28 +89,45 @@ def methods():
             max_number_of_populations=max_num_populations,
         ),
     )
-    yield (
-        '"Library (GIGA, U)"',
-        c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
-    )
+    # yield (
+    #     '"Library (GIGA, U)"',
+    #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
+    # )
 
     for metric in ["mi", "nmi"]:
-        for intron_strategy in ["none", "any_active"]:
-            yield (
-                f"{metric.upper()} LT {'IA' if intron_strategy != 'none' else ''}".strip(),
-                c.MixedGOMEA(
-                    discrete_model=c.LinkageTreeFOS(
-                        metric=metric,
-                        intron_strategy=intron_strategy,
-                        filter_root=True,
+        for fos in [
+            "LT",  #  "U"
+        ]:
+            if fos == "U":
+                yield (
+                    f"{metric.upper()} (U)",
+                    c.MixedGOMEA(
+                        discrete_model=c.UnivariateFOS(),
+                        ims_options=c.IMSOptions(
+                            initial_population_size=initial_population_size,
+                            max_num_populations=max_num_populations,
+                            restart_stale_populations=restart_stale_populations,
+                        ),
                     ),
-                    ims_options=c.IMSOptions(
-                        initial_population_size=initial_population_size,
-                        max_num_populations=max_num_populations,
-                        restart_stale_populations=restart_stale_populations,
-                    ),
-                ),
-            )
+                )
+
+            else:
+                for intron_strategy in ["none", "any_active"]:
+                    yield (
+                        f"{metric.upper()} LT {'IA' if intron_strategy != 'none' else ''}".strip(),
+                        c.MixedGOMEA(
+                            discrete_model=c.LinkageTreeFOS(
+                                metric=metric,
+                                intron_strategy=intron_strategy,
+                                filter_root=True,
+                            ),
+                            ims_options=c.IMSOptions(
+                                initial_population_size=initial_population_size,
+                                max_num_populations=max_num_populations,
+                                restart_stale_populations=restart_stale_populations,
+                            ),
+                        ),
+                    )
 
 
 if __name__ == "__main__":
@@ -131,7 +157,10 @@ if __name__ == "__main__":
         parquet_dir=parquet_dir,
         preprocess=preprocess,
     ) as conn:
-        fig = plot_scalability(conn)
+        fig = plot_scalability(
+            conn,
+            # methods=["Library (MI, LT)", "Library (MI, U)", "MI LT", "MI (U)"],
+        )
         for fmt in ["pdf", "png"]:
             fig.savefig(
                 plot_dir / f"{domain}_scalability.{fmt}",

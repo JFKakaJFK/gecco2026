@@ -277,12 +277,13 @@ class Tracked final : public InstanceBase {
     request_debug_report(debug_logpath, archive, debug_headers, debug_values);
   };
 
-  static std::tuple<AdaptiveGridArchive, TerminationStatus> run(InstanceBase& instance,
-                                                                MethodBase& method,
-                                                                Budget& budget,
-                                                                TrackingOptions config,
-                                                                std::optional<usize> seed = std::nullopt,
-                                                                std::optional<usize> population_size = std::nullopt) {
+  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& instance,
+      MethodBase& method,
+      Budget& budget,
+      TrackingOptions config,
+      std::optional<usize> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) {
     std::random_device rd;
     usize _seed = seed.has_value() ? seed.value()
                                    : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
@@ -316,7 +317,7 @@ class Tracked final : public InstanceBase {
 
     ti.report(ti.archive);
 
-    return std::make_tuple(std::move(ti.archive), ti.status);
+    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
   };
 
  private:

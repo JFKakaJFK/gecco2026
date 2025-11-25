@@ -511,26 +511,36 @@ class SolutionBase {
   ///
   /// The `always_inherit_continuous` determines if the corresponding continuous
   /// variables are also inherited for discrete only subsets.
-  virtual bool inherit(const SolutionBase& donor, const Subset& subset, bool always_inherit_continuous) {
-    bool any_active_changed = false;
+  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
+                                         const Subset& subset,
+                                         bool always_inherit_continuous) {
+    bool any_active_changed = false, anything_changed = false;
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
 
-    // note: remove if costly
-    if (!is_continuous && !is_discrete) {
-      return false;
-    }
+    assert(!always_inherit_continuous || num_continuous() >= num_discrete() &&
+                                             "All discrete indices must be valid continuous indices if the continuous "
+                                             "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
       for (usize di, i = 0; i < subset.discrete.size(); i++) {
         di = subset.discrete[i];
         if (discrete_values()(di) != donor.discrete_values()(di)) {
           any_active_changed |= discrete_active()(di);
+          anything_changed = true;
           discrete_values()(di) = donor.discrete_values()(di);
+        }
+
+        // yes, the indices here should be from the discrete subset!
+        if (!is_continuous && always_inherit_continuous) {
+          if (continuous_values()(di) != donor.continuous_values()(di)) {
+            any_active_changed |= continuous_active()(di);
+            anything_changed = true;
+            continuous_values()(di) = donor.continuous_values()(di);
+          }
         }
       }
     }
-
     if (is_continuous) {
       for (usize ci, i = 0; i < subset.continuous.size(); i++) {
         ci = subset.continuous[i];
@@ -538,15 +548,18 @@ class SolutionBase {
         // useful...
         if (continuous_values()(ci) != donor.continuous_values()(ci)) {
           any_active_changed |= continuous_active()(ci);
+          anything_changed = true;
           continuous_values()(ci) = donor.continuous_values()(ci);
         }
       }
-    } else if (always_inherit_continuous) {
-      // yes, the indices here should be from the discrete subset!
-      continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
     }
+    // else if (always_inherit_continuous) {
+    //   // yes, the indices here should be from the discrete subset!
+    //   // TODO do I need to mark anything as active here? - i.e. if the constant is active and this leads to a change,
+    //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
+    // }
 
-    return any_active_changed;
+    return std::make_tuple(any_active_changed, anything_changed);
   };
 
   virtual void reject(const SolutionBase& backup,
@@ -3749,7 +3762,7 @@ class GPContext {
       value_max_arity.push_back(0);
       value_idx.push_back(i);
     }
-    assert(value_kind.size() == num_values);
+    assert(value_kind.size() == num_values && "Not all values have been assigned.");
 
     // template structure lookup tables
     subtree_roots.resize(expression_template.subexpressions.size());
@@ -3801,7 +3814,7 @@ class GPContext {
           depth[idx] = 0;
         } else {
           auto p_idx = parent(idx);
-          assert(p_idx.has_value());
+          assert(p_idx.has_value() && "Nodes that are not tree roots must have a parent.");
 
           depth[idx] = depth[p_idx.value()] + 1;
 
@@ -3841,10 +3854,10 @@ class GPContext {
       }
     }
 
-    assert(index == num_discrete);
+    assert(index == num_discrete && "The domain has not been defined for all discrete variables.");
   };
 
-  inline std::optional<DType> value2domain(usize index, DType value) {
+  inline std::optional<DType> value2domain(usize index, DType value) const {
     auto dval = _value2domain(index, value);
     if (dval < domain_sizes[index]) {
       return dval;
@@ -3852,13 +3865,67 @@ class GPContext {
     return std::nullopt;
   };
 
-  inline std::optional<usize> parent(usize index) {
+  inline std::optional<usize> parent(usize index) const {
     auto p_idx = _parent[index];
     if (p_idx < num_discrete) {
       return p_idx;
     }
     return std::nullopt;
   };
+
+  // A helper that prints the expression in a human readable format
+  void debug_log_expressions(std::ostream& os,
+                             const SolutionBase& solution,
+                             std::optional<usize> node = std::nullopt,
+                             std::string indent = "") const {
+    // abuse default parameters to not have to declare a helper...
+    if (node.has_value()) {  // a node
+      usize idx = node.value();
+
+      for (usize i = 0; i < indent.size(); i++) {
+        indent[i] = ' ';
+      }
+      indent += "└─ ";
+
+      // lookup the value of the current node
+      DType value = domain2value(idx, solution.discrete_values()(idx));
+      usize v_idx = value_idx[value];
+
+      os << indent << idx << " (V = " << static_cast<usize>(value) << ", "
+         << (solution.discrete_active()(idx) ? "active" : "inactive") << "): ";
+
+      if (value_kind[value] == ValueKind::Input) {
+        os << "Input[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+        os << "Constant[" << v_idx << "] -> " << solution.continuous_values()(ci) << "\n";
+      } else if (value_kind[value] == ValueKind::Parameter) {
+        os << "Parameter[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Arg) {
+        os << "Arg[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Subtree) {
+        os << "Fn[" << v_idx << "] -> node " << subtree_roots[v_idx] << '\n';
+      } else if (value_kind[value] == ValueKind::Operator) {
+        os << "Op[" << v_idx << "] (arity = " << std::min(children[idx].size(), value_max_arity[value]) << ")\n";
+      } else {
+        std::unreachable();
+      }
+
+      for (usize c : children[idx]) {
+        debug_log_expressions(os, solution, c, std::string{indent});
+      }
+    } else {  // the base case - just print all subtrees and outputs
+      for (usize n : subtree_roots) {
+        os << "Subtree\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      for (usize n : output_roots) {
+        os << "Output\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      os << std::flush;
+    }
+  }
 
   // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
   // without references if the total number of nodes exceeds the `max_expression_size` or `std::nullopt` otherwise.
@@ -3882,13 +3949,13 @@ class GPContext {
     Array<u32> visited = Array<u32>::Zero(num_discrete);
 
     // to resolve subfunction arguments, we need to know the calling node
-    // (this stack only increases, to avoid revisiting nodes and more importantly to not invalidate stack indices)
+    // (and if that is another argument, we need the calling node of that tree and so on...)
     std::vector<usize> call_stack;
     call_stack.reserve(max_expression_size);
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
-    std::vector<std::tuple<usize, usize, bool>> node_stack;
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
 
     // for each output, walk the tree in post-order
@@ -3927,7 +3994,7 @@ class GPContext {
 
         // since this only a traversal without any evaluation, we only have to
         // check if this is an actual value or if we need to resolve arguments or other indirections
-        bool is_leaf = false;
+        bool update_tree = false;
 
         // we only need to look at the node if this is the first time we see it - in the post-order visit all we have to
         // do is add it to the tree
@@ -3947,27 +4014,58 @@ class GPContext {
             visited(idx) = 0;
 
             // we need to replace the argument with the corresponding child of the caller
-            usize calling_node = call_stack[call_stack_idx];
-            auto& cnodes = children[calling_node];
+            // and then replace the stack entry with with the actual argument
+            //
+            // but the caller might need some resolving if it is not the root of a tree
+            // (every function call adds to the call_stack, so it is not necessarily true that the previous call stack
+            // entry corresponds to the caller of the current subtree - it might just be an ancestor in the current tree
+            // that also calls another subfunction...)
 
-            // and replace the stack entry with with the actual argument
+            // get the previous call stack entry
+            usize calling_node = call_stack[call_stack_idx];
+
+            // since we move up the call chain, we need to go at least one call/frame backward, but maybe more
+            isize num_frames = 1;
+
+            // check if the calling node is an ancestor of the current node - if so, we need to move up the hierarchy to
+            // find the ancestor clostest to the root that is on the call_stack... (the first call into this subtree
+            // must have the actual caller)
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                // note: this works since we don't allow cycles by restricting the domain, i.e. there can only ever be
+                // one "active" call to this subfunction, guaranteeing that the calling node of the highest ancestor is
+                // the actual calling node.
+                calling_node = call_stack[call_stack_idx - num_frames++];
+              }
+              pidx = parent(pidx.value());
+            }
+
+            // now that we have the caller, we can finally replace the stack entry with with the actual argument
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+
             node_stack.pop_back();
             node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                    call_stack_idx - 1,  // use the stack index of the caller
+                                    call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             visited(idx) = 0;
+            assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
             // first update the call stack
             call_stack.push_back(idx);
 
             // then replace the stack entry with the called subtree
-            node_stack.pop_back();
-            node_stack.emplace_back(subtree_roots[v_idx],
-                                    call_stack.size() - 1,  // a call always needs to use the top of the stack, no
-                                                            // matter where the current call_stack_idx is (!)
-                                    false);
+            std::get<2>(node_stack[node_stack_idx]) =
+                true;  // this is a reference type, but we need the post-order visit to keep the call stack in sync
+            node_stack.emplace_back(
+                subtree_roots[v_idx],
+                call_stack.size() - 1,  // a call always needs to use the top of the stack, no
+                                        // matter where the current call_stack_idx is (!there might be a chain of calls
+                                        // between the root containing the actual caller of this node!)
+                false);
           } else if (value_kind[value] == ValueKind::Operator) {
             // the operator stays on the stack, but the next visit is post-order
             std::get<2>(node_stack[node_stack_idx]) = true;
@@ -3988,12 +4086,26 @@ class GPContext {
                 solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
               }
             }
-            is_leaf = true;
+
+            // this is a leaf, so the in-order is the post-order visit
+            update_tree = true;
+            node_stack.pop_back();  // this is the post-order visit, so no need to visit again
           }
+        } else {
+          if (value_kind[value] == ValueKind::Subtree) {
+            // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
+            call_stack.pop_back();
+          } else {
+            // this is a non-reference post-order visit, so we need to update the tree
+            update_tree = true;
+          }
+
+          // remove post order nodes from the stack
+          node_stack.pop_back();
         }
 
-        // if this is a leaf or if this is the post-order visit, then we remove it from the stack and add it to the tree
-        if (is_post_order || is_leaf) {
+        // finally, if this is a leaf or if this is a non-reference post-order visit, then we add it to the tree
+        if (update_tree) {
           // Indirections like Subtree/Arg calls are not kept, so only the constants for actual "values", not
           // "references" are used
           if (const_repr == ConstantRepr::Edges) {
@@ -4002,7 +4114,6 @@ class GPContext {
             }
           }
 
-          node_stack.pop_back();
           tree.push_back(idx);
         }
       }
@@ -4049,8 +4160,8 @@ class GPContext {
         usize v_idx = value_idx[value];
 
         // at this point, all references have been resolved
-        assert(value_kind[value] != ValueKind::Arg);
-        assert(value_kind[value] != ValueKind::Subtree);
+        assert(value_kind[value] != ValueKind::Arg && "Unresolved argument.");
+        assert(value_kind[value] != ValueKind::Subtree && "Unresolved subtree call.");
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
@@ -4141,8 +4252,8 @@ class GPContext {
         usize v_idx = value_idx[value];
 
         // at this point, all references have been resolved
-        assert(value_kind[value] != ValueKind::Arg);
-        assert(value_kind[value] != ValueKind::Subtree);
+        assert(value_kind[value] != ValueKind::Arg && "Unresolved argument.");
+        assert(value_kind[value] != ValueKind::Subtree && "Unresolved subtree call.");
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
@@ -4431,6 +4542,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h included by goblin.h                                                    //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -4566,7 +4678,9 @@ class SRProblem : public GPInstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final { return ctx.const_repr != ConstantRepr::Pool; };
+  bool always_inherit_continuous() const override final {
+    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
+  };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));
@@ -5560,7 +5674,7 @@ class BimodalTrap final : public ObjectiveBase {
       isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
       ov += unitation == 0 || unitation == static_cast<isize>(block_size)
                 ? static_cast<isize>(block_size)
-                : std::abs<isize>(2 * unitation - block_size - 2);
+                : std::abs(static_cast<isize>(2 * unitation - block_size - 2));
     }
     return std::make_tuple(ov, 0.0);
   };
@@ -6377,12 +6491,13 @@ class Tracked final : public InstanceBase {
     request_debug_report(debug_logpath, archive, debug_headers, debug_values);
   };
 
-  static std::tuple<AdaptiveGridArchive, TerminationStatus> run(InstanceBase& instance,
-                                                                MethodBase& method,
-                                                                Budget& budget,
-                                                                TrackingOptions config,
-                                                                std::optional<usize> seed = std::nullopt,
-                                                                std::optional<usize> population_size = std::nullopt) {
+  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& instance,
+      MethodBase& method,
+      Budget& budget,
+      TrackingOptions config,
+      std::optional<usize> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) {
     std::random_device rd;
     usize _seed = seed.has_value() ? seed.value()
                                    : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
@@ -6416,7 +6531,7 @@ class Tracked final : public InstanceBase {
 
     ti.report(ti.archive);
 
-    return std::make_tuple(std::move(ti.archive), ti.status);
+    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
   };
 
  private:
@@ -8234,7 +8349,8 @@ class RvState {
         bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active()(s).array().any();
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
-        } else {
+        } else {  // the parent needs to be updated even if we don't evaluate so that when a change is rejected in the
+                  // future, the parent is up to date
           parents[i] = solutions[i];
         }
       }
@@ -8585,11 +8701,18 @@ class RvState {
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#define __goblin_dbg_info() std::format("{}:{}", __FILE__, __LINE__)
-#ifdef DEBUG
-#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, __goblin_dbg_info())
+#ifndef NDEBUG
+#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_gom_backup_invariant() check_gom_backups(std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_invariants()            \
+  __assert_fitness_invariant(solutions); \
+  __assert_fitness_invariant(parents);   \
+  __assert_fitness_invariant(donors);    \
+  __assert_gom_backup_invariant()
 #else
 #define __assert_fitness_invariant(s)
+#define __assert_gom_backup_invariant()
+#define __assert_invariants()
 #endif
 
 namespace goblin {
@@ -8671,9 +8794,8 @@ create_and_register_clusters(Rng& rng,
       greedy_scattered_subset_selection(distance, solutions.size(), num_clusters, best_idx(random_objective(rng)));
 
   // Depending on which paper you look at, K-means is used to improve the
-  // cluster leader assignments here - TODO add the MO-RV/Amalgam paper I can't
-  // find right now that states that clustering on top of the greedy leader
-  // assignment is not really worth it...
+  // cluster leader assignments here - but https://ir.cwi.nl/pub/23049/23049D.pdf (Chapter 4.6)
+  // argues that that the k-means step does not necessarily help
 
   // 3. round robin cluster assignments (for clusters in random order, add
   // closest solution)
@@ -8931,16 +9053,9 @@ class Population {
     local_archive->reset_change_count();
 
     // ======= variation/evaluation/selection =======
+    __assert_invariants();
+
     usize subset_idx = 0;
-    // // discrete only variation loop
-    // while(subset_idx < max_discrete_subset_count){
-    //     evaluations += discrete_gom_step(rng, subset_idx++);
-
-    //     if (should_terminate(evaluations).has_value()) {
-    //         return evaluations;
-    //     }
-    // }
-
     std::uniform_real_distribution<double> U(0.0, 1.0);
     bool can_do_discrete_step;
     do {
@@ -8964,10 +9079,6 @@ class Population {
         do_discrete_step = U(rng) < p_discrete;
       }
 
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
-
       u64 evals = 0;
       // we first do the continuous step - it might not do anything (not enough active variables or already converged),
       // so we still want to be able to do a discrete step instead
@@ -8977,23 +9088,22 @@ class Population {
         // solution_clusters, cluster_solutions);
         evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                             cluster_solutions);
+        __assert_invariants();
         evaluations += evals;
         continuous_evaluations += evals;
       }
 
       if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
         evals = discrete_gom_step(rng, subset_idx++);
+        __assert_invariants();
         evaluations += evals;
         discrete_evaluations += evals;
       }
 
       if (is_continuous && options.continuous_mutation_probability > 0.0) {
         evaluations += continuous_mutation_step(rng);
+        __assert_invariants();
       }
-
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
 
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
@@ -9003,16 +9113,12 @@ class Population {
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
       evaluations += gradient_step(rng);
+      __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
+      __assert_invariants();
 
       // update no improvement stretches
       for (usize i = 0; i < size; i++) {
@@ -9101,20 +9207,75 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
+  void check_gom_backups(std::string_view info) {
+    assert(solutions.size() == parents.size());
+    for (usize i = 0; i < solutions.size(); i++) {
+      std::string s_discrete = log_helper(solutions[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  s_dactive = log_helper(solutions[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  s_continuous =
+                      log_helper(solutions[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  s_cactive = log_helper(solutions[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  p_discrete = log_helper(parents[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  p_dactive = log_helper(parents[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  p_continuous = log_helper(parents[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  p_cactive = log_helper(parents[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  s_quality = problem.fitness().format(solutions[i].quality()),
+                  p_quality = problem.fitness().format(parents[i].quality());
+
+      // we expect an exact match - after all, the values should have been copied over without a re-evaluation...
+      bool discrete_ok = s_discrete == p_discrete;
+      bool dactive_ok = s_dactive == p_dactive;
+      bool continuous_ok = s_continuous == p_continuous;
+      bool cactive_ok = s_cactive == p_cactive;
+      bool quality_ok = s_quality == p_quality;
+      if (!(discrete_ok && dactive_ok && continuous_ok && cactive_ok && quality_ok)) {
+        std::println("{}", info);
+        std::println("GOM backup/parent does not match solution {}: ", i);
+        std::println("Discrete: ({})", discrete_ok);
+        std::println("  Solution: {}", s_discrete);
+        std::println("  Parent:   {}", p_discrete);
+        std::println("Discrete Active: ({})", dactive_ok);
+        std::println("  Solution: {}", s_dactive);
+        std::println("  Parent:   {}", p_dactive);
+        std::println("Continuous: ({})", continuous_ok);
+        std::println("  Solution: {}", s_continuous);
+        std::println("  Parent:   {}", p_continuous);
+        std::println("Continuous Active: ({})", cactive_ok);
+        std::println("  Solution: {}", s_cactive);
+        std::println("  Parent:   {}", p_cactive);
+        std::println("Quality: ({})", quality_ok);
+        std::println("  Solution: {}", s_quality);
+        std::println("  Parent:   {}", p_quality);
+        std::abort();
+      }
+    }
+  };
+
+  // checks that the fitness matches the solution
   void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
-    SolutionSet copy = set;
+    SolutionSet copy;
+    for (usize i = 0; i < set.size(); i++) {
+      copy.add(set[i]);
+    }
     std::vector<usize> indices(copy.size());
     std::iota(indices.begin(), indices.end(), 0);
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      Ordering o = problem.fitness().cmp(copy[i].quality(), set[i].quality(), std::nullopt);
-      if (o != Ordering::Equal) {
+      auto expected = copy[i].quality(), actual = set[i].quality();
+      bool definitely_different =
+          (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
+      if (expected.objectives.array().isFinite().all()) {
+        definitely_different |= ((expected.objectives - actual.objectives).array().abs() >= 1e-6).any();
+      }
+      definitely_different |=
+          isna(expected.constraint_value) != isna(actual.constraint_value) ||
+          (!isna(expected.constraint_value) && std::abs(expected.constraint_value - actual.constraint_value) >= 1e-6);
+      if (definitely_different) {
         std::println("{}", info);
         std::println("Fitness invariant violated at index {}: ", i);
-        std::println("Expected: {} / {}", problem.format_solution(copy[i]),
-                     problem.fitness().format(copy[i].quality()));
-        std::println("Actual:   {} / {}", problem.format_solution(set[i]), problem.fitness().format(set[i].quality()));
+        std::println("Expected: {} / '{}'", problem.format_solution(copy[i]), problem.fitness().format(expected));
+        std::println("Actual:   {} / '{}'", problem.format_solution(set[i]), problem.fitness().format(actual));
         std::abort();
       }
     }
@@ -9207,11 +9368,13 @@ class Population {
         } while (i == donor_idx);
 
         subsets[i] = &cluster_FOS[k][fos_idx];
-        bool evaluation_needed =
+        auto [evaluation_needed, anything_changed] =
             solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
-        if (evaluation_needed) {
+        if (evaluation_needed) {  // parent will be updated during acceptance
           solutions_to_evaluate.push_back(i);
+        } else if (anything_changed) {  // no acceptance, parent has to be updated now
+          parents[i] = solutions[i];
         }
       }
     }
@@ -9219,10 +9382,7 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     // acceptance happens after one step for all solutions rather than the
     // default of all steps for one solution after the other
@@ -9233,7 +9393,9 @@ class Population {
 
       if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        solutions[i].reject(
+            parents[i], problem.always_inherit_continuous(),
+            std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
       } else {
         solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -9278,13 +9440,15 @@ class Population {
         if (fos_idx < cluster_FOS[k].size()) {
           subsets[i] = &cluster_FOS[k][fos_idx];
 
-          bool evaluation_needed =
+          auto [evaluation_needed, anything_changed] =
               solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
                                                                           : global_archive.random_solution(rng),
                                    *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {
+          if (evaluation_needed) {  // parent will be updated during acceptance
             eval2improve_idx.push_back(j);
             solutions_to_evaluate.push_back(i);
+          } else if (anything_changed) {  // no acceptance, so we need to update the parent
+            parents[i] = solutions[i];
           }
         }
       }
@@ -9310,7 +9474,9 @@ class Population {
 
           if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                          /* strict */ true)) {
-            solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+            solutions[i].reject(parents[i], problem.always_inherit_continuous(),
+                                std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
+                                                // are handled better
           } else {
             solution_changed[i] = true;
             parents[i] = solutions[i];
@@ -9400,10 +9566,7 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     std::shuffle(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), rng);
     for (usize i : solutions_to_evaluate) {
@@ -9412,7 +9575,9 @@ class Population {
 
       if (!accept_and_update_archive(solutions[i], parents[i], objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        solutions[i].reject(
+            parents[i], problem.always_inherit_continuous(),
+            std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -9443,11 +9608,8 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     auto [changed_indices, evaluations] =
         problem.gradient_steps(rng, solutions, parents, solutions_to_evaluate, options.gradient_step_count);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     // yes acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
@@ -9512,8 +9674,6 @@ class Population {
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
 };
-
-#undef __goblin_dbg_info
 
 class MixedGOMEA : public MethodBase {
  public:

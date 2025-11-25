@@ -191,12 +191,13 @@ TEST_CASE("goblin::gp::sr") {
                                 /* max_num_populations = */ 1),
                             std::make_shared<CombinedFOS>(models));
 
-    auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+    // auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+    auto [front, status] = gomea.run(srp, budget, /* seed = */ 42);
 
-    std::println("Status {}: {}", format_as(status), srp.format_solution(front.so_solution(0)));
+    std::println("Status {}: {}", format_as(status), srp.format_solution(front->so_solution(0)));
 
-    REQUIRE(front.empty() == false);
+    REQUIRE(front->empty() == false);
     // ls values are re-computed, so there can be slight differences here, hence 10x
-    REQUIRE(front.so_solution(0).quality().objectives(0) <= vtr * 10.0);
+    REQUIRE(front->so_solution(0).quality().objectives(0) <= vtr * 10.0);
   }
 }

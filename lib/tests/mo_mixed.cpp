@@ -41,13 +41,13 @@ TEST_CASE("goblin::methods::mixed") {
 
       std::println("Status {} {}: {}", repr, i++, format_as(status));
 
-      REQUIRE(front.empty() == false);
+      REQUIRE(front->empty() == false);
 
-      for (usize j = 0; j < front.size(); j++) {
-        std::println("{}", instance.format_solution(front[j]));
+      for (usize j = 0; j < front->size(); j++) {
+        std::println("{}", instance.format_solution((*front)[j]));
       }
 
-      REQUIRE(front.size() == NDIMS + 1);  // checks if the full pareto front was recovered
+      REQUIRE(front->size() == NDIMS + 1);  // checks if the full pareto front was recovered
     }
     // REQUIRE(false);
   }
