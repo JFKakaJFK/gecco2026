@@ -39,6 +39,7 @@ set(
     ctx_subfunction
     ctx_introns
     context
+    helper
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
