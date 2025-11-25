@@ -23,7 +23,10 @@ TEST_CASE("goblin::ga-gp::helper") {
         { 511, 512 },
         { 1024, 1024 },
         { 1025, 352 },
-        { 1023, 1024 }
+        { 1023, 1024 },
+        { 2048, 1024 },
+        { 2049, 416 }, 
+        { 2047, 1024 },
     };
 
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
