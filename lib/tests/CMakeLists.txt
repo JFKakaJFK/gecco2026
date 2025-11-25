@@ -37,7 +37,8 @@ set(
     archive_objectives
     eval_kernel
     ctx_subfunction
-    # ctx_introns
+    ctx_introns
+    context
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
