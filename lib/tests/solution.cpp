@@ -1,6 +1,7 @@
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <iostream>
 
 #include <Eigen/Dense>
 #include <doctest/doctest.h>

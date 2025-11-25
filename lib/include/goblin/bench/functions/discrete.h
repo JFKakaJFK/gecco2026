@@ -188,7 +188,7 @@ class BimodalTrap final : public ObjectiveBase {
       isize unitation = discrete_values(Eigen::seqN(i, std::min(block_size, dims - i))).cast<isize>().sum();
       ov += unitation == 0 || unitation == static_cast<isize>(block_size)
                 ? static_cast<isize>(block_size)
-                : std::abs<isize>(2 * unitation - block_size - 2);
+                : std::abs(static_cast<isize>(2 * unitation - block_size - 2));
     }
     return std::make_tuple(ov, 0.0);
   };

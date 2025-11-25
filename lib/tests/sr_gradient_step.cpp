@@ -1,4 +1,5 @@
 #include <print>
+#include <iostream>
 
 #include "doctest/doctest.h"
 

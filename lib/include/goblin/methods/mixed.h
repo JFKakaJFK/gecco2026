@@ -113,9 +113,8 @@ create_and_register_clusters(Rng& rng,
       greedy_scattered_subset_selection(distance, solutions.size(), num_clusters, best_idx(random_objective(rng)));
 
   // Depending on which paper you look at, K-means is used to improve the
-  // cluster leader assignments here - TODO add the MO-RV/Amalgam paper I can't
-  // find right now that states that clustering on top of the greedy leader
-  // assignment is not really worth it...
+  // cluster leader assignments here - but https://ir.cwi.nl/pub/23049/23049D.pdf (Chapter 4.6)
+  // argues that that the k-means step does not necessarily help
 
   // 3. round robin cluster assignments (for clusters in random order, add
   // closest solution)
@@ -649,11 +648,13 @@ class Population {
         } while (i == donor_idx);
 
         subsets[i] = &cluster_FOS[k][fos_idx];
-        bool evaluation_needed =
+        auto [evaluation_needed, anything_changed] =
             solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
-        if (evaluation_needed) {
+        if (evaluation_needed) { // parent will be updated during acceptance
           solutions_to_evaluate.push_back(i);
+        } else if(anything_changed){ // no acceptance, parent has to be updated now
+            parents[i] = solutions[i];
         }
       }
     }
@@ -720,13 +721,15 @@ class Population {
         if (fos_idx < cluster_FOS[k].size()) {
           subsets[i] = &cluster_FOS[k][fos_idx];
 
-          bool evaluation_needed =
+          auto [evaluation_needed, anything_changed] =
               solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
                                                                           : global_archive.random_solution(rng),
                                    *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {
+          if (evaluation_needed) { // parent will be updated during acceptance
             eval2improve_idx.push_back(j);
             solutions_to_evaluate.push_back(i);
+          } else if(anything_changed){ // no acceptance, so we need to update the parent
+              parents[i] = solutions[i];
           }
         }
       }

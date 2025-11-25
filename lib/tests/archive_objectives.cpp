@@ -1,5 +1,5 @@
 #include <print>
-
+#include <iostream>
 #include "doctest/doctest.h"
 
 #define EIGEN_MAX_ALIGN_BYTES 0

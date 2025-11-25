@@ -972,7 +972,7 @@ class RvState {
         bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active()(s).array().any();
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
-        } else {
+        } else { // the parent needs to be updated even if we don't evaluate so that when a change is rejected in the future, the parent is up to date
           parents[i] = solutions[i];
         }
       }
