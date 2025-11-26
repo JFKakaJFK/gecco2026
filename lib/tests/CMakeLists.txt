@@ -35,7 +35,7 @@ set(
     sr
     sr_gradient_step
     archive_objectives
-    eval_kernel
+    evaluate
     ctx_subfunction
     ctx_introns
     context

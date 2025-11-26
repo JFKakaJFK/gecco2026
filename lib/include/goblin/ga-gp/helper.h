@@ -60,6 +60,38 @@ int compute_block_size(int num_data_points) {
     return best_block_size;
 };
 
+#ifdef __CUDACC__
+template <typename T>
+T* allocate_on_gpu(size_t count) {
+    T* d_ptr = nullptr;
+    size_t bytes = count * sizeof(T);
+
+    __CHECK_CUDA_ERR__(cudaMalloc(&d_ptr, bytes));
+
+    return d_ptr;
+}
+
+template <typename T>
+void copy_to_gpu(T* d_ptr, const T* host_data, size_t count) {
+    size_t bytes = count * sizeof(T);
+
+    __CHECK_CUDA_ERR__(cudaMemcpy(d_ptr, host_data, bytes, cudaMemcpyHostToDevice));
+}
+
+template <typename T>
+T* allocate_and_copy(const T* host_data, size_t count) {
+    T* d_ptr = allocate_on_gpu<T>(count);
+    copy_to_gpu(d_ptr, host_data, count);
+
+    return d_ptr;
+}
+
+template <typename T>
+void free_on_gpu(T* d_ptr) {
+    __CHECK_CUDA_ERR__(cudaFree(d_ptr));
+}
+#endif
+
 };
 
 
