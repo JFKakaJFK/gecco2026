@@ -163,7 +163,7 @@ class IMS final : public MethodBase {
             }
           }
         }
-        if (!is_multi_objective && problem.num_discrete() == 0) {  // continuous only
+        if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
           // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
           // population is better condition
           avg_dist_to_so_elite(i) = populations[i].avg_dist_to_global_so_elite();

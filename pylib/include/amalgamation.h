@@ -518,9 +518,9 @@ class SolutionBase {
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
 
-    assert(!always_inherit_continuous || num_continuous() >= num_discrete() &&
-                                             "All discrete indices must be valid continuous indices if the continuous "
-                                             "values should be inherited with the discrete ones.");
+    assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+           "All discrete indices must be valid continuous indices if the continuous "
+           "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
       for (usize di, i = 0; i < subset.discrete.size(); i++) {
@@ -1811,6 +1811,12 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
             continue;
           }
 
+          // if (intron_aware && (l == intron_idx || r == intron_idx)) {
+          //   if (is_all_active || (is_any_active && l == r)) {
+          //     continue;
+          //   }
+          // }
+
           p = counts(l, r) / total_count;
           e += -p * std::log2(p);
         }
@@ -2292,11 +2298,11 @@ class LinkageTreeFOS final : public LinkageModelBase {
                  /// is used to modify the estimation of linkage when learning the linkage
                  /// tree
                  /// - none: Ignore introns
-                 /// - any_active: Introns are marked as such to remove random noise and
+                 /// - any_active: introns are marked as such to remove random noise and
                  /// only variable pairs with at least one active variable are considered
                  /// - all_active: Only variable pairs where both variables are active are
                  /// considered
-                 /// - mark_only: Introns are marked as such to reduce noise, but pairs
+                 /// - mark_only: introns are marked as such to reduce noise, but pairs
                  /// consisting of only introns are still considered
                  std::string intron_strategy = "none",
                  bool merge_continuous = true,
@@ -2339,7 +2345,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
 
     if (normalize_initial_linkage_bias && variables == VariableSet::Discrete) {
       // __goblin_runtime_assert(intron_strategy == "none");
-      // Intron awareness and Marco's linkage normalization are incompatible
+      // intron awareness and Marco's linkage normalization are incompatible
       // - conditioning the unbiasing matrix to only consider active variables
       // would lead to potential division by 0 issues (you can't normalize no
       // active values) and learning linkage in an intron aware manner likely
@@ -2369,16 +2375,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
     }
   };
 
-  FOS subsets(Rng& rng,
-              InstanceBase& problem,
-              SolutionSetBase& solutions,
-              const std::span<const usize> indices,
-              std::optional<std::reference_wrapper<const Mat<CType>>> covariance = std::nullopt) const override final {
-    bool is_discrete = subset.discrete.size() > 0;
-    bool is_continuous = subset.continuous.size() > 0;
+  Mat<CType> compute_similarity(
+      Rng& rng,
+      InstanceBase& problem,
+      SolutionSetBase& solutions,
+      const std::span<const usize> indices,
+      std::optional<std::reference_wrapper<const Mat<CType>>> covariance = std::nullopt) const {
+    const isize l = subset.size();
+    const bool is_discrete = subset.discrete.size() > 0;
+    const bool is_continuous = subset.continuous.size() > 0;
 
-    // 1. get similarity matrix based on the measure...
-    isize l = subset.size();
     Mat<CType> similarity;
     if (is_discrete && is_continuous) {
       similarity.resize(l, l);
@@ -2408,13 +2414,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
         }
       }
     } else {
-      __goblin_runtime_assert(false);  // unknown subset of variables to learn LT for
+      __goblin_runtime_assert(false && "Unknown subset of variables to learn a LT for.");
     }
+    return similarity;
+  };
 
-    // 2. clustering
+  FOS learn_lt(Rng& rng, Mat<CType> similarity, bool filter_root_default) const {
     auto merges = UPGMA::cluster(rng, similarity);
 
     // 3. merge subsets...
+    isize l = similarity.rows();
     FOS fos(2 * l - 1);
     {  // init with the univariate FOS
       usize i = 0;
@@ -2428,7 +2437,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
 
     // and add all of the merges performed during clustering as subsets
     usize num_merges = merges.size();
-    if (num_merges > 0 && filter_root.value_or(is_discrete && !is_continuous)) {
+    if (num_merges > 0 && filter_root.value_or(filter_root_default)) {
       num_merges--;
     }
     for (usize i = 0; i < num_merges; i++) {
@@ -2461,6 +2470,261 @@ class LinkageTreeFOS final : public LinkageModelBase {
 
     // remove the empty subsets
     std::erase_if(fos, [](const auto& s) { return s.size() == 0; });
+    return fos;
+  };
+
+  FOS learn_lt_original(Rng& rng, Mat<CType> similarity, bool filter_root_default) const {
+    const isize numberOfVariables = subset.size();
+    const isize maximumSetSize = max_subset_size.value_or(numberOfVariables);
+
+    Mat<CType> S = similarity;
+
+    auto determineNearestNeighbour = [&](usize index, const std::vector<std::vector<isize>>& mpm) {
+      usize result = 0;
+
+      if (result == index)
+        result++;
+
+      for (usize i = 1; i < mpm.size(); i++) {
+        if (mpm[i].size() > static_cast<usize>(numberOfVariables)) {
+          assert(false);
+        }
+        if (i != index) {
+          if (mpm[index].size() + mpm[result].size() > static_cast<usize>(maximumSetSize)) {
+            if (mpm[i].size() < mpm[result].size()) {
+              result = i;
+            }
+          } else if (mpm[index].size() + mpm[i].size() <= static_cast<usize>(maximumSetSize)) {
+            if ((S(index, i) > S(index, result)) ||
+                ((S(index, i) == S(index, result)) && (mpm[i].size() < mpm[result].size()))) {
+              result = i;
+            }
+          }
+        }
+      }
+      return result;
+    };
+
+    std::vector<std::vector<isize>> fos_;
+    fos_.reserve(2 * numberOfVariables - 1);
+
+    std::vector<isize> mpmFOSMap;
+    std::vector<isize> mpmFOSMapNew;
+
+    /* Initialize MPM to the univariate factorization */
+    std::vector<isize> order(numberOfVariables);
+    std::iota(order.begin(), order.end(), 0);
+    std::shuffle(order.begin(), order.end(), rng);
+
+    std::vector<std::vector<isize>> mpm(numberOfVariables);
+    std::vector<std::vector<isize>> mpmNew(numberOfVariables);
+
+    for (isize i = 0; i < numberOfVariables; i++) {
+      mpm[i].push_back(order[i]);
+    }
+
+    /* Initialize LT to the initial MPM */
+    fos_.resize(numberOfVariables);
+
+    isize FOSsIndex = 0;
+    for (isize i = 0; i < numberOfVariables; i++) {
+      fos_[i] = mpm[i];
+      mpmFOSMap.push_back(i);
+      FOSsIndex++;
+    }
+
+    for (isize i = 0; i < numberOfVariables; ++i) {
+      for (isize j = 0; j < numberOfVariables; j++)
+        S(i, j) = similarity(mpm[i][0], mpm[j][0]);
+
+      S(i, i) = 0;
+    }
+    // printf("Initialized similarity matrix. (%.3fs)\n",getTime(t)/1000.0);
+
+    std::vector<usize> NN_chain;
+    NN_chain.resize(numberOfVariables + 2);
+    isize NN_chain_length = 0;
+    bool done = false;
+    while (!done) {
+      if (NN_chain_length == 0) {
+        NN_chain[NN_chain_length] =
+            std::uniform_int_distribution<usize>(0, mpm.size() - 1)(rng);  //  utils::rng() % mpm.size();
+
+        NN_chain_length++;
+      }
+
+      while (NN_chain_length < 3) {
+        NN_chain[NN_chain_length] = determineNearestNeighbour(NN_chain[NN_chain_length - 1], mpm);
+        NN_chain_length++;
+      }
+
+      while (NN_chain[NN_chain_length - 3] != NN_chain[NN_chain_length - 1]) {
+        NN_chain[NN_chain_length] = determineNearestNeighbour(NN_chain[NN_chain_length - 1], mpm);
+        if (((S(NN_chain[NN_chain_length - 1], NN_chain[NN_chain_length]) ==
+              S(NN_chain[NN_chain_length - 1], NN_chain[NN_chain_length - 2]))) &&
+            (NN_chain[NN_chain_length] != NN_chain[NN_chain_length - 2]))
+          NN_chain[NN_chain_length] = NN_chain[NN_chain_length - 2];
+
+        NN_chain_length++;
+        if (NN_chain_length > numberOfVariables)
+          break;
+      }
+
+      usize r0 = NN_chain[NN_chain_length - 2];
+      usize r1 = NN_chain[NN_chain_length - 1];
+      bool skipFOSElement = false;
+      // TODO
+      // if( filtered )
+      // {
+      // 	if ( (similarityMeasure == linkage::MI || similarityMeasure == linkage::NMI ) )
+      // 	{
+      // 		if( S(r1, r0) >= 1-(1e-6))
+      // 			skipFOSElement = true;
+      // 	}
+      // 	else
+      // 	{
+      // 		if( S(r1, r0) == 0 )
+      // 			skipFOSElement = true;
+      // 	}
+      // }
+
+      if (r1 >= mpm.size() || r0 >= mpm.size() ||
+          mpm[r0].size() + mpm[r1].size() > static_cast<usize>(maximumSetSize)) {
+        NN_chain_length = 1;
+        NN_chain[0] = 0;
+        if (maximumSetSize < numberOfVariables) {
+          done = true;
+          for (usize i = 1; i < mpm.size(); i++) {
+            if (mpm[i].size() + mpm[NN_chain[0]].size() <= static_cast<usize>(maximumSetSize)) {
+              done = false;
+              // printf("%d %d [%d + %d]\n",i,NN_chain[0],mpm[i].size(),mpm[NN_chain[0]].size());
+            }
+            if (mpm[i].size() < mpm[NN_chain[0]].size())
+              NN_chain[0] = i;
+          }
+          if (done)
+            break;
+        }
+        continue;
+      }
+
+      if (r0 > r1) {
+        isize rswap = r0;
+        r0 = r1;
+        r1 = rswap;
+      }
+      NN_chain_length -= 3;
+
+      if (r1 < mpm.size()) {
+        if (mpm[r0].size() + mpm[r1].size() > static_cast<usize>(maximumSetSize)) {
+          done = true;
+          break;
+        }
+        std::vector<isize> indices(mpm[r0].size() + mpm[r1].size());
+
+        usize i = 0;
+        for (usize j = 0; j < mpm[r0].size(); j++) {
+          indices[i] = mpm[r0][j];
+          i++;
+        }
+
+        for (usize j = 0; j < mpm[r1].size(); j++) {
+          indices[i] = mpm[r1][j];
+          i++;
+        }
+
+        if (!skipFOSElement) {
+          fos_.push_back(indices);
+          FOSsIndex++;
+          assert(fos_.size() == static_cast<usize>(FOSsIndex));
+        }
+
+        double mul0 = static_cast<double>(mpm[r0].size()) / static_cast<double>(mpm[r0].size() + mpm[r1].size());
+        double mul1 = static_cast<double>(mpm[r1].size()) / static_cast<double>(mpm[r0].size() + mpm[r1].size());
+        for (usize i = 0; i < mpm.size(); i++) {
+          if ((i != r0) && (i != r1)) {
+            S(i, r0) = mul0 * S(i, r0) + mul1 * S(i, r1);
+            S(r0, i) = S(i, r0);
+          }
+        }
+
+        mpmNew.resize(mpm.size() - 1);
+        mpmFOSMapNew.resize(mpmFOSMap.size() - 1);
+        for (usize i = 0; i < mpmNew.size(); i++) {
+          mpmNew[i] = mpm[i];
+          mpmFOSMapNew[i] = mpmFOSMap[i];
+        }
+
+        mpmNew[r0] = indices;
+        mpmFOSMapNew[r0] = FOSsIndex - 1;
+
+        if (r1 < mpm.size() - 1) {
+          mpmNew[r1] = mpm[mpm.size() - 1];
+          mpmFOSMapNew[r1] = mpmFOSMap[mpm.size() - 1];
+
+          for (usize i = 0; i < r1; i++) {
+            S(i, r1) = S(i, mpm.size() - 1);
+            S(r1, i) = S(i, r1);
+          }
+
+          for (usize j = r1 + 1; j < mpmNew.size(); j++) {
+            S(r1, j) = S(j, mpm.size() - 1);
+            S(j, r1) = S(r1, j);
+          }
+        }
+
+        for (i = 0; i < static_cast<usize>(NN_chain_length); i++) {
+          if (NN_chain[i] == mpm.size() - 1) {
+            NN_chain[i] = r1;
+            break;
+          }
+        }
+
+        mpm = mpmNew;
+        mpmFOSMap = mpmFOSMapNew;
+
+        if (!filter_root.value_or(filter_root_default)) {
+          if (mpm.size() == 1)
+            done = true;
+        } else {
+          if (mpm.size() == 2)
+            done = true;
+        }
+      }
+    }
+
+    // Map subset indices to structs
+    FOS fos;
+    fos.resize(fos_.size());
+    for (usize i = 0; i < fos_.size(); i++) {
+      for (usize j : fos_[i]) {
+        if (j < subset.discrete.size()) {
+          fos[i].discrete.push_back(subset.discrete[j]);
+        } else {
+          fos[i].continuous.push_back(subset.continuous[j - subset.discrete.size()]);
+        }
+      }
+    }
+
+    return fos;
+  };
+
+  FOS subsets(Rng& rng,
+              InstanceBase& problem,
+              SolutionSetBase& solutions,
+              const std::span<const usize> indices,
+              std::optional<std::reference_wrapper<const Mat<CType>>> covariance = std::nullopt) const override final {
+    // 1. get similarity matrix based on the measure...
+    Mat<CType> similarity = compute_similarity(rng, problem, solutions, indices, covariance);
+    assert(static_cast<usize>(similarity.rows()) == subset.size() &&
+           static_cast<usize>(similarity.cols()) == subset.size());
+
+    // 2. turn that into a FOS by clustering + merging subsets
+    bool is_discrete = subset.discrete.size() > 0;
+    bool is_continuous = subset.continuous.size() > 0;
+    bool filter_root_default = is_discrete && !is_continuous;
+    FOS fos = learn_lt(rng, similarity, filter_root_default);
+    // FOS fos = learn_lt_original(rng, similarity, filter_root_default);
 
     // std::println("Population:");
     // for (auto i : indices) {
@@ -2782,7 +3046,7 @@ class IMS final : public MethodBase {
             }
           }
         }
-        if (!is_multi_objective && problem.num_discrete() == 0) {  // continuous only
+        if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
           // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
           // population is better condition
           avg_dist_to_so_elite(i) = populations[i].avg_dist_to_global_so_elite();
@@ -5490,15 +5754,6 @@ class Repeat final : public ObjectiveBase {
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
 
-
-// TODO
-// - [x] OneMax
-// - [x] ZeroMax
-// - [ ] DeceptiveTrap
-// - [ ] BimodalDTrap
-// - [ ] Leading Ones
-// - [ ] Trailing Zeroes
-
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -5626,6 +5881,47 @@ class TrailingZeros final : public ObjectiveBase {
 
  private:
   usize dims;
+};
+
+
+class HLeadingOnes final : public ObjectiveBase {
+ public:
+  HLeadingOnes(usize ndims, usize branching_factor = 2) : dims(ndims), branching_factor(branching_factor) {
+      if( dims == 0){
+          throw std::runtime_error("At least one variable is required.");
+      }
+  };
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    CType ov = CType(0.0);
+    eval_helper(discrete_values, discrete_active, 0, ov);
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov){
+      discrete_active(i) = true;
+      if(discrete_values(i) > 0){
+          ov += 1.0;
+
+          usize num_active_children = std::min(static_cast<usize>(discrete_values(i)), branching_factor);
+          for(usize j = 0, c; j < num_active_children; j++){
+              c = branching_factor * i + j + 1; // index of j-th child of i
+              if(c < dims){
+                  eval_helper(discrete_values, discrete_active, c, ov);
+              }
+          }
+      }
+  };
+
+  usize dims;
+  usize branching_factor;
 };
 
 class DeceptiveTrap final : public ObjectiveBase {
@@ -6069,6 +6365,8 @@ class BenchmarkInstance final : public InstanceBase {
       }
     }
   };
+
+  void set_init(AnyInit init) { _init = from_any_init(init); }
 
   void set_initial_bounds(std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0),
                           std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0)) {
@@ -6568,27 +6866,38 @@ class Tracked final : public InstanceBase {
     }
 
     // actually evaluate, but ensure we don't go beyond the evaluation limit
-    usize evals_performed;
+    u64 evaluations_performed;
     if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
       auto evals_left = budget.max_evaluations.value() - evaluations;
       eval_timer.start();
       eval(indices.first(evals_left));
       eval_timer.stop();
-      evals_performed = evals_left;
+      evaluations_performed = evals_left;
+
+      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
+             "Evaluation limit was not reached!");
     } else {
       eval_timer.start();
       eval(indices);
       eval_timer.stop();
-      evals_performed = indices.size();
+      evaluations_performed = indices.size();
     }
 
-    evaluations += evals_performed;
-    evaluations_since_last_archive_adaption += evals_performed;
+    // update the internal archive, and possibly stop if the target was reached
+    for (usize i = 0; i < evaluations_performed; i++) {
+      archive.update(solutions[indices[i]], true);
+      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
+                      // evaluations performed were considered...
 
-    // update the internal archive
-    for (auto& i : indices) {
-      archive.update(solutions[i], true);
+      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
+      // evaluating one by one
+      if (instance.target_reached(archive)) {
+        status = TerminationStatus::TargetReached;
+        throw TrackingException("");
+      }
     }
+
+    evaluations_since_last_archive_adaption += evaluations_performed;
 
     // check if we need to stop because the evaluation time/evaluations
     // exhausted the budget
@@ -6596,12 +6905,6 @@ class Tracked final : public InstanceBase {
     ts = budget.exhausted(0, evaluations, elapsed);
     if (ts.has_value()) {
       status = ts.value();
-      throw TrackingException("");
-    }
-
-    // or if we already reached the target
-    if (instance.target_reached(archive)) {
-      status = TerminationStatus::TargetReached;
       throw TrackingException("");
     }
 
@@ -6950,7 +7253,9 @@ class DiscreteGOMEA final : public MethodBase {
                 usize base_population_size = 2,         // The size of the first population in the multi-start scheme.
                 usize max_number_of_populations = 100,  // The maximum number of populations in the multi-start scheme.
                 usize subgeneration_factor = 4,         // The subgeneration factor in the multi-start scheme.
-                usize max_archive_size = 0) {
+                usize max_archive_size = 0,
+                std::string fos_order = "default" // parallel, fixed
+  ) {
     config.generational_statistics = false;
     config.usePartialEvaluations = 0;
     config.AnalyzeFOS = 0;
@@ -6964,12 +7269,15 @@ class DiscreteGOMEA final : public MethodBase {
       linkage_config = gomea::linkage_config_t(similarity_metric.c_str(), filter_linkage,
                                                max_subset_size.value_or(std::numeric_limits<int>().infinity()), false);
     } else {
-      // TODO raise error?
+        throw std::runtime_error("Unknown or unsupported FOS type!");
     }
     config.linkage_config = &linkage_config;
 
     config.gene_invariant = gene_invariant;
     config.useForcedImprovements = forced_improvements ? 1 : 0;
+
+    config.useParallelFOSOrder = fos_order == "parallel" ? 1 : 0;
+    config.fixFOSOrderForPopulation = fos_order == "fixed" ? 1 : 0;
 
     config.maxArchiveSize = max_archive_size;
 
@@ -8935,6 +9243,11 @@ struct PopulationOptions {
   bool forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
 
+  bool strict_elite_acceptance = false; // should the single objective elite solutions accept only strict improvements or also neutral changes?
+
+  double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
+                                         // of all subset variables being identical between the solution and donor
+
   // Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
   double continuous_mutation_probability = 0.0;
   CType continuous_mutation_temperature = 0.1;
@@ -9014,7 +9327,17 @@ class Population {
     // after this, donors == parents == solutions holds
     for (usize i = 0; i < size; i++) {
       donors[i] = solutions[i];
+
+      // if acceptance for elites is strict, find the current elite solution for each single-objective cluster
+      if(options.strict_elite_acceptance){
+          usize k = solution_clusters[i];
+
+          if(k < problem.num_objectives() && problem.fitness().cmp(solutions[i].quality(), solutions[so_elite_idx[k]].quality(), std::nullopt) == Ordering::Better){
+              so_elite_idx[k] = i;
+          }
+      }
     }
+    __assert_gom_backup_invariant();
 
     // ======= state/model updates =======
 
@@ -9041,6 +9364,7 @@ class Population {
       }
       subset_orders.rowwise() =
           Vec<usize>::LinSpaced(max_discrete_subset_count, 0, max_discrete_subset_count - 1).transpose();
+
       for (auto row : subset_orders.rowwise()) {
         std::shuffle(row.begin(), row.end(), rng);
       }
@@ -9158,7 +9482,8 @@ class Population {
       }
     }
 
-    return no_improvement_stretch >= max_nis && no_evaluations_performed;
+    return false;
+    // return no_improvement_stretch >= max_nis && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {
@@ -9281,17 +9606,21 @@ class Population {
     }
   };
 
-  bool accept_and_update_archive(const SolutionBase& solution,
-                                 const SolutionBase& parent,
-                                 std::optional<usize> objective,
+  // Returns whether a solution should be accepted or not. The parameter `strict` determines if random walks in neutral
+  // fitness landscape are allowed or not.
+  bool accept_and_update_archive(usize idx, std::optional<usize> objective,
                                  bool strict) {
-    Ordering o = problem.fitness().cmp(solution.quality(), parent.quality(), objective);
+    Ordering o = problem.fitness().cmp(solutions[idx].quality(), parents[idx].quality(), objective);
 
     if (o == Ordering::Worse) {
       return false;
     }
 
-    bool non_dominated = local_archive->update(solution, strict);
+    bool non_dominated = local_archive->update(solutions[idx], strict);
+
+    if(options.strict_elite_acceptance && objective.has_value() && idx == so_elite_idx[objective.value()]){
+        return o == Ordering::Better;
+    }
 
     // if strict: we want clear improvements,
     // i.e. better in SO or at least non-dominated in MO
@@ -9329,6 +9658,8 @@ class Population {
     solution_nis.clear();
     solution_nis.resize(size, 0);
 
+    so_elite_idx.resize(num_clusters);
+
     no_improvement_stretch = 0;
     no_evaluations_performed = false;
     iterations_since_last_gradient_step = 0;
@@ -9349,7 +9680,10 @@ class Population {
   };
 
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
-    solutions_to_evaluate.clear();
+    std::vector<usize> donor_pool(size);
+    std::iota(donor_pool.begin(), donor_pool.end(), 0);
+
+      solutions_to_evaluate.clear();
 
     // TODO parallel?
     for (usize i = 0; i < solutions.size(); i++) {
@@ -9359,23 +9693,32 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
-        // TODO permute instead of rejection sampling? Possibly having a donor search fraction could be useful (e.g. try
-        // until 0.2 * size different solutions haven't led to something to evaluate)
-        std::uniform_int_distribution<usize> donor_inidices(0, cluster_donors[k].size() - 1);
-        usize donor_idx;
-        do {
-          donor_idx = cluster_donors[k][donor_inidices(rng)];
-        } while (i == donor_idx);
-
         subsets[i] = &cluster_FOS[k][fos_idx];
-        auto [evaluation_needed, anything_changed] =
-            solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
-        if (evaluation_needed) {  // parent will be updated during acceptance
-          solutions_to_evaluate.push_back(i);
-        } else if (anything_changed) {  // no acceptance, parent has to be updated now
-          parents[i] = solutions[i];
-        }
+        // the library does donor search, so this also is added behind a flag to allow fair comparisons to the
+        // reference version...
+        usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * size;
+        usize donor_idx, donor_pool_idx = 0;
+
+        bool evaluation_needed, anything_changed;
+        do {
+          // do a partial Fisher-Yates shuffle
+          std::swap(donor_pool[donor_pool_idx], donor_pool[std::uniform_int_distribution<usize>(donor_pool_idx, size - 1)(rng)]);
+
+          donor_idx = donor_pool[donor_pool_idx++];
+          if (i == donor_idx) {
+            continue;
+          }
+
+          std::tie(evaluation_needed, anything_changed) =
+              solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+
+          if (evaluation_needed) {  // parent will be updated during acceptance
+            solutions_to_evaluate.push_back(i);
+          } else if (anything_changed) {  // no acceptance, parent has to be updated now
+            parents[i] = solutions[i];
+          }
+        } while (!evaluation_needed && donor_pool_idx < max_donor_search_iterations);
       }
     }
 
@@ -9391,11 +9734,12 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(
-            parents[i], problem.always_inherit_continuous(),
-            std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        solutions[i] = parents[i];
       } else {
         solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -9472,11 +9816,12 @@ class Population {
           std::optional<usize> objective =
               k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-          if (!accept_and_update_archive(solutions[i], parents[i], objective,
+          if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            solutions[i].reject(parents[i], problem.always_inherit_continuous(),
-                                std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
-                                                // are handled better
+            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
+            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
+            //                                     // are handled better
+            solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
             parents[i] = solutions[i];
@@ -9573,11 +9918,12 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(
-            parents[i], problem.always_inherit_continuous(),
-            std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -9617,9 +9963,10 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -9652,6 +9999,8 @@ class Population {
   usize no_improvement_stretch;
   bool no_evaluations_performed;
   usize iterations_since_last_gradient_step;
+
+  std::vector<usize> so_elite_idx;
 
   SolutionSet donors;  // previous population
   SolutionSet solutions;

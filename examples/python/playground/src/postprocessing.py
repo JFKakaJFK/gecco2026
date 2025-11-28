@@ -3,8 +3,8 @@ import pathlib
 import shutil
 from typing import Iterable
 
-import numpy as np
 import duckdb
+import numpy as np
 
 
 def load_results(
@@ -61,6 +61,7 @@ def load_results(
     if parquet_dir is None:
         conn.sql(
             f"""
+            SET preserve_insertion_order=false;
             CREATE OR REPLACE VIEW results AS SELECT * FROM
                 read_csv(
                     {str([f"{d}/**/*.csv" for d in result_dirs])}, union_by_name=true,

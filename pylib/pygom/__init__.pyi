@@ -968,6 +968,26 @@ class LinkageTreeFOS(LinkageModelBase):
     ) -> None:
         pass
 
+    def compute_similarity(
+        self,
+        rng: Rng,
+        problem: InstanceBase,
+        solutions: SolutionSetBase,
+        indices: std.span[int],
+        covariance: Optional[std.reference_wrapper[Mat[float]]] = None,
+    ) -> Mat[float]:
+        pass
+
+    def learn_lt(
+        self, rng: Rng, similarity: Mat[float], filter_root_default: bool
+    ) -> FOS:
+        pass
+
+    def learn_lt_original(
+        self, rng: Rng, similarity: Mat[float], filter_root_default: bool
+    ) -> FOS:
+        pass
+
     def subsets(
         self,
         rng: Rng,
@@ -2518,14 +2538,6 @@ class Repeat(ObjectiveBase):
 # #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #
 
-# TODO
-# - [x] OneMax
-# - [x] ZeroMax
-# - [ ] DeceptiveTrap
-# - [ ] BimodalDTrap
-# - [ ] Leading Ones
-# - [ ] Trailing Zeroes
-
 class OneMax(ObjectiveBase):
     """
     (final class)
@@ -2635,6 +2647,29 @@ class TrailingZeros(ObjectiveBase):
     """
 
     def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class HLeadingOnes(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int, branching_factor: int = 2) -> None:
         pass
 
     def num_discrete(self) -> int:
@@ -2982,6 +3017,9 @@ class BenchmarkInstance(InstanceBase):
     ) -> None:
         pass
 
+    def set_init(self, init: AnyInit) -> None:
+        pass
+
     def set_initial_bounds(
         self,
         continuous_init_lower_bound: Union[float, Vec[float]] = float(0.0),
@@ -3287,6 +3325,7 @@ class DiscreteGOMEA(MethodBase):
         max_number_of_populations: int = 100,
         subgeneration_factor: int = 4,
         max_archive_size: int = 0,
+        fos_order: str = "default",
     ) -> None:
         pass
 
@@ -3721,6 +3760,15 @@ class PopulationOptions:
     forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
 
+    strict_elite_acceptance: bool = (
+        False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
+    )
+
+    donor_search_proportion: float = (
+        0.0  # the fraction of solutions to consider before skipping an evaluation in case
+    )
+    # of all subset variables being identical between the solution and donor
+
     # Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
     continuous_mutation_probability: float = 0.0
     continuous_mutation_temperature: float = 0.1
@@ -3736,6 +3784,8 @@ class PopulationOptions:
         max_nis: Optional[int] = None,
         forced_improvements: bool = True,
         target_continuous_to_discrete_balance: float = 1.0,
+        strict_elite_acceptance: bool = False,
+        donor_search_proportion: float = 0.0,
         continuous_mutation_probability: float = 0.0,
         continuous_mutation_temperature: float = 0.1,
         continuous_mutation_decay_factor: float = 0.9,

@@ -11,7 +11,12 @@ from tqdm import tqdm
 from .config import Config
 
 
-def run_one(task_path: str, logfile: str, loginfo: list[tuple[str, str]]):
+def run_one(
+    task_path: str,
+    logfile: str,
+    loginfo: list[tuple[str, str]],
+    seed: int | None = None,
+):
     task = Config.eval(Config.load(task_path), ctx=vars(pygom))
 
     if pathlib.Path(logfile).is_file():
@@ -27,7 +32,7 @@ def run_one(task_path: str, logfile: str, loginfo: list[tuple[str, str]]):
             method=task["method"],
             budget=task["budget"],
             config=TrackingOptions(logfile, loginfo, report_intermediate_results=False),
-            seed=task.get("seed", None),
+            seed=task.get("seed", seed),
             population_size=task.get("population_size", None),
         )
     except Exception as e:

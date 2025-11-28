@@ -1,4 +1,5 @@
 #pragma once
+#include <stdexcept>
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
@@ -40,7 +41,9 @@ class DiscreteGOMEA final : public MethodBase {
                 usize base_population_size = 2,         // The size of the first population in the multi-start scheme.
                 usize max_number_of_populations = 100,  // The maximum number of populations in the multi-start scheme.
                 usize subgeneration_factor = 4,         // The subgeneration factor in the multi-start scheme.
-                usize max_archive_size = 0) {
+                usize max_archive_size = 0,
+                std::string fos_order = "default" // parallel, fixed
+  ) {
     config.generational_statistics = false;
     config.usePartialEvaluations = 0;
     config.AnalyzeFOS = 0;
@@ -54,12 +57,15 @@ class DiscreteGOMEA final : public MethodBase {
       linkage_config = gomea::linkage_config_t(similarity_metric.c_str(), filter_linkage,
                                                max_subset_size.value_or(std::numeric_limits<int>().infinity()), false);
     } else {
-      // TODO raise error?
+        throw std::runtime_error("Unknown or unsupported FOS type!");
     }
     config.linkage_config = &linkage_config;
 
     config.gene_invariant = gene_invariant;
     config.useForcedImprovements = forced_improvements ? 1 : 0;
+
+    config.useParallelFOSOrder = fos_order == "parallel" ? 1 : 0;
+    config.fixFOSOrderForPopulation = fos_order == "fixed" ? 1 : 0;
 
     config.maxArchiveSize = max_archive_size;
 

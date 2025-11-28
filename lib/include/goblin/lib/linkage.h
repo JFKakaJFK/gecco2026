@@ -215,6 +215,12 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
             continue;
           }
 
+          // if (intron_aware && (l == intron_idx || r == intron_idx)) {
+          //   if (is_all_active || (is_any_active && l == r)) {
+          //     continue;
+          //   }
+          // }
+
           p = counts(l, r) / total_count;
           e += -p * std::log2(p);
         }

@@ -26,7 +26,8 @@ if(CCACHE_PROGRAM)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE) # RelWithDebInfo
+    # set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
 endif()
 
 include(CheckCXXCompilerFlag)
@@ -55,7 +56,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3  -march=native"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
     )
 endif()
 

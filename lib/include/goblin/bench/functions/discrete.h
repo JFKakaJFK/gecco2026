@@ -1,17 +1,9 @@
+#pragma once
+#include <stdexcept>
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
-#pragma once
-
 #include "goblin/bench/functions.h"
-
-// TODO
-// - [x] OneMax
-// - [x] ZeroMax
-// - [ ] DeceptiveTrap
-// - [ ] BimodalDTrap
-// - [ ] Leading Ones
-// - [ ] Trailing Zeroes
 
 namespace goblin {
 
@@ -140,6 +132,47 @@ class TrailingZeros final : public ObjectiveBase {
 
  private:
   usize dims;
+};
+
+
+class HLeadingOnes final : public ObjectiveBase {
+ public:
+  HLeadingOnes(usize ndims, usize branching_factor = 2) : dims(ndims), branching_factor(branching_factor) {
+      if( dims == 0){
+          throw std::runtime_error("At least one variable is required.");
+      }
+  };
+
+  usize num_discrete() const override final { return dims; };
+  usize num_continuous() const override final { return 0; };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Active> discrete_active,
+                                    RefS<Active> continuous_active) override final {
+    CType ov = CType(0.0);
+    eval_helper(discrete_values, discrete_active, 0, ov);
+    return std::make_tuple(ov, 0.0);
+  };
+
+ private:
+  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov){
+      discrete_active(i) = true;
+      if(discrete_values(i) > 0){
+          ov += 1.0;
+
+          usize num_active_children = std::min(static_cast<usize>(discrete_values(i)), branching_factor);
+          for(usize j = 0, c; j < num_active_children; j++){
+              c = branching_factor * i + j + 1; // index of j-th child of i
+              if(c < dims){
+                  eval_helper(discrete_values, discrete_active, c, ov);
+              }
+          }
+      }
+  };
+
+  usize dims;
+  usize branching_factor;
 };
 
 class DeceptiveTrap final : public ObjectiveBase {

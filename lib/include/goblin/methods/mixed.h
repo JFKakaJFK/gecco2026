@@ -262,6 +262,11 @@ struct PopulationOptions {
   bool forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
 
+  bool strict_elite_acceptance = false; // should the single objective elite solutions accept only strict improvements or also neutral changes?
+
+  double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
+                                         // of all subset variables being identical between the solution and donor
+
   // Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
   double continuous_mutation_probability = 0.0;
   CType continuous_mutation_temperature = 0.1;
@@ -341,7 +346,17 @@ class Population {
     // after this, donors == parents == solutions holds
     for (usize i = 0; i < size; i++) {
       donors[i] = solutions[i];
+
+      // if acceptance for elites is strict, find the current elite solution for each single-objective cluster
+      if(options.strict_elite_acceptance){
+          usize k = solution_clusters[i];
+
+          if(k < problem.num_objectives() && problem.fitness().cmp(solutions[i].quality(), solutions[so_elite_idx[k]].quality(), std::nullopt) == Ordering::Better){
+              so_elite_idx[k] = i;
+          }
+      }
     }
+    __assert_gom_backup_invariant();
 
     // ======= state/model updates =======
 
@@ -368,6 +383,7 @@ class Population {
       }
       subset_orders.rowwise() =
           Vec<usize>::LinSpaced(max_discrete_subset_count, 0, max_discrete_subset_count - 1).transpose();
+
       for (auto row : subset_orders.rowwise()) {
         std::shuffle(row.begin(), row.end(), rng);
       }
@@ -485,7 +501,8 @@ class Population {
       }
     }
 
-    return no_improvement_stretch >= max_nis && no_evaluations_performed;
+    return false;
+    // return no_improvement_stretch >= max_nis && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {
@@ -608,17 +625,21 @@ class Population {
     }
   };
 
-  bool accept_and_update_archive(const SolutionBase& solution,
-                                 const SolutionBase& parent,
-                                 std::optional<usize> objective,
+  // Returns whether a solution should be accepted or not. The parameter `strict` determines if random walks in neutral
+  // fitness landscape are allowed or not.
+  bool accept_and_update_archive(usize idx, std::optional<usize> objective,
                                  bool strict) {
-    Ordering o = problem.fitness().cmp(solution.quality(), parent.quality(), objective);
+    Ordering o = problem.fitness().cmp(solutions[idx].quality(), parents[idx].quality(), objective);
 
     if (o == Ordering::Worse) {
       return false;
     }
 
-    bool non_dominated = local_archive->update(solution, strict);
+    bool non_dominated = local_archive->update(solutions[idx], strict);
+
+    if(options.strict_elite_acceptance && objective.has_value() && idx == so_elite_idx[objective.value()]){
+        return o == Ordering::Better;
+    }
 
     // if strict: we want clear improvements,
     // i.e. better in SO or at least non-dominated in MO
@@ -656,6 +677,8 @@ class Population {
     solution_nis.clear();
     solution_nis.resize(size, 0);
 
+    so_elite_idx.resize(num_clusters);
+
     no_improvement_stretch = 0;
     no_evaluations_performed = false;
     iterations_since_last_gradient_step = 0;
@@ -676,7 +699,10 @@ class Population {
   };
 
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
-    solutions_to_evaluate.clear();
+    std::vector<usize> donor_pool(size);
+    std::iota(donor_pool.begin(), donor_pool.end(), 0);
+
+      solutions_to_evaluate.clear();
 
     // TODO parallel?
     for (usize i = 0; i < solutions.size(); i++) {
@@ -686,23 +712,32 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
-        // TODO permute instead of rejection sampling? Possibly having a donor search fraction could be useful (e.g. try
-        // until 0.2 * size different solutions haven't led to something to evaluate)
-        std::uniform_int_distribution<usize> donor_inidices(0, cluster_donors[k].size() - 1);
-        usize donor_idx;
-        do {
-          donor_idx = cluster_donors[k][donor_inidices(rng)];
-        } while (i == donor_idx);
-
         subsets[i] = &cluster_FOS[k][fos_idx];
-        auto [evaluation_needed, anything_changed] =
-            solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
-        if (evaluation_needed) {  // parent will be updated during acceptance
-          solutions_to_evaluate.push_back(i);
-        } else if (anything_changed) {  // no acceptance, parent has to be updated now
-          parents[i] = solutions[i];
-        }
+        // the library does donor search, so this also is added behind a flag to allow fair comparisons to the
+        // reference version...
+        usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * size;
+        usize donor_idx, donor_pool_idx = 0;
+
+        bool evaluation_needed, anything_changed;
+        do {
+          // do a partial Fisher-Yates shuffle
+          std::swap(donor_pool[donor_pool_idx], donor_pool[std::uniform_int_distribution<usize>(donor_pool_idx, size - 1)(rng)]);
+
+          donor_idx = donor_pool[donor_pool_idx++];
+          if (i == donor_idx) {
+            continue;
+          }
+
+          std::tie(evaluation_needed, anything_changed) =
+              solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+
+          if (evaluation_needed) {  // parent will be updated during acceptance
+            solutions_to_evaluate.push_back(i);
+          } else if (anything_changed) {  // no acceptance, parent has to be updated now
+            parents[i] = solutions[i];
+          }
+        } while (!evaluation_needed && donor_pool_idx < max_donor_search_iterations);
       }
     }
 
@@ -718,11 +753,12 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(
-            parents[i], problem.always_inherit_continuous(),
-            std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        solutions[i] = parents[i];
       } else {
         solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -799,11 +835,12 @@ class Population {
           std::optional<usize> objective =
               k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-          if (!accept_and_update_archive(solutions[i], parents[i], objective,
+          if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            solutions[i].reject(parents[i], problem.always_inherit_continuous(),
-                                std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
-                                                // are handled better
+            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
+            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms
+            //                                     // are handled better
+            solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
             parents[i] = solutions[i];
@@ -900,11 +937,12 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(
-            parents[i], problem.always_inherit_continuous(),
-            std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -944,9 +982,10 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -979,6 +1018,8 @@ class Population {
   usize no_improvement_stretch;
   bool no_evaluations_performed;
   usize iterations_since_last_gradient_step;
+
+  std::vector<usize> so_elite_idx;
 
   SolutionSet donors;  // previous population
   SolutionSet solutions;

@@ -191,8 +191,8 @@ class SolutionBase {
     bool is_discrete = subset.discrete.size() > 0;
 
     assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-                                             "All discrete indices must be valid continuous indices if the continuous "
-                                             "values should be inherited with the discrete ones.");
+           "All discrete indices must be valid continuous indices if the continuous "
+           "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
       for (usize di, i = 0; i < subset.discrete.size(); i++) {

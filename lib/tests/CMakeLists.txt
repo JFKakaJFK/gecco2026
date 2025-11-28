@@ -30,6 +30,7 @@ set(
     mixed
     mo_mixed
     mixed_rv
+    mixed_ia
     mixed_mixed
     gp_operators
     sr
@@ -52,3 +53,4 @@ target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)
 target_compile_options(lib_test_ctx_introns PRIVATE -O2 -g)
+target_compile_options(lib_test_mixed_ia PRIVATE -O2 -g)

@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import seaborn as sns
 
+sns.set_style("whitegrid")
+
 
 def plot_scalability(
     conn: duckdb.DuckDBPyConnection,
@@ -55,8 +57,9 @@ def plot_scalability(
     nrows = len(metrics)
     ncols = len(problems)
     fig, axes = plt.subplots(
-        nrows=nrows, ncols=ncols, figsize=(5 * nrows, 3 * ncols), sharex="col"
+        nrows=nrows, ncols=ncols, figsize=(4 * ncols, 3 * nrows), sharex="col"
     )
+    axes = axes.reshape(nrows, ncols)
 
     methods = sorted(methods)
     hues = sns.color_palette(n_colors=len(methods))  # , palette="colorblind")
@@ -148,9 +151,12 @@ def plot_scalability(
                 ax.set_yscale("log")
             if log_x:
                 ax.set_xscale("log")
-            ax.set_xticks(sorted(set(all_dims)))
+            sdims = sorted(set(all_dims))
+            ax.set_xticks(sdims)
             # make sure all ticks are shown
             ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())
+            assert len(sdims) > 0, sdims
+            ax.set_xlim(xmin=sdims[0] - 1)  # , xmax=sdims[-1] + 1)
 
             if mi == 0:
                 ax.set_title(problem_name)
