@@ -62,25 +62,43 @@ params = {
     #     constant_representation="none",
     # ),
     # the default, compares to the original version
-    "Mixed": lambda ls, max_evals: dict(
-        linear_scaling=ls,
-        budget_kwargs=dict(
-            max_evaluations=max_evals, termination_callback=termination_callback
-        ),
-        ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-        rv_kwargs=dict(enabled=False),
-        population_kwargs=dict(),
-        discrete_model_kwargs=dict(
-            metric="mi",
-            intron_strategy="none",
-            filter_root=True,
-            merge_continuous=False,
-            num_continuous_bins=25,
-            normalize_initial_linkage_bias=True,
-        ),
-    ),
+    # "Mixed": lambda ls, max_evals: dict(
+    #     linear_scaling=ls,
+    #     budget_kwargs=dict(
+    #         max_evaluations=max_evals, termination_callback=termination_callback
+    #     ),
+    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
+    #     rv_kwargs=dict(enabled=False),
+    #     population_kwargs=dict(),
+    #     discrete_model_kwargs=dict(
+    #         metric="mi",
+    #         intron_strategy="none",
+    #         filter_root=True,
+    #         merge_continuous=False,
+    #         num_continuous_bins=25,
+    #         normalize_initial_linkage_bias=True,
+    #     ),
+    # ),
+    # # with intron awareness, compares to GP-RV (which already has intron awareness)
+    # "Mixed IA": lambda ls, max_evals: dict(
+    #     linear_scaling=ls,
+    #     budget_kwargs=dict(
+    #         max_evaluations=max_evals, termination_callback=termination_callback
+    #     ),
+    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
+    #     rv_kwargs=dict(enabled=False),
+    #     population_kwargs=dict(),
+    #     discrete_model_kwargs=dict(
+    #         metric="mi",
+    #         intron_strategy="any_active",
+    #         filter_root=True,
+    #         merge_continuous=False,
+    #         num_continuous_bins=25,
+    #         normalize_initial_linkage_bias=False,
+    #     ),
+    # ),
     # with intron awareness, compares to GP-RV (which already has intron awareness)
-    "Mixed IA": lambda ls, max_evals: dict(
+    "Mixed IAm": lambda ls, max_evals: dict(
         linear_scaling=ls,
         budget_kwargs=dict(
             max_evaluations=max_evals, termination_callback=termination_callback
@@ -90,7 +108,7 @@ params = {
         population_kwargs=dict(),
         discrete_model_kwargs=dict(
             metric="mi",
-            intron_strategy="any_active",
+            intron_strategy="mark_only",
             filter_root=True,
             merge_continuous=False,
             num_continuous_bins=25,

@@ -46,7 +46,7 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
     SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"nmse"}, std::nullopt, linear_scaling);
     srp.register_target({vtr});
 
-    Rng rng(42, 0);
+    Rng rng = seeded_rng(42);
     AoSSet solutions, parents;
     std::vector<usize> indices{0};
     UnboundedArchive archive(srp.archive_fitness());

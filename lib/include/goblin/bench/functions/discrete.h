@@ -134,13 +134,12 @@ class TrailingZeros final : public ObjectiveBase {
   usize dims;
 };
 
-
 class HLeadingOnes final : public ObjectiveBase {
  public:
   HLeadingOnes(usize ndims, usize branching_factor = 2) : dims(ndims), branching_factor(branching_factor) {
-      if( dims == 0){
-          throw std::runtime_error("At least one variable is required.");
-      }
+    if (dims == 0) {
+      throw std::runtime_error("At least one variable is required.");
+    }
   };
 
   usize num_discrete() const override final { return dims; };
@@ -156,19 +155,19 @@ class HLeadingOnes final : public ObjectiveBase {
   };
 
  private:
-  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov){
-      discrete_active(i) = true;
-      if(discrete_values(i) > 0){
-          ov += 1.0;
+  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov) {
+    discrete_active(i) = true;
+    if (discrete_values(i) > 0) {
+      ov += 1.0;
 
-          usize num_active_children = std::min(static_cast<usize>(discrete_values(i)), branching_factor);
-          for(usize j = 0, c; j < num_active_children; j++){
-              c = branching_factor * i + j + 1; // index of j-th child of i
-              if(c < dims){
-                  eval_helper(discrete_values, discrete_active, c, ov);
-              }
-          }
+      usize num_active_children = std::min(static_cast<usize>(discrete_values(i)), branching_factor);
+      for (usize j = 0, c; j < num_active_children; j++) {
+        c = branching_factor * i + j + 1;  // index of j-th child of i
+        if (c < dims) {
+          eval_helper(discrete_values, discrete_active, c, ov);
+        }
       }
+    }
   };
 
   usize dims;

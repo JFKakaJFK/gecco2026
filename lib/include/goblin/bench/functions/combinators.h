@@ -177,7 +177,7 @@ class Rotated final : public ObjectiveBase {
 
   Rotated(std::shared_ptr<ObjectiveBase> objective, usize seed, std::optional<usize> rotation_block_size = std::nullopt)
       : fn(objective) {
-    Rng rng(seed, 0);
+    Rng rng = seeded_rng(seed);
 
     usize block_size = rotation_block_size.value_or(fn->num_continuous());
 

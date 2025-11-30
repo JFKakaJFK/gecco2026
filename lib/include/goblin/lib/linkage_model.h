@@ -1,5 +1,4 @@
 #pragma once
-#include <random>
 #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
 #define _GOBLIN_LIB_LINKAGE_MODEL_H
 
@@ -9,6 +8,7 @@
 #include <span>
 #include <string_view>
 #include <vector>
+#include <random>
 
 #include <Eigen/Dense>
 
@@ -588,20 +588,25 @@ class LinkageTreeFOS final : public LinkageModelBase {
  private:
   void entropy2similarity(Mat<CType>& H) const {
     // entropy -> MI/NMI
+    CType tmp;
     if (metric == "mi") {
       auto& MI = H;
       for (isize i = 0; i < H.rows(); i++) {
         for (isize j = 0; j < i; j++) {
-          MI(i, j) = H(i, i) + H(j, j) - H(i, j);
-          MI(j, i) = MI(i, j);
+          tmp = H(i, i) + H(j, j) - H(i, j);
+          MI(i, j) = tmp;
+          MI(j, i) = tmp;
         }
       }
     } else if (metric == "nmi") {
       auto& NMI = H;
       for (isize i = 0; i < H.rows(); i++) {
         for (isize j = 0; j < i; j++) {
-          NMI(i, j) = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
-          NMI(j, i) = NMI(i, j);
+          tmp = H(i, j) > 0
+              ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0))
+              : CType(0.0);
+          NMI(i, j) = tmp;
+          NMI(j, i) = tmp;
         }
       }
     } else {

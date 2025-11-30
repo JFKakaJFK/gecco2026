@@ -17,7 +17,7 @@ TEST_CASE("goblin::lib::instance_default_gradient") {
   REQUIRE(sphere.num_objectives() == 1);
   REQUIRE(sphere.num_continuous() == 2);
 
-  Rng rng(42, 0);
+  Rng rng = seeded_rng(42);
   AoSSet solutions, parents;
   std::vector<usize> indices{0};
 

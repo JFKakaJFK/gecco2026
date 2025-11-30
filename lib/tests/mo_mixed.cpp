@@ -3,6 +3,9 @@
 #include <print>
 
 #include "doctest/doctest.h"
+
+#define EIGEN_MAX_ALIGN_BYTES 0
+#define EIGEN_DONT_VECTORIZE
 #include <Eigen/Dense>
 
 #include "goblin/bench/functions/combinators.h"

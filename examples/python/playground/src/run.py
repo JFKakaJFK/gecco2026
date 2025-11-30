@@ -1,3 +1,4 @@
+import datetime
 import json
 import os
 import pathlib
@@ -31,7 +32,17 @@ def run_one(
             instance=task["instance"],
             method=task["method"],
             budget=task["budget"],
-            config=TrackingOptions(logfile, loginfo, report_intermediate_results=False),
+            config=TrackingOptions(  #
+                logfile,  #
+                loginfo,
+                # report_intermediate_results=False,
+                max_generations_until_next_report=1,
+                generation_factor=1,
+                initial_evaluations_until_next_report=100,
+                max_evaluations_until_next_report=5000,
+                eval_factor=1,
+                initial_time_until_next_report=datetime.timedelta(hours=1),
+            ),
             seed=task.get("seed", seed),
             population_size=task.get("population_size", None),
         )

@@ -1508,10 +1508,22 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("mixed", goblin::VariableSet::Mixed, "");
 
 
-  m.def("estimate_entropy",
-      goblin::estimate_entropy,
+  m.def("estimate_entropy2",
+      goblin::estimate_entropy2,
       nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none(),
       " TODO this method does way too much, but where else to put all of the\n modifications of the frequency counts for the entropy?\n - problem shouldn't have to know about the intron related entropy\n modifications\n - continuous stuff interacts with the introns...\n => current tradeoff is having the problem provide info about discrete\n values that actually correspond to a continuous value...");
+
+
+  auto pyEnumDiscreteIntronStrategy =
+      nb::enum_<goblin::DiscreteIntronStrategy>(m, "DiscreteIntronStrategy", nb::is_arithmetic(), "TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file (fine, since the template is only used here)")
+          .value("none", goblin::DiscreteIntronStrategy::None, "")
+          .value("any_active", goblin::DiscreteIntronStrategy::AnyActive, "")
+          .value("all_active", goblin::DiscreteIntronStrategy::AllActive, "")
+          .value("mark_only", goblin::DiscreteIntronStrategy::MarkOnly, "");
+
+
+  m.def("estimate_entropy",
+      goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none());
   // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
   //
@@ -3094,7 +3106,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassPopulationOptions =
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
+      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       {
           new (self) goblin::PopulationOptions();  // placement new
           auto r_ctor_ = self;
@@ -3102,6 +3114,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->max_nis = max_nis;
           r_ctor_->forced_improvements = forced_improvements;
           r_ctor_->target_continuous_to_discrete_balance = target_continuous_to_discrete_balance;
+          r_ctor_->sequential_gom = sequential_gom;
           r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
           r_ctor_->donor_search_proportion = donor_search_proportion;
           r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
@@ -3112,12 +3125,13 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->gradient_step_frequency = gradient_step_frequency;
           r_ctor_->gradient_step_count = gradient_step_count;
       },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
+      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
       .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
       .def_rw("forced_improvements", &goblin::PopulationOptions::forced_improvements, "")
       .def_rw("target_continuous_to_discrete_balance", &goblin::PopulationOptions::target_continuous_to_discrete_balance, "")
+      .def_rw("sequential_gom", &goblin::PopulationOptions::sequential_gom, "performs GOM sequentially per solution, incompatible with other mechanisms")
       .def_rw("strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance, "should the single objective elite solutions accept only strict improvements or also neutral changes?")
       .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion, "the fraction of solutions to consider before skipping an evaluation in case")
       .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")

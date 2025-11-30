@@ -50,9 +50,7 @@ class MOBinaryGOMEA final : public MethodBase {
 
     auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
     TerminationStatus status = TerminationStatus::Converged;
-    std::random_device rd;
-    std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
-    Rng rng(seed.value_or(seed_dist(rd)), 0);
+    Rng rng = seeded_rng(seed);
 
     AoSSet s;
     s.add(Solution(problem.archive_fitness().worst(), Vec<DType>::Zero(problem.num_discrete()), std::nullopt));

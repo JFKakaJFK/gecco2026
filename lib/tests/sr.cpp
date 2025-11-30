@@ -43,7 +43,7 @@ TEST_CASE("goblin::gp::sr") {
       bool linear_scaling = ls > 0;
       SRProblem srp(ctx, X, Y, X_test, Y_test, obj, /* objectives_to_optimize = */ std::nullopt, linear_scaling);
 
-      Rng rng(1, 0);
+      Rng rng = seeded_rng(42);
 
       AoSSet sset;
 

@@ -62,6 +62,11 @@ class Quality:
 # #ifndef _GOBLIN_LIB_RNG_H
 #
 
+# using Rng = std::mt19937;
+
+# TODO possibly use the OpenRAND provided sampling methods (decreases rng portability, but it looks like any rng can be
+# wrapped with openrand::BaseRNG<T> and the sampling methods both look convenient and decently fast)
+
 # TODO possibly profile & look at (for faster rn generation)
 # - https://www.pcg-random.org/posts/bounded-rands.html
 # - https://github.com/swiftlang/swift/pull/39143#issue-comment-box
@@ -755,7 +760,7 @@ class VariableSet(enum.IntEnum):
     continuous = enum.auto()  # (= 0b10)
     mixed = enum.auto()  # (= 0b11)
 
-def estimate_entropy(
+def estimate_entropy2(
     problem: InstanceBase,
     solutions: SolutionSetBase,
     indices: std.span[int],
@@ -772,6 +777,25 @@ def estimate_entropy(
     => current tradeoff is having the problem provide info about discrete
     values that actually correspond to a continuous value...
     """
+    pass
+
+class DiscreteIntronStrategy(enum.IntEnum):
+    """TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file (fine, since the template is only used here)"""
+
+    none = enum.auto()  # (= 0)
+    any_active = enum.auto()  # (= 1)
+    all_active = enum.auto()  # (= 2)
+    mark_only = enum.auto()  # (= 3)
+
+def estimate_entropy(
+    problem: InstanceBase,
+    solutions: SolutionSetBase,
+    indices: std.span[int],
+    subset: std.span[int],
+    intron_strategy: str,
+    merge_continuous: bool,
+    num_continuous_bins: Optional[int],
+) -> Mat[float]:
     pass
 
 # #endif
@@ -3759,7 +3783,9 @@ class PopulationOptions:
     max_nis: Optional[int] = None
     forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
-
+    sequential_gom: bool = (
+        False  # performs GOM sequentially per solution, incompatible with other mechanisms
+    )
     strict_elite_acceptance: bool = (
         False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
     )
@@ -3784,6 +3810,7 @@ class PopulationOptions:
         max_nis: Optional[int] = None,
         forced_improvements: bool = True,
         target_continuous_to_discrete_balance: float = 1.0,
+        sequential_gom: bool = False,
         strict_elite_acceptance: bool = False,
         donor_search_proportion: float = 0.0,
         continuous_mutation_probability: float = 0.0,

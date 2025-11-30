@@ -68,9 +68,7 @@ class IMS final : public MethodBase {
       opts.additional_clusters_per_start = 0;
     }
 
-    std::random_device rd;
-    std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
-    Rng rng(seed.value_or(seed_dist(rd)), 0);
+    Rng rng = seeded_rng(seed);
     auto archive =
         opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
             ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.archive_fitness()))

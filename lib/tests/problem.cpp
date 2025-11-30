@@ -23,7 +23,7 @@ TEST_CASE("goblin::bench::problem") {
   REQUIRE(sphere.num_objectives() == 1);
   REQUIRE(sphere.num_continuous() == 2);
 
-  Philox rng(42, 0);
+  Rng rng = seeded_rng(42);
 
   AoSSet s;
   s.add(Solution(sphere.archive_fitness().worst(), std::nullopt, Vec<double>::Zero(2)));
