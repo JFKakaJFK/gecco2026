@@ -780,12 +780,15 @@ def estimate_entropy2(
     pass
 
 class DiscreteIntronStrategy(enum.IntEnum):
-    """TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file (fine, since the template is only used here)"""
+    """TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file
+    (fine, since the template is only used here)
+    """
 
     none = enum.auto()  # (= 0)
     any_active = enum.auto()  # (= 1)
     all_active = enum.auto()  # (= 2)
     mark_only = enum.auto()  # (= 3)
+    weighted_any_active = enum.auto()  # (= 4)
 
 def estimate_entropy(
     problem: InstanceBase,
@@ -1296,6 +1299,16 @@ class Template:
     outputs: List[TemplateNode]
     subexpressions: List[TemplateNode]
 
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(
+        self, outputs: List[TemplateNode], subexpressions: List[TemplateNode]
+    ) -> None:
+        pass
+
     def size(self) -> int:
         pass
 
@@ -1309,14 +1322,6 @@ class Template:
         pass
 
     def is_valid(self) -> bool:
-        pass
-
-    def __init__(
-        self,
-        outputs: List[TemplateNode] = List[TemplateNode](),
-        subexpressions: List[TemplateNode] = List[TemplateNode](),
-    ) -> None:
-        """Auto-generated default constructor with named params"""
         pass
 
 # #endif
@@ -2017,6 +2022,9 @@ class RecursiveCompleteInit(DiscreteInitBase):
 
 # #endif
 
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/sr.h included by goblin.h                                                    //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_SR_H
 #
 
@@ -2034,6 +2042,7 @@ class SRProblem(GPInstanceBase):
         init: Optional[AnyInit] = None,
         constant_init_lower_bound: float = -1.0,
         constant_init_upper_bound: float = 1.0,
+        target_objectives: Optional[List[float]] = None,
     ) -> None:
         pass
 

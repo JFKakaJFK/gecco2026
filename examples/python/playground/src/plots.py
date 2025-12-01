@@ -32,7 +32,8 @@ def plot_convergence_so(
     log_y: bool = False,
     show_generation_boundaries: bool = False,
     nsamples: int = 25,
-    ymin="auto",
+    ymin: float | str | None = None,
+    ymax: float | str | None = None,
     **kwargs,
 ):
     if methods is None:
@@ -111,7 +112,7 @@ def plot_convergence_so(
     hues = sns.color_palette(n_colors=len(methods))
     palette = {m: h for m, h in zip(methods, hues)}
 
-    global_ymin = ymin
+    global_ymin, global_ymax = ymin, ymax
 
     for log_x in [False, True]:
         for metric, metric_label in zip(metrics, metric_labels):
@@ -244,16 +245,20 @@ def plot_convergence_so(
                     else:
                         ax.set_ylabel("")
 
+                    q = 0.975
                     if global_ymin == "auto":
-                        q = 0.975
-                        # ymax = df[
-                        #     "value"
-                        # ].max()  # .quantile(1 - q if y_agg == "MIN" else q)
-                        ymin = df["value"].quantile(q if y_agg == "MIN" else 1 - q)
+                        ymin = df["value"].quantile(1 - q)
                         if np.isfinite(ymin):  # and np.isfinite(ymax):
                             ax.set_ylim(ymin=ymin)  # , ymax=ymax)
                     elif isinstance(ymin, (int, float)):
                         ax.set_ylim(ymin=ymin)
+
+                    if global_ymax == "auto":
+                        ymax = df["value"].quantile(q)
+                        if np.isfinite(ymax):
+                            ax.set_ylim(ymax=ymax)
+                    elif isinstance(ymin, (int, float)):
+                        ax.set_ylim(ymax=ymax)
 
                     if log_y:
                         ax.set_yscale("symlog")

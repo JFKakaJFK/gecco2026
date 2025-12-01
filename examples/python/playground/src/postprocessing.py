@@ -56,6 +56,7 @@ def load_results(
                 break
         if columns_checked:
             break
+    assert columns_checked, "No results found"
 
     conn = duckdb.connect(":memory:")
     if parquet_dir is None:

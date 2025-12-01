@@ -17,47 +17,49 @@ budget = c.Budget(max_evaluations=int(1e6))
 
 
 def problems():
-    # for d in [  #
-    #     5,
-    #     10,
-    #     20,
-    #     40,
-    #     80,
-    #     160,
-    #     320,
-    #     640,
-    # ]:
-    #     # display name, instance info, actual instance
-    #     yield (
-    #         "OneMax",
-    #         d,
-    #         c.BenchmarkInstance(
-    #             c.OneMax(d),
-    #             target=[float(d)],
-    #             init=c.RandomInit(),
-    #         ),
-    #     )
-    # yield (
-    #     "DTrap5",
-    #     d,
-    #     c.BenchmarkInstance(
-    #         c.Repeat(c.DeceptiveTrap(5), d // 5),
-    #         target=[float(d)],
-    #         init=c.RandomInit(),
-    #     ),
-    # )
-    #     yield (
-    #         "LeadingOnes",
-    #         d,
-    #         c.BenchmarkInstance(
-    #             c.Masked(c.LeadingOnes(d)),
-    #             target=[float(d)],
-    #             init=c.RandomInit(),
-    #         ),
-    #     )
+    for d in [  #
+        5,
+        10,
+        20,
+        40,
+        80,
+    ]:
+        # display name, instance info, actual instance
+        yield (
+            "OneMax",
+            d,
+            c.BenchmarkInstance(
+                c.OneMax(d),
+                target=[float(d)],
+                init=c.RandomInit(),
+            ),
+        )
+        yield (
+            "DTrap5",
+            d,
+            c.BenchmarkInstance(
+                c.Repeat(c.DeceptiveTrap(5), d // 5),
+                target=[float(d)],
+                init=c.RandomInit(),
+            ),
+        )
+        yield (
+            "LeadingOnes",
+            d,
+            c.BenchmarkInstance(
+                c.Masked(c.LeadingOnes(d)),
+                target=[float(d)],
+                init=c.RandomInit(),
+            ),
+        )
 
     for init in ["random", "complete"]:
-        for d in [10, 25, 50, 100, 200, 400]:
+        for d in [
+            10,
+            25,
+            50,
+            100,  # 200, 400
+        ]:
             actual_init = c.RandomInit() if init == "random" else c.CompleteInit()
             yield (
                 f"LeadingOnes IA ({init})",
@@ -95,15 +97,15 @@ def methods():
     #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
     # )
 
-    for metric in [  # not it
+    for metric in [  #
         "mi",
         # "nmi",
     ]:
-        for linkage_model in [  # not it
+        for linkage_model in [  #
             # "Univariate",
             "LinkageTree",
         ]:
-            for forced_improvements in [  # not it
+            for forced_improvements in [  #
                 True,
                 # False,
             ]:
@@ -119,25 +121,25 @@ def methods():
                     desc = common_desc + (
                         f", {fos_order}" if fos_order != "default" else ""
                     )
-                    # yield (
-                    #     f'"Library ({desc})"',
-                    #     c.DiscreteGOMEA(
-                    #         linkage_model=linkage_model,
-                    #         forced_improvements=forced_improvements,
-                    #         similarity_metric=metric.upper(),
-                    #         base_population_size=initial_population_size,
-                    #         subgeneration_factor=subgeneration_factor,
-                    #         max_number_of_populations=max_num_populations,
-                    #         fos_order=fos_order,
-                    #     ),
-                    # )
+                    yield (
+                        f'"Library ({desc})"',
+                        c.DiscreteGOMEA(
+                            linkage_model=linkage_model,
+                            forced_improvements=forced_improvements,
+                            similarity_metric=metric.upper(),
+                            base_population_size=initial_population_size,
+                            subgeneration_factor=subgeneration_factor,
+                            max_number_of_populations=max_num_populations,
+                            fos_order=fos_order,
+                        ),
+                    )
 
-                for dsp in [  # not it
+                for dsp in [  #
                     0.0,
                     # 0.05,
                     # 1.0,
                 ]:
-                    for strict_elite_acceptance in [  # not it
+                    for strict_elite_acceptance in [  #
                         False,
                         # True
                     ]:
@@ -175,13 +177,15 @@ def methods():
                             elif lm == "LT":
                                 for intron_strategy in [
                                     "none",
-                                    "any_active",
-                                    "all_active",  # definitely bad, as expected
-                                    "mark_only",
+                                    # "any_active",
+                                    # "weighted_any_active",
+                                    # "all_active",  # definitely bad, as expected
+                                    # "mark_only",
                                 ]:
                                     is_desc = dict(
                                         none="",
                                         any_active=r", $IA_{any}$",
+                                        weighted_any_active=r", $IA_{w,any}$",
                                         all_active=r", $IA_{all}$",
                                         mark_only=r", $IA_{mark}$",
                                     )[intron_strategy]
@@ -199,6 +203,7 @@ def methods():
 
 
 def add_reference_results(odir: pathlib.Path | str, all_rows: bool = False):
+    """Just for debugging, loads results from a different version that"""
     # copy over results from yet another reference to make the format match...
     path = pathlib.Path(
         "/Users/johannes/Documents/github/pygomea/results/pygomea"
@@ -209,6 +214,10 @@ def add_reference_results(odir: pathlib.Path | str, all_rows: bool = False):
     path = pathlib.Path(
         "/Users/johannes/Documents/github/pygomea/results/pygomea2"
     )  # IMS up to 200D, IA only
+
+    if not path.exists():
+        print("No reference results found, skipping ...")
+        return
 
     opath = pathlib.Path(odir) / "pygom.csv"
 
@@ -261,6 +270,7 @@ def add_reference_results(odir: pathlib.Path | str, all_rows: bool = False):
 
 
 def debug_one():
+    """A helper to re-run outliers (with a profiler attached, e.g. `samply record uv run discrete.py`)"""
     problem = "LeadingOnes IA"
     method = '"Mixed (MI, LT, FI, IA)"'
     dims = 150
@@ -270,6 +280,7 @@ def debug_one():
     logfile = pathlib.Path(
         f"results/debug/discrete/{problem}/{dims}/{method}/{run:03d}.csv"
     )
+    seed = 15329365302178898957
 
     if logfile.exists():
         logfile.unlink()
@@ -284,7 +295,7 @@ def debug_one():
             run=str(run),
         ).items()
     )
-    run_one(task_path, logfile, loginfo, seed=15329365302178898957)
+    run_one(task_path, logfile, loginfo, seed=seed)
 
 
 def main():
@@ -298,7 +309,7 @@ def main():
         methods=methods,
         budget=budget,
         num_repeats=REPEATS,
-        # clean=True,
+        clean=True,
         # limit=1,
         # max_workers=1,
     )

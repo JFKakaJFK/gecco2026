@@ -602,9 +602,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
       auto& NMI = H;
       for (isize i = 0; i < H.rows(); i++) {
         for (isize j = 0; j < i; j++) {
-          tmp = H(i, j) > 0
-              ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0))
-              : CType(0.0);
+          tmp = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
           NMI(i, j) = tmp;
           NMI(j, i) = tmp;
         }

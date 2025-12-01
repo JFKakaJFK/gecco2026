@@ -53,6 +53,7 @@ create_and_register_clusters(Rng& rng,
                              usize donor_pool_size,
                              const SolutionSetBase& previous_solutions,
                              std::vector<usize>& previous_clusters) {
+  assert(donor_pool_size > 0);
   std::vector<usize> solution_clusters(solutions.size(), 0);
   std::vector<std::vector<usize>> cluster_solutions(num_clusters);
   std::vector<std::vector<usize>> cluster_donors;
@@ -177,14 +178,6 @@ create_and_register_clusters(Rng& rng,
     remaining_clusters.pop_back();
   }
 
-  // fill reverse mapping
-  for (usize k = 0; k < num_clusters; k++) {
-    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
-  }
-  for (usize i = 0; i < solution_clusters.size(); i++) {
-    cluster_solutions[solution_clusters[i]].push_back(i);
-  }
-
   // 5. (if previous objectives + solution_cluster assignments are passed) -
   // perform cluster registration by minimizing maximum matched cluster distance
   // (= average distance between cluster solutions)
@@ -233,11 +226,24 @@ create_and_register_clusters(Rng& rng,
     for (usize i = 0; i < remaining_clusters.size(); i++) {
       cluster_perm[remaining_clusters[i]] = num_objectives + best_permutation[i];
     }
+  } else {
+    // if we don't do cluster registration, then we still need to make sure that each cluster is in cluster_perm
+    for (usize i : remaining_clusters) {
+      cluster_perm[i] = i;
+    }
   }
 
   // 6. apply cluster permutation, i.e. apply permutation to solution_clusters
   for (usize i = 0; i < solution_clusters.size(); i++) {
     solution_clusters[i] = cluster_perm[solution_clusters[i]];
+  }
+
+  // fill reverse mapping
+  for (usize k = 0; k < num_clusters; k++) {
+    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
+  }
+  for (usize i = 0; i < solution_clusters.size(); i++) {
+    cluster_solutions[solution_clusters[i]].push_back(i);
   }
 
   // 7. assign donor indices -> closest donor pool size solutins to cluster
@@ -252,6 +258,13 @@ create_and_register_clusters(Rng& rng,
 
     cluster_donors[k].insert(cluster_donors[k].end(), indices.begin(), indices.begin() + donor_pool_size);
   }
+
+#ifndef NDEBUG
+  for (usize i = 0; i < num_clusters; i++) {
+    assert(cluster_donors[i].size() == std::min(donor_pool_size, solutions.size()) &&
+           "All clusters are supposed to have the same, non-zero donor pool size.");
+  }
+#endif
 
   return std::make_tuple(solution_clusters, cluster_solutions, cluster_donors);
 };

@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 MAX_EVALUATIONS = [100_000, 500_000]
 NUM_RUNS = 30
 MAX_NUM_ROWS = 5000
-PLMB_CACHE_DIR = "../pmlb/datasets"
+PLMB_CACHE_DIR = ".pmlb/datasets"
 
 # black_box from https://arxiv.org/abs/2505.03977v1
 DATASETS = [

@@ -1,9 +1,9 @@
 import itertools
+import json
 import pathlib
 from types import NoneType
 
 import yaml
-import json
 
 
 class Config:
@@ -86,7 +86,11 @@ class Config:
             parts = s.split(".")
             obj = ctx.get(parts[0], None)
             for member in parts[1:]:
-                if obj is not None:
+                if obj is None:
+                    break
+                if isinstance(obj, dict):
+                    obj = obj.get(member, None)
+                else:
                     obj = getattr(obj, member, None)
             return obj
 
@@ -112,6 +116,10 @@ class Config:
                         except Exception as e:
                             print(e)
                             kwargs["args"] = args
+                    elif isinstance(raw_kwargs, dict) and "args" in raw_kwargs:
+                        print("Possibly failed to evaluate", key)
+                        print(v)
+                        print()
 
                     # fail silently and just return a dict
                     res[key] = eval_expansion(raw_kwargs)
@@ -125,13 +133,13 @@ class Config:
         return eval_expansion(cfg)
 
     @staticmethod
-    def load(path: pathlib.Path | str):
+    def load_config(path: pathlib.Path | str):
         with open(path, "rb") as f:
             # return yaml.safe_load(f)
             return json.load(f)
 
     @staticmethod
-    def save(data, path: pathlib.Path | str):
+    def save_config(data, path: pathlib.Path | str):
         with open(path, "+w") as f:
             # yaml.dump(data, f)
             json.dump(data, f, indent=2)

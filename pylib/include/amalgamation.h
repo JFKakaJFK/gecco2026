@@ -1862,15 +1862,18 @@ inline Mat<CType> estimate_entropy2(const InstanceBase& problem,
   return H;
 };
 
-// TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file (fine, since the template is only used here)
-enum class DiscreteIntronStrategy : u8 { None, AnyActive, AllActive, MarkOnly };
+// TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file
+// (fine, since the template is only used here)
+enum class DiscreteIntronStrategy : u8 { None, AnyActive, AllActive, MarkOnly, WeightedAnyActive };
+// TODO potentially try first allocating a matrix with the actual values and then doing a branch free reduction based on
+// that... O(indices * subset.size())
 template <DiscreteIntronStrategy intron_strategy>
 inline Mat<CType> estimate_entropy_impl(const InstanceBase& problem,
-                                   const SolutionSetBase& solutions,
-                                   const std::span<const usize> indices,
-                                   const std::span<const usize> subset,
-                                   bool merge_continuous,
-                                   std::optional<usize> num_continuous_bins) {
+                                        const SolutionSetBase& solutions,
+                                        const std::span<const usize> indices,
+                                        const std::span<const usize> subset,
+                                        bool merge_continuous,
+                                        std::optional<usize> num_continuous_bins) {
   __goblin_runtime_assert(subset.size() > 0);
 
   auto& domain_sizes = problem.discrete_domain_sizes();
@@ -1958,38 +1961,50 @@ inline Mat<CType> estimate_entropy_impl(const InstanceBase& problem,
   usize offset = max_value_count;
   max_value_count += domain_sizes(subset).maxCoeff();
 
+  // loop over all solutions and indices and prepare the value (is read multiple times, and lots of expensive branching
+  // inside of the loop...)
   std::optional<CType> v;
-  Mat<usize> counts(max_value_count, max_value_count);
-  Mat<CType> H(subset.size(), subset.size());
-  for (usize lhs = 0; lhs < subset.size(); lhs++) {
-    usize lhs_idx = subset[lhs];
-    // compute diagonal H(lhs, lhs)
-    usize total = 0;
-    counts.col(0).setZero();
-    for (usize i : indices) {
+  Eigen::Matrix<usize, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mapped_values(indices.size(), subset.size());
+  for (usize i = 0; i < indices.size(); i++) {
+    for (usize j = 0, s_j; j < subset.size(); j++) {
+      s_j = subset[j];
       if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-        if (!solutions[i].discrete_active()(lhs_idx)) {
-          if constexpr (intron_strategy == DiscreteIntronStrategy::MarkOnly) {
-            total++;
-            counts(intron_idx, 0)++;
-          }
+        if (!solutions[indices[i]].discrete_active()(s_j)) {
+          mapped_values(i, j) = intron_idx;
           continue;
         }
       }
 
-      total++;
-      v = specialize_continuous ? problem.as_continuous(solutions[i], lhs_idx) : std::nullopt;
+      v = specialize_continuous ? problem.as_continuous(solutions[indices[i]], s_j) : std::nullopt;
       if (v.has_value()) {
         if (merge_continuous) {
-          counts(first_continuous_idx, 0)++;
+          mapped_values(i, j) = first_continuous_idx;
         } else {
           // index of closest bin
-          counts(first_continuous_idx + std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1),
-                 0)++;
+          mapped_values(i, j) =
+              first_continuous_idx + std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
         }
       } else {
-        counts(offset + solutions[i].discrete_values()(lhs_idx), 0)++;
+        mapped_values(i, j) = offset + solutions[indices[i]].discrete_values()(s_j);
       }
+    }
+  }
+
+  Mat<usize> counts(max_value_count, max_value_count);
+  Mat<CType> H(subset.size(), subset.size());
+  for (usize lhs = 0; lhs < subset.size(); lhs++) {
+    usize total = 0;
+    counts.col(0).setZero();
+    for (usize i = 0; i < indices.size(); i++) {
+      if constexpr (intron_strategy == DiscreteIntronStrategy::AnyActive ||
+                    intron_strategy == DiscreteIntronStrategy::WeightedAnyActive ||
+                    intron_strategy == DiscreteIntronStrategy::AllActive) {
+        if (mapped_values(i, lhs) == intron_idx) {
+          continue;
+        }
+      }
+      total++;
+      counts(mapped_values(i, lhs), 0)++;
     }
 
     // turn (adjusted) frequency counts into entropy
@@ -2001,89 +2016,45 @@ inline Mat<CType> estimate_entropy_impl(const InstanceBase& problem,
           e += -p * std::log2(p);
         }
       }
+      if constexpr (intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
+        e *= static_cast<CType>(total) / static_cast<CType>(indices.size());
+      }
       H(lhs, lhs) = e > 0.0 ? e : 0.0;
     } else {
       H(lhs, lhs) = 0.0;
     }
 
     for (usize rhs = 0; rhs < lhs; rhs++) {
-      usize rhs_idx = subset[rhs], l, r;
-      bool lhs_active, rhs_active;
-
       total = 0;
       counts.setZero();
-      for (usize i : indices) {
-        // lhs_idx
-        if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-          lhs_active = solutions[i].discrete_active()(lhs_idx);
-          if constexpr (intron_strategy == DiscreteIntronStrategy::AllActive) {
-            if (!lhs_active) {
-              continue;
-            }
-          }
-        } else {
-          lhs_active = true;
-        }
 
-        if (lhs_active) {
-          v = specialize_continuous ? problem.as_continuous(solutions[i], lhs_idx) : std::nullopt;
-          if (v.has_value()) {
-            l = merge_continuous ? first_continuous_idx
-                                 // index of closest bin
-                                 : first_continuous_idx +
-                                       std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
-          } else {
-            l = offset + solutions[i].discrete_values()(lhs_idx);
+      for (usize i = 0; i < indices.size(); i++) {
+        if constexpr (intron_strategy == DiscreteIntronStrategy::AnyActive ||
+                      intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
+          if (mapped_values(i, lhs) == intron_idx && mapped_values(i, rhs) == intron_idx) {
+            continue;
           }
-        } else {
-          l = intron_idx;
         }
-
-        // rhs_idx
-        if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-          rhs_active = solutions[i].discrete_active()(rhs_idx);
-          if constexpr (intron_strategy == DiscreteIntronStrategy::AllActive) {
-            if (!rhs_active) {
-              continue;
-            }
+        if constexpr (intron_strategy == DiscreteIntronStrategy::AllActive) {
+          if (mapped_values(i, lhs) == intron_idx || mapped_values(i, rhs) == intron_idx) {
+            continue;
           }
-          if constexpr (intron_strategy == DiscreteIntronStrategy::AnyActive) {
-            if (!rhs_active && !lhs_active) {
-              continue;
-            }
-          }
-        } else {
-          rhs_active = true;
         }
-
-        if (rhs_active) {
-          v = specialize_continuous ? problem.as_continuous(solutions[i], rhs_idx) : std::nullopt;
-          if (v.has_value()) {
-            r = merge_continuous ? first_continuous_idx
-                                 // index of closest bin
-                                 : first_continuous_idx +
-                                       std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
-          } else {
-            r = offset + solutions[i].discrete_values()(rhs_idx);
-          }
-        } else {
-          r = intron_idx;
-        }
-
         total++;
-        counts(l, r)++;
+        counts(mapped_values(i, lhs), mapped_values(i, rhs))++;
       }
 
       // turn (adjusted) frequency counts into entropy
       if (total > 1) {
         CType e = 0.0, p;
-        for (usize i = 0; i < max_value_count; i++) {
-          for (usize j = 0; j < max_value_count; j++) {
-            if (counts(i, j) > 0) {
-              p = static_cast<CType>(counts(i, j)) / static_cast<CType>(total);
-              e += -p * std::log2(p);
-            }
+        for (isize i = 0; i < counts.size(); i++) {
+          if (counts(i) > 0) {
+            p = static_cast<CType>(counts(i)) / static_cast<CType>(total);
+            e += -p * std::log2(p);
           }
+        }
+        if constexpr (intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
+          e *= static_cast<CType>(total) / static_cast<CType>(indices.size());
         }
         H(lhs, rhs) = e > 0.0 ? e : 0.0;
       } else {
@@ -2103,17 +2074,20 @@ inline Mat<CType> estimate_entropy(const InstanceBase& problem,
                                    bool merge_continuous,
                                    std::optional<usize> num_continuous_bins) {
   if (intron_strategy == "any_active") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::AnyActive>(problem, solutions, indices, subset, merge_continuous,
-                                                               num_continuous_bins);
+    return estimate_entropy_impl<DiscreteIntronStrategy::AnyActive>(problem, solutions, indices, subset,
+                                                                    merge_continuous, num_continuous_bins);
+  } else if (intron_strategy == "weighted_any_active") {
+    return estimate_entropy_impl<DiscreteIntronStrategy::WeightedAnyActive>(problem, solutions, indices, subset,
+                                                                            merge_continuous, num_continuous_bins);
   } else if (intron_strategy == "none") {
     return estimate_entropy_impl<DiscreteIntronStrategy::None>(problem, solutions, indices, subset, merge_continuous,
-                                                          num_continuous_bins);
-  } else if (intron_strategy == "mark_only") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::MarkOnly>(problem, solutions, indices, subset, merge_continuous,
-                                                              num_continuous_bins);
-  } else if (intron_strategy == "all_active") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::AllActive>(problem, solutions, indices, subset, merge_continuous,
                                                                num_continuous_bins);
+  } else if (intron_strategy == "mark_only") {
+    return estimate_entropy_impl<DiscreteIntronStrategy::MarkOnly>(problem, solutions, indices, subset,
+                                                                   merge_continuous, num_continuous_bins);
+  } else if (intron_strategy == "all_active") {
+    return estimate_entropy_impl<DiscreteIntronStrategy::AllActive>(problem, solutions, indices, subset,
+                                                                    merge_continuous, num_continuous_bins);
   } else {
     throw std::runtime_error("Unknown intron strategy.");
   }
@@ -3033,20 +3007,23 @@ class LinkageTreeFOS final : public LinkageModelBase {
  private:
   void entropy2similarity(Mat<CType>& H) const {
     // entropy -> MI/NMI
+    CType tmp;
     if (metric == "mi") {
       auto& MI = H;
       for (isize i = 0; i < H.rows(); i++) {
         for (isize j = 0; j < i; j++) {
-          MI(i, j) = H(i, i) + H(j, j) - H(i, j);
-          MI(j, i) = MI(i, j);
+          tmp = H(i, i) + H(j, j) - H(i, j);
+          MI(i, j) = tmp;
+          MI(j, i) = tmp;
         }
       }
     } else if (metric == "nmi") {
       auto& NMI = H;
       for (isize i = 0; i < H.rows(); i++) {
         for (isize j = 0; j < i; j++) {
-          NMI(i, j) = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
-          NMI(j, i) = NMI(i, j);
+          tmp = H(i, j) > 0 ? (((H(i, i) + H(j, j)) / H(i, j)) - CType(1.0)) : CType(0.0);
+          NMI(i, j) = tmp;
+          NMI(j, i) = tmp;
         }
       }
     } else {
@@ -3642,6 +3619,14 @@ struct Template {
   std::vector<TemplateNode> outputs;
   std::vector<TemplateNode> subexpressions;
 
+  Template() = default;
+  Template(std::vector<TemplateNode> outputs, std::vector<TemplateNode> subexpressions)
+      : outputs(outputs), subexpressions(subexpressions) {
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
+  }
+
   usize size() const {
     usize s = 0;
     for (auto& o : outputs) {
@@ -3666,12 +3651,16 @@ struct Template {
 
   void add_output(TemplateNode output) {
     outputs.emplace_back(output);
-    __goblin_runtime_assert(is_valid());
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
   };
 
   void add_subtree(TemplateNode subexpression) {
     subexpressions.emplace_back(subexpression);
-    __goblin_runtime_assert(is_valid());
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
   };
 
   bool is_valid() const {
@@ -5085,7 +5074,6 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h included by goblin.h                                                    //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -5126,7 +5114,9 @@ class SRProblem : public GPInstanceBase {
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
-            CType constant_init_upper_bound = 1.0)
+            CType constant_init_upper_bound = 1.0,
+            std::optional<std::vector<CType>> target_objectives = std::nullopt
+  )
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -5193,6 +5183,10 @@ class SRProblem : public GPInstanceBase {
           var_Y_test(i) = 1.0;
         }
       }
+    }
+
+    if(target_objectives.has_value()){
+        register_target(target_objectives.value());
     }
   };
 
@@ -9304,6 +9298,7 @@ create_and_register_clusters(Rng& rng,
                              usize donor_pool_size,
                              const SolutionSetBase& previous_solutions,
                              std::vector<usize>& previous_clusters) {
+  assert(donor_pool_size > 0);
   std::vector<usize> solution_clusters(solutions.size(), 0);
   std::vector<std::vector<usize>> cluster_solutions(num_clusters);
   std::vector<std::vector<usize>> cluster_donors;
@@ -9428,14 +9423,6 @@ create_and_register_clusters(Rng& rng,
     remaining_clusters.pop_back();
   }
 
-  // fill reverse mapping
-  for (usize k = 0; k < num_clusters; k++) {
-    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
-  }
-  for (usize i = 0; i < solution_clusters.size(); i++) {
-    cluster_solutions[solution_clusters[i]].push_back(i);
-  }
-
   // 5. (if previous objectives + solution_cluster assignments are passed) -
   // perform cluster registration by minimizing maximum matched cluster distance
   // (= average distance between cluster solutions)
@@ -9484,11 +9471,24 @@ create_and_register_clusters(Rng& rng,
     for (usize i = 0; i < remaining_clusters.size(); i++) {
       cluster_perm[remaining_clusters[i]] = num_objectives + best_permutation[i];
     }
+  } else {
+    // if we don't do cluster registration, then we still need to make sure that each cluster is in cluster_perm
+    for (usize i : remaining_clusters) {
+      cluster_perm[i] = i;
+    }
   }
 
   // 6. apply cluster permutation, i.e. apply permutation to solution_clusters
   for (usize i = 0; i < solution_clusters.size(); i++) {
     solution_clusters[i] = cluster_perm[solution_clusters[i]];
+  }
+
+  // fill reverse mapping
+  for (usize k = 0; k < num_clusters; k++) {
+    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
+  }
+  for (usize i = 0; i < solution_clusters.size(); i++) {
+    cluster_solutions[solution_clusters[i]].push_back(i);
   }
 
   // 7. assign donor indices -> closest donor pool size solutins to cluster
@@ -9503,6 +9503,13 @@ create_and_register_clusters(Rng& rng,
 
     cluster_donors[k].insert(cluster_donors[k].end(), indices.begin(), indices.begin() + donor_pool_size);
   }
+
+#ifndef NDEBUG
+  for (usize i = 0; i < num_clusters; i++) {
+    assert(cluster_donors[i].size() == std::min(donor_pool_size, solutions.size()) &&
+           "All clusters are supposed to have the same, non-zero donor pool size.");
+  }
+#endif
 
   return std::make_tuple(solution_clusters, cluster_solutions, cluster_donors);
 };

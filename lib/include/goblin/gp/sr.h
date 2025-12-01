@@ -1,5 +1,4 @@
 #pragma once
-#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -59,7 +58,9 @@ class SRProblem : public GPInstanceBase {
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
-            CType constant_init_upper_bound = 1.0)
+            CType constant_init_upper_bound = 1.0,
+            std::optional<std::vector<CType>> target_objectives = std::nullopt
+  )
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -126,6 +127,10 @@ class SRProblem : public GPInstanceBase {
           var_Y_test(i) = 1.0;
         }
       }
+    }
+
+    if(target_objectives.has_value()){
+        register_target(target_objectives.value());
     }
   };
 

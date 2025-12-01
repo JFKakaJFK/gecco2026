@@ -1515,11 +1515,12 @@ void py_init_module_pygoblin(nb::module_& m) {
 
 
   auto pyEnumDiscreteIntronStrategy =
-      nb::enum_<goblin::DiscreteIntronStrategy>(m, "DiscreteIntronStrategy", nb::is_arithmetic(), "TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file (fine, since the template is only used here)")
+      nb::enum_<goblin::DiscreteIntronStrategy>(m, "DiscreteIntronStrategy", nb::is_arithmetic(), " TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file\n (fine, since the template is only used here)")
           .value("none", goblin::DiscreteIntronStrategy::None, "")
           .value("any_active", goblin::DiscreteIntronStrategy::AnyActive, "")
           .value("all_active", goblin::DiscreteIntronStrategy::AllActive, "")
-          .value("mark_only", goblin::DiscreteIntronStrategy::MarkOnly, "");
+          .value("mark_only", goblin::DiscreteIntronStrategy::MarkOnly, "")
+          .value("weighted_any_active", goblin::DiscreteIntronStrategy::WeightedAnyActive, "");
 
 
   m.def("estimate_entropy",
@@ -1830,17 +1831,11 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassTemplate =
       nb::class_<goblin::Template>
           (m, "Template", "")
-      .def("__init__", [](goblin::Template * self, std::vector<goblin::TemplateNode> outputs = std::vector<goblin::TemplateNode>(), std::vector<goblin::TemplateNode> subexpressions = std::vector<goblin::TemplateNode>())
-      {
-          new (self) goblin::Template();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->outputs = outputs;
-          r_ctor_->subexpressions = subexpressions;
-      },
-      nb::arg("outputs") = std::vector<goblin::TemplateNode>(), nb::arg("subexpressions") = std::vector<goblin::TemplateNode>()
-      )
       .def_rw("outputs", &goblin::Template::outputs, "")
       .def_rw("subexpressions", &goblin::Template::subexpressions, "")
+      .def(nb::init<>())
+      .def(nb::init<std::vector<goblin::TemplateNode>, std::vector<goblin::TemplateNode>>(),
+          nb::arg("outputs"), nb::arg("subexpressions"))
       .def("size",
           &goblin::Template::size)
       .def("max_num_children",
@@ -2280,8 +2275,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassSRProblem =
       nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
           (m, "SRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType>(),
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>>(),
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none())
       .def("num_discrete",
           &goblin::SRProblem::num_discrete)
       .def("discrete_domain_sizes",
