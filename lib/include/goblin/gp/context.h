@@ -17,6 +17,7 @@
 #include <iterator>
 #include <ranges>
 
+#include "goblin/ga-gp/types.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
 #include "goblin/lib/assert.h"
@@ -656,13 +657,17 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<u8>& node_type, std::vector<float>& node_value) const {
+  void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
+
+    // initially we haven't visited anything, so we set everything to be inactive
+    solution.discrete_active().array() = false;
+    solution.continuous_active().array() = false;
 
     std::vector<usize> stack;
 
     // Vectors to hold temporary type and value data
-    std::vector<u8> temp_type;
+    std::vector<NodeType> temp_type;
     std::vector<float> temp_value;
 
     // Push root node on stack
@@ -678,7 +683,10 @@ class GPContext {
       usize v_idx = value_idx[domain_value];
       enum ValueKind type = value_kind[domain_value];
 
-      temp_type.push_back(static_cast<u8>(type));  
+      // Mark current node as active
+      solution.discrete_active()(node) = true;
+
+      temp_type.push_back(static_cast<NodeType>(type));  
 
      if (type == ValueKind::Input) {
         // Push the index of the input feature, will be used to access the input matrix on GPU
@@ -688,6 +696,8 @@ class GPContext {
         temp_value.push_back(v_idx);
       } else if (type == ValueKind::Constant) {
         usize ci = const_repr == ConstantRepr::Pool ? v_idx : node;
+        // Mark node as active
+        solution.continuous_active()(ci) = true;
         // Push the constant value, will be used directly in the evaluation on GPU
         temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
       } else if (type == ValueKind::Arg) {
@@ -714,8 +724,8 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO investigate coalesced memory access
-    temp_type.resize(num_discrete, std::numeric_limits<u8>::max());
-    temp_value.resize(num_discrete, std::numeric_limits<float>::max());
+    temp_type.resize(max_expression_size, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
     node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
