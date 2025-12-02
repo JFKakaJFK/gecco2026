@@ -27,6 +27,7 @@ add_library(${PROJECT_NAME}
     methods/amalgam.cpp
     methods/mo_gomea.cpp
     ga-gp/evaluate.cu
+    ga-gp/helper.cu
 )
 # endif()
 # disable any warnings in the amalgam code
