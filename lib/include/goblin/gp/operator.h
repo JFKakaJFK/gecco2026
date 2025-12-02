@@ -161,6 +161,36 @@ class OpSub : public OperatorBase {
   };
 };
 
+class OpSubGPU : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 2; };
+  usize max_arity() const override final { return std::numeric_limits<usize>::max(); };
+
+  bool is_commutative() const override final {
+    // well actually: all arguments after the first one are interchangeable
+    return false;
+  };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final {
+    return;
+  };
+
+  bool has_gradient() const override final { return false; };
+  void apply_grad(Ref<Array<CType>> out,
+                  Ref<Array<CType>> d_out,
+                  CRef<Arr2D<CType>> args,
+                  CRef<Arr2D<CType>> d_args) const override final {
+    return;
+  };
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    std::ostringstream ss;
+    ss << '(' << args[0] << " - " << args[1] << ')';
+
+    return ss.str();
+  };
+};
+
 class OpMul : public OperatorBase {
  public:
   usize min_arity() const override final { return 2; };
