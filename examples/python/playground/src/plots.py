@@ -223,7 +223,6 @@ def plot_convergence_so(
                         err_kws=dict(linewidth=0),
                         legend=None,
                         ax=ax,
-                        alpha=0.5,
                     )
 
                     if mi == 0:

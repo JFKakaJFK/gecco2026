@@ -405,7 +405,7 @@ def main():
         OUTPUT_DIRECTORY,
         all_jobs(),
         num_repeats=REPEATS_PER_FOLD,
-        clean=True,
+        # clean=True,
         # limit=1,
         # max_workers=1,
     )
@@ -434,7 +434,7 @@ def main():
             conn,
             # methods=methods, # TODO add support for plotting only some variables at a time...
             y_agg="MAX",
-            ymin=None,  # "auto",  # cuts of the lower 2.5% of data points
+            ymin="auto",  # cuts of the lower 2.5% of data points
             ymax=None,
             # SQL can be used to derive values...
             y_var="1 - objectives[1]::DOUBLE / var_y::DOUBLE",

@@ -59,8 +59,7 @@ class SRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt
-  )
+            std::optional<std::vector<CType>> target_objectives = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -129,8 +128,8 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    if(target_objectives.has_value()){
-        register_target(target_objectives.value());
+    if (target_objectives.has_value()) {
+      register_target(target_objectives.value());
     }
   };
 
