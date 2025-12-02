@@ -5,6 +5,7 @@
 #include <set>
 #include <tuple>
 #include <vector>
+#include <stdexcept>
 
 #include "goblin/lib/assert.h"
 #include "goblin/lib/types.h"
@@ -91,6 +92,14 @@ struct Template {
   std::vector<TemplateNode> outputs;
   std::vector<TemplateNode> subexpressions;
 
+  Template() = default;
+  Template(std::vector<TemplateNode> outputs, std::vector<TemplateNode> subexpressions)
+      : outputs(outputs), subexpressions(subexpressions) {
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
+  }
+
   usize size() const {
     usize s = 0;
     for (auto& o : outputs) {
@@ -115,12 +124,16 @@ struct Template {
 
   void add_output(TemplateNode output) {
     outputs.emplace_back(output);
-    __goblin_runtime_assert(is_valid());
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
   };
 
   void add_subtree(TemplateNode subexpression) {
     subexpressions.emplace_back(subexpression);
-    __goblin_runtime_assert(is_valid());
+    if (!is_valid()) {
+      throw std::runtime_error("Template is not valid!");
+    }
   };
 
   bool is_valid() const {

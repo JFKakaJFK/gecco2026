@@ -1,4 +1,5 @@
 #include <print>
+#include <iostream>
 
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
@@ -27,6 +28,6 @@ TEST_CASE("goblin::bench::tracked") {
 
   std::println("Status: {}", format_as(status));
 
-  REQUIRE(front.empty() == false);
-  CHECK(front.so_solution(0).quality().objectives[0] <= 1e-8);
+  REQUIRE(front->empty() == false);
+  CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
 }

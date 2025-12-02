@@ -1,7 +1,11 @@
 #include <cstdio>
+#include <iostream>
 #include <print>
 
 #include "doctest/doctest.h"
+
+#define EIGEN_MAX_ALIGN_BYTES 0
+#define EIGEN_DONT_VECTORIZE
 #include <Eigen/Dense>
 
 #include "goblin/bench/functions/combinators.h"
@@ -40,13 +44,13 @@ TEST_CASE("goblin::methods::mixed") {
 
       std::println("Status {} {}: {}", repr, i++, format_as(status));
 
-      REQUIRE(front.empty() == false);
+      REQUIRE(front->empty() == false);
 
-      for (usize j = 0; j < front.size(); j++) {
-        std::println("{}", instance.format_solution(front[j]));
+      for (usize j = 0; j < front->size(); j++) {
+        std::println("{}", instance.format_solution((*front)[j]));
       }
 
-      REQUIRE(front.size() == NDIMS + 1);  // checks if the full pareto front was recovered
+      REQUIRE(front->size() == NDIMS + 1);  // checks if the full pareto front was recovered
     }
     // REQUIRE(false);
   }

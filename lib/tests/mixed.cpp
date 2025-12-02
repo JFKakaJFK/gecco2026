@@ -1,3 +1,4 @@
+#include <iostream>
 #include <cassert>
 #include <print>
 
@@ -58,8 +59,8 @@ TEST_CASE("goblin::methods::mixed") {
 
         std::println("Status {} {}: {}", repr, i++, format_as(status));
 
-        REQUIRE(front.empty() == false);
-        REQUIRE_MESSAGE(front.so_solution(0).quality().objectives[0] == vtr, repr);
+        REQUIRE(front->empty() == false);
+        REQUIRE_MESSAGE(front->so_solution(0).quality().objectives[0] == vtr, repr);
       }
     }
     // REQUIRE(false);

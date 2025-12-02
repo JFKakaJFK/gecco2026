@@ -224,7 +224,7 @@ public:
             continuous_active // function name (c++)
         );
     }
-    bool inherit(const goblin::SolutionBase & donor, const goblin::Subset & subset, bool always_inherit_continuous) override
+    std::tuple<bool, bool> inherit(const goblin::SolutionBase & donor, const goblin::Subset & subset, bool always_inherit_continuous) override
     {
         NB_OVERRIDE_NAME(
             "inherit", // function name (python)
@@ -1508,10 +1508,23 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("mixed", goblin::VariableSet::Mixed, "");
 
 
-  m.def("estimate_entropy",
-      goblin::estimate_entropy,
+  m.def("estimate_entropy2",
+      goblin::estimate_entropy2,
       nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none(),
       " TODO this method does way too much, but where else to put all of the\n modifications of the frequency counts for the entropy?\n - problem shouldn't have to know about the intron related entropy\n modifications\n - continuous stuff interacts with the introns...\n => current tradeoff is having the problem provide info about discrete\n values that actually correspond to a continuous value...");
+
+
+  auto pyEnumDiscreteIntronStrategy =
+      nb::enum_<goblin::DiscreteIntronStrategy>(m, "DiscreteIntronStrategy", nb::is_arithmetic(), " TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file\n (fine, since the template is only used here)")
+          .value("none", goblin::DiscreteIntronStrategy::None, "")
+          .value("any_active", goblin::DiscreteIntronStrategy::AnyActive, "")
+          .value("all_active", goblin::DiscreteIntronStrategy::AllActive, "")
+          .value("mark_only", goblin::DiscreteIntronStrategy::MarkOnly, "")
+          .value("weighted_any_active", goblin::DiscreteIntronStrategy::WeightedAnyActive, "");
+
+
+  m.def("estimate_entropy",
+      goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none());
   // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
   //
@@ -1617,6 +1630,12 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::LinkageTreeFOS::clone)
       .def("init",
           &goblin::LinkageTreeFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
+      .def("compute_similarity",
+          &goblin::LinkageTreeFOS::compute_similarity, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+      .def("learn_lt",
+          &goblin::LinkageTreeFOS::learn_lt, nb::arg("rng"), nb::arg("similarity"), nb::arg("filter_root_default"))
+      .def("learn_lt_original",
+          &goblin::LinkageTreeFOS::learn_lt_original, nb::arg("rng"), nb::arg("similarity"), nb::arg("filter_root_default"))
       .def("subsets",
           &goblin::LinkageTreeFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
       ;
@@ -1812,17 +1831,11 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassTemplate =
       nb::class_<goblin::Template>
           (m, "Template", "")
-      .def("__init__", [](goblin::Template * self, std::vector<goblin::TemplateNode> outputs = std::vector<goblin::TemplateNode>(), std::vector<goblin::TemplateNode> subexpressions = std::vector<goblin::TemplateNode>())
-      {
-          new (self) goblin::Template();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->outputs = outputs;
-          r_ctor_->subexpressions = subexpressions;
-      },
-      nb::arg("outputs") = std::vector<goblin::TemplateNode>(), nb::arg("subexpressions") = std::vector<goblin::TemplateNode>()
-      )
       .def_rw("outputs", &goblin::Template::outputs, "")
       .def_rw("subexpressions", &goblin::Template::subexpressions, "")
+      .def(nb::init<>())
+      .def(nb::init<std::vector<goblin::TemplateNode>, std::vector<goblin::TemplateNode>>(),
+          nb::arg("outputs"), nb::arg("subexpressions"))
       .def("size",
           &goblin::Template::size)
       .def("max_num_children",
@@ -2182,6 +2195,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
       .def("parent",
           &goblin::GPContext::parent, nb::arg("index"))
+      .def("debug_log_expressions",
+          &goblin::GPContext::debug_log_expressions,
+          nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
+          "A helper that prints the expression in a human readable format")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
@@ -2258,8 +2275,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassSRProblem =
       nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
           (m, "SRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType>(),
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>>(),
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none())
       .def("num_discrete",
           &goblin::SRProblem::num_discrete)
       .def("discrete_domain_sizes",
@@ -2542,6 +2559,20 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
+  auto pyClassHLeadingOnes =
+      nb::class_<goblin::HLeadingOnes, goblin::ObjectiveBase>
+          (m, "HLeadingOnes", nb::is_final(), "\n(final class)")
+      .def(nb::init<usize, usize>(),
+          nb::arg("ndims"), nb::arg("branching_factor") = 2)
+      .def("num_discrete",
+          &goblin::HLeadingOnes::num_discrete)
+      .def("num_continuous",
+          &goblin::HLeadingOnes::num_continuous)
+      .def("evaluate",
+          &goblin::HLeadingOnes::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
+      ;
+
+
   auto pyClassDeceptiveTrap =
       nb::class_<goblin::DeceptiveTrap, goblin::ObjectiveBase>
           (m, "DeceptiveTrap", nb::is_final(), "\n(final class)")
@@ -2725,6 +2756,8 @@ void py_init_module_pygoblin(nb::module_& m) {
                                        std::shared_ptr<goblin::MOFunctionBase>,
                                        std::shared_ptr<goblin::ObjectiveBase>>, std::variant<DType, Vec<DType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::optional<AnyInit>, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>>, std::optional<usize>>(),
           nb::arg("objectives"), nb::arg("discrete_domain") = DType(2), nb::arg("continuous_lower_bound") = -std::numeric_limits<CType>::infinity(), nb::arg("continuous_upper_bound") = std::numeric_limits<CType>::infinity(), nb::arg("continuous_init_lower_bound") = CType(0.0), nb::arg("continuous_init_upper_bound") = CType(1.0), nb::arg("init").none() = nb::none(), nb::arg("target").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none())
+      .def("set_init",
+          &goblin::BenchmarkInstance::set_init, nb::arg("init"))
       .def("set_initial_bounds",
           &goblin::BenchmarkInstance::set_initial_bounds, nb::arg("continuous_init_lower_bound") = CType(0.0), nb::arg("continuous_init_upper_bound") = CType(1.0))
       .def("register_target",
@@ -2878,8 +2911,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassDiscreteGOMEA =
       nb::class_<goblin::DiscreteGOMEA, goblin::MethodBase>
           (m, "DiscreteGOMEA", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string_view, std::string, bool, bool, bool, std::optional<usize>, usize, usize, usize, usize>(),
-          nb::arg("linkage_model") = "LinkageTree", nb::arg("similarity_metric") = "MI", nb::arg("gene_invariant") = false, nb::arg("forced_improvements") = true, nb::arg("filter_linkage") = false, nb::arg("max_subset_size").none() = nb::none(), nb::arg("base_population_size") = 2, nb::arg("max_number_of_populations") = 100, nb::arg("subgeneration_factor") = 4, nb::arg("max_archive_size") = 0)
+      .def(nb::init<std::string_view, std::string, bool, bool, bool, std::optional<usize>, usize, usize, usize, usize, std::string>(),
+          nb::arg("linkage_model") = "LinkageTree", nb::arg("similarity_metric") = "MI", nb::arg("gene_invariant") = false, nb::arg("forced_improvements") = true, nb::arg("filter_linkage") = false, nb::arg("max_subset_size").none() = nb::none(), nb::arg("base_population_size") = 2, nb::arg("max_number_of_populations") = 100, nb::arg("subgeneration_factor") = 4, nb::arg("max_archive_size") = 0, nb::arg("fos_order") = "default")
       .def("run",
           &goblin::DiscreteGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
       .def("current_generation",
@@ -3068,7 +3101,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassPopulationOptions =
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
+      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       {
           new (self) goblin::PopulationOptions();  // placement new
           auto r_ctor_ = self;
@@ -3076,6 +3109,9 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->max_nis = max_nis;
           r_ctor_->forced_improvements = forced_improvements;
           r_ctor_->target_continuous_to_discrete_balance = target_continuous_to_discrete_balance;
+          r_ctor_->sequential_gom = sequential_gom;
+          r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
+          r_ctor_->donor_search_proportion = donor_search_proportion;
           r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
           r_ctor_->continuous_mutation_temperature = continuous_mutation_temperature;
           r_ctor_->continuous_mutation_decay_factor = continuous_mutation_decay_factor;
@@ -3084,12 +3120,15 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->gradient_step_frequency = gradient_step_frequency;
           r_ctor_->gradient_step_count = gradient_step_count;
       },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
+      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
       .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
       .def_rw("forced_improvements", &goblin::PopulationOptions::forced_improvements, "")
       .def_rw("target_continuous_to_discrete_balance", &goblin::PopulationOptions::target_continuous_to_discrete_balance, "")
+      .def_rw("sequential_gom", &goblin::PopulationOptions::sequential_gom, "performs GOM sequentially per solution, incompatible with other mechanisms")
+      .def_rw("strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance, "should the single objective elite solutions accept only strict improvements or also neutral changes?")
+      .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion, "the fraction of solutions to consider before skipping an evaluation in case")
       .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")
       .def_rw("continuous_mutation_temperature", &goblin::PopulationOptions::continuous_mutation_temperature, "")
       .def_rw("continuous_mutation_decay_factor", &goblin::PopulationOptions::continuous_mutation_decay_factor, "")

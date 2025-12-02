@@ -1,4 +1,5 @@
 #include <print>
+#include <iostream>
 
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
@@ -63,7 +64,7 @@ TEST_CASE("goblin::gp::ctx_introns") {
         SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, objectives, /* objectives_to_optimize = */ std::nullopt,
                       linear_scaling);
 
-        Rng rng(1, 0);
+        Rng rng = seeded_rng(42);
         AoSSet solutions;
 
         srp.add_random(rng, solutions, N);

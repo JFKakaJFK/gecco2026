@@ -1,3 +1,4 @@
+#include <iostream>
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
 
@@ -11,7 +12,7 @@ using namespace goblin;
 TEST_CASE("goblin::lib::entropy") {
   BenchmarkInstance instance(std::make_shared<OneMax>(4));
   AoSSet solutions;
-  Rng rng(1, 0);
+  Rng rng = seeded_rng(42);
   instance.add_random(rng, solutions, 8);
   std::vector<usize> indices{0, 1, 2, 3};
 
@@ -74,7 +75,7 @@ TEST_CASE("goblin::lib::entropy") {
                                /* merge_continuous = */ false,
                                /* num_continuous_bins = */ std::nullopt);
   auto H_mo = estimate_entropy(instance, solutions, indices, subset,
-                               /* intron_strategy = */ "mask_only",
+                               /* intron_strategy = */ "mark_only",
                                /* merge_continuous = */ false,
                                /* num_continuous_bins = */ std::nullopt);
 
@@ -117,7 +118,7 @@ TEST_CASE("goblin::lib::entropy") {
 TEST_CASE("goblin::lib::entropy_any_active") {
   BenchmarkInstance instance(std::make_shared<OneMax>(4));
   AoSSet solutions;
-  Rng rng(1, 0);
+  Rng rng = seeded_rng(42);
   instance.add_random(rng, solutions, 8);
   std::vector<usize> indices{0, 1, 2, 3, 4, 5, 6, 7};
   std::vector<usize> subset{0, 1, 2, 3};

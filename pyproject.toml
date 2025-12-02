@@ -12,7 +12,7 @@ authors = [ { name = "Johannes Koch", email = "johannes.koch@cwi.nl" } ]
 requires-python = ">=3.7"
 classifiers = [
     "Development Status :: 4 - Beta",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: CC BY-NC-ND 4.0 License",
     "Programming Language :: Python :: 3 :: Only",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
@@ -31,8 +31,8 @@ dependencies = [
 ]
 
 [tool.scikit-build]
-cmake.build-type = "Release"
-# cmake.build-type = "RelWithDebInfo"
+# cmake.build-type = "Release"
+cmake.build-type = "RelWithDebInfo"
 # cmake.verbose = true
 build.targets = ["_pygoblin"] # cmake target to build...
 build-dir = "build/{wheel_tag}"

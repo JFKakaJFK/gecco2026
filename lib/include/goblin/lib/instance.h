@@ -38,7 +38,7 @@ class InstanceBase {
   };
 
   void evaluate(SolutionSetBase& solutions, std::optional<u64> seed = std::nullopt) {
-    Rng rng(seed.value_or(42), 0);
+    Rng rng = seeded_rng(seed);
     std::vector<usize> indices(solutions.size());
     std::iota(indices.begin(), indices.end(), 0);
     evaluate(rng, solutions, indices);

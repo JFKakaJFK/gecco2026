@@ -62,6 +62,11 @@ class Quality:
 # #ifndef _GOBLIN_LIB_RNG_H
 #
 
+# using Rng = std::mt19937;
+
+# TODO possibly use the OpenRAND provided sampling methods (decreases rng portability, but it looks like any rng can be
+# wrapped with openrand::BaseRNG<T> and the sampling methods both look convenient and decently fast)
+
 # TODO possibly profile & look at (for faster rn generation)
 # - https://www.pcg-random.org/posts/bounded-rands.html
 # - https://github.com/swiftlang/swift/pull/39143#issue-comment-box
@@ -274,7 +279,7 @@ class SolutionBase:
 
     def inherit(  # overridable
         self, donor: SolutionBase, subset: Subset, always_inherit_continuous: bool
-    ) -> bool:
+    ) -> Tuple[bool, bool]:
         """/ Inherits a subset of the decision variables from the donor, returning True
         / if there was a change to the active variables and an evaluation is needed.
         /
@@ -755,7 +760,7 @@ class VariableSet(enum.IntEnum):
     continuous = enum.auto()  # (= 0b10)
     mixed = enum.auto()  # (= 0b11)
 
-def estimate_entropy(
+def estimate_entropy2(
     problem: InstanceBase,
     solutions: SolutionSetBase,
     indices: std.span[int],
@@ -772,6 +777,28 @@ def estimate_entropy(
     => current tradeoff is having the problem provide info about discrete
     values that actually correspond to a continuous value...
     """
+    pass
+
+class DiscreteIntronStrategy(enum.IntEnum):
+    """TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file
+    (fine, since the template is only used here)
+    """
+
+    none = enum.auto()  # (= 0)
+    any_active = enum.auto()  # (= 1)
+    all_active = enum.auto()  # (= 2)
+    mark_only = enum.auto()  # (= 3)
+    weighted_any_active = enum.auto()  # (= 4)
+
+def estimate_entropy(
+    problem: InstanceBase,
+    solutions: SolutionSetBase,
+    indices: std.span[int],
+    subset: std.span[int],
+    intron_strategy: str,
+    merge_continuous: bool,
+    num_continuous_bins: Optional[int],
+) -> Mat[float]:
     pass
 
 # #endif
@@ -966,6 +993,26 @@ class LinkageTreeFOS(LinkageModelBase):
         solutions: SolutionSetBase,
         variables: VariableSet,
     ) -> None:
+        pass
+
+    def compute_similarity(
+        self,
+        rng: Rng,
+        problem: InstanceBase,
+        solutions: SolutionSetBase,
+        indices: std.span[int],
+        covariance: Optional[std.reference_wrapper[Mat[float]]] = None,
+    ) -> Mat[float]:
+        pass
+
+    def learn_lt(
+        self, rng: Rng, similarity: Mat[float], filter_root_default: bool
+    ) -> FOS:
+        pass
+
+    def learn_lt_original(
+        self, rng: Rng, similarity: Mat[float], filter_root_default: bool
+    ) -> FOS:
         pass
 
     def subsets(
@@ -1252,6 +1299,16 @@ class Template:
     outputs: List[TemplateNode]
     subexpressions: List[TemplateNode]
 
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(
+        self, outputs: List[TemplateNode], subexpressions: List[TemplateNode]
+    ) -> None:
+        pass
+
     def size(self) -> int:
         pass
 
@@ -1265,14 +1322,6 @@ class Template:
         pass
 
     def is_valid(self) -> bool:
-        pass
-
-    def __init__(
-        self,
-        outputs: List[TemplateNode] = List[TemplateNode](),
-        subexpressions: List[TemplateNode] = List[TemplateNode](),
-    ) -> None:
-        """Auto-generated default constructor with named params"""
         pass
 
 # #endif
@@ -1849,6 +1898,16 @@ class GPContext:
     def parent(self, index: int) -> Optional[int]:
         pass
 
+    def debug_log_expressions(
+        self,
+        os: io.IOBase,
+        solution: SolutionBase,
+        node: Optional[int] = None,
+        indent: str = "",
+    ) -> None:
+        """A helper that prints the expression in a human readable format"""
+        pass
+
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -1983,6 +2042,7 @@ class SRProblem(GPInstanceBase):
         init: Optional[AnyInit] = None,
         constant_init_lower_bound: float = -1.0,
         constant_init_upper_bound: float = 1.0,
+        target_objectives: Optional[List[float]] = None,
     ) -> None:
         pass
 
@@ -2511,14 +2571,6 @@ class Repeat(ObjectiveBase):
 # #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #
 
-# TODO
-# - [x] OneMax
-# - [x] ZeroMax
-# - [ ] DeceptiveTrap
-# - [ ] BimodalDTrap
-# - [ ] Leading Ones
-# - [ ] Trailing Zeroes
-
 class OneMax(ObjectiveBase):
     """
     (final class)
@@ -2628,6 +2680,29 @@ class TrailingZeros(ObjectiveBase):
     """
 
     def __init__(self, ndims: int) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: RefS[Vec[int]],
+        continuous_values: RefS[Vec[float]],
+        discrete_active: RefS[np.ndarray],
+        continuous_active: RefS[np.ndarray],
+    ) -> Tuple[float, float]:
+        pass
+
+class HLeadingOnes(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, ndims: int, branching_factor: int = 2) -> None:
         pass
 
     def num_discrete(self) -> int:
@@ -2975,6 +3050,9 @@ class BenchmarkInstance(InstanceBase):
     ) -> None:
         pass
 
+    def set_init(self, init: AnyInit) -> None:
+        pass
+
     def set_initial_bounds(
         self,
         continuous_init_lower_bound: Union[float, Vec[float]] = float(0.0),
@@ -3189,7 +3267,7 @@ class Tracked(InstanceBase):
         config: TrackingOptions,
         seed: Optional[int] = None,
         population_size: Optional[int] = None,
-    ) -> Tuple[AdaptiveGridArchive, TerminationStatus]:
+    ) -> Tuple[ArchiveBase, TerminationStatus]:
         pass
 
 def debug_log(
@@ -3280,6 +3358,7 @@ class DiscreteGOMEA(MethodBase):
         max_number_of_populations: int = 100,
         subgeneration_factor: int = 4,
         max_archive_size: int = 0,
+        fos_order: str = "default",
     ) -> None:
         pass
 
@@ -3713,6 +3792,17 @@ class PopulationOptions:
     max_nis: Optional[int] = None
     forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
+    sequential_gom: bool = (
+        False  # performs GOM sequentially per solution, incompatible with other mechanisms
+    )
+    strict_elite_acceptance: bool = (
+        False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
+    )
+
+    donor_search_proportion: float = (
+        0.0  # the fraction of solutions to consider before skipping an evaluation in case
+    )
+    # of all subset variables being identical between the solution and donor
 
     # Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
     continuous_mutation_probability: float = 0.0
@@ -3729,6 +3819,9 @@ class PopulationOptions:
         max_nis: Optional[int] = None,
         forced_improvements: bool = True,
         target_continuous_to_discrete_balance: float = 1.0,
+        sequential_gom: bool = False,
+        strict_elite_acceptance: bool = False,
+        donor_search_proportion: float = 0.0,
         continuous_mutation_probability: float = 0.0,
         continuous_mutation_temperature: float = 0.1,
         continuous_mutation_decay_factor: float = 0.9,

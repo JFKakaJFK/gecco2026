@@ -9,14 +9,45 @@
 #include <random>
 #include <type_traits>
 #include <vector>
+#include <optional>
 
 #include <openrand/philox.h>
+#include <openrand/squares.h>
 
 #include "goblin/lib/types.h"
 
 namespace goblin {
-using Philox = openrand::Philox;
-using Rng = Philox;
+using Rng = openrand::Philox;
+// using Rng = std::mt19937;
+
+// OpenRAND and other rngs don't have the same API other than std::uniform_random_bit_generator, so a wrapper for the
+// RNG creation allows changing PRNG
+template <typename R = Rng>
+inline R seeded_rng(u64 state, u32 ctr = 0) {
+  // OpenRAND-like
+  if constexpr (std::is_constructible_v<R, u64, u32>) {
+    return R(state, ctr);
+  } else {
+    // std::random-like
+    std::seed_seq seed{static_cast<u32>(state), ctr};
+    R rng;
+    rng.seed(seed);
+    return rng;
+  }
+};
+inline Rng seeded_rng(std::optional<u64> seed = std::nullopt) {
+  if (seed.has_value()) {
+    return seeded_rng(seed.value());
+  } else {
+    std::random_device rd;
+    std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
+
+    return seeded_rng<Rng>(seed_dist(rd));
+  }
+};
+
+// TODO possibly use the OpenRAND provided sampling methods (decreases rng portability, but it looks like any rng can be
+// wrapped with openrand::BaseRNG<T> and the sampling methods both look convenient and decently fast)
 
 // TODO possibly profile & look at (for faster rn generation)
 // - https://www.pcg-random.org/posts/bounded-rands.html

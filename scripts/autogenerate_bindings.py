@@ -164,7 +164,9 @@ def configure_litgen() -> litgen.LitgenOptions:
 
     # These functions are excluded
     # - format_as: messes with the bindings and not needed on the Python side
-    options.fn_exclude_by_name__regex = r"^format_as$|^request_debug_report$"
+    options.fn_exclude_by_name__regex = (
+        r"^format_as$|^request_debug_report$|^seeded_rng$"
+    )
 
     # Format the python stubs with black
     options.python_run_black_formatter = True

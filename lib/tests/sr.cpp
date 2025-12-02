@@ -1,4 +1,5 @@
 #include <print>
+#include <iostream>
 
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
@@ -42,7 +43,7 @@ TEST_CASE("goblin::gp::sr") {
       bool linear_scaling = ls > 0;
       SRProblem srp(ctx, X, Y, X_test, Y_test, obj, /* objectives_to_optimize = */ std::nullopt, linear_scaling);
 
-      Rng rng(1, 0);
+      Rng rng = seeded_rng(42);
 
       AoSSet sset;
 
@@ -190,12 +191,13 @@ TEST_CASE("goblin::gp::sr") {
                                 /* max_num_populations = */ 1),
                             std::make_shared<CombinedFOS>(models));
 
-    auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+    // auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+    auto [front, status] = gomea.run(srp, budget, /* seed = */ 42);
 
-    std::println("Status {}: {}", format_as(status), srp.format_solution(front.so_solution(0)));
+    std::println("Status {}: {}", format_as(status), srp.format_solution(front->so_solution(0)));
 
-    REQUIRE(front.empty() == false);
+    REQUIRE(front->empty() == false);
     // ls values are re-computed, so there can be slight differences here, hence 10x
-    REQUIRE(front.so_solution(0).quality().objectives(0) <= vtr * 10.0);
+    REQUIRE(front->so_solution(0).quality().objectives(0) <= vtr * 10.0);
   }
 }

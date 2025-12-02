@@ -277,12 +277,13 @@ class Tracked final : public InstanceBase {
     request_debug_report(debug_logpath, archive, debug_headers, debug_values);
   };
 
-  static std::tuple<AdaptiveGridArchive, TerminationStatus> run(InstanceBase& instance,
-                                                                MethodBase& method,
-                                                                Budget& budget,
-                                                                TrackingOptions config,
-                                                                std::optional<usize> seed = std::nullopt,
-                                                                std::optional<usize> population_size = std::nullopt) {
+  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& instance,
+      MethodBase& method,
+      Budget& budget,
+      TrackingOptions config,
+      std::optional<usize> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) {
     std::random_device rd;
     usize _seed = seed.has_value() ? seed.value()
                                    : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
@@ -316,7 +317,7 @@ class Tracked final : public InstanceBase {
 
     ti.report(ti.archive);
 
-    return std::make_tuple(std::move(ti.archive), ti.status);
+    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
   };
 
  private:
@@ -353,27 +354,38 @@ class Tracked final : public InstanceBase {
     }
 
     // actually evaluate, but ensure we don't go beyond the evaluation limit
-    usize evals_performed;
+    u64 evaluations_performed;
     if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
       auto evals_left = budget.max_evaluations.value() - evaluations;
       eval_timer.start();
       eval(indices.first(evals_left));
       eval_timer.stop();
-      evals_performed = evals_left;
+      evaluations_performed = evals_left;
+
+      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
+             "Evaluation limit was not reached!");
     } else {
       eval_timer.start();
       eval(indices);
       eval_timer.stop();
-      evals_performed = indices.size();
+      evaluations_performed = indices.size();
     }
 
-    evaluations += evals_performed;
-    evaluations_since_last_archive_adaption += evals_performed;
+    // update the internal archive, and possibly stop if the target was reached
+    for (usize i = 0; i < evaluations_performed; i++) {
+      archive.update(solutions[indices[i]], true);
+      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
+                      // evaluations performed were considered...
 
-    // update the internal archive
-    for (auto& i : indices) {
-      archive.update(solutions[i], true);
+      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
+      // evaluating one by one
+      if (instance.target_reached(archive)) {
+        status = TerminationStatus::TargetReached;
+        throw TrackingException("");
+      }
     }
+
+    evaluations_since_last_archive_adaption += evaluations_performed;
 
     // check if we need to stop because the evaluation time/evaluations
     // exhausted the budget
@@ -381,12 +393,6 @@ class Tracked final : public InstanceBase {
     ts = budget.exhausted(0, evaluations, elapsed);
     if (ts.has_value()) {
       status = ts.value();
-      throw TrackingException("");
-    }
-
-    // or if we already reached the target
-    if (instance.target_reached(archive)) {
-      status = TerminationStatus::TargetReached;
       throw TrackingException("");
     }
 
