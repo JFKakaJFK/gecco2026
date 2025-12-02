@@ -161,6 +161,55 @@ class OpSub : public OperatorBase {
   };
 };
 
+class OpSubGPU : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 2; };
+  usize max_arity() const override final { return std::numeric_limits<usize>::max(); };
+
+  bool is_commutative() const override final {
+    // well actually: all arguments after the first one are interchangeable
+    return false;
+  };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final {
+    if (args.cols() > 1) {
+      out = args.col(0) - args(Eigen::placeholders::all, Eigen::seqN(1, args.cols() - 1)).rowwise().sum();
+    } else {
+      out = -args.col(0);
+    }
+  };
+
+  bool has_gradient() const override final { return true; };
+  void apply_grad(Ref<Array<CType>> out,
+                  Ref<Array<CType>> d_out,
+                  CRef<Arr2D<CType>> args,
+                  CRef<Arr2D<CType>> d_args) const override final {
+    apply(out, args);
+    if (args.cols() > 1) {
+      d_out = d_args.col(0) - d_args(Eigen::placeholders::all, Eigen::seqN(1, d_args.cols() - 1)).rowwise().sum();
+    } else {
+      d_out = -d_args.col(0);
+    }
+  };
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    std::ostringstream ss;
+    if (args.size() == 1) {
+      ss << "(-" << args[0] << ')';
+    } else {
+      ss << '(';
+      for (usize i = 0; i < args.size(); i++) {
+        if (i > 0) {
+          ss << " - ";
+        }
+        ss << args[i];
+      }
+      ss << ')';
+    }
+    return ss.str();
+  };
+};
+
 class OpMul : public OperatorBase {
  public:
   usize min_arity() const override final { return 2; };

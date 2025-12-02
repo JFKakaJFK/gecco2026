@@ -15,12 +15,12 @@ TEST_CASE("goblin::gp::context") {
 
     std::vector<std::shared_ptr<OperatorBase>> operators = {
         std::make_shared<OpAdd>(), 
-        std::make_shared<OpSub>(),
+        std::make_shared<OpSubGPU>(),
         std::make_shared<OpMul>(), 
         std::make_shared<OpDiv>()
     };
 
-    GPContext ctx(X.cols(), tmplate, operators);
+    GPContext ctx(X.cols(), tmplate, operators, 0, "ercs", 10, false, 15);
     std::vector<std::string> obj = {"mse"};
     SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, obj, std::nullopt, false);
 
@@ -30,14 +30,14 @@ TEST_CASE("goblin::gp::context") {
                  Vec<CType>::Zero(srp.num_continuous()));
     sset.add(s);
 
-    std::vector<u8> node_type; 
+    std::vector<NodeType> node_type; 
     std::vector<float> node_value;
 
-    std::vector<u8> expected_node_type;
+    std::vector<NodeType> expected_node_type;
     std::vector<float> expected_node_value;
 
-    auto expect = [&](std::vector<u8> types, std::vector<float> values) {
-        types.resize(ctx.num_discrete, std::numeric_limits<u8>::max());
+    auto expect = [&](std::vector<NodeType> types, std::vector<float> values) {
+        types.resize(ctx.num_discrete, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
         values.resize(ctx.num_discrete, std::numeric_limits<float>::max());
         expected_node_type = std::move(types);
         expected_node_value = std::move(values);
@@ -55,7 +55,7 @@ TEST_CASE("goblin::gp::context") {
         sset[0].discrete_values()(left) = 0;   // x0
         sset[0].discrete_values()(right) = 1;   // x1
 
-        expect({0, 0, 2}, {1, 0, 0});
+        expect({I, I, O}, {Idx(1), Idx(0), Add});
     }
 
     SUBCASE("(x0 + 3.2) * (x2 - (x1 / -1.5))") {
@@ -82,8 +82,8 @@ TEST_CASE("goblin::gp::context") {
         sset[0].continuous_values()(ctx.children[right_right][1]) = -1.5;
 
         expect(
-            {1, 0, 2, 0, 2, 1, 0, 2, 2},
-            {-1.5, 1, 3, 2, 1, 3.2, 0, 0, 2}
+            {C, I, O, I, O, C, I, O, O},
+            {Val(-1.5f), Idx(1), Div, Idx(2), Sub, Val(3.2f), Idx(0), Add, Mul}
         );
     }
 

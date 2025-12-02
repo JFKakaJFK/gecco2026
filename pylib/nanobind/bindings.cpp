@@ -1445,8 +1445,65 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def(nb::init<>())  // implicit default constructor
           .def("sample", &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
   // #endif
-  // #ifndef _GOBLIN_GP_INSTANCE_H
+  // #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
   //
+  // #ifndef _GOBLIN_GA_GP_TYPES_H
+  //
+
+
+  auto pyEnumNodeType =
+      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
+          .value("input", goblin::NodeType::Input, "")
+          .value("constant", goblin::NodeType::Constant, "")
+          .value("operator", goblin::NodeType::Operator, "");
+
+
+  auto pyEnumOperator =
+      nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
+          .value("add", goblin::Operator::Add, "")
+          .value("sub", goblin::Operator::Sub, "")
+          .value("mul", goblin::Operator::Mul, "")
+          .value("div", goblin::Operator::Div, "");
+
+
+  m.def("val",
+      nb::overload_cast<float>(goblin::Val), nb::arg("x"));
+
+  m.def("val",
+      nb::overload_cast<int>(goblin::Val), nb::arg("x"));
+
+  m.def("idx",
+      goblin::Idx, nb::arg("idx"));
+
+  m.def("op",
+      goblin::Op, nb::arg("op"));
+  // #endif
+
+
+  m.def("evaluate_kernel_wrapper",
+      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("solution_length"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("se"));
+
+  m.def("compute_mse_kernel_wrapper",
+      goblin::compute_mse_kernel_wrapper, nb::arg("se"), nb::arg("mse"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_output_kernel",
+      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"));
+
+  m.def("test_evaluate_kernel",
+      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_mse_kernel",
+      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+  // #endif
+  // #ifndef _GOBLIN_GA_GP_SR_H
+  //
+  // #ifndef _GOBLIN_GA_GP_HELPER_H
+  //
+
+
+  m.def("compute_block_size",
+      goblin::compute_block_size, nb::arg("count"));
+  // #endif
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //
   // #ifndef _GOBLIN_GP_OPERATOR_H
@@ -1485,6 +1542,343 @@ void py_init_module_pygoblin(nb::module_& m) {
                              .def("is_valid", &goblin::Template::is_valid);
   // #endif
 
+
+  auto pyClassOperatorBase =
+      nb::class_<goblin::OperatorBase, goblin::OperatorBase_trampoline>
+          (m, "OperatorBase", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OperatorBase::min_arity)
+      .def("max_arity",
+          &goblin::OperatorBase::max_arity)
+      .def("is_commutative",
+          &goblin::OperatorBase::is_commutative)
+      .def("apply",
+          &goblin::OperatorBase::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OperatorBase::has_gradient)
+      .def("apply_grad",
+          &goblin::OperatorBase::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("__call__",
+          &goblin::OperatorBase::operator(), nb::arg("args"))
+      .def("format",
+          &goblin::OperatorBase::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpAdd =
+      nb::class_<goblin::OpAdd, goblin::OperatorBase>
+          (m, "OpAdd", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpAdd::min_arity)
+      .def("max_arity",
+          &goblin::OpAdd::max_arity)
+      .def("is_commutative",
+          &goblin::OpAdd::is_commutative)
+      .def("apply",
+          &goblin::OpAdd::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpAdd::has_gradient)
+      .def("apply_grad",
+          &goblin::OpAdd::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpAdd::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSub =
+      nb::class_<goblin::OpSub, goblin::OperatorBase>
+          (m, "OpSub", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSub::min_arity)
+      .def("max_arity",
+          &goblin::OpSub::max_arity)
+      .def("is_commutative",
+          &goblin::OpSub::is_commutative)
+      .def("apply",
+          &goblin::OpSub::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSub::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSub::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSub::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSubGPU =
+      nb::class_<goblin::OpSubGPU, goblin::OperatorBase>
+          (m, "OpSubGPU", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSubGPU::min_arity)
+      .def("max_arity",
+          &goblin::OpSubGPU::max_arity)
+      .def("is_commutative",
+          &goblin::OpSubGPU::is_commutative)
+      .def("apply",
+          &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSubGPU::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSubGPU::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpMul =
+      nb::class_<goblin::OpMul, goblin::OperatorBase>
+          (m, "OpMul", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpMul::min_arity)
+      .def("max_arity",
+          &goblin::OpMul::max_arity)
+      .def("is_commutative",
+          &goblin::OpMul::is_commutative)
+      .def("apply",
+          &goblin::OpMul::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpMul::has_gradient)
+      .def("apply_grad",
+          &goblin::OpMul::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpMul::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpDiv =
+      nb::class_<goblin::OpDiv, goblin::OperatorBase>
+          (m, "OpDiv", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpDiv::min_arity)
+      .def("max_arity",
+          &goblin::OpDiv::max_arity)
+      .def("is_commutative",
+          &goblin::OpDiv::is_commutative)
+      .def("apply",
+          &goblin::OpDiv::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpDiv::has_gradient)
+      .def("apply_grad",
+          &goblin::OpDiv::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpDiv::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSin =
+      nb::class_<goblin::OpSin, goblin::OperatorBase>
+          (m, "OpSin", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSin::min_arity)
+      .def("max_arity",
+          &goblin::OpSin::max_arity)
+      .def("is_commutative",
+          &goblin::OpSin::is_commutative)
+      .def("apply",
+          &goblin::OpSin::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSin::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSin::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpCos =
+      nb::class_<goblin::OpCos, goblin::OperatorBase>
+          (m, "OpCos", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpCos::min_arity)
+      .def("max_arity",
+          &goblin::OpCos::max_arity)
+      .def("is_commutative",
+          &goblin::OpCos::is_commutative)
+      .def("apply",
+          &goblin::OpCos::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpCos::has_gradient)
+      .def("apply_grad",
+          &goblin::OpCos::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpCos::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpExp =
+      nb::class_<goblin::OpExp, goblin::OperatorBase>
+          (m, "OpExp", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpExp::min_arity)
+      .def("max_arity",
+          &goblin::OpExp::max_arity)
+      .def("is_commutative",
+          &goblin::OpExp::is_commutative)
+      .def("apply",
+          &goblin::OpExp::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpExp::has_gradient)
+      .def("apply_grad",
+          &goblin::OpExp::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpExp::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpLog =
+      nb::class_<goblin::OpLog, goblin::OperatorBase>
+          (m, "OpLog", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpLog::min_arity)
+      .def("max_arity",
+          &goblin::OpLog::max_arity)
+      .def("is_commutative",
+          &goblin::OpLog::is_commutative)
+      .def("apply",
+          &goblin::OpLog::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpLog::has_gradient)
+      .def("apply_grad",
+          &goblin::OpLog::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpLog::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSquare =
+      nb::class_<goblin::OpSquare, goblin::OperatorBase>
+          (m, "OpSquare", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSquare::min_arity)
+      .def("max_arity",
+          &goblin::OpSquare::max_arity)
+      .def("is_commutative",
+          &goblin::OpSquare::is_commutative)
+      .def("apply",
+          &goblin::OpSquare::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSquare::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSquare::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSquare::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSqrt =
+      nb::class_<goblin::OpSqrt, goblin::OperatorBase>
+          (m, "OpSqrt", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSqrt::min_arity)
+      .def("max_arity",
+          &goblin::OpSqrt::max_arity)
+      .def("is_commutative",
+          &goblin::OpSqrt::is_commutative)
+      .def("apply",
+          &goblin::OpSqrt::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSqrt::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSqrt::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSqrt::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpPow =
+      nb::class_<goblin::OpPow, goblin::OperatorBase>
+          (m, "OpPow", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpPow::min_arity)
+      .def("max_arity",
+          &goblin::OpPow::max_arity)
+      .def("is_commutative",
+          &goblin::OpPow::is_commutative)
+      .def("apply",
+          &goblin::OpPow::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpPow::has_gradient)
+      .def("apply_grad",
+          &goblin::OpPow::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpPow::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpAbs =
+      nb::class_<goblin::OpAbs, goblin::OperatorBase>
+          (m, "OpAbs", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpAbs::min_arity)
+      .def("max_arity",
+          &goblin::OpAbs::max_arity)
+      .def("is_commutative",
+          &goblin::OpAbs::is_commutative)
+      .def("apply",
+          &goblin::OpAbs::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpAbs::has_gradient)
+      .def("apply_grad",
+          &goblin::OpAbs::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpAbs::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpMin =
+      nb::class_<goblin::OpMin, goblin::OperatorBase>
+          (m, "OpMin", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpMin::min_arity)
+      .def("max_arity",
+          &goblin::OpMin::max_arity)
+      .def("is_commutative",
+          &goblin::OpMin::is_commutative)
+      .def("apply",
+          &goblin::OpMin::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpMin::has_gradient)
+      .def("apply_grad",
+          &goblin::OpMin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpMin::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpMax =
+      nb::class_<goblin::OpMax, goblin::OperatorBase>
+          (m, "OpMax", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpMax::min_arity)
+      .def("max_arity",
+          &goblin::OpMax::max_arity)
+      .def("is_commutative",
+          &goblin::OpMax::is_commutative)
+      .def("apply",
+          &goblin::OpMax::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpMax::has_gradient)
+      .def("apply_grad",
+          &goblin::OpMax::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpMax::format, nb::arg("args"))
+      ;
   auto pyClassOperatorBase = nb::class_<goblin::OperatorBase, goblin::OperatorBase_trampoline>(m, "OperatorBase", "")
                                  .def(nb::init<>())  // implicit default constructor
                                  .def("min_arity", &goblin::OperatorBase::min_arity)
@@ -1667,6 +2061,48 @@ void py_init_module_pygoblin(nb::module_& m) {
                              .value("parameter", goblin::ValueKind::Parameter, "function class parameter idx");
 
   auto pyClassGPContext =
+      nb::class_<goblin::GPContext>
+          (m, "GPContext", "/ The lookup tables needed to map the linear representation to the encoded\n/ semantics and the methods for computing the output, active nodes and sympy\n/ conversion.\n/\n/ A two-step approach is used, where each semantic symbol (e.g. operators or\n/ input features) are mapped to a value. However, the domain for e.g. leaf\n/ nodes does not contain all values, so a second mapping is used to map\n/ between node domain and value.")
+      .def(nb::init<usize, goblin::Template, std::vector<std::shared_ptr<goblin::OperatorBase>>, usize, std::string_view, usize, bool, usize>(),
+          nb::arg("num_inputs"), nb::arg("expression_template"), nb::arg("operators"), nb::arg("num_parameters") = 0, nb::arg("constant_representation") = "ercs", nb::arg("constant_pool_size") = 10, nb::arg("enable_subfunctions") = false, nb::arg("max_expression_size") = 50)
+      .def("value2domain",
+          &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
+      .def("parent",
+          &goblin::GPContext::parent, nb::arg("index"))
+      .def("debug_log_expressions",
+          &goblin::GPContext::debug_log_expressions,
+          nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
+          "A helper that prints the expression in a human readable format")
+      .def("to_sympy",
+          &goblin::GPContext::to_sympy, nb::arg("solution"))
+      .def("to_gpu_repr",
+          &goblin::GPContext::to_gpu_repr, nb::arg("solution"), nb::arg("node_type"), nb::arg("node_value"))
+      .def_rw("const_repr", &goblin::GPContext::const_repr, "")
+      .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
+      .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")
+      .def_rw("num_subexpressions", &goblin::GPContext::num_subexpressions, "")
+      .def_rw("num_discrete", &goblin::GPContext::num_discrete, "")
+      .def_rw("num_continuous", &goblin::GPContext::num_continuous, "")
+      .def_rw("max_expression_size", &goblin::GPContext::max_expression_size, "")
+      .def_rw("num_parameters", &goblin::GPContext::num_parameters, "")
+      .def_rw("max_num_children", &goblin::GPContext::max_num_children, "")
+      .def_rw("operators", &goblin::GPContext::operators, "")
+      .def_rw("op_idx2value", &goblin::GPContext::op_idx2value, "")
+      .def_rw("value_kind", &goblin::GPContext::value_kind, "")
+      .def_rw("value_min_arity", &goblin::GPContext::value_min_arity, "")
+      .def_rw("value_max_arity", &goblin::GPContext::value_max_arity, "")
+      .def_rw("value_idx", &goblin::GPContext::value_idx, "")
+      .def_rw("subtree_roots", &goblin::GPContext::subtree_roots, "indices of all subtree root nodes")
+      .def_rw("output_roots", &goblin::GPContext::output_roots, "indices of all output root nodes")
+      .def_rw("domain_sizes", &goblin::GPContext::domain_sizes, "node -> domain size")
+      .def_rw("domain2value", &goblin::GPContext::domain2value, "node domain -> value")
+      .def_rw("root", &goblin::GPContext::root, "node -> current tree root")
+      .def_rw("sizes", &goblin::GPContext::sizes, "node -> size of subtree starting at node,")
+      .def_rw("depth", &goblin::GPContext::depth, "node -> node depth")
+      .def_rw("height", &goblin::GPContext::height, "node -> node height")
+      .def_rw("children", &goblin::GPContext::children, "node -> child node indices")
+      .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this")
+      ;
       nb::class_<goblin::GPContext>(
           m, "GPContext",
           "/ The lookup tables needed to map the linear representation to the encoded\n/ semantics and the methods for "
@@ -1712,6 +2148,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("children", &goblin::GPContext::children, "node -> child node indices")
           .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this");
   // #endif
+  // #ifndef _GOBLIN_GP_INIT_H
+  //
+  // #ifndef _GOBLIN_GP_INSTANCE_H
+  //
 
   auto pyClassGPInstanceBase =
       nb::class_<goblin::GPInstanceBase, goblin::InstanceBase, goblin::GPInstanceBase_trampoline>(m, "GPInstanceBase",
@@ -1719,8 +2159,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def(nb::init<>())  // implicit default constructor
           .def("context", &goblin::GPInstanceBase::context);
   // #endif
-  // #ifndef _GOBLIN_GP_INIT_H
-  //
 
   auto pyClassFullInit =
       nb::class_<goblin::FullInit, goblin::DiscreteInitBase>(m, "FullInit", nb::is_final(), "\n(final class)")
@@ -1740,6 +2178,50 @@ void py_init_module_pygoblin(nb::module_& m) {
           "\"probabilistically complete\"\n/ in isolation.\n(final class)")
           .def(nb::init<>())  // implicit default constructor
           .def("sample", &goblin::RecursiveCompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+  // #endif
+
+
+  auto pyClassGASRProblem =
+      nb::class_<goblin::GASRProblem, goblin::GPInstanceBase>
+          (m, "GASRProblem", "")
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, bool, std::optional<AnyInit>, CType, CType>(),
+          nb::arg("ctx"), nb::arg("x"), nb::arg("y"), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def("free_gpu",
+          &goblin::GASRProblem::free_gpu)
+      .def("num_discrete",
+          &goblin::GASRProblem::num_discrete)
+      .def("discrete_domain_sizes",
+          &goblin::GASRProblem::discrete_domain_sizes)
+      .def("num_continuous",
+          &goblin::GASRProblem::num_continuous)
+      .def("continuous_lower_bounds",
+          &goblin::GASRProblem::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::GASRProblem::continuous_upper_bounds)
+      .def("continuous_init_lower_bounds",
+          &goblin::GASRProblem::continuous_init_lower_bounds)
+      .def("continuous_init_upper_bounds",
+          &goblin::GASRProblem::continuous_init_upper_bounds)
+      .def("evaluate",
+          &goblin::GASRProblem::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+      .def("add_random",
+          &goblin::GASRProblem::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
+      .def("fitness",
+          &goblin::GASRProblem::fitness)
+      .def("archive_fitness",
+          &goblin::GASRProblem::archive_fitness)
+      .def("context",
+          &goblin::GASRProblem::context)
+      .def("log_header",
+          &goblin::GASRProblem::log_header, nb::arg("os"))
+      .def("log",
+          &goblin::GASRProblem::log, nb::arg("os"), nb::arg("solution"))
+      .def("log_solution",
+          &goblin::GASRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
+      .def_rw("ctx", &goblin::GASRProblem::ctx, "")
+      .def_rw("linear_scaling", &goblin::GASRProblem::linear_scaling, "")
+      .def_rw("objective", &goblin::GASRProblem::objective, "")
+      ;
   // #endif
   // #ifndef _GOBLIN_GP_SR_H
   //
