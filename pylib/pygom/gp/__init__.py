@@ -128,61 +128,29 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         linear_scaling = self.kwargs.get("linear_scaling", True)
         init = vars(pygom)[self.kwargs.get("init", "HalfHalfInit")]()
 
-        # if self.gpu_accelerated:
-        #     ProblemClass = pygom.GASRProblem
-        #     specific_args = {}
-        # else:
-        #     ProblemClass = pygom.SRProblem
-        #     specific_args = {
-        #         "objectives": self.kwargs.get("objectives", "mse"),
-        #     }
-
-        # problem = ProblemClass(
-        #     ctx,
-        #     X,
-        #     Y,
-        #     linear_scaling=linear_scaling,
-        #     init=init,
-        #     constant_init_lower_bound=self.kwargs.get(
-        #         "constant_init_lower_bound", float(-np.nanmax(Y))
-        #     ),
-        #     constant_init_upper_bound=self.kwargs.get(
-        #         "constant_init_upper_bound", float(np.nanmax(Y))
-        #     ),
-        #     **specific_args,
-        # )
-
         if self.gpu_accelerated:
-            print("GASR")
-            problem = pygom.GASRProblem(
-                ctx,
-                X,
-                Y,
-                linear_scaling=linear_scaling,
-                init=init,
-                constant_init_lower_bound=self.kwargs.get(
-                    "constant_init_lower_bound", float(-np.nanmax(Y))
-                ),
-                constant_init_upper_bound=self.kwargs.get(
-                    "constant_init_upper_bound", float(np.nanmax(Y))
-                ),
-            )
+            ProblemClass = pygom.GASRProblem
+            specific_args = {}
         else:
-            print("SR")
-            problem = pygom.SRProblem(
-                ctx,
-                X,
-                Y,
-                linear_scaling=linear_scaling,
-                objectives=self.kwargs.get("objectives", "mse"),
-                init=init,
-                constant_init_lower_bound=self.kwargs.get(
-                    "constant_init_lower_bound", float(-np.nanmax(Y))
-                ),
-                constant_init_upper_bound=self.kwargs.get(
-                    "constant_init_upper_bound", float(np.nanmax(Y))
-                ),
-            )
+            ProblemClass = pygom.SRProblem
+            specific_args = {
+                "objectives": self.kwargs.get("objectives", "mse"),
+            }
+
+        problem = ProblemClass(
+            ctx,
+            X,
+            Y,
+            linear_scaling=linear_scaling,
+            init=init,
+            constant_init_lower_bound=self.kwargs.get(
+                "constant_init_lower_bound", float(-np.nanmax(Y))
+            ),
+            constant_init_upper_bound=self.kwargs.get(
+                "constant_init_upper_bound", float(np.nanmax(Y))
+            ),
+            **specific_args,
+        )
 
         seed = self.kwargs.get("random_state", self.kwargs.get("seed"))
 
