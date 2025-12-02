@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <variant>
+#include <sstream>
 
 #include "goblin/lib/algorithms/subset_selection.h"
 #include "goblin/lib/ims.h"
@@ -27,11 +28,18 @@
 #include "goblin/bench/tracked.h"
 #include "goblin/methods/continuous.h"
 
-#define __goblin_dbg_info() std::format("{}:{}", __FILE__, __LINE__)
-#ifdef DEBUG
-#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, __goblin_dbg_info())
+#ifndef NDEBUG
+#define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_gom_backup_invariant() check_gom_backups(std::format("{}:{}", __FILE__, __LINE__))
+#define __assert_invariants()            \
+  __assert_fitness_invariant(solutions); \
+  __assert_fitness_invariant(parents);   \
+  __assert_fitness_invariant(donors);    \
+  __assert_gom_backup_invariant()
 #else
 #define __assert_fitness_invariant(s)
+#define __assert_gom_backup_invariant()
+#define __assert_invariants()
 #endif
 
 namespace goblin {
@@ -45,6 +53,7 @@ create_and_register_clusters(Rng& rng,
                              usize donor_pool_size,
                              const SolutionSetBase& previous_solutions,
                              std::vector<usize>& previous_clusters) {
+  assert(donor_pool_size > 0);
   std::vector<usize> solution_clusters(solutions.size(), 0);
   std::vector<std::vector<usize>> cluster_solutions(num_clusters);
   std::vector<std::vector<usize>> cluster_donors;
@@ -113,9 +122,8 @@ create_and_register_clusters(Rng& rng,
       greedy_scattered_subset_selection(distance, solutions.size(), num_clusters, best_idx(random_objective(rng)));
 
   // Depending on which paper you look at, K-means is used to improve the
-  // cluster leader assignments here - TODO add the MO-RV/Amalgam paper I can't
-  // find right now that states that clustering on top of the greedy leader
-  // assignment is not really worth it...
+  // cluster leader assignments here - but https://ir.cwi.nl/pub/23049/23049D.pdf (Chapter 4.6)
+  // argues that that the k-means step does not necessarily help
 
   // 3. round robin cluster assignments (for clusters in random order, add
   // closest solution)
@@ -170,14 +178,6 @@ create_and_register_clusters(Rng& rng,
     remaining_clusters.pop_back();
   }
 
-  // fill reverse mapping
-  for (usize k = 0; k < num_clusters; k++) {
-    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
-  }
-  for (usize i = 0; i < solution_clusters.size(); i++) {
-    cluster_solutions[solution_clusters[i]].push_back(i);
-  }
-
   // 5. (if previous objectives + solution_cluster assignments are passed) -
   // perform cluster registration by minimizing maximum matched cluster distance
   // (= average distance between cluster solutions)
@@ -226,11 +226,24 @@ create_and_register_clusters(Rng& rng,
     for (usize i = 0; i < remaining_clusters.size(); i++) {
       cluster_perm[remaining_clusters[i]] = num_objectives + best_permutation[i];
     }
+  } else {
+    // if we don't do cluster registration, then we still need to make sure that each cluster is in cluster_perm
+    for (usize i : remaining_clusters) {
+      cluster_perm[i] = i;
+    }
   }
 
   // 6. apply cluster permutation, i.e. apply permutation to solution_clusters
   for (usize i = 0; i < solution_clusters.size(); i++) {
     solution_clusters[i] = cluster_perm[solution_clusters[i]];
+  }
+
+  // fill reverse mapping
+  for (usize k = 0; k < num_clusters; k++) {
+    cluster_solutions[k].reserve(solutions.size() / num_clusters + 1);
+  }
+  for (usize i = 0; i < solution_clusters.size(); i++) {
+    cluster_solutions[solution_clusters[i]].push_back(i);
   }
 
   // 7. assign donor indices -> closest donor pool size solutins to cluster
@@ -246,6 +259,13 @@ create_and_register_clusters(Rng& rng,
     cluster_donors[k].insert(cluster_donors[k].end(), indices.begin(), indices.begin() + donor_pool_size);
   }
 
+#ifndef NDEBUG
+  for (usize i = 0; i < num_clusters; i++) {
+    assert(cluster_donors[i].size() == std::min(donor_pool_size, solutions.size()) &&
+           "All clusters are supposed to have the same, non-zero donor pool size.");
+  }
+#endif
+
   return std::make_tuple(solution_clusters, cluster_solutions, cluster_donors);
 };
 
@@ -254,6 +274,12 @@ struct PopulationOptions {
   std::optional<usize> max_nis = std::nullopt;
   bool forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
+  bool sequential_gom = false;  // performs GOM sequentially per solution, incompatible with other mechanisms
+  bool strict_elite_acceptance =
+      false;  // should the single objective elite solutions accept only strict improvements or also neutral changes?
+
+  double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
+                                         // of all subset variables being identical between the solution and donor
 
   // Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
   double continuous_mutation_probability = 0.0;
@@ -309,10 +335,7 @@ class Population {
     __goblin_runtime_assert(is_discrete || is_continuous);
 
     // ======= initialization (if necessary) =======
-    // bool init_cluster_states = false;
     if (solutions.empty()) {
-      // init_cluster_states = true;
-
       evaluations += initialize(rng);
 
       if (should_terminate(evaluations)) {
@@ -334,7 +357,19 @@ class Population {
     // after this, donors == parents == solutions holds
     for (usize i = 0; i < size; i++) {
       donors[i] = solutions[i];
+
+      // if acceptance for elites is strict, find the current elite solution for each single-objective cluster
+      if (options.strict_elite_acceptance) {
+        usize k = solution_clusters[i];
+
+        if (k < problem.num_objectives() &&
+            problem.fitness().cmp(solutions[i].quality(), solutions[so_elite_idx[k]].quality(), std::nullopt) ==
+                Ordering::Better) {
+          so_elite_idx[k] = i;
+        }
+      }
     }
+    __assert_gom_backup_invariant();
 
     // ======= state/model updates =======
 
@@ -356,13 +391,19 @@ class Population {
 
       // and fix the subset order for each solution
       // (colwise, each column is contiguous and one step)
-      if (static_cast<usize>(subset_orders.cols()) < max_discrete_subset_count) {
+      if (static_cast<usize>(subset_orders.cols()) < max_discrete_subset_count || !discrete_model->is_static()) {
         subset_orders.resize(size, max_discrete_subset_count);
+
+        // for(auto row: subset_orders.rowwise()){
+        //     std::iota(row.begin(), row.begin() + max_discrete_subset_count, 0);
+        // }
+        for (usize i = 0; i < max_discrete_subset_count; i++) {
+          subset_orders.col(i).array() = i;
+        }
       }
-      subset_orders.rowwise() =
-          Vec<usize>::LinSpaced(max_discrete_subset_count, 0, max_discrete_subset_count - 1).transpose();
+
       for (auto row : subset_orders.rowwise()) {
-        std::shuffle(row.begin(), row.end(), rng);
+        std::shuffle(row.begin(), row.begin() + max_discrete_subset_count, rng);
       }
     }
 
@@ -373,88 +414,121 @@ class Population {
     local_archive->reset_change_count();
 
     // ======= variation/evaluation/selection =======
-    usize subset_idx = 0;
-    // // discrete only variation loop
-    // while(subset_idx < max_discrete_subset_count){
-    //     evaluations += discrete_gom_step(rng, subset_idx++);
+    __assert_invariants();
 
-    //     if (should_terminate(evaluations).has_value()) {
-    //         return evaluations;
-    //     }
-    // }
+    if (options.sequential_gom) {
+      solutions_to_evaluate.resize(1);
+      for (usize i = 0; i < size; i++) {
+        usize k = solution_clusters[i];
+        auto objective = k < problem.num_objectives() ? std::make_optional(k) : std::nullopt;
 
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    bool can_do_discrete_step;
-    do {
-      can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
-      bool do_discrete_step;
-      if (!is_continuous || !rv_state.options.enabled) {
-        do_discrete_step = can_do_discrete_step;
-      } else if (!can_do_discrete_step) {
-        do_discrete_step = false;
-      } else {
-        double actual_evaluation_balance =
-            discrete_evaluations > 0.0
-                ? continuous_evaluations / discrete_evaluations
-                // since no discrete evaluations were performed we either flip a coin or force a first discrete step if
-                // a first continuous step was already done
-                : (continuous_evaluations > 0.0 ? 2.0 : 1.0) * options.target_continuous_to_discrete_balance;
-        // maps the fraction to a percentage such that 0.5 is the target balance,
-        // less means too many continuous evaluations, more means too many discrete evaluations
-        double p_discrete = 0.5 * actual_evaluation_balance / options.target_continuous_to_discrete_balance;
+        perm.resize(cluster_donors[k].size());
+        std::iota(perm.begin(), perm.end(), 0);
 
-        do_discrete_step = U(rng) < p_discrete;
+        usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * perm.size();
+
+        for (usize subset_idx = 0; subset_idx < max_discrete_subset_count; subset_idx++) {
+          if (subset_idx < cluster_FOS[k].size()) {
+            subsets[i] = &cluster_FOS[k][subset_orders(i, subset_idx)];
+
+            usize perm_idx = 0;
+            bool evaluation_needed, anything_changed;
+            do {
+              std::swap(perm[perm_idx], perm[std::uniform_int_distribution<usize>(perm_idx, perm.size() - 1)(rng)]);
+              usize donor_idx = cluster_donors[k][perm[perm_idx++]];
+              if (i == donor_idx) {
+                continue;
+              }
+
+              std::tie(evaluation_needed, anything_changed) =
+                  solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+
+              if (evaluation_needed) {
+                solutions_to_evaluate[0] = i;
+
+                problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
+
+                if (accept_and_update_archive(i, objective,
+                                              /* strict */ false)) {
+                  parents[i] = solutions[i];
+                  solution_changed[i] = true;
+                } else {
+                  solutions[i] = parents[i];
+                }
+              } else if (anything_changed) {
+                parents[i] = solutions[i];
+              }
+
+            } while (!evaluation_needed && perm_idx < max_donor_search_iterations);
+          }
+        }
       }
+    } else {
+      usize subset_idx = 0;
+      std::uniform_real_distribution<double> U(0.0, 1.0);
+      bool can_do_discrete_step;
+      do {
+        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
+        bool do_discrete_step;
+        if (!is_continuous || !rv_state.options.enabled) {
+          do_discrete_step = can_do_discrete_step;
+        } else if (!can_do_discrete_step) {
+          do_discrete_step = false;
+        } else {
+          double actual_evaluation_balance =
+              discrete_evaluations > 0.0
+                  ? continuous_evaluations / discrete_evaluations
+                  // since no discrete evaluations were performed we either flip a coin or force a first discrete step
+                  // if a first continuous step was already done
+                  : (continuous_evaluations > 0.0 ? 2.0 : 1.0) * options.target_continuous_to_discrete_balance;
+          // maps the fraction to a percentage such that 0.5 is the target balance,
+          // less means too many continuous evaluations, more means too many discrete evaluations
+          double p_discrete = 0.5 * actual_evaluation_balance / options.target_continuous_to_discrete_balance;
 
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
+          do_discrete_step = U(rng) < p_discrete;
+        }
 
-      u64 evals = 0;
-      // we first do the continuous step - it might not do anything (not enough active variables or already converged),
-      // so we still want to be able to do a discrete step instead
-      if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
-        // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
-        // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
-        // solution_clusters, cluster_solutions);
-        evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
-                                            cluster_solutions);
-        evaluations += evals;
-        continuous_evaluations += evals;
-      }
+        u64 evals = 0;
+        // we first do the continuous step - it might not do anything (not enough active variables or already
+        // converged), so we still want to be able to do a discrete step instead
+        if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+          // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
+          // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
+          // solution_clusters, cluster_solutions);
+          evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
+                                              cluster_solutions);
+          __assert_invariants();
+          evaluations += evals;
+          continuous_evaluations += evals;
+        }
 
-      if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
-        evals = discrete_gom_step(rng, subset_idx++);
-        evaluations += evals;
-        discrete_evaluations += evals;
-      }
+        if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
+          evals = discrete_gom_step(rng, subset_idx++);
+          __assert_invariants();
+          evaluations += evals;
+          discrete_evaluations += evals;
+        }
 
-      if (is_continuous && options.continuous_mutation_probability > 0.0) {
-        evaluations += continuous_mutation_step(rng);
-      }
+        if (is_continuous && options.continuous_mutation_probability > 0.0) {
+          evaluations += continuous_mutation_step(rng);
+          __assert_invariants();
+        }
 
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
-
-      if (should_terminate(evaluations).has_value()) {
-        return evaluations;
-      }
-    } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
+        if (should_terminate(evaluations).has_value()) {
+          return evaluations;
+        }
+      } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
+    }
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
       evaluations += gradient_step(rng);
+      __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
-      __assert_fitness_invariant(donors);
-      __assert_fitness_invariant(solutions);
-      __assert_fitness_invariant(parents);
+      __assert_invariants();
 
       // update no improvement stretches
       for (usize i = 0; i < size; i++) {
@@ -543,36 +617,94 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
-  void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
-    SolutionSet copy = set;
-    std::vector<usize> indices(copy.size());
-    std::iota(indices.begin(), indices.end(), 0);
-    problem.evaluate(rng, copy, indices);
+  void check_gom_backups(std::string_view info) {
+    assert(solutions.size() == parents.size());
+    for (usize i = 0; i < solutions.size(); i++) {
+      std::string s_discrete = log_helper(solutions[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  s_dactive = log_helper(solutions[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  s_continuous =
+                      log_helper(solutions[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  s_cactive = log_helper(solutions[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  p_discrete = log_helper(parents[i].discrete_values(), /* escape = */ false, /* indent = */ false),
+                  p_dactive = log_helper(parents[i].discrete_active(), /* escape = */ false, /* indent = */ false),
+                  p_continuous = log_helper(parents[i].continuous_values(), /* escape = */ false, /* indent = */ false),
+                  p_cactive = log_helper(parents[i].continuous_active(), /* escape = */ false, /* indent = */ false),
+                  s_quality = problem.fitness().format(solutions[i].quality()),
+                  p_quality = problem.fitness().format(parents[i].quality());
 
-    for (auto i : indices) {
-      Ordering o = problem.fitness().cmp(copy[i].quality(), set[i].quality(), std::nullopt);
-      if (o != Ordering::Equal) {
+      // we expect an exact match - after all, the values should have been copied over without a re-evaluation...
+      bool discrete_ok = s_discrete == p_discrete;
+      bool dactive_ok = s_dactive == p_dactive;
+      bool continuous_ok = s_continuous == p_continuous;
+      bool cactive_ok = s_cactive == p_cactive;
+      bool quality_ok = s_quality == p_quality;
+      if (!(discrete_ok && dactive_ok && continuous_ok && cactive_ok && quality_ok)) {
         std::println("{}", info);
-        std::println("Fitness invariant violated at index {}: ", i);
-        std::println("Expected: {} / {}", problem.format_solution(copy[i]),
-                     problem.fitness().format(copy[i].quality()));
-        std::println("Actual:   {} / {}", problem.format_solution(set[i]), problem.fitness().format(set[i].quality()));
+        std::println("GOM backup/parent does not match solution {}: ", i);
+        std::println("Discrete: ({})", discrete_ok);
+        std::println("  Solution: {}", s_discrete);
+        std::println("  Parent:   {}", p_discrete);
+        std::println("Discrete Active: ({})", dactive_ok);
+        std::println("  Solution: {}", s_dactive);
+        std::println("  Parent:   {}", p_dactive);
+        std::println("Continuous: ({})", continuous_ok);
+        std::println("  Solution: {}", s_continuous);
+        std::println("  Parent:   {}", p_continuous);
+        std::println("Continuous Active: ({})", cactive_ok);
+        std::println("  Solution: {}", s_cactive);
+        std::println("  Parent:   {}", p_cactive);
+        std::println("Quality: ({})", quality_ok);
+        std::println("  Solution: {}", s_quality);
+        std::println("  Parent:   {}", p_quality);
         std::abort();
       }
     }
   };
 
-  bool accept_and_update_archive(const SolutionBase& solution,
-                                 const SolutionBase& parent,
-                                 std::optional<usize> objective,
-                                 bool strict) {
-    Ordering o = problem.fitness().cmp(solution.quality(), parent.quality(), objective);
+  // checks that the fitness matches the solution
+  void check_fitness_invariant(Rng& rng, SolutionSet& set, std::string_view info) {
+    SolutionSet copy;
+    for (usize i = 0; i < set.size(); i++) {
+      copy.add(set[i]);
+    }
+    std::vector<usize> indices(copy.size());
+    std::iota(indices.begin(), indices.end(), 0);
+    problem.evaluate(rng, copy, indices);
+
+    for (auto i : indices) {
+      auto expected = copy[i].quality(), actual = set[i].quality();
+      bool definitely_different =
+          (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
+      if (expected.objectives.array().isFinite().all()) {
+        definitely_different |= ((expected.objectives - actual.objectives).array().abs() >= 1e-6).any();
+      }
+      definitely_different |=
+          isna(expected.constraint_value) != isna(actual.constraint_value) ||
+          (!isna(expected.constraint_value) && std::abs(expected.constraint_value - actual.constraint_value) >= 1e-6);
+      if (definitely_different) {
+        std::println("{}", info);
+        std::println("Fitness invariant violated at index {}: ", i);
+        std::println("Expected: {} / '{}'", problem.format_solution(copy[i]), problem.fitness().format(expected));
+        std::println("Actual:   {} / '{}'", problem.format_solution(set[i]), problem.fitness().format(actual));
+        std::abort();
+      }
+    }
+  };
+
+  // Returns whether a solution should be accepted or not. The parameter `strict` determines if random walks in neutral
+  // fitness landscape are allowed or not.
+  bool accept_and_update_archive(usize idx, std::optional<usize> objective, bool strict) {
+    Ordering o = problem.fitness().cmp(solutions[idx].quality(), parents[idx].quality(), objective);
 
     if (o == Ordering::Worse) {
       return false;
     }
 
-    bool non_dominated = local_archive->update(solution, strict);
+    bool non_dominated = local_archive->update(solutions[idx], strict);
+
+    if (options.strict_elite_acceptance && objective.has_value() && idx == so_elite_idx[objective.value()]) {
+      return o == Ordering::Better;
+    }
 
     // if strict: we want clear improvements,
     // i.e. better in SO or at least non-dominated in MO
@@ -610,6 +742,8 @@ class Population {
     solution_nis.clear();
     solution_nis.resize(size, 0);
 
+    so_elite_idx.resize(num_clusters);
+
     no_improvement_stretch = 0;
     no_evaluations_performed = false;
     iterations_since_last_gradient_step = 0;
@@ -630,6 +764,18 @@ class Population {
   };
 
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
+    std::vector<usize> donor_pool;
+    {
+      usize max_donor_pool_size = cluster_donors[0].size();
+      assert(max_donor_pool_size > 0);
+      for (usize k = 1; k < num_clusters; k++) {
+        assert(cluster_donors[k].size() > 0);
+        max_donor_pool_size = std::max(max_donor_pool_size, cluster_donors[k].size());
+      }
+      donor_pool.resize(max_donor_pool_size);
+      std::iota(donor_pool.begin(), donor_pool.end(), 0);
+    }
+
     solutions_to_evaluate.clear();
 
     // TODO parallel?
@@ -640,31 +786,41 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
-        // TODO permute instead of rejection sampling? Possibly having a donor search fraction could be useful (e.g. try
-        // until 0.2 * size different solutions haven't led to something to evaluate)
-        std::uniform_int_distribution<usize> donor_inidices(0, cluster_donors[k].size() - 1);
-        usize donor_idx;
-        do {
-          donor_idx = cluster_donors[k][donor_inidices(rng)];
-        } while (i == donor_idx);
-
         subsets[i] = &cluster_FOS[k][fos_idx];
-        bool evaluation_needed =
-            solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+        assert(subsets[i]->discrete.size() > 0);
 
-        if (evaluation_needed) {
-          solutions_to_evaluate.push_back(i);
-        }
+        // the library does donor search, so this also is added behind a flag to allow fair comparisons to the
+        // reference version...
+        usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * cluster_donors[k].size();
+        usize donor_idx, donor_pool_idx = 0;
+
+        bool evaluation_needed, anything_changed;
+        do {
+          // do a partial Fisher-Yates shuffle
+          std::swap(donor_pool[donor_pool_idx],
+                    donor_pool[std::uniform_int_distribution<usize>(donor_pool_idx, donor_pool.size() - 1)(rng)]);
+
+          donor_idx = donor_pool[donor_pool_idx++];
+          if (donor_idx >= cluster_donors[k].size() || i == cluster_donors[k][donor_idx]) {
+            continue;
+          }
+
+          std::tie(evaluation_needed, anything_changed) = solutions[i].inherit(
+              donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
+
+          if (evaluation_needed) {  // parent will be updated during acceptance
+            solutions_to_evaluate.push_back(i);
+          } else if (anything_changed) {  // no acceptance, parent has to be updated now
+            parents[i] = solutions[i];
+          }
+        } while (!evaluation_needed && donor_pool_idx < max_donor_search_iterations);
       }
     }
 
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     // acceptance happens after one step for all solutions rather than the
     // default of all steps for one solution after the other
@@ -673,9 +829,12 @@ class Population {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
+        solutions[i] = parents[i];
       } else {
         solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -720,13 +879,15 @@ class Population {
         if (fos_idx < cluster_FOS[k].size()) {
           subsets[i] = &cluster_FOS[k][fos_idx];
 
-          bool evaluation_needed =
+          auto [evaluation_needed, anything_changed] =
               solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
                                                                           : global_archive.random_solution(rng),
                                    *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {
+          if (evaluation_needed) {  // parent will be updated during acceptance
             eval2improve_idx.push_back(j);
             solutions_to_evaluate.push_back(i);
+          } else if (anything_changed) {  // no acceptance, so we need to update the parent
+            parents[i] = solutions[i];
           }
         }
       }
@@ -750,9 +911,13 @@ class Population {
           std::optional<usize> objective =
               k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-          if (!accept_and_update_archive(solutions[i], parents[i], objective,
+          if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
+            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS
+            //                     terms
+            //                                     // are handled better
+            solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
             parents[i] = solutions[i];
@@ -842,19 +1007,20 @@ class Population {
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     problem.evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
     std::shuffle(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), rng);
     for (usize i : solutions_to_evaluate) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *subsets[i]);
+        // solutions[i].reject(
+        //     parents[i], problem.always_inherit_continuous(),
+        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled
+        //     better
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -866,11 +1032,18 @@ class Population {
 
   u64 gradient_step(Rng& rng) {
     solutions_to_evaluate.clear();
+
+    // the mutation before doing a gradient step is decoupled from the other mutation operator
+    // - i.e. it should be possible to enable randomization before the gradient optimization without having to also
+    // enable the other mutation operator. To make this work, the continuous_mutation_probability is temporarily
+    // overwritten
+    auto backup_mutation_probability = options.continuous_mutation_probability;
+    options.continuous_mutation_probability = 1.0;
+
     // TODO parallel?
     for (usize i = 0; i < solutions.size(); i++) {
       bool evaluation_needed;
       if (options.mutate_before_gradient_step) {
-        assert(options.continuous_mutation_probability > 0.0);
         Subset _;
         mutate_continuous(rng, solutions[i], evaluation_needed, _);
       } else {
@@ -882,24 +1055,25 @@ class Population {
       }
     }
 
+    options.continuous_mutation_probability = backup_mutation_probability;
+
+    // If no solution has active continuous values, there is nothing more to do
     if (solutions_to_evaluate.empty())
       return 0;
 
-    __assert_fitness_invariant(parents);
     auto [changed_indices, evaluations] =
         problem.gradient_steps(rng, solutions, parents, solutions_to_evaluate, options.gradient_step_count);
-    __assert_fitness_invariant(solutions);
-    __assert_fitness_invariant(parents);
 
-    // yes acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
+    // acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
     for (usize i : changed_indices) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
-      if (!accept_and_update_archive(solutions[i], parents[i], objective,
+      if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
+        solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
         parents[i] = solutions[i];
@@ -933,6 +1107,8 @@ class Population {
   bool no_evaluations_performed;
   usize iterations_since_last_gradient_step;
 
+  std::vector<usize> so_elite_idx;
+
   SolutionSet donors;  // previous population
   SolutionSet solutions;
 
@@ -954,8 +1130,6 @@ class Population {
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
 };
-
-#undef __goblin_dbg_info
 
 class MixedGOMEA : public MethodBase {
  public:

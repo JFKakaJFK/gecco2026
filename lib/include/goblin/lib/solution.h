@@ -183,21 +183,23 @@ class SolutionBase {
   ///
   /// The `always_inherit_continuous` determines if the corresponding continuous
   /// variables are also inherited for discrete only subsets.
-  virtual bool inherit(const SolutionBase& donor, const Subset& subset, bool always_inherit_continuous) {
-    bool any_active_changed = false;
+  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
+                                         const Subset& subset,
+                                         bool always_inherit_continuous) {
+    bool any_active_changed = false, anything_changed = false;
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
 
-    // note: remove if costly
-    if (!is_continuous && !is_discrete) {
-      return false;
-    }
+    assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+           "All discrete indices must be valid continuous indices if the continuous "
+           "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
       for (usize di, i = 0; i < subset.discrete.size(); i++) {
         di = subset.discrete[i];
         if (discrete_values()(di) != donor.discrete_values()(di)) {
           any_active_changed |= discrete_active()(di);
+          anything_changed = true;
           discrete_values()(di) = donor.discrete_values()(di);
         }
 
@@ -205,6 +207,7 @@ class SolutionBase {
         if (!is_continuous && always_inherit_continuous) {
           if (continuous_values()(di) != donor.continuous_values()(di)) {
             any_active_changed |= continuous_active()(di);
+            anything_changed = true;
             continuous_values()(di) = donor.continuous_values()(di);
           }
         }
@@ -217,6 +220,7 @@ class SolutionBase {
         // useful...
         if (continuous_values()(ci) != donor.continuous_values()(ci)) {
           any_active_changed |= continuous_active()(ci);
+          anything_changed = true;
           continuous_values()(ci) = donor.continuous_values()(ci);
         }
       }
@@ -227,7 +231,7 @@ class SolutionBase {
     //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
     // }
 
-    return any_active_changed;
+    return std::make_tuple(any_active_changed, anything_changed);
   };
 
   virtual void reject(const SolutionBase& backup,

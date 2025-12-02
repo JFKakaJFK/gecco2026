@@ -58,7 +58,8 @@ class SRProblem : public GPInstanceBase {
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
-            CType constant_init_upper_bound = 1.0)
+            CType constant_init_upper_bound = 1.0,
+            std::optional<std::vector<CType>> target_objectives = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -126,6 +127,10 @@ class SRProblem : public GPInstanceBase {
         }
       }
     }
+
+    if (target_objectives.has_value()) {
+      register_target(target_objectives.value());
+    }
   };
 
   usize num_discrete() const override final { return ctx.num_discrete; };
@@ -153,7 +158,9 @@ class SRProblem : public GPInstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final { return ctx.const_repr != ConstantRepr::Pool; };
+  bool always_inherit_continuous() const override final {
+    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
+  };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));

@@ -240,9 +240,6 @@ Finally, there are also multiple ways to handle constants during the discrete li
 
 ### Automatically Defined Trees/Functions
 
-> [!CAUTION]
-> This was not tested yet, and currently there is no way to specify separate linkage learning for different trees!
-
 Understanding larger equations or computer programs is tractable due to decomposition - isolated concepts and subroutines can be understood separately and avoid repetition. Something along those lines is what Koza, the grandfather of GP, called automatically defined trees/functions (ADTs/ADFs). For GP-GOMEA, this idea was explored in https://arxiv.org/pdf/2505.01262v1 and is also implemented in this version. Conceptually there is a hierarchy of subtrees/subfunctions that output trees can refer to, where the hierarchy is needed to avoid cycles. Repeated calling of subfunctions can drastically increase the expression size, hence there is a `max_expression_size` parameter to limit this and allow pre-allocating buffers internally needed to store intermediate results during evaluation.
 
 ### Function class learning

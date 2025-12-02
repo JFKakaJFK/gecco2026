@@ -1,3 +1,4 @@
+#include <iostream>
 #include <functional>
 #include <print>
 
@@ -31,7 +32,7 @@ struct DummyPopulation {
         num_clusters(num_clusters),
         generation_population_sizes(generation_population_sizes) {
     if (global_archive.empty()) {
-      Rng rng(1, 0);
+      Rng rng = seeded_rng(42);
       AoSSet p;
       problem.add_random(rng, p, 1);
       global_archive.update(p[0], true);

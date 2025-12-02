@@ -21,6 +21,9 @@ add_subdirectory(extern)
 option(GOBLIN_BUILD_TESTING "Build the test targets" ON)
 option(GOBLIN_BUILD_DOCS "Build the docs" ON)
 option(GOBLIN_BUILD_PYLIB "Build the Python bindings" OFF)
+option(GOBLIN_USE_ASAN "Enable the address sanitizer if available." OFF)
+option(GOBLIN_USE_MSAN "Enable the memory sanitizer if available." OFF)
+option(GOBLIN_USE_UBSAN "Enable the undefined behaviour sanitizer if available." OFF)
 
 include(CTest)
 
@@ -32,17 +35,32 @@ if(CCACHE_PROGRAM)
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
+    # set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
     set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
 endif()
 
 include(CheckCXXCompilerFlag)
-check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
-
-if(COMPILER_SUPPORTS_ASAN)
-    set(
-    CMAKE_CXX_FLAGS_DEBUG
-    "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=address" # sanitizers don't work e.g. on arm macos
-)
+# sanitizers don't work e.g. on arm macos
+if(GOBLIN_USE_ASAN)
+    check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
+    if(COMPILER_SUPPORTS_ASAN)
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
+        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
+    endif()
+endif()
+if(GOBLIN_USE_MSAN)
+    check_cxx_compiler_flag("-fsanitize=memory" COMPILER_SUPPORTS_MSAN)
+    if(COMPILER_SUPPORTS_UBSAN)
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=memory")
+        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=memory")
+    endif()
+endif()
+if(GOBLIN_USE_UBSAN)
+    check_cxx_compiler_flag("-fsanitize=undefined" COMPILER_SUPPORTS_UBSAN)
+    if(COMPILER_SUPPORTS_UBSAN)
+        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
+        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=undefined")
+    endif()
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -61,7 +79,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3  -march=native"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
     )
 endif()
 
@@ -76,6 +94,8 @@ endif()
 add_subdirectory(lib)
 
 if(SKBUILD OR GOBLIN_BUILD_PYLIB)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
+
     include(cmake/litgen_cmake.cmake)
 
     litgen_find_nanobind()

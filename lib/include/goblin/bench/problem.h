@@ -152,6 +152,8 @@ class BenchmarkInstance final : public InstanceBase {
     }
   };
 
+  void set_init(AnyInit init) { _init = from_any_init(init); }
+
   void set_initial_bounds(std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0),
                           std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0)) {
     if (std::holds_alternative<CType>(continuous_init_lower_bound)) {

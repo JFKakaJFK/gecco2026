@@ -9,6 +9,7 @@ dependencies = [
     "matplotlib>=3.5.3",
     "numpy>=1.21.6",
     "pandas>=1.1.5",
+    "pmlb>=1.0.1.post3",
     "pygom",
     "pyyaml>=6.0.1",
     "rliable>=1.2.0",
