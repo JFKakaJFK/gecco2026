@@ -2,13 +2,15 @@
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
+#include <vector>
+
 #include "goblin/ga-gp/types.h"
 
 namespace goblin {
 
 #ifdef __CUDACC__
 __global__
-void evaluate(
+void evaluate_kernel(
     float* X, 
     float* Y, 
     NodeType* v_type, 
@@ -29,7 +31,7 @@ float compute_tree_output(
 );
 
 __global__
-void compute_mse(
+void compute_mse_kernel(
     float* se, 
     float* mse, 
     int num_solutions, 
@@ -47,6 +49,24 @@ void compute_tree_output_wrapper(
     float* result
 );
 #endif
+
+void evaluate_kernel_wrapper(
+    float* X, 
+    float* Y, 
+    NodeType* type, 
+    float* value, 
+    int solution_length, 
+    int num_solutions,
+    int num_datapoints,
+    float* se
+);
+
+void compute_mse_kernel_wrapper(
+    float* se, 
+    float* mse, 
+    int num_solutions, 
+    int num_datapoints
+);
 
 float test_compute_output_kernel(
     std::vector<float> h_X,

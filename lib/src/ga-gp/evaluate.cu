@@ -4,6 +4,8 @@
 #include "goblin/ga-gp/helper.h"
 #include "goblin/ga-gp/types.h"
 
+#define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
+
 // Defines the number of elements in the stack that holds temporary values for the current thread
 // Depends on the maximum tree depth (e.g. depth = 2 -> 7 temp values, depth = 3 -> 15 temp values)
 #define MAX_STACK_DEPTH 64
@@ -46,7 +48,7 @@ namespace goblin {
 */
 
 __global__
-void evaluate(
+void evaluate_kernel(
     float* X, 
     float* Y, 
     NodeType* v_type, 
@@ -58,8 +60,6 @@ void evaluate(
     // Calculate datapoint index
     int datapoint_index = blockIdx.y * blockDim.x + threadIdx.x;
     int solution_index = blockIdx.x;
-
-    float se = 0;
     
     if (datapoint_index < num_datapoints) {
         // Calculate offset for first element of solution
@@ -79,11 +79,11 @@ void evaluate(
 
         // Determine squared error
         float error = output - Y[datapoint_index];
-        se = error * error;
+        float se = error * error;
+
+        // Store squared error in global memory
+        result[solution_index * num_datapoints + datapoint_index] = se;
     }
-    
-    // Store squared error in global memory
-    result[solution_index * num_datapoints + datapoint_index] = se;
 };
 
 __device__
@@ -144,10 +144,8 @@ float compute_tree_output(
 }
 
 __global__
-void compute_mse(float* se, float* mse, int num_solutions, int num_datapoints) {
-    int solution_index = threadIdx.x;
-
-    float result = 0.0f;
+void compute_mse_kernel(float* se, float* mse, int num_solutions, int num_datapoints) {
+    int solution_index = blockIdx.x * blockDim.x + threadIdx.x;
 
     if (solution_index < num_solutions) {
         int se_start = solution_index * num_datapoints; 
@@ -161,10 +159,56 @@ void compute_mse(float* se, float* mse, int num_solutions, int num_datapoints) {
         }
 
         // Divide by num_datapoints to get the mean
-        result = sum / num_datapoints;
-    }
+        float result = sum / num_datapoints;
 
-    mse[solution_index] = result;
+        mse[solution_index] = result;
+    }
+}
+
+void evaluate_kernel_wrapper(
+    float* X, 
+    float* Y, 
+    NodeType* type, 
+    float* value, 
+    int solution_length, 
+    int num_solutions,
+    int num_datapoints,
+    float* se
+) {
+    // Dimensions for evaluation kernel
+    int eval_block_x = compute_block_size(num_datapoints);
+    int eval_grid_y = (num_datapoints + eval_block_x - 1) / eval_block_x;
+    
+    dim3 block(eval_block_x);
+    dim3 grid(num_solutions, eval_grid_y);
+
+    // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+    evaluate_kernel<<<grid, block>>>(X, Y, type, value, solution_length, num_datapoints, se);
+    __CHECK_CUDA_ERR__(cudaGetLastError());
+
+    // Wait until all blocks and threads are done
+    __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
+}
+
+void compute_mse_kernel_wrapper(
+    float* se, 
+    float* mse, 
+    int num_solutions, 
+    int num_datapoints
+) {
+    // Dimensions for mse kernel
+    int mse_block_x = compute_block_size(num_solutions);
+    int mse_grid_x = (num_solutions + mse_block_x - 1) / mse_block_x;
+
+    dim3 block(mse_block_x);
+    dim3 grid(mse_grid_x);
+
+    // Launch mse kernel that calculates the mse over all datapoints for each solution
+    compute_mse_kernel<<<grid, block>>>(se, mse, num_solutions, num_datapoints);
+    __CHECK_CUDA_ERR__(cudaGetLastError());
+
+    // Wait until all blocks and threads are done
+    __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
 }
 
 /* 
@@ -251,7 +295,7 @@ std::vector<float> test_evaluate_kernel(
     dim3 block(num_datapoints);
     dim3 grid(num_solutions, 1);
 
-    evaluate<<<grid, block>>>(d_X, d_Y, d_type, d_value, solution_length, num_datapoints, d_result);
+    evaluate_kernel<<<grid, block>>>(d_X, d_Y, d_type, d_value, solution_length, num_datapoints, d_result);
 
     __CHECK_CUDA_ERR__(cudaGetLastError());
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
@@ -276,7 +320,7 @@ std::vector<float> test_compute_mse_kernel(std::vector<float> se, int num_soluti
     dim3 block(num_solutions);
     dim3 grid(1);
 
-    compute_mse<<<grid, block>>>(d_se, d_mse, num_solutions, num_datapoints);
+    compute_mse_kernel<<<grid, block>>>(d_se, d_mse, num_solutions, num_datapoints);
 
     __CHECK_CUDA_ERR__(cudaGetLastError());
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
