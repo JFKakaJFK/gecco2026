@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -7372,15 +7371,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -7502,14 +7497,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -7867,9 +7859,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -7965,18 +7954,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -9268,7 +9253,6 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10277,11 +10261,14 @@ class Population {
 
   u64 gradient_step(Rng& rng) {
     solutions_to_evaluate.clear();
+
+    auto backup_mutation_probability = options.continuous_mutation_probability;
+    options.continuous_mutation_probability = 1.0;
+
     // TODO parallel?
     for (usize i = 0; i < solutions.size(); i++) {
       bool evaluation_needed;
       if (options.mutate_before_gradient_step) {
-        assert(options.continuous_mutation_probability > 0.0);
         Subset _;
         mutate_continuous(rng, solutions[i], evaluation_needed, _);
       } else {
@@ -10292,6 +10279,8 @@ class Population {
         solutions_to_evaluate.push_back(i);
       }
     }
+
+    options.continuous_mutation_probability = backup_mutation_probability;
 
     if (solutions_to_evaluate.empty())
       return 0;
@@ -10446,7 +10435,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

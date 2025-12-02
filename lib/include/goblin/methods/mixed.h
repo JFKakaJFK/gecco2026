@@ -1032,11 +1032,18 @@ class Population {
 
   u64 gradient_step(Rng& rng) {
     solutions_to_evaluate.clear();
+
+    // the mutation before doing a gradient step is decoupled from the other mutation operator
+    // - i.e. it should be possible to enable randomization before the gradient optimization without having to also
+    // enable the other mutation operator. To make this work, the continuous_mutation_probability is temporarily
+    // overwritten
+    auto backup_mutation_probability = options.continuous_mutation_probability;
+    options.continuous_mutation_probability = 1.0;
+
     // TODO parallel?
     for (usize i = 0; i < solutions.size(); i++) {
       bool evaluation_needed;
       if (options.mutate_before_gradient_step) {
-        assert(options.continuous_mutation_probability > 0.0);
         Subset _;
         mutate_continuous(rng, solutions[i], evaluation_needed, _);
       } else {
@@ -1048,13 +1055,16 @@ class Population {
       }
     }
 
+    options.continuous_mutation_probability = backup_mutation_probability;
+
+    // If no solution has active continuous values, there is nothing more to do
     if (solutions_to_evaluate.empty())
       return 0;
 
     auto [changed_indices, evaluations] =
         problem.gradient_steps(rng, solutions, parents, solutions_to_evaluate, options.gradient_step_count);
 
-    // yes acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
+    // acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
     for (usize i : changed_indices) {
       auto k = solution_clusters[i];
