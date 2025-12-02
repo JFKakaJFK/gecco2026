@@ -29,7 +29,7 @@ def plot_convergence_so(
     y_label: str = "Objective Value",
     metrics=("evaluations", "total_time_seconds", "generation"),
     metric_labels=("Evaluations", "Time [s]", "Generations"),
-    log_y: bool = False,
+    ylog: bool = False,
     show_generation_boundaries: bool = False,
     nsamples: int = 25,
     ymin: float | str | None = None,
@@ -223,6 +223,7 @@ def plot_convergence_so(
                         err_kws=dict(linewidth=0),
                         legend=None,
                         ax=ax,
+                        alpha=0.5,
                     )
 
                     if mi == 0:
@@ -260,7 +261,7 @@ def plot_convergence_so(
                     elif isinstance(ymin, (int, float)):
                         ax.set_ylim(ymax=ymax)
 
-                    if log_y:
+                    if ylog:
                         ax.set_yscale("symlog")
 
                     if log_x:

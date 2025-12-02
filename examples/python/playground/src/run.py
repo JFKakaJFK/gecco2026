@@ -20,6 +20,7 @@ def run_one(
     logfile: str,
     loginfo: list[tuple[str, str]],
     seed: int | None = None,
+    run: int | None = None,
 ):
     task = Config.eval(
         Config.load_config(task_path), ctx=dict(**vars(pygom), np=vars(np))
@@ -33,6 +34,9 @@ def run_one(
                 return
 
     try:
+        seed = task.get("seed", seed)
+        if seed and run is not None:
+            seed += run
         Tracked.run(
             instance=task["instance"],
             method=task["method"],
@@ -48,7 +52,7 @@ def run_one(
                 eval_factor=1,
                 initial_time_until_next_report=datetime.timedelta(hours=1),
             ),
-            seed=task.get("seed", seed),
+            seed=seed,
             population_size=task.get("population_size", None),
         )
     except Exception as e:
@@ -198,6 +202,7 @@ def run_tasks(
                         logfile=str(logfile),
                         loginfo=[(str(k), str(v)) for k, v in info.items()]
                         + [("run", str(run))],
+                        run=run,
                     ),
                 )
             )
