@@ -40,6 +40,7 @@ set(
     ctx_introns
     context
     helper
+    ga_sr
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
@@ -51,6 +52,7 @@ endforeach()
 
 target_compile_options(lib_test_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_sr PRIVATE -O2 -g)
+target_compile_options(lib_test_ga_sr PRIVATE -O2 -g)
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)
