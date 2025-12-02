@@ -1774,8 +1774,66 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INSTANCE_H
+  // #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
   //
+  // #ifndef _GOBLIN_GA_GP_TYPES_H
+  //
+
+
+  auto pyEnumNodeType =
+      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
+          .value("input", goblin::NodeType::Input, "")
+          .value("constant", goblin::NodeType::Constant, "")
+          .value("operator", goblin::NodeType::Operator, "")
+          .value("none", goblin::NodeType::None, "");
+
+
+  auto pyEnumOperator =
+      nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
+          .value("add", goblin::Operator::Add, "")
+          .value("sub", goblin::Operator::Sub, "")
+          .value("mul", goblin::Operator::Mul, "")
+          .value("div", goblin::Operator::Div, "");
+
+
+  m.def("val",
+      nb::overload_cast<float>(goblin::Val), nb::arg("x"));
+
+  m.def("val",
+      nb::overload_cast<int>(goblin::Val), nb::arg("x"));
+
+  m.def("idx",
+      goblin::Idx, nb::arg("idx"));
+
+  m.def("op",
+      goblin::Op, nb::arg("op"));
+  // #endif
+
+
+  m.def("evaluate_kernel_wrapper",
+      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("solution_length"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("se"));
+
+  m.def("compute_mse_kernel_wrapper",
+      goblin::compute_mse_kernel_wrapper, nb::arg("se"), nb::arg("mse"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_output_kernel",
+      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"));
+
+  m.def("test_evaluate_kernel",
+      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_mse_kernel",
+      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+  // #endif
+  // #ifndef _GOBLIN_GA_GP_SR_H
+  //
+  // #ifndef _GOBLIN_GA_GP_HELPER_H
+  //
+
+
+  m.def("compute_block_size",
+      goblin::compute_block_size, nb::arg("count"));
+  // #endif
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //
   // #ifndef _GOBLIN_GP_OPERATOR_H
@@ -1899,6 +1957,27 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSub::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
       .def("format",
           &goblin::OpSub::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSubGPU =
+      nb::class_<goblin::OpSubGPU, goblin::OperatorBase>
+          (m, "OpSubGPU", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSubGPU::min_arity)
+      .def("max_arity",
+          &goblin::OpSubGPU::max_arity)
+      .def("is_commutative",
+          &goblin::OpSubGPU::is_commutative)
+      .def("apply",
+          &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSubGPU::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSubGPU::format, nb::arg("args"))
       ;
 
 
@@ -2182,8 +2261,14 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
       .def("parent",
           &goblin::GPContext::parent, nb::arg("index"))
+      .def("debug_log_expressions",
+          &goblin::GPContext::debug_log_expressions,
+          nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
+          "A helper that prints the expression in a human readable format")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
+      .def("to_gpu_repr",
+          &goblin::GPContext::to_gpu_repr, nb::arg("solution"), nb::arg("node_type"), nb::arg("node_value"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
       .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
       .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")
@@ -2211,6 +2296,10 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this")
       ;
   // #endif
+  // #ifndef _GOBLIN_GP_INIT_H
+  //
+  // #ifndef _GOBLIN_GP_INSTANCE_H
+  //
 
 
   auto pyClassGPInstanceBase =
@@ -2221,8 +2310,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPInstanceBase::context)
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INIT_H
-  //
 
 
   auto pyClassFullInit =
@@ -2249,6 +2336,50 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def(nb::init<>()) // implicit default constructor
       .def("sample",
           &goblin::RecursiveCompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
+      ;
+  // #endif
+
+
+  auto pyClassGASRProblem =
+      nb::class_<goblin::GASRProblem, goblin::GPInstanceBase>
+          (m, "GASRProblem", "")
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, bool, std::optional<AnyInit>, CType, CType>(),
+          nb::arg("ctx"), nb::arg("x"), nb::arg("y"), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def("free_gpu",
+          &goblin::GASRProblem::free_gpu)
+      .def("num_discrete",
+          &goblin::GASRProblem::num_discrete)
+      .def("discrete_domain_sizes",
+          &goblin::GASRProblem::discrete_domain_sizes)
+      .def("num_continuous",
+          &goblin::GASRProblem::num_continuous)
+      .def("continuous_lower_bounds",
+          &goblin::GASRProblem::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::GASRProblem::continuous_upper_bounds)
+      .def("continuous_init_lower_bounds",
+          &goblin::GASRProblem::continuous_init_lower_bounds)
+      .def("continuous_init_upper_bounds",
+          &goblin::GASRProblem::continuous_init_upper_bounds)
+      .def("evaluate",
+          &goblin::GASRProblem::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+      .def("add_random",
+          &goblin::GASRProblem::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
+      .def("fitness",
+          &goblin::GASRProblem::fitness)
+      .def("archive_fitness",
+          &goblin::GASRProblem::archive_fitness)
+      .def("context",
+          &goblin::GASRProblem::context)
+      .def("log_header",
+          &goblin::GASRProblem::log_header, nb::arg("os"))
+      .def("log",
+          &goblin::GASRProblem::log, nb::arg("os"), nb::arg("solution"))
+      .def("log_solution",
+          &goblin::GASRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
+      .def_rw("ctx", &goblin::GASRProblem::ctx, "")
+      .def_rw("linear_scaling", &goblin::GASRProblem::linear_scaling, "")
+      .def_rw("objective", &goblin::GASRProblem::objective, "")
       ;
   // #endif
   // #ifndef _GOBLIN_GP_SR_H

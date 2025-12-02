@@ -528,9 +528,16 @@ class SolutionBase {
           any_active_changed |= discrete_active()(di);
           discrete_values()(di) = donor.discrete_values()(di);
         }
+
+        // yes, the indices here should be from the discrete subset!
+        if (!is_continuous && always_inherit_continuous) {
+          if (continuous_values()(di) != donor.continuous_values()(di)) {
+            any_active_changed |= continuous_active()(di);
+            continuous_values()(di) = donor.continuous_values()(di);
+          }
+        }
       }
     }
-
     if (is_continuous) {
       for (usize ci, i = 0; i < subset.continuous.size(); i++) {
         ci = subset.continuous[i];
@@ -541,10 +548,12 @@ class SolutionBase {
           continuous_values()(ci) = donor.continuous_values()(ci);
         }
       }
-    } else if (always_inherit_continuous) {
-      // yes, the indices here should be from the discrete subset!
-      continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
     }
+    // else if (always_inherit_continuous) {
+    //   // yes, the indices here should be from the discrete subset!
+    //   // TODO do I need to mark anything as active here? - i.e. if the constant is active and this leads to a change,
+    //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
+    // }
 
     return any_active_changed;
   };
@@ -2970,14 +2979,189 @@ class CompleteInit final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/instance.h included by goblin.h                                              //
+//                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GP_INSTANCE_H
-#define _GOBLIN_GP_INSTANCE_H
+#ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
+#define _GOBLIN_GA_GP_EVAL_KERNEL_H
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/types.h included by goblin/ga-gp/evaluate.h                               //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_TYPES_H
+#define _GOBLIN_GA_GP_TYPES_H
+
+
+namespace goblin {
+
+enum class NodeType : uint8_t {
+    Input,
+    Constant,
+    Operator,
+    None,
+};
+
+enum class Operator : uint8_t {
+    Add,
+    Sub,
+    Mul,
+    Div
+};
+
+constexpr NodeType C = NodeType::Constant;
+constexpr NodeType I = NodeType::Input;
+constexpr NodeType O = NodeType::Operator;
+
+constexpr float Val(float x) { return x; }
+constexpr float Val(int x) { return static_cast<float>(x); }
+constexpr float Idx(int idx) { return static_cast<float>(idx); }
+constexpr float Op(Operator op) { return static_cast<float>(op); }
+
+constexpr float Add = Op(Operator::Add);
+constexpr float Sub = Op(Operator::Sub);
+constexpr float Mul = Op(Operator::Mul);
+constexpr float Div = Op(Operator::Div);
+
+}
+
+#endif /* _GOBLIN_GA_GP_TYPES_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/evaluate.h continued                                                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace goblin {
+
+#ifdef __CUDACC__
+__global__
+void evaluate_kernel(
+    float* X,
+    float* Y,
+    NodeType* v_type,
+    float* v_value,
+    int solution_length,
+    int num_datapoints,
+    float* result
+);
+
+__device__
+float compute_tree_output(
+    float* X,
+    NodeType* type,
+    float* value,
+    int solution_length,
+    int num_datapoints,
+    int datapoint_index
+);
+
+__global__
+void compute_mse_kernel(
+    float* se,
+    float* mse,
+    int num_solutions,
+    int num_datapoints
+);
+
+__global__
+void compute_tree_output_wrapper(
+    float* X,
+    NodeType* type,
+    float* value,
+    int solution_length,
+    int num_datapoints,
+    int datapoint_index,
+    float* result
+);
+#endif
+
+void evaluate_kernel_wrapper(
+    float* X,
+    float* Y,
+    NodeType* type,
+    float* value,
+    int solution_length,
+    int num_solutions,
+    int num_datapoints,
+    float* se
+);
+
+void compute_mse_kernel_wrapper(
+    float* se,
+    float* mse,
+    int num_solutions,
+    int num_datapoints
+);
+
+float test_compute_output_kernel(
+    std::vector<float> h_X,
+    std::vector<NodeType> h_type,
+    std::vector<float> h_value,
+    int num_datapoints,
+    int datapoint_index
+);
+
+std::vector<float> test_evaluate_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<NodeType> h_type,
+    std::vector<float> h_value,
+    int num_solutions,
+    int num_datapoints
+);
+
+std::vector<float> test_compute_mse_kernel(
+    std::vector<float> se,
+    int num_solutions,
+    int num_datapoints
+);
+
+}
+
+#endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_SR_H
+#define _GOBLIN_GA_GP_SR_H
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
+//                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_HELPER_H
+#define _GOBLIN_GA_GP_HELPER_H
+
+
+// Maximum number of threads per CUDA block, currently defined as 1024,
+// which is the maximum for modern NVIDIA GPUs.
+#define MAX_THREADS_PER_BLOCK 1024
+
+namespace goblin {
+
+#ifdef __CUDACC__
+void check(cudaError_t err, char const* func, char const* file, int line);
+#endif
+
+template <typename T> T* allocate_on_gpu(size_t count);
+
+template <typename T> void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
+
+template <typename T> T* allocate_and_copy(const T* host_data, size_t count);
+
+template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count);
+
+template <typename T> void free_on_gpu(T* d_ptr);
+
+int compute_block_size(int count);
+
+};
+
+
+
+#endif /* _GOBLIN_GA_GP_HELPER_H */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/context.h included by goblin/ga-gp/ga_sr.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
@@ -3281,6 +3465,36 @@ class OpSub : public OperatorBase {
       }
       ss << ')';
     }
+    return ss.str();
+  };
+};
+
+class OpSubGPU : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 2; };
+  usize max_arity() const override final { return std::numeric_limits<usize>::max(); };
+
+  bool is_commutative() const override final {
+    // well actually: all arguments after the first one are interchangeable
+    return false;
+  };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final {
+    return;
+  };
+
+  bool has_gradient() const override final { return false; };
+  void apply_grad(Ref<Array<CType>> out,
+                  Ref<Array<CType>> d_out,
+                  CRef<Arr2D<CType>> args,
+                  CRef<Arr2D<CType>> d_args) const override final {
+    return;
+  };
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    std::ostringstream ss;
+    ss << '(' << args[0] << " - " << args[1] << ')';
+
     return ss.str();
   };
 };
@@ -3844,7 +4058,7 @@ class GPContext {
     assert(index == num_discrete);
   };
 
-  inline std::optional<DType> value2domain(usize index, DType value) {
+  inline std::optional<DType> value2domain(usize index, DType value) const {
     auto dval = _value2domain(index, value);
     if (dval < domain_sizes[index]) {
       return dval;
@@ -3852,13 +4066,67 @@ class GPContext {
     return std::nullopt;
   };
 
-  inline std::optional<usize> parent(usize index) {
+  inline std::optional<usize> parent(usize index) const {
     auto p_idx = _parent[index];
     if (p_idx < num_discrete) {
       return p_idx;
     }
     return std::nullopt;
   };
+
+  // A helper that prints the expression in a human readable format
+  void debug_log_expressions(std::ostream& os,
+                             const SolutionBase& solution,
+                             std::optional<usize> node = std::nullopt,
+                             std::string indent = "") const {
+    // abuse default parameters to not have to declare a helper...
+    if (node.has_value()) {  // a node
+      usize idx = node.value();
+
+      for (usize i = 0; i < indent.size(); i++) {
+        indent[i] = ' ';
+      }
+      indent += "└─ ";
+
+      // lookup the value of the current node
+      DType value = domain2value(idx, solution.discrete_values()(idx));
+      usize v_idx = value_idx[value];
+
+      os << indent << idx << " (V = " << static_cast<usize>(value) << ", "
+         << (solution.discrete_active()(idx) ? "active" : "inactive") << "): ";
+
+      if (value_kind[value] == ValueKind::Input) {
+        os << "Input[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+        os << "Constant[" << v_idx << "] -> " << solution.continuous_values()(ci) << "\n";
+      } else if (value_kind[value] == ValueKind::Parameter) {
+        os << "Parameter[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Arg) {
+        os << "Arg[" << v_idx << "]\n";
+      } else if (value_kind[value] == ValueKind::Subtree) {
+        os << "Fn[" << v_idx << "] -> node " << subtree_roots[v_idx] << '\n';
+      } else if (value_kind[value] == ValueKind::Operator) {
+        os << "Op[" << v_idx << "] (arity = " << std::min(children[idx].size(), value_max_arity[value]) << ")\n";
+      } else {
+        std::unreachable();
+      }
+
+      for (usize c : children[idx]) {
+        debug_log_expressions(os, solution, c, std::string{indent});
+      }
+    } else {  // the base case - just print all subtrees and outputs
+      for (usize n : subtree_roots) {
+        os << "Subtree\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      for (usize n : output_roots) {
+        os << "Output\n";
+        debug_log_expressions(os, solution, n, /* indent = */ "");
+      }
+      os << std::flush;
+    }
+  }
 
   // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
   // without references if the total number of nodes exceeds the `max_expression_size` or `std::nullopt` otherwise.
@@ -3882,13 +4150,13 @@ class GPContext {
     Array<u32> visited = Array<u32>::Zero(num_discrete);
 
     // to resolve subfunction arguments, we need to know the calling node
-    // (this stack only increases, to avoid revisiting nodes and more importantly to not invalidate stack indices)
+    // (and if that is another argument, we need the calling node of that tree and so on...)
     std::vector<usize> call_stack;
     call_stack.reserve(max_expression_size);
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
-    std::vector<std::tuple<usize, usize, bool>> node_stack;
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
 
     // for each output, walk the tree in post-order
@@ -3927,7 +4195,7 @@ class GPContext {
 
         // since this only a traversal without any evaluation, we only have to
         // check if this is an actual value or if we need to resolve arguments or other indirections
-        bool is_leaf = false;
+        bool update_tree = false;
 
         // we only need to look at the node if this is the first time we see it - in the post-order visit all we have to
         // do is add it to the tree
@@ -3947,27 +4215,58 @@ class GPContext {
             visited(idx) = 0;
 
             // we need to replace the argument with the corresponding child of the caller
-            usize calling_node = call_stack[call_stack_idx];
-            auto& cnodes = children[calling_node];
+            // and then replace the stack entry with with the actual argument
+            //
+            // but the caller might need some resolving if it is not the root of a tree
+            // (every function call adds to the call_stack, so it is not necessarily true that the previous call stack
+            // entry corresponds to the caller of the current subtree - it might just be an ancestor in the current tree
+            // that also calls another subfunction...)
 
-            // and replace the stack entry with with the actual argument
+            // get the previous call stack entry
+            usize calling_node = call_stack[call_stack_idx];
+
+            // since we move up the call chain, we need to go at least one call/frame backward, but maybe more
+            isize num_frames = 1;
+
+            // check if the calling node is an ancestor of the current node - if so, we need to move up the hierarchy to
+            // find the ancestor clostest to the root that is on the call_stack... (the first call into this subtree
+            // must have the actual caller)
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                // note: this works since we don't allow cycles by restricting the domain, i.e. there can only ever be
+                // one "active" call to this subfunction, guaranteeing that the calling node of the highest ancestor is
+                // the actual calling node.
+                calling_node = call_stack[call_stack_idx - num_frames++];
+              }
+              pidx = parent(pidx.value());
+            }
+
+            // now that we have the caller, we can finally replace the stack entry with with the actual argument
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()]);  // no self references
+
             node_stack.pop_back();
             node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                    call_stack_idx - 1,  // use the stack index of the caller
+                                    call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             visited(idx) = 0;
+            assert(root[idx] != subtree_roots[v_idx]);  // no loops allowed
             // we need to replace the actual subtree with the called subtree
 
             // first update the call stack
             call_stack.push_back(idx);
 
             // then replace the stack entry with the called subtree
-            node_stack.pop_back();
-            node_stack.emplace_back(subtree_roots[v_idx],
-                                    call_stack.size() - 1,  // a call always needs to use the top of the stack, no
-                                                            // matter where the current call_stack_idx is (!)
-                                    false);
+            std::get<2>(node_stack[node_stack_idx]) =
+                true;  // this is a reference type, but we need the post-order visit to keep the call stack in sync
+            node_stack.emplace_back(
+                subtree_roots[v_idx],
+                call_stack.size() - 1,  // a call always needs to use the top of the stack, no
+                                        // matter where the current call_stack_idx is (!there might be a chain of calls
+                                        // between the root containing the actual caller of this node!)
+                false);
           } else if (value_kind[value] == ValueKind::Operator) {
             // the operator stays on the stack, but the next visit is post-order
             std::get<2>(node_stack[node_stack_idx]) = true;
@@ -3988,12 +4287,26 @@ class GPContext {
                 solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
               }
             }
-            is_leaf = true;
+
+            // this is a leaf, so the in-order is the post-order visit
+            update_tree = true;
+            node_stack.pop_back();  // this is the post-order visit, so no need to visit again
           }
+        } else {
+            if (value_kind[value] == ValueKind::Subtree) {
+          // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
+          call_stack.pop_back();
+        } else {
+          // this is a non-reference post-order visit, so we need to update the tree
+          update_tree = true;
         }
 
-        // if this is a leaf or if this is the post-order visit, then we remove it from the stack and add it to the tree
-        if (is_post_order || is_leaf) {
+            // remove post order nodes from the stack
+            node_stack.pop_back();
+        }
+
+        // finally, if this is a leaf or if this is a non-reference post-order visit, then we add it to the tree
+        if (update_tree) {
           // Indirections like Subtree/Arg calls are not kept, so only the constants for actual "values", not
           // "references" are used
           if (const_repr == ConstantRepr::Edges) {
@@ -4002,7 +4315,6 @@ class GPContext {
             }
           }
 
-          node_stack.pop_back();
           tree.push_back(idx);
         }
       }
@@ -4185,6 +4497,81 @@ class GPContext {
     return outputs;
   }
 
+  void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
+    // TODO implement multi-output (multiple trees per solution) parsing
+
+    // initially we haven't visited anything, so we set everything to be inactive
+    solution.discrete_active().array() = false;
+    solution.continuous_active().array() = false;
+
+    std::vector<usize> stack;
+
+    // Vectors to hold temporary type and value data
+    std::vector<NodeType> temp_type;
+    std::vector<float> temp_value;
+
+    // Push root node on stack
+    stack.push_back(output_roots[0]);
+
+    while (!stack.empty()) {
+      // Pop the top node from the stack
+      usize node = stack.back();
+      stack.pop_back();
+
+      // Get the type and value for the current node
+      DType domain_value = domain2value(node, solution.discrete_values()(node));
+      usize v_idx = value_idx[domain_value];
+      enum ValueKind type = value_kind[domain_value];
+
+      // Mark current node as active
+      solution.discrete_active()(node) = true;
+
+      temp_type.push_back(static_cast<NodeType>(type));
+
+     if (type == ValueKind::Input) {
+        // Push the index of the input feature, will be used to access the input matrix on GPU
+        temp_value.push_back(v_idx);
+      } else if (type == ValueKind::Parameter) {
+        // Push the index of the parameter, will be used to access the parameter array on GPU
+        temp_value.push_back(v_idx);
+      } else if (type == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? v_idx : node;
+        // Mark node as active
+        solution.continuous_active()(ci) = true;
+        // Push the constant value, will be used directly in the evaluation on GPU
+        temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
+      } else if (type == ValueKind::Arg) {
+        // TODO implement arg handling
+        continue;
+      } else if (type == ValueKind::Subtree) {
+        // TODO implement subtree handling
+        continue;
+      } else if (type == ValueKind::Operator) {
+        // Push the operator index, will be used to apply the operator on GPU
+        temp_value.push_back(static_cast<float>(v_idx));
+
+        // Push the children of the current node onto the stack
+        usize arity = std::min(children[node].size(), operators[v_idx]->max_arity());
+        for (usize j = arity; j > 0; j--) {
+          stack.push_back(children[node][j - 1]);
+        }
+      }
+    }
+
+    // Reverse the vectors to allow forward iteration on the GPU
+    std::reverse(temp_type.begin(), temp_type.end());
+    std::reverse(temp_value.begin(), temp_value.end());
+
+    // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
+    // TODO investigate coalesced memory access
+    temp_type.resize(max_expression_size, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
+
+    // Append temporary vectors to final vectors
+    node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
+    node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
+  }
+
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices
   // template <typename Scalar>
@@ -4239,10 +4626,20 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/init.h included by goblin/ga-gp/ga_sr.h                                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GP_INIT_H
+#define _GOBLIN_GP_INIT_H
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/instance.h continued                                                         //
+//                       goblin/gp/instance.h included by goblin/gp/init.h                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GP_INSTANCE_H
+#define _GOBLIN_GP_INSTANCE_H
+
 
 namespace goblin {
 
@@ -4257,13 +4654,10 @@ class GPInstanceBase : public InstanceBase {
 
 #endif /* _GOBLIN_GP_INSTANCE_H */
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/init.h included by goblin.h                                                  //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GP_INIT_H
-#define _GOBLIN_GP_INIT_H
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/init.h continued                                                             //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace goblin {
 class FullInit final : public DiscreteInitBase {
@@ -4427,6 +4821,261 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_INIT_H */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/ga_sr.h continued                                                         //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace goblin {
+
+class GASRProblem : public GPInstanceBase {
+    public:
+        GASRProblem(
+            GPContext ctx,
+            Arr2D<CType> X,
+            Arr2D<CType> Y,
+            bool linear_scaling = false,
+            std::optional<AnyInit> init = std::nullopt,
+            CType constant_init_lower_bound = -1.0,
+            CType constant_init_upper_bound = 1.0
+        ) : ctx(ctx),
+            linear_scaling(linear_scaling),
+            objective("mse"),
+            _archive_fitness(MOFitness(1)),
+            _fitness(MOFitness(1)),
+            _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
+            _target(_archive_fitness),
+            _num_datapoints(X.rows()),
+            _solution_length(ctx.max_expression_size) {
+
+            _num_continuous = this->ctx.num_continuous;
+
+            _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
+            _continuous_lower_bounds = -_continuous_upper_bounds;
+
+            _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
+            _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
+
+            // Copy data to GPU
+            _num_solutions_allocated = 0;
+            _copy_data_to_gpu(X, Y);
+        }
+
+        ~GASRProblem() {
+            free_gpu();
+        }
+
+        void free_gpu() {
+            _free_data_on_gpu();
+            _free_solution_on_gpu();
+        }
+
+        usize num_discrete() const override final { return ctx.num_discrete; };
+        CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
+
+        usize num_continuous() const override final { return _num_continuous; };
+        CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
+        CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
+
+        CRef<Vec<CType>> continuous_init_lower_bounds() const override final { return _continuous_init_lower_bounds; };
+        CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
+
+
+        void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+            int num_solutions = indices.size();
+
+            if (num_solutions == 0) {
+                return;
+            }
+
+            // Transform solutions to GPU compatible representation
+            std::vector<NodeType> node_type;
+            std::vector<float> node_value;
+
+            for (auto i : indices) {
+                ctx.to_gpu_repr(solutions[i], node_type, node_value);
+            }
+
+            __goblin_runtime_assert(node_type.size() == node_value.size());
+
+            // Copy solution data to GPU
+            _copy_solutions_to_gpu(node_type, node_value);
+
+            // Allocate memory for se and mse on device
+            _allocate_results_on_gpu(num_solutions);
+
+            // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+            evaluate_kernel_wrapper(
+                d_X,
+                d_Y,
+                d_type,
+                d_value,
+                _solution_length,
+                num_solutions,
+                _num_datapoints,
+                d_se
+            );
+
+            // Launch mse kernel that calculates the mse over all datapoints for each solution
+            compute_mse_kernel_wrapper(
+                d_se,
+                d_mse,
+                num_solutions,
+                _num_datapoints
+            );
+
+            // Retrieve the results from the GPU
+            std::vector<float> result(num_solutions);
+            copy_from_device(result.data(), d_mse, num_solutions);
+
+            size_t k = 0;
+            for (auto i : indices) {
+                solutions[i].quality().constraint_value = 0.0;
+                solutions[i].quality().objectives(0) = result[k++];
+            }
+        }
+
+        void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+            _init->add_random(rng, *this, solutions, count);
+        };
+
+        const FitnessBase& fitness() const override final { return _fitness; };
+
+        const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
+
+        const GPContext& context() const override final { return ctx; }
+
+        void log_header(std::ostream& os) const override final {
+            os << "expressions,";
+            os << "mse_train,";
+            // for (auto& o : objectives) {
+            //     os << o << "_train,";
+            // }
+            // if (Y_test.size() > 0) {
+            // for (auto& o : objectives) {
+            //     os << o << "_test,";
+            // }
+            // }
+
+            fitness().log_header(os);
+        };
+
+        void log(std::ostream& os, SolutionBase& solution) override final {
+            os << '"';
+            log_solution(os, solution);
+            os << "\",";
+            for (usize i = 0; i < 1; i++) {
+                os << solution.quality().objectives(i) << ',';
+            }
+            // if (Y_test.size() > 0) {
+            // // TODO cache this -> solution gets optional second quality?
+            // // Then again, one can just call predict using the SKlearn regressor for actual use
+            // // and for all other experiments the overhead is not an issue yet
+            // Quality q_test = archive_fitness().worst();
+            // Array<ScalarType> params;  // TODO fit FC params...
+            // eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
+            // for (usize i = 0; i < objectives.size(); i++) {
+            //     os << q_test.objectives(i) << ',';
+            // }
+            // }
+
+            fitness().log(os, solution.quality());
+        };
+
+        void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
+            auto exprs = ctx.to_sympy(solution);
+            for (usize i = 0; i < exprs.size(); i++) {
+                if (i > 0) {
+                    os << " , ";
+                }
+                if (linear_scaling) {
+                    os << solution.continuous_values()(ctx.num_continuous + 2 * i) << " + ("
+                    << solution.continuous_values()(ctx.num_continuous + 2 * i + 1) << " * (" << exprs[i] << "))";
+                } else {
+                    os << exprs[i];
+                }
+            }
+        };
+
+        GPContext ctx;
+        bool linear_scaling;
+        std::string objective;
+
+
+    private:
+        void _copy_data_to_gpu(Arr2D<CType> X, Arr2D<CType> Y) {
+            // Convert double to float
+            Arr2D<float> X32 = X.cast<float>();
+            Arr2D<float> Y32 = Y.cast<float>();
+
+            d_X = allocate_and_copy(X32.data(), X32.size());
+            d_Y = allocate_and_copy(Y32.data(), Y32.size());
+        }
+
+        void _copy_solutions_to_gpu(std::vector<NodeType> node_type, std::vector<float> node_value) {
+            size_t num_solutions = node_type.size();
+
+            // Allocate memory if not allocated or size has increased
+            if (_num_solutions_allocated < num_solutions) {
+                // Free existing memory
+                _free_solution_on_gpu();
+
+                // Allocate and copy new solution data
+                d_type = allocate_and_copy(node_type.data(), node_type.size());
+                d_value = allocate_and_copy(node_value.data(), node_value.size());
+                _num_solutions_allocated = num_solutions;
+            } else {
+                copy_to_gpu(d_type, node_type.data(), node_type.size());
+                copy_to_gpu(d_value, node_value.data(), node_value.size());
+            }
+        }
+
+        void _allocate_results_on_gpu(size_t num_solutions) {
+            d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
+            d_mse = allocate_on_gpu<float>(num_solutions);
+        }
+
+        void _free_data_on_gpu() {
+            free_on_gpu(d_X);
+            free_on_gpu(d_Y);
+        }
+
+        void _free_solution_on_gpu() {
+            free_on_gpu(d_type);
+            free_on_gpu(d_value);
+            _num_solutions_allocated = 0;
+        }
+
+        // bool _solution_allocated;
+        size_t _num_solutions_allocated;
+
+        // GPU pointers
+        float* d_X = nullptr;
+        float* d_Y = nullptr;
+        NodeType* d_type = nullptr;
+        float* d_value = nullptr;
+        float* d_se = nullptr;
+        float* d_mse = nullptr;
+
+        MOFitness _archive_fitness;
+        MOFitness _fitness;
+        std::shared_ptr<InitBase> _init;
+        UnboundedArchive _target;
+        usize _num_continuous;
+        Vec<CType> _continuous_lower_bounds;
+        Vec<CType> _continuous_upper_bounds;
+        Vec<CType> _continuous_init_lower_bounds;
+        Vec<CType> _continuous_init_upper_bounds;
+
+        int _num_datapoints;
+        int _solution_length;
+};
+
+}
+
+
+#endif /* _GOBLIN_GA_GP_SR_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h included by goblin.h                                                    //
