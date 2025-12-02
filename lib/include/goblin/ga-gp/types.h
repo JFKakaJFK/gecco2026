@@ -2,15 +2,17 @@
 #ifndef _GOBLIN_GA_GP_TYPES_H
 #define _GOBLIN_GA_GP_TYPES_H
 
+#include <cstdint>
+
 namespace goblin {
 
-enum class NodeType : u_int8_t {
+enum class NodeType : uint8_t {
     Input,
     Constant,
     Operator,
 };
 
-enum class Operator : u_int8_t {
+enum class Operator : uint8_t {
     Add,
     Sub,
     Mul,
