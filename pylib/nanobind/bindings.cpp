@@ -1784,8 +1784,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
           .value("input", goblin::NodeType::Input, "")
           .value("constant", goblin::NodeType::Constant, "")
-          .value("operator", goblin::NodeType::Operator, "")
-          .value("none", goblin::NodeType::None, "");
+          .value("operator", goblin::NodeType::Operator, "");
 
 
   auto pyEnumOperator =

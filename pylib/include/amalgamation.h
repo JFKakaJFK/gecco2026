@@ -2999,7 +2999,6 @@ enum class NodeType : uint8_t {
     Input,
     Constant,
     Operator,
-    None,
 };
 
 enum class Operator : uint8_t {
