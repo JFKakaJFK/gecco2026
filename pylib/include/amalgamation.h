@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -5499,6 +5500,30 @@ class GASRProblem : public GPInstanceBase {
 
         const GPContext& context() const override final { return ctx; }
 
+        void register_target(CRefS<Vec<CType>> target_objectives) {
+            _target.clear();
+            Solution s(
+                archive_fitness().worst(),
+                num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+                num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+            s.quality().objectives = target_objectives;
+            __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
+            s.quality().constraint_value = 0.0;
+            _target.update(s, false);
+        };
+
+        void register_target(std::vector<CType> target_objectives) {
+            register_target(Eigen::Map<Vec<CType>>(target_objectives.data(), target_objectives.size()));
+        };
+
+        bool target_reached(const ArchiveBase& archive) const override final {
+            if (!_target.empty()) {
+            return archive.covers(_target);
+            } else {
+            return false;
+            }
+        };
+
         void log_header(std::ostream& os) const override final {
             os << "expressions,";
             os << "mse_train,";
@@ -5674,8 +5699,7 @@ class SRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt
-  )
+            std::optional<std::vector<CType>> target_objectives = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -5744,8 +5768,8 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    if(target_objectives.has_value()){
-        register_target(target_objectives.value());
+    if (target_objectives.has_value()) {
+      register_target(target_objectives.value());
     }
   };
 
@@ -7931,11 +7955,15 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -8057,11 +8085,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8419,6 +8450,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8514,14 +8548,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9813,6 +9851,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10822,6 +10861,10 @@ class Population {
   u64 gradient_step(Rng& rng) {
     solutions_to_evaluate.clear();
 
+    // the mutation before doing a gradient step is decoupled from the other mutation operator
+    // - i.e. it should be possible to enable randomization before the gradient optimization without having to also
+    // enable the other mutation operator. To make this work, the continuous_mutation_probability is temporarily
+    // overwritten
     auto backup_mutation_probability = options.continuous_mutation_probability;
     options.continuous_mutation_probability = 1.0;
 
@@ -10842,13 +10885,14 @@ class Population {
 
     options.continuous_mutation_probability = backup_mutation_probability;
 
+    // If no solution has active continuous values, there is nothing more to do
     if (solutions_to_evaluate.empty())
       return 0;
 
     auto [changed_indices, evaluations] =
         problem.gradient_steps(rng, solutions, parents, solutions_to_evaluate, options.gradient_step_count);
 
-    // yes acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
+    // acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
     for (usize i : changed_indices) {
       auto k = solution_clusters[i];
@@ -10995,6 +11039,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

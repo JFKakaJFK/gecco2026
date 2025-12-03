@@ -131,6 +131,30 @@ class GASRProblem : public GPInstanceBase {
 
         const GPContext& context() const override final { return ctx; }
 
+        void register_target(CRefS<Vec<CType>> target_objectives) {
+            _target.clear();
+            Solution s(
+                archive_fitness().worst(),
+                num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+                num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+            s.quality().objectives = target_objectives;
+            __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
+            s.quality().constraint_value = 0.0;
+            _target.update(s, false);
+        };
+
+        void register_target(std::vector<CType> target_objectives) {
+            register_target(Eigen::Map<Vec<CType>>(target_objectives.data(), target_objectives.size()));
+        };
+
+        bool target_reached(const ArchiveBase& archive) const override final {
+            if (!_target.empty()) {
+            return archive.covers(_target);
+            } else {
+            return false;
+            }
+        };
+
         void log_header(std::ostream& os) const override final {
             os << "expressions,";
             os << "mse_train,";

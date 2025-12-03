@@ -54,6 +54,9 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
     CHECK_NE(sset[1].quality().objectives(0), doctest::Approx(0.0));
 
     sset.clear();
+
+    CType vtr = 1e-8;
+    gasrp.register_target({vtr});
     Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
 
     auto gomea = MixedGOMEA(
@@ -65,8 +68,8 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
     auto [front, status] = Tracked::run(gasrp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
 
     // std::println("Status {}: {}", format_as(status), gasrp1.format_solution(front.so_solution(0)));
-    INFO("Status: ", format_as(status), "\t|\tSolution: ", gasrp.format_solution(front.so_solution(0)));
+    INFO("Status: ", format_as(status), "\t|\tSolution: ", gasrp.format_solution(front->so_solution(0)));
 
-    CHECK_EQ(status, TerminationStatus::Converged);
-    CHECK_EQ(front.empty(), false);
+    CHECK_EQ(status, TerminationStatus::TargetReached);
+    CHECK_EQ(front->empty(), false);
 }

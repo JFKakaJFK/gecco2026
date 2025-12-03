@@ -2218,6 +2218,17 @@ class GASRProblem(GPInstanceBase):
     def context(self) -> GPContext:
         pass
 
+    @overload
+    def register_target(self, target_objectives: CRefS[Vec[float]]) -> None:
+        pass
+
+    @overload
+    def register_target(self, target_objectives: List[float]) -> None:
+        pass
+
+    def target_reached(self, archive: ArchiveBase) -> bool:
+        pass
+
     def log_header(self, os: io.IOBase) -> None:
         pass
 
