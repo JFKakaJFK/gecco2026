@@ -1294,7 +1294,7 @@ def op(op: Operator) -> float:
 def evaluate_kernel_wrapper(
     x: float,
     y: float,
-    type: NodeType,
+    type: float,
     value: float,
     solution_length: int,
     num_solutions: int,
@@ -1310,7 +1310,7 @@ def compute_mse_kernel_wrapper(
 
 def test_compute_output_kernel(
     h_x: List[float],
-    h_type: List[NodeType],
+    h_type: List[float],
     h_value: List[float],
     num_datapoints: int,
     datapoint_index: int,
@@ -1320,7 +1320,7 @@ def test_compute_output_kernel(
 def test_evaluate_kernel(
     h_x: List[float],
     h_y: List[float],
-    h_type: List[NodeType],
+    h_type: List[float],
     h_value: List[float],
     num_solutions: int,
     num_datapoints: int,
@@ -2039,7 +2039,7 @@ class GPContext:
         pass
 
     def to_gpu_repr(
-        self, solution: SolutionBase, node_type: List[NodeType], node_value: List[float]
+        self, solution: SolutionBase, node_type: List[float], node_value: List[float]
     ) -> None:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter

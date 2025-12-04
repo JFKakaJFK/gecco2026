@@ -3519,7 +3519,7 @@ class CompleteInit final : public DiscreteInitBase {
 
 namespace goblin {
 
-enum class NodeType : uint8_t {
+enum class NodeType : u_int8_t {
     Input,
     Constant,
     Operator,
@@ -3532,9 +3532,9 @@ enum class Operator : uint8_t {
     Div
 };
 
-constexpr NodeType C = NodeType::Constant;
-constexpr NodeType I = NodeType::Input;
-constexpr NodeType O = NodeType::Operator;
+constexpr float C = static_cast<float>(NodeType::Constant);
+constexpr float I = static_cast<float>(NodeType::Input);
+constexpr float O = static_cast<float>(NodeType::Operator);
 
 constexpr float Val(float x) { return x; }
 constexpr float Val(int x) { return static_cast<float>(x); }
@@ -3561,7 +3561,7 @@ __global__
 void evaluate_kernel(
     float* X,
     float* Y,
-    NodeType* v_type,
+    float* v_type,
     float* v_value,
     int solution_length,
     int num_datapoints,
@@ -3571,7 +3571,7 @@ void evaluate_kernel(
 __device__
 float compute_tree_output(
     float* X,
-    NodeType* type,
+    float* type,
     float* value,
     int solution_length,
     int num_datapoints,
@@ -3589,7 +3589,7 @@ void compute_mse_kernel(
 __global__
 void compute_tree_output_wrapper(
     float* X,
-    NodeType* type,
+    float* type,
     float* value,
     int solution_length,
     int num_datapoints,
@@ -3601,7 +3601,7 @@ void compute_tree_output_wrapper(
 void evaluate_kernel_wrapper(
     float* X,
     float* Y,
-    NodeType* type,
+    float* type,
     float* value,
     int solution_length,
     int num_solutions,
@@ -3618,7 +3618,7 @@ void compute_mse_kernel_wrapper(
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
     int num_datapoints,
     int datapoint_index
@@ -3627,7 +3627,7 @@ float test_compute_output_kernel(
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
     int num_solutions,
     int num_datapoints
@@ -5051,7 +5051,7 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
+  void to_gpu_repr(SolutionBase& solution, std::vector<float>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
 
     // initially we haven't visited anything, so we set everything to be inactive
@@ -5061,7 +5061,7 @@ class GPContext {
     std::vector<usize> stack;
 
     // Vectors to hold temporary type and value data
-    std::vector<NodeType> temp_type;
+    std::vector<float> temp_type;
     std::vector<float> temp_value;
 
     // Push root node on stack
@@ -5080,7 +5080,7 @@ class GPContext {
       // Mark current node as active
       solution.discrete_active()(node) = true;
 
-      temp_type.push_back(static_cast<NodeType>(type));
+      temp_type.push_back(static_cast<float>(type));
 
      if (type == ValueKind::Input) {
         // Push the index of the input feature, will be used to access the input matrix on GPU
@@ -5118,7 +5118,7 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO investigate coalesced memory access
-    temp_type.resize(max_expression_size, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
@@ -5446,7 +5446,7 @@ class GASRProblem : public GPInstanceBase {
             }
 
             // Transform solutions to GPU compatible representation
-            std::vector<NodeType> node_type;
+            std::vector<float> node_type;
             std::vector<float> node_value;
 
             for (auto i : indices) {
@@ -5574,7 +5574,7 @@ class GASRProblem : public GPInstanceBase {
             d_Y = allocate_and_copy(Y32.data(), Y32.size());
         }
 
-        void _copy_solutions_to_gpu(std::vector<NodeType> node_type, std::vector<float> node_value) {
+        void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
             size_t num_solutions = node_type.size();
 
             // Allocate memory if not allocated or size has increased
@@ -5624,7 +5624,7 @@ class GASRProblem : public GPInstanceBase {
         // GPU pointers
         float* d_X = nullptr;
         float* d_Y = nullptr;
-        NodeType* d_type = nullptr;
+        float* d_type = nullptr;
         float* d_value = nullptr;
         float* d_se = nullptr;
         float* d_mse = nullptr;
