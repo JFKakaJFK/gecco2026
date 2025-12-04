@@ -5412,8 +5412,9 @@ class GASRProblem : public GPInstanceBase {
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
             // Copy data to GPU
-            _num_solutions_allocated = 0;
             _copy_data_to_gpu(X, Y);
+            _num_solutions_allocated = 0;
+            _num_results_allocated = 0;
         }
 
         ~GASRProblem() {
@@ -5423,6 +5424,7 @@ class GASRProblem : public GPInstanceBase {
         void free_gpu() {
             _free_data_on_gpu();
             _free_solution_on_gpu();
+            _free_results_on_gpu();
         }
 
         usize num_discrete() const override final { return ctx.num_discrete; };
@@ -5527,14 +5529,6 @@ class GASRProblem : public GPInstanceBase {
         void log_header(std::ostream& os) const override final {
             os << "expressions,";
             os << "mse_train,";
-            // for (auto& o : objectives) {
-            //     os << o << "_train,";
-            // }
-            // if (Y_test.size() > 0) {
-            // for (auto& o : objectives) {
-            //     os << o << "_test,";
-            // }
-            // }
 
             fitness().log_header(os);
         };
@@ -5546,17 +5540,6 @@ class GASRProblem : public GPInstanceBase {
             for (usize i = 0; i < 1; i++) {
                 os << solution.quality().objectives(i) << ',';
             }
-            // if (Y_test.size() > 0) {
-            // // TODO cache this -> solution gets optional second quality?
-            // // Then again, one can just call predict using the SKlearn regressor for actual use
-            // // and for all other experiments the overhead is not an issue yet
-            // Quality q_test = archive_fitness().worst();
-            // Array<ScalarType> params;  // TODO fit FC params...
-            // eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
-            // for (usize i = 0; i < objectives.size(); i++) {
-            //     os << q_test.objectives(i) << ',';
-            // }
-            // }
 
             fitness().log(os, solution.quality());
         };
@@ -5610,8 +5593,11 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _allocate_results_on_gpu(size_t num_solutions) {
-            d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
-            d_mse = allocate_on_gpu<float>(num_solutions);
+            if (_num_results_allocated < num_solutions) {
+                d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
+                d_mse = allocate_on_gpu<float>(num_solutions);
+                _num_results_allocated = num_solutions;
+            }
         }
 
         void _free_data_on_gpu() {
@@ -5625,8 +5611,15 @@ class GASRProblem : public GPInstanceBase {
             _num_solutions_allocated = 0;
         }
 
+        void _free_results_on_gpu() {
+            free_on_gpu(d_se);
+            free_on_gpu(d_mse);
+            _num_results_allocated = 0;
+        }
+
         // bool _solution_allocated;
         size_t _num_solutions_allocated;
+        size_t _num_results_allocated;
 
         // GPU pointers
         float* d_X = nullptr;
