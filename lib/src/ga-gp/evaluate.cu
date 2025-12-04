@@ -9,6 +9,7 @@
 // Defines the number of elements in the stack that holds temporary values for the current thread
 // Depends on the maximum tree depth (e.g. depth = 2 -> 7 temp values, depth = 3 -> 15 temp values)
 #define MAX_STACK_DEPTH 64
+#define MAX_NUM_NODES 64
 
 namespace goblin {
 
@@ -49,10 +50,10 @@ namespace goblin {
 
 __global__
 void evaluate_kernel(
-    float* X, 
-    float* Y, 
-    NodeType* v_type, 
-    float* v_value, 
+    float* __restrict__ X, 
+    float* __restrict__ Y, 
+    float* __restrict__ v_type, 
+    float* __restrict__ v_value, 
     int solution_length, 
     int num_datapoints,
     float* result
@@ -60,18 +61,28 @@ void evaluate_kernel(
     // Calculate datapoint index
     int datapoint_index = blockIdx.y * blockDim.x + threadIdx.x;
     int solution_index = blockIdx.x;
-    
+
+    // Calculate offset for solution
+    int solution_offset = solution_index * solution_length;
+
+    // Layout shared memory
+    __shared__ float shmem[MAX_NUM_NODES * 2];
+    float* sh_type = (float*)shmem;
+    float* sh_value = (float*)(sh_type + solution_length);
+
+    // Cooperative load of solution data into shared memory
+    for (int i = threadIdx.x; i < solution_length; i+= blockDim.x) {
+        sh_type[i] = v_type[solution_offset + i];
+        sh_value[i] = v_value[solution_offset + i];
+    }
+
+    __syncthreads();
+
+    // Early exit if thread does not correspond to datapoint
     if (datapoint_index < num_datapoints) {
-        // Calculate offset for first element of solution
-        int solution_offset = solution_index * solution_length;
-
-        // Pointers to first element of solution
-        NodeType* type = v_type + solution_offset;
-        float* value = v_value + solution_offset;
-
         // Compute output of solution
         float output = compute_tree_output(
-            X, type, value, 
+            X, sh_type, sh_value, 
             solution_length, 
             num_datapoints, 
             datapoint_index
@@ -88,9 +99,9 @@ void evaluate_kernel(
 
 __device__
 float compute_tree_output(
-    float* X, 
-    NodeType* type,
-    float* value,
+    float* __restrict__ X, 
+    float* __restrict__ type,
+    float* __restrict__ value,
     int solution_length,
     int num_datapoints,
     int datapoint_index
@@ -168,7 +179,7 @@ void compute_mse_kernel(float* se, float* mse, int num_solutions, int num_datapo
 void evaluate_kernel_wrapper(
     float* X, 
     float* Y, 
-    NodeType* type, 
+    float* type, 
     float* value, 
     int solution_length, 
     int num_solutions,
@@ -220,7 +231,7 @@ void compute_mse_kernel_wrapper(
 __global__
 void compute_tree_output_wrapper(
     float* X, 
-    NodeType* type,
+    float* type,
     float* value,
     int solution_length,
     int num_datapoints,
@@ -239,7 +250,7 @@ void compute_tree_output_wrapper(
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
     int num_datapoints,
     int datapoint_index
@@ -249,7 +260,7 @@ float test_compute_output_kernel(
 
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
-    NodeType* d_type = allocate_and_copy(h_type.data(), solution_length);
+    float* d_type = allocate_and_copy(h_type.data(), solution_length);
     float* d_value = allocate_and_copy(h_value.data(), solution_length);
 
     // Allocate memory
@@ -276,7 +287,7 @@ float test_compute_output_kernel(
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X, 
     std::vector<float> h_Y, 
-    std::vector<NodeType> h_type, 
+    std::vector<float> h_type, 
     std::vector<float> h_value, 
     int num_solutions,
     int num_datapoints
@@ -286,7 +297,7 @@ std::vector<float> test_evaluate_kernel(
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
     float* d_Y = allocate_and_copy(h_Y.data(), h_Y.size());
-    NodeType* d_type = allocate_and_copy(h_type.data(), h_type.size());
+    float* d_type = allocate_and_copy(h_type.data(), h_type.size());
     float* d_value = allocate_and_copy(h_value.data(), h_value.size());
 
     // Allocate memory

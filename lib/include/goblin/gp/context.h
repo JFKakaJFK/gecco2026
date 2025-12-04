@@ -657,7 +657,7 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
+  void to_gpu_repr(SolutionBase& solution, std::vector<float>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
 
     // initially we haven't visited anything, so we set everything to be inactive
@@ -667,7 +667,7 @@ class GPContext {
     std::vector<usize> stack;
 
     // Vectors to hold temporary type and value data
-    std::vector<NodeType> temp_type;
+    std::vector<float> temp_type;
     std::vector<float> temp_value;
 
     // Push root node on stack
@@ -686,7 +686,7 @@ class GPContext {
       // Mark current node as active
       solution.discrete_active()(node) = true;
 
-      temp_type.push_back(static_cast<NodeType>(type));  
+      temp_type.push_back(static_cast<float>(type));  
 
      if (type == ValueKind::Input) {
         // Push the index of the input feature, will be used to access the input matrix on GPU
@@ -724,7 +724,7 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO investigate coalesced memory access
-    temp_type.resize(max_expression_size, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors

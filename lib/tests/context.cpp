@@ -30,14 +30,14 @@ TEST_CASE("goblin::gp::context") {
                  Vec<CType>::Zero(srp.num_continuous()));
     sset.add(s);
 
-    std::vector<NodeType> node_type; 
+    std::vector<float> node_type; 
     std::vector<float> node_value;
 
-    std::vector<NodeType> expected_node_type;
+    std::vector<float> expected_node_type;
     std::vector<float> expected_node_value;
 
-    auto expect = [&](std::vector<NodeType> types, std::vector<float> values) {
-        types.resize(ctx.num_discrete, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    auto expect = [&](std::vector<float> types, std::vector<float> values) {
+        types.resize(ctx.num_discrete, std::numeric_limits<float>::max());
         values.resize(ctx.num_discrete, std::numeric_limits<float>::max());
         expected_node_type = std::move(types);
         expected_node_value = std::move(values);

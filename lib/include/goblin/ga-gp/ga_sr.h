@@ -77,7 +77,7 @@ class GASRProblem : public GPInstanceBase {
             }
 
             // Transform solutions to GPU compatible representation
-            std::vector<NodeType> node_type;
+            std::vector<float> node_type;
             std::vector<float> node_value;
 
             for (auto i : indices) {
@@ -205,7 +205,7 @@ class GASRProblem : public GPInstanceBase {
             d_Y = allocate_and_copy(Y32.data(), Y32.size());
         }
 
-        void _copy_solutions_to_gpu(std::vector<NodeType> node_type, std::vector<float> node_value) {
+        void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
             size_t num_solutions = node_type.size();
             
             // Allocate memory if not allocated or size has increased
@@ -255,7 +255,7 @@ class GASRProblem : public GPInstanceBase {
         // GPU pointers
         float* d_X = nullptr;
         float* d_Y = nullptr;
-        NodeType* d_type = nullptr;
+        float* d_type = nullptr;
         float* d_value = nullptr;
         float* d_se = nullptr;
         float* d_mse = nullptr;

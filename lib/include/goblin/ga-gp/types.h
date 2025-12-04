@@ -6,7 +6,7 @@
 
 namespace goblin {
 
-enum class NodeType : uint8_t {
+enum class NodeType : u_int8_t {
     Input,
     Constant,
     Operator,
@@ -19,9 +19,9 @@ enum class Operator : uint8_t {
     Div
 };
 
-constexpr NodeType C = NodeType::Constant;
-constexpr NodeType I = NodeType::Input;
-constexpr NodeType O = NodeType::Operator;
+constexpr float C = static_cast<float>(NodeType::Constant);
+constexpr float I = static_cast<float>(NodeType::Input);
+constexpr float O = static_cast<float>(NodeType::Operator);
 
 constexpr float Val(float x) { return x; }
 constexpr float Val(int x) { return static_cast<float>(x); }

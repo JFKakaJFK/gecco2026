@@ -11,7 +11,7 @@ using namespace goblin;
 TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
     struct TestCase {
         std::vector<float> X;
-        std::vector<NodeType> type;
+        std::vector<float> type;
         std::vector<float> value;
         int num_datapoints;
         int datapoint_index;
@@ -93,7 +93,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
-        std::vector<NodeType> type;
+        std::vector<float> type;
         std::vector<float> value;
         int num_solutions;
         int num_datapoints;
