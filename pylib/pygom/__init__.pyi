@@ -2168,12 +2168,17 @@ class GASRProblem(GPInstanceBase):
     def __init__(
         self,
         ctx: GPContext,
-        x: Arr2D[float],
-        y: Arr2D[float],
+        x_train: Arr2D[float],
+        y_train: Arr2D[float],
+        x_test: Optional[Arr2D[float]] = None,
+        y_test: Optional[Arr2D[float]] = None,
+        objectives: Union[str, List[str]] = "mse",
+        objectives_to_optimize: Optional[int] = None,
         linear_scaling: bool = False,
         init: Optional[AnyInit] = None,
         constant_init_lower_bound: float = -1.0,
         constant_init_upper_bound: float = 1.0,
+        target_objectives: Optional[List[float]] = None,
     ) -> None:
         pass
 

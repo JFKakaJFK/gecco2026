@@ -2355,8 +2355,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassGASRProblem =
       nb::class_<goblin::GASRProblem, goblin::GPInstanceBase>
           (m, "GASRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, bool, std::optional<AnyInit>, CType, CType>(),
-          nb::arg("ctx"), nb::arg("x"), nb::arg("y"), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>>(),
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none())
       .def("free_gpu",
           &goblin::GASRProblem::free_gpu)
       .def("num_discrete",

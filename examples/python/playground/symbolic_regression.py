@@ -183,11 +183,11 @@ def problems(rng):
                     for operator_set, operators in [
                         (
                             "small",
-                            [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
+                            [c.OpAdd(), c.OpSubGPU(), c.OpMul(), c.OpDiv()],
                         )
                     ]:
                         for constant_representation in ["none", "ercs"]:
-                            for linear_scaling in [False, True]:
+                            for linear_scaling in [False]: # True
                                 for init_name, init in [("HalfHalf", c.HalfHalfInit())]:
                                     ctx = c.GPContext(
                                         num_inputs=int(X_fold.shape[1]),
@@ -196,44 +196,65 @@ def problems(rng):
                                         constant_representation=constant_representation,
                                     )
 
+                                    for device in ["CPU", "GPU"]:
+
                                     # for multiple different functions, branch here
                                     # for device in ["CPU"]:
                                     # and then in the plotting code use the method query to append e.g. device to the method name -> comparison plots are in the same plt.Axes object
 
-                                    yield (
-                                        dict(
-                                            problem_name=problem,
-                                            fold=fold,
-                                            num_rows=num_rows,
-                                            template_height=height,
-                                            operator_set=operator_set,
-                                            constant_representation=constant_representation,
-                                            linear_scaling=linear_scaling,
-                                            init_name=init_name,
-                                            # this just attaches columns to the logfile (the load_results function allows specifying a type, but duckdb's defaults are usually pretty good) - so it can be abused to pass information to the plotting code (totally cursed yes, but in my experience way better than matching and expanding the logs afterwards)
-                                            var_y=float(np.var(y_fold[:, 0])),
-                                            var_y_test=float(np.var(y_test)),
-                                        ),
-                                        c.SRProblem(
-                                            ctx,
-                                            x_train=c.np.load(str(X_path.absolute())),
-                                            y_train=c.np.load(str(y_path.absolute())),
-                                            x_test=c.np.load(
-                                                str(X_test_path.absolute())
+                                        yield (
+                                            dict(
+                                                problem_name=problem,
+                                                fold=fold,
+                                                num_rows=num_rows,
+                                                template_height=height,
+                                                operator_set=operator_set,
+                                                constant_representation=constant_representation,
+                                                linear_scaling=linear_scaling,
+                                                init_name=init_name,
+                                                device=device,
+                                                # this just attaches columns to the logfile (the load_results function allows specifying a type, but duckdb's defaults are usually pretty good) - so it can be abused to pass information to the plotting code (totally cursed yes, but in my experience way better than matching and expanding the logs afterwards)
+                                                var_y=float(np.var(y_fold[:, 0])),
+                                                var_y_test=float(np.var(y_test)),
                                             ),
-                                            y_test=c.np.load(
-                                                str(y_test_path.absolute())
+                                            c.SRProblem(
+                                                ctx,
+                                                x_train=c.np.load(str(X_path.absolute())),
+                                                y_train=c.np.load(str(y_path.absolute())),
+                                                x_test=c.np.load(
+                                                    str(X_test_path.absolute())
+                                                ),
+                                                y_test=c.np.load(
+                                                    str(y_test_path.absolute())
+                                                ),
+                                                objectives="mse",
+                                                linear_scaling=linear_scaling,
+                                                init=init,
+                                                constant_init_lower_bound=-10.0,
+                                                constant_init_upper_bound=10.0,
+                                                target_objectives=[
+                                                    1e-6
+                                                ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
+                                            ) if device == "CPU" else c.GASRProblem(
+                                                ctx,
+                                                c.np.load(str(X_path.absolute())),
+                                                c.np.load(str(y_path.absolute())),
+                                                # x_test=c.np.load(
+                                                #     str(X_test_path.absolute())
+                                                # ),
+                                                # y_test=c.np.load(
+                                                #     str(y_test_path.absolute())
+                                                # ),
+                                                # objectives="mse",
+                                                linear_scaling=linear_scaling,
+                                                init=init,
+                                                constant_init_lower_bound=-10.0,
+                                                constant_init_upper_bound=10.0,
+                                                target_objectives=[
+                                                    1e-6
+                                                ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
                                             ),
-                                            objectives="mse",
-                                            linear_scaling=linear_scaling,
-                                            init=init,
-                                            constant_init_lower_bound=-10.0,
-                                            constant_init_upper_bound=10.0,
-                                            target_objectives=[
-                                                1e-6
-                                            ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
-                                        ),
-                                    )
+                                        )
 
 
 def methods(rng, info):
@@ -405,7 +426,7 @@ def main():
         OUTPUT_DIRECTORY,
         all_jobs(),
         num_repeats=REPEATS_PER_FOLD,
-        # clean=True,
+        clean=True,
         # limit=1,
         # max_workers=1,
     )
@@ -442,7 +463,7 @@ def main():
             unit_query="format('{}.{}', fold, run)",
             # metrics=["evaluations / dims::DOUBLE", "total_time_seconds / dims::DOUBLE"],
             # metric_labels=[r"$\frac{Evaluations}{Dimensions}$", "Time/Dimensions [s]"],
-            modifier_query="[num_rows::STRING, template_height::STRING,operator_set::STRING,constant_representation::STRING,IF(linear_scaling, 'Yes', 'No')::STRING,init_name::STRING]",
+            modifier_query="[num_rows::STRING, template_height::STRING,operator_set::STRING,constant_representation::STRING,IF(linear_scaling, 'Yes', 'No')::STRING,init_name::STRING,device::STRING]",
             modifier_labels=[
                 "#Rows",
                 "Height",
@@ -450,6 +471,7 @@ def main():
                 "Constants",
                 "LS",
                 "Init",
+                "Device",
             ],
             # show_generation_boundaries=True,
             nsamples=100,

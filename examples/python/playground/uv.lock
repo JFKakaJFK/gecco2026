@@ -2707,6 +2707,7 @@ dev = [
     { name = "litgen", marker = "python_full_version >= '3.10'", git = "https://github.com/pthom/litgen" },
     { name = "mypy", specifier = ">=1.4.1" },
     { name = "nanobind", specifier = ">=2.9.1" },
+    { name = "pmlb", specifier = ">=1.0.1.post3" },
     { name = "pre-commit", specifier = ">=2.21.0" },
     { name = "pytest", specifier = ">=7.4.4" },
     { name = "ruff", specifier = ">=0.12.11" },

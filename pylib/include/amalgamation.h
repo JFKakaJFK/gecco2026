@@ -5387,12 +5387,17 @@ class GASRProblem : public GPInstanceBase {
     public:
         GASRProblem(
             GPContext ctx,
-            Arr2D<CType> X,
-            Arr2D<CType> Y,
+            Arr2D<CType> X_train,
+            Arr2D<CType> Y_train,
+            std::optional<Arr2D<CType>> X_test = std::nullopt,
+            std::optional<Arr2D<CType>> Y_test = std::nullopt,
+            std::variant<std::string, std::vector<std::string>> objectives = "mse",
+            std::optional<usize> objectives_to_optimize = std::nullopt,
             bool linear_scaling = false,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
-            CType constant_init_upper_bound = 1.0
+            CType constant_init_upper_bound = 1.0,
+            std::optional<std::vector<CType>> target_objectives = std::nullopt
         ) : ctx(ctx),
             linear_scaling(linear_scaling),
             objective("mse"),
@@ -5400,7 +5405,7 @@ class GASRProblem : public GPInstanceBase {
             _fitness(MOFitness(1)),
             _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
             _target(_archive_fitness),
-            _num_datapoints(X.rows()),
+            _num_datapoints(X_train.rows()),
             _solution_length(ctx.max_expression_size) {
 
             _num_continuous = this->ctx.num_continuous;
@@ -5411,8 +5416,12 @@ class GASRProblem : public GPInstanceBase {
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
+            if (target_objectives.has_value()) {
+                register_target(target_objectives.value());
+            }
+
             // Copy data to GPU
-            _copy_data_to_gpu(X, Y);
+            _copy_data_to_gpu(X_train, Y_train);
             _num_solutions_allocated = 0;
             _num_results_allocated = 0;
         }
