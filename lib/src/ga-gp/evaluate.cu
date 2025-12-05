@@ -76,9 +76,9 @@ void evaluate_kernel(
         sh_value[i] = v_value[solution_offset + i];
     }
 
+    // Ensure all solution data has been copied into shared memory
     __syncthreads();
 
-    // Early exit if thread does not correspond to datapoint
     if (datapoint_index < num_datapoints) {
         // Compute output of solution
         float output = compute_tree_output(
