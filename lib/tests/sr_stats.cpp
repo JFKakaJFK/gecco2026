@@ -44,7 +44,7 @@ TEST_CASE("goblin::gp::sr_stats") {
     SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"mse"}, /* objectives_to_optimize = */ std::nullopt,
                   /* linear_scaling = */ true);
 
-    Budget budget(/* max_evaluations = */ 500000);
+    Budget budget(/* max_evaluations = */ 100000);
 
     auto gomea = MixedGOMEA(
     PopulationOptions{

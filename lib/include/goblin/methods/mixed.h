@@ -1273,6 +1273,8 @@ class Population {
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
   std::vector<FosStats> fos_stats;
+
+  u64 generation;
   u64 generations_until_next_fos_log;
 };
 
