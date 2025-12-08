@@ -34,11 +34,15 @@ type ?= Debug
 configure:
 	@cmake -S . -B build -DCMAKE_BUILD_TYPE=$(type) -G $(GENERATOR)
 
+target ?=
 build: configure
-	@cmake --build build -j$(NPROC)
+	@if [ -z "$(target)" ]; then \
+	    cmake --build build -j$(NPROC); \
+	else \
+		cmake --build build -j$(NPROC) --target $(target); \
+	fi
 
 test: build
-	# @CTEST_OUTPUT_ON_FAILURE=1 cmake --build build --target test -- -j$(NPROC)
 	@cd build && ctest -j$(NPROC) --output-on-failure
 
 fmt:
