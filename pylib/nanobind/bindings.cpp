@@ -3141,7 +3141,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassPopulationOptions =
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
+      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       {
           new (self) goblin::PopulationOptions();  // placement new
           auto r_ctor_ = self;
@@ -3153,6 +3153,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
           r_ctor_->donor_search_proportion = donor_search_proportion;
           r_ctor_->subset_logfile = subset_logfile;
+          r_ctor_->generation = generation;
           r_ctor_->initial_generations_until_next_fos_log = initial_generations_until_next_fos_log;
           r_ctor_->fos_log_factor = fos_log_factor;
           r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
@@ -3163,7 +3164,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->gradient_step_frequency = gradient_step_frequency;
           r_ctor_->gradient_step_count = gradient_step_count;
       },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
+      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
       .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
@@ -3173,6 +3174,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance, "should the single objective elite solutions accept only strict improvements or also neutral changes?")
       .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion, "the fraction of solutions to consider before skipping an evaluation in case")
       .def_rw("subset_logfile", &goblin::PopulationOptions::subset_logfile, "")
+      .def_rw("generation", &goblin::PopulationOptions::generation, "")
       .def_rw("initial_generations_until_next_fos_log", &goblin::PopulationOptions::initial_generations_until_next_fos_log, "> 0, subset stats are logged every")
       .def_rw("fos_log_factor", &goblin::PopulationOptions::fos_log_factor, "1 is linear, 2 is exponential log spacing")
       .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")

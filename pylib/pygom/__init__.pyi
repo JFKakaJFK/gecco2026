@@ -3869,6 +3869,7 @@ class PopulationOptions:
     )
     # of all subset variables being identical between the solution and donor
     subset_logfile: Optional[str] = None
+    generation: int = 0
     initial_generations_until_next_fos_log: int = (
         5  # > 0, subset stats are logged every
     )
@@ -3893,6 +3894,7 @@ class PopulationOptions:
         strict_elite_acceptance: bool = False,
         donor_search_proportion: float = 0.0,
         subset_logfile: Optional[str] = None,
+        generation: int = 0,
         initial_generations_until_next_fos_log: int = 5,
         fos_log_factor: int = 2,
         continuous_mutation_probability: float = 0.0,

@@ -10,7 +10,7 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import run_tasks
 
-REPEATS_PER_DATASET = 25
+REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
@@ -22,8 +22,8 @@ PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    max_evaluations=int(1e4)
-    # max_evaluations=int(1e7)
+    # max_evaluations=int(1e4)
+    max_evaluations=int(1e7)
 )
 
 
@@ -35,10 +35,10 @@ def problems(rng):
         "Airfoil",
         "Bike Sharing",
         "Breast Cancer",
-        # "Concrete Compressive Strength",
-        # "Energy Cooling",
-        # "Energy Heating",
-        # "Yacht Hydrodynamics",
+        "Concrete Compressive Strength",
+        "Energy Cooling",
+        "Energy Heating",
+        "Yacht Hydrodynamics",
     ]:
         for (
             fold,

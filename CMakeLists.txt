@@ -93,6 +93,7 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
 
     include(cmake/litgen_cmake.cmake)
 
+    set(NB_USE_SUBMODULE_DEPS ON) # hotfix for https://github.com/wjakob/nanobind/issues/1237
     litgen_find_nanobind()
     set(python_module_sources
         pylib/nanobind/module.cpp                  # The python module entry point
