@@ -9692,6 +9692,7 @@ struct PopulationOptions {
   double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
                                          // of all subset variables being identical between the solution and donor
   std::optional<std::string> subset_logfile = std::nullopt;
+  u64 generation = 0;
   u64 initial_generations_until_next_fos_log = 5;  // > 0, subset stats are logged every
   u64 fos_log_factor = 2;                          // 1 is linear, 2 is exponential log spacing
 
@@ -9963,6 +9964,8 @@ class Population {
     }
     no_evaluations_performed = evaluations == 0;
 
+    generation++;
+
     return evaluations;
   };
 
@@ -10027,10 +10030,9 @@ class Population {
 
  private:
   void log_subset_statistics() {
-    assert(generations_until_next_fos_log == 0);
     generations_until_next_fos_log =
         options.initial_generations_until_next_fos_log > 0 ? options.initial_generations_until_next_fos_log : 1;
-    options.initial_generations_until_next_fos_log = generations_until_next_fos_log * options.fos_log_factor;
+    options.initial_generations_until_next_fos_log *= options.fos_log_factor;
 
     AoSSet s;
     s.add(local_archive->so_solution(0));  // solution does not matter, but there should only be a single one...
@@ -10075,11 +10077,7 @@ class Population {
     if (cluster_FOS.empty() || !discrete_model->is_static()) {
       cluster_FOS.clear();
 
-      if (generations_until_next_fos_log > 0) {
-        generations_until_next_fos_log--;
-      }
-
-      if (options.subset_logfile.has_value() && generations_until_next_fos_log == 0) {
+      if (options.subset_logfile.has_value() && generation == generations_until_next_fos_log) {
         Mat<CType> sim(0, 0);
         if (auto p = dynamic_cast<LinkageTreeFOS*>(discrete_model.get()); p != nullptr) {
           p->register_similarity_callback([&sim](const auto& s) { sim = s; });
@@ -10276,6 +10274,7 @@ class Population {
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
 
+    generation = 0;
     generations_until_next_fos_log = 0;
 
     return solutions_to_evaluate.size();
@@ -10670,6 +10669,8 @@ class Population {
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
   std::vector<FosStats> fos_stats;
+
+  u64 generation;
   u64 generations_until_next_fos_log;
 };
 
