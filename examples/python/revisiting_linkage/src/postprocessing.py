@@ -15,6 +15,7 @@ def load_results(
     parquet_dir: pathlib.Path | str | None = None,
     preprocess: bool = False,
     partition_cols: list[str] = ("method_name", "problem_name"),
+    conn: duckdb.DuckDBPyConnection | None = None,
 ) -> duckdb.DuckDBPyConnection:
     """Returns a view over all results, you should close the database."""
     if isinstance(result_dirs, (str, pathlib.Path)):
@@ -60,7 +61,9 @@ def load_results(
             break
     assert columns_checked, "No results found"
 
-    conn = duckdb.connect(":memory:")
+    if conn is None:
+        conn = duckdb.connect(":memory:")
+
     if parquet_dir is None:
         conn.sql(
             f"""

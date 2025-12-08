@@ -202,7 +202,7 @@ def main():
     run_tasks(
         LOG_DIR,
         all_tasks(),
-        clean=True,
+        # clean=True,
         # limit=1,
         # max_workers=1,
     )
@@ -212,8 +212,32 @@ def main():
         file_pattern="stats",
         # enable pre-processing the .csv logs into .parquet files
         preprocess=True,
-        parquet_dir=PARQUET_DIR,
+        parquet_dir=PARQUET_DIR / "stats",
     ) as conn:
+        load_results(
+            LOG_DIR,
+            file_pattern="subset_stats",
+            table_name="fos_stats",
+            types=dict(
+                population_size="INTEGER",
+                cluster="INTEGER",
+                similarity="DOUBLE[][]",
+                subsets="UINTEGER[][]",
+                usage_count="UINTEGER[]",
+                evaluation_rate="DOUBLE[]",
+                acceptance_rate="DOUBLE[]",
+                avg_improvement="DOUBLE[]",
+                solution_activation_rate="DOUBLE[]",
+                variables_activation_rate="DOUBLE[]",
+            ),
+            # enable pre-processing the .csv logs into .parquet files
+            preprocess=True,
+            parquet_dir=PARQUET_DIR / "fos_stats",
+            conn=conn,
+        )
+
+        print(conn.sql("DESCRIBE fos_stats;"))
+
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         plot_convergence_so(
             PLOT_DIR / "convergence",
