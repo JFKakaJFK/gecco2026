@@ -10,6 +10,8 @@ import numpy as np
 def load_results(
     result_dirs: Iterable[pathlib.Path | str] | pathlib.Path | str,
     types: dict | None = None,
+    file_pattern: str = "*",
+    table_name: str = "results",
     parquet_dir: pathlib.Path | str | None = None,
     preprocess: bool = False,
     partition_cols: list[str] = ("method_name", "problem_name"),
@@ -41,7 +43,7 @@ def load_results(
     columns_checked = False
     for d in result_dirs:
         dp = pathlib.Path(d)
-        for fn in dp.rglob("*.csv"):
+        for fn in dp.rglob(f"{file_pattern}.csv"):
             with open(fn, "r") as f:
                 try:
                     columns = f.readline().split(",")
@@ -63,9 +65,9 @@ def load_results(
         conn.sql(
             f"""
             SET preserve_insertion_order=false;
-            CREATE OR REPLACE VIEW results AS SELECT * FROM
+            CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM
                 read_csv(
-                    {str([f"{d}/**/*.csv" for d in result_dirs])}, union_by_name=true,
+                    {str([f"{d}/**/{file_pattern}.csv" for d in result_dirs])}, union_by_name=true,
                     types={{{", ".join(f"'{k}': '{v}'" for k, v in types.items())}}}
                 )
             """
@@ -80,7 +82,7 @@ def load_results(
                 COPY (
                     SELECT * FROM
                         read_csv(
-                            {str([f"{d}/**/*.csv" for d in result_dirs])}, union_by_name=true,
+                            {str([f"{d}/**/{file_pattern}.csv" for d in result_dirs])}, union_by_name=true,
                             types={{{", ".join(f"'{k}': '{v}'" for k, v in types.items())}}}
                         )
                     )
@@ -93,7 +95,7 @@ def load_results(
         )
         conn.sql(
             f"""
-            CREATE OR REPLACE VIEW results AS SELECT * FROM
+            CREATE OR REPLACE VIEW {table_name} AS SELECT * FROM
                 read_parquet(
                     '{f"{str(parquet_dir)}/**/*.parquet"}',
                     union_by_name=true,

@@ -209,6 +209,7 @@ def main():
 
     with load_results(
         LOG_DIR,
+        file_pattern="stats",
         # enable pre-processing the .csv logs into .parquet files
         preprocess=True,
         parquet_dir=PARQUET_DIR,
