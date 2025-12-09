@@ -197,3 +197,8 @@ _skbuild/
 cmake-build-*/
 .idea/
 .DS_Store
+
+plmb_cache/
+experiments/results/
+*.nsys-rep
+*.sqlite
