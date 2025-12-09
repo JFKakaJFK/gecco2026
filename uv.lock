@@ -1482,8 +1482,8 @@ wheels = [
 
 [[package]]
 name = "pmlb"
-version = "1.0.1.post3"
-source = { registry = "https://pypi.org/simple" }
+version = "1.0.2a0"
+source = { git = "https://github.com/EpistasisLab/pmlb.git?rev=master#7c1f4bdc00136dc2e55c87fa6b8ba6e8af6d1a68" }
 dependencies = [
     { name = "pandas", version = "1.1.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.7.1'" },
     { name = "pandas", version = "1.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.7.1' and python_full_version < '3.8'" },
@@ -1494,10 +1494,10 @@ dependencies = [
     { name = "requests", version = "2.31.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8'" },
     { name = "requests", version = "2.32.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.8.*'" },
     { name = "requests", version = "2.32.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.9'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/6a/db/187a171dd5fcf2fca01691c79f83533e08cdeed2d8abd8a404698aaea31b/pmlb-1.0.1.post3.tar.gz", hash = "sha256:ff1195abf0b54f2e06ea8f30c95a746e6561c5d5e01ef83950158cb7ff58a315", size = 11041, upload-time = "2020-09-10T22:53:54.901Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/e3/6e6d1cb10b6736ceb1693f6ad8f8f979a3c8a101e9b20c4fd1a1613d3a76/pmlb-1.0.1.post3-py3-none-any.whl", hash = "sha256:bca36d3cc749978d986c86728387ac35785e41c3e22d5ae508b665903b3360aa", size = 19490, upload-time = "2020-09-10T22:53:53.883Z" },
+    { name = "scikit-learn", version = "1.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.8'" },
+    { name = "scikit-learn", version = "1.3.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.8.*'" },
+    { name = "scikit-learn", version = "1.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.9.*'" },
+    { name = "scikit-learn", version = "1.7.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
 ]
 
 [[package]]
@@ -1634,7 +1634,7 @@ dev = [
     { name = "litgen", marker = "python_full_version >= '3.10'", git = "https://github.com/pthom/litgen" },
     { name = "mypy", specifier = ">=1.4.1" },
     { name = "nanobind", specifier = ">=2.9.1" },
-    { name = "pmlb", specifier = ">=1.0.1.post3" },
+    { name = "pmlb", git = "https://github.com/EpistasisLab/pmlb.git?rev=master" },
     { name = "pre-commit", specifier = ">=2.21.0" },
     { name = "pytest", specifier = ">=7.4.4" },
     { name = "ruff", specifier = ">=0.12.11" },
