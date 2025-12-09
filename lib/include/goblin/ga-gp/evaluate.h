@@ -91,6 +91,16 @@ std::vector<float> test_compute_mse_kernel(
     int num_datapoints
 );
 
+void test_evaluate_and_mse_kernel(
+    std::vector<float> h_X, 
+    std::vector<float> h_Y, 
+    std::vector<float> h_type, 
+    std::vector<float> h_value, 
+    int num_solutions,
+    int num_datapoints,
+    float* result
+);
+
 }
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
