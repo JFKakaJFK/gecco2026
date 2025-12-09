@@ -1332,6 +1332,17 @@ def test_compute_mse_kernel(
 ) -> List[float]:
     pass
 
+def test_evaluate_and_mse_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    result: float,
+) -> None:
+    pass
+
 # #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
