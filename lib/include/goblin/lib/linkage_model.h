@@ -1,5 +1,4 @@
 #pragma once
-#include <optional>
 #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
 #define _GOBLIN_LIB_LINKAGE_MODEL_H
 
@@ -7,7 +6,6 @@
 #include <cstdint>
 #include <print>
 #include <span>
-#include <stdexcept>
 #include <string_view>
 #include <vector>
 #include <random>
@@ -130,7 +128,7 @@ class FullFOS final : public LinkageModelBase {
 
 class LinkageTreeFOS final : public LinkageModelBase {
  public:
-  LinkageTreeFOS(std::string metric = "mi",  // nmi, pearson_r2, random
+  LinkageTreeFOS(std::string metric = "mi",  // nmi, pearson_r2
 
                  /// The intron strategy determines how knowledge about inactive variables
                  /// is used to modify the estimation of linkage when learning the linkage
@@ -151,41 +149,19 @@ class LinkageTreeFOS final : public LinkageModelBase {
                                                                   // continuous/mixed
                  std::optional<usize> max_subset_size = std::nullopt,
                  bool normalize_initial_linkage_bias = false,
-                 std::optional<Subset> subset = std::nullopt,
-                 std::optional<Mat<CType>> custom_similarity = std::nullopt,
-                 std::optional<CType> eta_custom_similarity = std::nullopt,
-                 std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback = std::nullopt,
-                 bool freeze = false)
-      : subset(subset.value_or(Subset{})),
-        custom_similarity(custom_similarity),
-        similarity_callback(similarity_callback),
-        metric(metric),
+                 std::optional<Subset> subset = std::nullopt)
+      : metric(metric),
         intron_strategy(intron_strategy),
+        merge_continuous(merge_continuous),
         num_continuous_bins(num_continuous_bins),
         filter_parent_threshold(filter_parent_threshold),
         filter_children_threshold(filter_children_threshold),
         filter_root(filter_root),
         max_subset_size(max_subset_size),
-        eta_custom_similarity(eta_custom_similarity),
-        merge_continuous(merge_continuous),
         normalize_initial_linkage_bias(normalize_initial_linkage_bias),
-        freeze(freeze) {
-    if (this->eta_custom_similarity.has_value()) {
-      if (!(0.0 < this->eta_custom_similarity.value() && this->eta_custom_similarity.value() < 1.0)) {
-        throw std::runtime_error("Invalid eta_custom_similarity, must be in (0, 1) if provided.");
-      }
-    }
-  };
+        subset(subset.value_or(Subset{})) {};
 
   std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<LinkageTreeFOS>(*this); }
-
-  bool is_static() const override final { return freeze; };
-
-  void register_similarity_callback(std::function<void(CRef<Mat<CType>>)>&& similarity_callback) {
-    this->similarity_callback = similarity_callback;
-  };
-
-  void unregister_similarity_callback() { this->similarity_callback = std::nullopt; };
 
   void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
     if (subset.empty()) {
@@ -200,15 +176,6 @@ class LinkageTreeFOS final : public LinkageModelBase {
         for (usize i = 0; i < problem.num_continuous(); i++) {
           subset.continuous.push_back(i);
         }
-      }
-    }
-
-    if (custom_similarity.has_value()) {
-      if (static_cast<usize>(custom_similarity.value().rows()) != subset.size() ||
-          static_cast<usize>(custom_similarity.value().cols()) != subset.size()) {
-        throw std::runtime_error(
-            "Custom similarity matrix has invalid dimensions, expected a square matrix corresponding to the subset "
-            "size.");
       }
     }
 
@@ -255,22 +222,11 @@ class LinkageTreeFOS final : public LinkageModelBase {
     const bool is_continuous = subset.continuous.size() > 0;
 
     Mat<CType> similarity;
-    if (custom_similarity.has_value() && !eta_custom_similarity.has_value()) {
-      similarity = custom_similarity.value();
-    } else if (metric == "random") {
-      similarity.resize(l, l);
-      std::uniform_real_distribution<CType> U(0.0, 1.0);
-      for (isize i = 0; i < l; i++) {
-        for (isize j = 0; j <= i; j++) {
-          similarity(i, j) = U(rng);
-          similarity(j, i) = similarity(i, j);
-        }
-      }
-    } else if (is_discrete && is_continuous) {
+    if (is_discrete && is_continuous) {
       similarity.resize(l, l);
       // No mixed subset learning (yet?)
       // https://homepages.cwi.nl/~bosman/publications/2016_learningandexploiting.pdf
-      throw std::runtime_error("Mixed linkage learning isn't supported.");
+      __goblin_runtime_assert(false);
     } else if (is_discrete) {
       similarity = estimate_entropy(problem, solutions, indices, subset.discrete, intron_strategy, merge_continuous,
                                     num_continuous_bins);
@@ -280,14 +236,11 @@ class LinkageTreeFOS final : public LinkageModelBase {
       entropy2similarity(similarity);
     } else if (is_continuous) {
       similarity.resize(l, l);
-      if (!covariance.has_value()) {
-        throw std::runtime_error("Continuous linkage learning requires a covariance matrix.");
-      } else if (covariance.value().get().rows() != l || covariance.value().get().cols() != l) {
-        throw std::runtime_error(
-            "Covariance matrix has invalid dimensions, expected a square matrix corresponding to the subset size.");
-      }
+      __goblin_runtime_assert(covariance.has_value());
 
       Mat<CType> cov = covariance.value();
+      __goblin_runtime_assert(cov.rows() == l);
+      __goblin_runtime_assert(cov.cols() == l);
       for (isize i = 0; i < l; i++) {
         for (isize j = 0; j < i; j++) {
           // https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
@@ -297,16 +250,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
         }
       }
     } else {
-      throw std::runtime_error("Unknown subset of variables to learn a LT for.");
-    }
-
-    if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
-      similarity = (1.0 - eta_custom_similarity.value()) * similarity +
-                   eta_custom_similarity.value() * custom_similarity.value();
-    }
-
-    if (similarity_callback.has_value()) {
-      similarity_callback.value()(similarity);
+      __goblin_runtime_assert(false && "Unknown subset of variables to learn a LT for.");
     }
     return similarity;
   };
@@ -669,20 +613,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
     }
   };
 
-  Subset subset;
-  std::optional<Mat<CType>> custom_similarity;
-  std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback;
   std::string metric;
   std::string intron_strategy;
+  bool merge_continuous;
   std::optional<usize> num_continuous_bins;
   std::optional<CType> filter_parent_threshold;
   std::optional<CType> filter_children_threshold;
   std::optional<bool> filter_root;
   std::optional<usize> max_subset_size;
-  std::optional<CType> eta_custom_similarity;
-  bool merge_continuous;
   bool normalize_initial_linkage_bias;
-  bool freeze;
+  Subset subset;
 
   Mat<CType> initial_bias_adjustments;
 };

@@ -1,6 +1,9 @@
-#pragma once
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
+
+#include "fitness.h"
+#include "types.h"
+#pragma once
 
 #include <algorithm>
 #include <cassert>
