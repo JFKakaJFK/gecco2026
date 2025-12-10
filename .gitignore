@@ -198,8 +198,14 @@ cmake-build-*/
 .idea/
 .DS_Store
 
+# Dataset cache
 plmb_cache/
+
+# Experiment results and plots
 experiments/results/
+examples/python/playground/plots/symbolic_regression_convergence/
+
+# NSight Compute and Nsight Systems files
 *.ncu-rep
 *.nsys-rep
 *.html
