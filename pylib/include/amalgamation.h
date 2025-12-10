@@ -3557,6 +3557,81 @@ constexpr float Div = Op(Operator::Div);
 namespace goblin {
 
 #ifdef __CUDACC__
+
+/**
+ * @brief Evaluate all solutions over all datapoints and compute per-datapoint squared error.
+ *
+ * This kernel evaluates a population of solutions (assumed to be expression trees) over
+ * a dataset and computes the squared error for every (solution, datapoint) pair.
+ *
+ * The CUDA grid is structured as follows:
+ * - gridDim.x -> number of solutions
+ * - gridDim.y -> tiles of datapoints
+ * The CUDA blocks are structured as follows:
+ * - blockDim.x -> number of datapoints in a tile
+ *
+ * This structure guarantees that all threads in a block evaluate the same solution, thus
+ * minimizing divergence.
+ *
+ * Each active thread within a block evaluates at most one datapoint.
+ *
+ * ---
+ * ### Shared memory
+ * For efficient reading of solution data, the solution data is read from global memory and
+ * written into shared memory. Shared memory is available to all threads in a block, so every
+ * thread has access to the solution data. The type and value arrays are laid out consecutively
+ * and are loaded using a cooperative strided load. This means that all threads in the block
+ * (if required) cooperate with the load, hiding some of the read latencies. Only after all data
+ * is loaded are threads allowed to continue.
+ *
+ * ---
+ * ### Output and squared error computation
+ * Every thread that corresponds to a datapoint computes the output of the solution using
+ * the 'compute_tree_output' device function. The output is then used to compute the squared error
+ * and the final result is stored in global memory.
+ *
+ * ---
+ * ### Thread mapping
+ * - solution_index  = blockIdx.x
+ * - datapoint_index = blockIdx.y * blockDim.x + threadIdx.x
+ *
+ * ---
+ * ### Global Memory Access Pattern
+ * Input layout:
+ *   v_type  [solution_index * solution_length + i]
+ *   v_value [solution_index * solution_length + i]
+ *   X       [datapoint_index]
+ *   Y       [datapoint_index]
+ *
+ * Output layout:
+ *   result[solution_index * num_datapoints + datapoint_index]
+ *
+ * ---
+ * ### Assumptions & Requirements
+ * - Grid dimensions must be:
+ *     grid.x = num_solutions
+ *     grid.y = ceil(num_datapoints / blockDim.x)
+ * - X must be in column-major order: X[datapoint + feature * num_datapoints].
+ * - MAX_NUM_NODES must be >= solution_length.
+ * - MAX_STACK_DEPTH must be >= maximum expression evaluation stack depth.
+ * - Only binary operators (arity = 2) are currently supported.
+ * - Division by zero returns 0.0f.
+ * - v_type encodes NodeType as float-cast enum values.
+ * - v_value encodes:
+ *     - input indices for Input nodes,
+ *     - literal values for Constant nodes,
+ *     - operator IDs (float-cast enums) for Operator nodes.
+ * - result must have size >= num_solutions * num_datapoints.
+ *
+ * ---
+ * @param[in]  X               Flattened input datapoint array of length num_datapoints * num_features (column-major)
+ * @param[in]  Y               Target output array of length num_datapoints
+ * @param[in]  v_type          Concatenated node-type arrays for all solutions
+ * @param[in]  v_value         Concatenated node-value arrays for all solutions
+ * @param[in]  solution_length Number of nodes per solution
+ * @param[in]  num_datapoints  Total number of datapoints
+ * @param[out] result          Output squared-error matrix of size [num_solutions * num_datapoints]
+ */
 __global__
 void evaluate_kernel(
     float* X,
@@ -3568,6 +3643,73 @@ void evaluate_kernel(
     float* result
 );
 
+/**
+ * @brief Evaluate a single solution (expression tree) for one datapoint.
+ *
+ * This device function interprets a linearized expression tree in postfix
+ * (stack-based) form and evaluates it for a single datapoint. The evaluation
+ * is performed using a per-thread stack stored in registers/local memory.
+ *
+ * Each node in the solution is processed sequentially from left to right:
+ *  - Input nodes push a feature value from X onto the stack.
+ *  - Constant nodes push a literal value onto the stack.
+ *  - Operator nodes pop operands from the stack, apply a binary operation,
+ *    and push the result back onto the stack.
+ *
+ * At the end of evaluation, the final result is expected to be at the top
+ * of the stack and is returned to the caller.
+ *
+ * ---
+ * ### Expression Encoding
+ * The solution is encoded using two parallel arrays:
+ *  - type[i]  -> NodeType enum value (cast to float)
+ *  - value[i] -> Node-dependent value:
+ *      - Input:    feature index
+ *      - Constant: literal floating-point constant
+ *      - Operator: Operator enum value (cast to float)
+ *
+ * ---
+ * ### Memory Access Pattern
+ * Feature values are loaded from X using (column-major) layout:
+ *
+ *     X[input_index][datapoint] = X[datapoint + input_index * num_datapoints]
+ *
+ * This guarantees coalesced memory access when consecutive threads evaluate
+ * the same feature across consecutive datapoints.
+ *
+ * ---
+ * ### Operator Semantics
+ * Currently supported binary operators:
+ *  - Add: a + b
+ *  - Sub: a - b
+ *  - Mul: a * b
+ *  - Div: (b == 0) ? 0 : a / b
+ *
+ * Division by zero deterministically returns 0.0f.
+ *
+ * ---
+ * ### Stack Semantics & Safety
+ * - A fixed-size per-thread evaluation stack of size MAX_STACK_DEPTH is used.
+ * - The stack pointer grows upward on push and downward on pop.
+ * - The expression is assumed to be well-formed:
+ *     - No stack underflow during operator evaluation.
+ *     - Exactly one final value remains on the stack at termination.
+ * - MAX_STACK_DEPTH must be >= the maximum runtime stack depth of any solution.
+ *
+ * ---
+ * @param[in] X               Column-major input data array of size num_features * num_datapoints
+ * @param[in] type            Node type array for a single solution
+ * @param[in] value           Node value array for a single solution
+ * @param[in] solution_length Number of nodes in the solution
+ * @param[in] num_datapoints  Total number of datapoints (used for addressing X)
+ * @param[in] datapoint_index Index of the datapoint to evaluate
+ *
+ * @return Evaluated floating-point output of the solution for the given datapoint
+ *
+ * @note This function performs no bounds checking on the evaluation stack.
+ *       Incorrectly encoded expressions may cause stack underflow, overflow,
+ *       or undefined behavior.
+ */
 __device__
 float compute_tree_output(
     float* X,
@@ -3637,6 +3779,16 @@ std::vector<float> test_compute_mse_kernel(
     std::vector<float> se,
     int num_solutions,
     int num_datapoints
+);
+
+void test_evaluate_and_mse_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    int num_solutions,
+    int num_datapoints,
+    float* result
 );
 
 }

@@ -197,3 +197,10 @@ _skbuild/
 cmake-build-*/
 .idea/
 .DS_Store
+
+plmb_cache/
+experiments/results/
+*.ncu-rep
+*.nsys-rep
+*.html
+*.sqlite

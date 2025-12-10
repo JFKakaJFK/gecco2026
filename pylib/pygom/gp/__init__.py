@@ -189,9 +189,16 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         if np.isnan(X).any():
             X = self.imputer.transform(X)
 
-        y_pred = self.__lambdify_expression(self.model)(X)
+        y_pred = np.asarray(self.__lambdify_expression(self.model)(X))
 
-        if len(y_pred.shape) < 2:
+        if y_pred.ndim == 0:
+            y_pred = np.full((X.shape[0], 1), y_pred)
+        elif y_pred.ndim == 1:
             y_pred = y_pred.reshape(-1, 1)
+
+        # print((y_pred, type(y_pred)))
+
+        # if len(y_pred.shape) < 2:
+        #     y_pred = y_pred.reshape(-1, 1)
 
         return y_pred
