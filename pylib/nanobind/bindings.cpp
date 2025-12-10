@@ -1634,6 +1634,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::LinkageTreeFOS::register_similarity_callback, nb::arg("similarity_callback"))
       .def("unregister_similarity_callback",
           &goblin::LinkageTreeFOS::unregister_similarity_callback)
+      .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool, std::optional<goblin::Subset>>(),
+          nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false, nb::arg("subset").none() = nb::none())
+      .def("clone",
+          &goblin::LinkageTreeFOS::clone)
       .def("init",
           &goblin::LinkageTreeFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
       .def("compute_similarity",
@@ -1799,8 +1803,65 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INSTANCE_H
+  // #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
   //
+  // #ifndef _GOBLIN_GA_GP_TYPES_H
+  //
+
+
+  auto pyEnumNodeType =
+      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
+          .value("input", goblin::NodeType::Input, "")
+          .value("constant", goblin::NodeType::Constant, "")
+          .value("operator", goblin::NodeType::Operator, "");
+
+
+  auto pyEnumOperator =
+      nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
+          .value("add", goblin::Operator::Add, "")
+          .value("sub", goblin::Operator::Sub, "")
+          .value("mul", goblin::Operator::Mul, "")
+          .value("div", goblin::Operator::Div, "");
+
+
+  m.def("val",
+      nb::overload_cast<float>(goblin::Val), nb::arg("x"));
+
+  m.def("val",
+      nb::overload_cast<int>(goblin::Val), nb::arg("x"));
+
+  m.def("idx",
+      goblin::Idx, nb::arg("idx"));
+
+  m.def("op",
+      goblin::Op, nb::arg("op"));
+  // #endif
+
+
+  m.def("evaluate_kernel_wrapper",
+      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("solution_length"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("se"));
+
+  m.def("compute_mse_kernel_wrapper",
+      goblin::compute_mse_kernel_wrapper, nb::arg("se"), nb::arg("mse"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_output_kernel",
+      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"));
+
+  m.def("test_evaluate_kernel",
+      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+
+  m.def("test_compute_mse_kernel",
+      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+  // #endif
+  // #ifndef _GOBLIN_GA_GP_SR_H
+  //
+  // #ifndef _GOBLIN_GA_GP_HELPER_H
+  //
+
+
+  m.def("compute_block_size",
+      goblin::compute_block_size, nb::arg("count"));
+  // #endif
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //
   // #ifndef _GOBLIN_GP_OPERATOR_H
@@ -1918,6 +1979,27 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSub::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
       .def("format",
           &goblin::OpSub::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSubGPU =
+      nb::class_<goblin::OpSubGPU, goblin::OperatorBase>
+          (m, "OpSubGPU", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSubGPU::min_arity)
+      .def("max_arity",
+          &goblin::OpSubGPU::max_arity)
+      .def("is_commutative",
+          &goblin::OpSubGPU::is_commutative)
+      .def("apply",
+          &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSubGPU::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("format",
+          &goblin::OpSubGPU::format, nb::arg("args"))
       ;
 
 
@@ -2211,6 +2293,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::normalized_root_proximity, " Matrix of size `num_discrete x num_discrete`, where the entry i,j\n corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)\n if both are from the same tree, otherwise 0")
       .def("normalized_node_proximity",
           &goblin::GPContext::normalized_node_proximity, "Normalized node proximity [1.0: same node, 0.0: no connection]")
+      .def("to_gpu_repr",
+          &goblin::GPContext::to_gpu_repr, nb::arg("solution"), nb::arg("node_type"), nb::arg("node_value"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
       .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
       .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")
@@ -2220,7 +2304,6 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("max_expression_size", &goblin::GPContext::max_expression_size, "")
       .def_rw("num_parameters", &goblin::GPContext::num_parameters, "")
       .def_rw("max_num_children", &goblin::GPContext::max_num_children, "")
-      .def_rw("enable_subfunctions", &goblin::GPContext::enable_subfunctions, "")
       .def_rw("operators", &goblin::GPContext::operators, "")
       .def_rw("op_idx2value", &goblin::GPContext::op_idx2value, "")
       .def_rw("value_kind", &goblin::GPContext::value_kind, "")
@@ -2239,6 +2322,11 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this")
       ;
   // #endif
+  // #ifndef _GOBLIN_GP_INIT_H
+  //
+  // #ifndef _GOBLIN_GP_INSTANCE_H
+  //
+
 
 
   auto pyClassGPInstanceBase =
@@ -2249,8 +2337,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPInstanceBase::context)
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INIT_H
-  //
+
 
 
   auto pyClassFullInit =
@@ -2277,6 +2364,56 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def(nb::init<>()) // implicit default constructor
       .def("sample",
           &goblin::RecursiveCompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
+      ;
+  // #endif
+
+
+  auto pyClassGASRProblem =
+      nb::class_<goblin::GASRProblem, goblin::GPInstanceBase>
+          (m, "GASRProblem", "")
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, bool, std::optional<AnyInit>, CType, CType>(),
+          nb::arg("ctx"), nb::arg("x"), nb::arg("y"), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0)
+      .def("free_gpu",
+          &goblin::GASRProblem::free_gpu)
+      .def("num_discrete",
+          &goblin::GASRProblem::num_discrete)
+      .def("discrete_domain_sizes",
+          &goblin::GASRProblem::discrete_domain_sizes)
+      .def("num_continuous",
+          &goblin::GASRProblem::num_continuous)
+      .def("continuous_lower_bounds",
+          &goblin::GASRProblem::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::GASRProblem::continuous_upper_bounds)
+      .def("continuous_init_lower_bounds",
+          &goblin::GASRProblem::continuous_init_lower_bounds)
+      .def("continuous_init_upper_bounds",
+          &goblin::GASRProblem::continuous_init_upper_bounds)
+      .def("evaluate",
+          &goblin::GASRProblem::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+      .def("add_random",
+          &goblin::GASRProblem::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
+      .def("fitness",
+          &goblin::GASRProblem::fitness)
+      .def("archive_fitness",
+          &goblin::GASRProblem::archive_fitness)
+      .def("context",
+          &goblin::GASRProblem::context)
+      .def("register_target",
+          nb::overload_cast<CRefS<Vec<CType>>>(&goblin::GASRProblem::register_target), nb::arg("target_objectives"))
+      .def("register_target",
+          nb::overload_cast<std::vector<CType>>(&goblin::GASRProblem::register_target), nb::arg("target_objectives"))
+      .def("target_reached",
+          &goblin::GASRProblem::target_reached, nb::arg("archive"))
+      .def("log_header",
+          &goblin::GASRProblem::log_header, nb::arg("os"))
+      .def("log",
+          &goblin::GASRProblem::log, nb::arg("os"), nb::arg("solution"))
+      .def("log_solution",
+          &goblin::GASRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
+      .def_rw("ctx", &goblin::GASRProblem::ctx, "")
+      .def_rw("linear_scaling", &goblin::GASRProblem::linear_scaling, "")
+      .def_rw("objective", &goblin::GASRProblem::objective, "")
       ;
   // #endif
   // #ifndef _GOBLIN_GP_SR_H
@@ -3142,6 +3279,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
       .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
+      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       {
           new (self) goblin::PopulationOptions();  // placement new
           auto r_ctor_ = self;
@@ -3165,6 +3303,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->gradient_step_count = gradient_step_count;
       },
       nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
+      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
       .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")

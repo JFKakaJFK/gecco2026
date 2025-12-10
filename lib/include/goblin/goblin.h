@@ -23,6 +23,11 @@
 #include "goblin/lib/ims.h"
 #include "goblin/lib/init.h"
 
+#include "goblin/ga-gp/evaluate.h"
+#include "goblin/ga-gp/ga_sr.h"
+#include "goblin/ga-gp/helper.h"
+#include "goblin/ga-gp/types.h"
+
 #include "goblin/gp/instance.h"
 #include "goblin/gp/template.h"
 #include "goblin/gp/operator.h"
