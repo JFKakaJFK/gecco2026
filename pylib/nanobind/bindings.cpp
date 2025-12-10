@@ -1624,16 +1624,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassLinkageTreeFOS =
       nb::class_<goblin::LinkageTreeFOS, goblin::LinkageModelBase>
           (m, "LinkageTreeFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool, std::optional<goblin::Subset>, std::optional<Mat<CType>>, std::optional<CType>, std::optional<std::function<void(CRef<Mat<CType>>)>>, bool>(),
-          nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false, nb::arg("subset").none() = nb::none(), nb::arg("custom_similarity").none() = nb::none(), nb::arg("eta_custom_similarity").none() = nb::none(), nb::arg("similarity_callback").none() = nb::none(), nb::arg("freeze") = false)
-      .def("clone",
-          &goblin::LinkageTreeFOS::clone)
-      .def("is_static",
-          &goblin::LinkageTreeFOS::is_static)
-      .def("register_similarity_callback",
-          &goblin::LinkageTreeFOS::register_similarity_callback, nb::arg("similarity_callback"))
-      .def("unregister_similarity_callback",
-          &goblin::LinkageTreeFOS::unregister_similarity_callback)
       .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool, std::optional<goblin::Subset>>(),
           nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false, nb::arg("subset").none() = nb::none())
       .def("clone",
@@ -2289,10 +2279,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           "A helper that prints the expression in a human readable format")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
-      .def("normalized_root_proximity",
-          &goblin::GPContext::normalized_root_proximity, " Matrix of size `num_discrete x num_discrete`, where the entry i,j\n corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)\n if both are from the same tree, otherwise 0")
-      .def("normalized_node_proximity",
-          &goblin::GPContext::normalized_node_proximity, "Normalized node proximity [1.0: same node, 0.0: no connection]")
       .def("to_gpu_repr",
           &goblin::GPContext::to_gpu_repr, nb::arg("solution"), nb::arg("node_type"), nb::arg("node_value"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
@@ -2328,7 +2314,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
 
 
-
   auto pyClassGPInstanceBase =
       nb::class_<goblin::GPInstanceBase, goblin::InstanceBase, goblin::GPInstanceBase_trampoline>
           (m, "GPInstanceBase", "")
@@ -2337,7 +2322,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPInstanceBase::context)
       ;
   // #endif
-
 
 
   auto pyClassFullInit =
@@ -3246,39 +3230,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       goblin::create_and_register_clusters, nb::arg("rng"), nb::arg("archive"), nb::arg("fitness"), nb::arg("solutions"), nb::arg("num_clusters"), nb::arg("donor_pool_size"), nb::arg("previous_solutions"), nb::arg("previous_clusters"));
 
 
-  auto pyClassFosStats =
-      nb::class_<goblin::FosStats>
-          (m, "FosStats", "")
-      .def("__init__", [](goblin::FosStats * self, std::vector<CType> solution_activation_rate = std::vector<CType>(), std::vector<CType> variables_activation_rate = std::vector<CType>(), std::vector<u64> usage_count = std::vector<u64>(), std::vector<u64> evaluation_count = std::vector<u64>(), std::vector<u64> acceptance_count = std::vector<u64>(), std::vector<CType> cumulative_fitness_difference = std::vector<CType>(), std::vector<u64> finite_acceptance_count = std::vector<u64>(), Mat<CType> similarity = Mat<CType>())
-      {
-          new (self) goblin::FosStats();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->solution_activation_rate = solution_activation_rate;
-          r_ctor_->variables_activation_rate = variables_activation_rate;
-          r_ctor_->usage_count = usage_count;
-          r_ctor_->evaluation_count = evaluation_count;
-          r_ctor_->acceptance_count = acceptance_count;
-          r_ctor_->cumulative_fitness_difference = cumulative_fitness_difference;
-          r_ctor_->finite_acceptance_count = finite_acceptance_count;
-          r_ctor_->similarity = similarity;
-      },
-      nb::arg("solution_activation_rate") = std::vector<CType>(), nb::arg("variables_activation_rate") = std::vector<CType>(), nb::arg("usage_count") = std::vector<u64>(), nb::arg("evaluation_count") = std::vector<u64>(), nb::arg("acceptance_count") = std::vector<u64>(), nb::arg("cumulative_fitness_difference") = std::vector<CType>(), nb::arg("finite_acceptance_count") = std::vector<u64>(), nb::arg("similarity") = Mat<CType>()
-      )
-      .def_rw("solution_activation_rate", &goblin::FosStats::solution_activation_rate, "whats the proportion of solutions where initially at least one of the")
-      .def_rw("variables_activation_rate", &goblin::FosStats::variables_activation_rate, "conditioned on solutions with at least one active variables in the subset, whats")
-      .def_rw("usage_count", &goblin::FosStats::usage_count, "how often was the FOS used? (without FI, - should be the population size)")
-      .def_rw("evaluation_count", &goblin::FosStats::evaluation_count, "how often was an evaluation needed? (i.e. active parts were modified)")
-      .def_rw("acceptance_count", &goblin::FosStats::acceptance_count, "how often was the change accepted? (after evaluation)")
-      .def_rw("cumulative_fitness_difference", &goblin::FosStats::cumulative_fitness_difference, "how big were the accepted improvements?")
-      .def_rw("finite_acceptance_count", &goblin::FosStats::finite_acceptance_count, "how many improvements had a finite fitness difference to their parent?")
-      .def_rw("similarity", &goblin::FosStats::similarity, "(inf/nan mess up the average...)")
-      ;
-
-
   auto pyClassPopulationOptions =
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
       {
           new (self) goblin::PopulationOptions();  // placement new
@@ -3290,10 +3244,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->sequential_gom = sequential_gom;
           r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
           r_ctor_->donor_search_proportion = donor_search_proportion;
-          r_ctor_->subset_logfile = subset_logfile;
-          r_ctor_->generation = generation;
-          r_ctor_->initial_generations_until_next_fos_log = initial_generations_until_next_fos_log;
-          r_ctor_->fos_log_factor = fos_log_factor;
           r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
           r_ctor_->continuous_mutation_temperature = continuous_mutation_temperature;
           r_ctor_->continuous_mutation_decay_factor = continuous_mutation_decay_factor;
@@ -3302,7 +3252,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->gradient_step_frequency = gradient_step_frequency;
           r_ctor_->gradient_step_count = gradient_step_count;
       },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
@@ -3312,10 +3261,6 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("sequential_gom", &goblin::PopulationOptions::sequential_gom, "performs GOM sequentially per solution, incompatible with other mechanisms")
       .def_rw("strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance, "should the single objective elite solutions accept only strict improvements or also neutral changes?")
       .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion, "the fraction of solutions to consider before skipping an evaluation in case")
-      .def_rw("subset_logfile", &goblin::PopulationOptions::subset_logfile, "")
-      .def_rw("generation", &goblin::PopulationOptions::generation, "")
-      .def_rw("initial_generations_until_next_fos_log", &goblin::PopulationOptions::initial_generations_until_next_fos_log, "> 0, subset stats are logged every")
-      .def_rw("fos_log_factor", &goblin::PopulationOptions::fos_log_factor, "1 is linear, 2 is exponential log spacing")
       .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")
       .def_rw("continuous_mutation_temperature", &goblin::PopulationOptions::continuous_mutation_temperature, "")
       .def_rw("continuous_mutation_decay_factor", &goblin::PopulationOptions::continuous_mutation_decay_factor, "")

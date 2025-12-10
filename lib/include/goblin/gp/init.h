@@ -105,8 +105,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
             }
           }
 
-          // NOTE it could be better to maximize the number of active variables by sampling terminals only once (this
-          // definitely holds for the root, but not necessarily for other nodes, so this is not done here)
+          // TODO is it better to maximize the number of active variables by sampling terminals only once?
           std::vector<DType> perm(problem.discrete_domain_sizes()(current));
           std::iota(perm.begin(), perm.end(), 0);
 

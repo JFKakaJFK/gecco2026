@@ -1,9 +1,6 @@
 #include <print>
 #include <iostream>
 
-#define EIGEN_DONT_ALIGN
-#define EIGEN_MAX_ALIGN_BYTES 0
-#define EIGEN_DONT_VECTORIZE
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
 
@@ -188,15 +185,11 @@ TEST_CASE("goblin::gp::sr") {
           /* subset = */ Subset{.discrete = ctx.nodes[i]}));
     }
 
-    auto gomea = MixedGOMEA(
-        PopulationOptions{
-            // .subset_logfile = "fos_stats.csv"
-        },
-        RvOptions{.enabled = false},
-        IMSOptions(
-            /* initial_population_size = */ 256,
-            /* max_num_populations = */ 1),
-        std::make_shared<CombinedFOS>(models));
+    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled = false},
+                            IMSOptions(
+                                /* initial_population_size = */ 256,
+                                /* max_num_populations = */ 1),
+                            std::make_shared<CombinedFOS>(models));
 
     // auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
     auto [front, status] = gomea.run(srp, budget, /* seed = */ 42);

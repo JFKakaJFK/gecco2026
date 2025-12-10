@@ -1,18 +1,7 @@
-#pragma once
 #ifndef _GOBLIN_LIB_TYPES_H
 #define _GOBLIN_LIB_TYPES_H
 
-#ifndef NDEBUG
-#ifndef EIGEN_DONT_ALIGN
-#define EIGEN_DONT_ALIGN
-#endif
-#ifndef EIGEN_MAX_ALIGN_BYTES
-#define EIGEN_MAX_ALIGN_BYTES 0
-#endif
-#ifndef EIGEN_DONT_VECTORIZE
-#define EIGEN_DONT_VECTORIZE
-#endif
-#endif
+#pragma once
 
 #include <Eigen/Dense>
 #include <cstdint>
