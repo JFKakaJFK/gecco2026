@@ -980,10 +980,25 @@ class LinkageTreeFOS(LinkageModelBase):
         max_subset_size: Optional[int] = None,
         normalize_initial_linkage_bias: bool = False,
         subset: Optional[Subset] = None,
+        custom_similarity: Optional[Mat[float]] = None,
+        eta_custom_similarity: Optional[float] = None,
+        similarity_callback: Optional[Callable[[CRef[Mat[float]]], None]] = None,
+        freeze: bool = False,
     ) -> None:
         pass
 
     def clone(self) -> LinkageModelBase:
+        pass
+
+    def is_static(self) -> bool:
+        pass
+
+    def register_similarity_callback(
+        self, similarity_callback: Callable[[CRef[Mat[float]]], None]
+    ) -> None:
+        pass
+
+    def unregister_similarity_callback(self) -> None:
         pass
 
     def init(
@@ -2038,6 +2053,15 @@ class GPContext:
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
 
+    def normalized_root_proximity(self) -> Mat[float]:
+        """Matrix of size `num_discrete x num_discrete`, where the entry i,j
+        corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)
+        if both are from the same tree, otherwise 0
+        """
+        pass
+
+    def normalized_node_proximity(self) -> Mat[float]:
+        """Normalized node proximity [1.0: same node, 0.0: no connection]"""
     def to_gpu_repr(
         self, solution: SolutionBase, node_type: List[NodeType], node_value: List[float]
     ) -> None:
@@ -2063,6 +2087,7 @@ class GPContext:
     max_expression_size: int
     num_parameters: int
     max_num_children: int
+    enable_subfunctions: bool
 
     operators: List[OperatorBase]
     op_idx2value: List[int]
@@ -4008,6 +4033,44 @@ def create_and_register_clusters(
 ) -> Tuple[List[int], List[List[int]], List[List[int]]]:
     pass
 
+class FosStats:
+    solution_activation_rate: List[
+        float
+    ]  # whats the proportion of solutions where initially at least one of the
+    # variables in the subset is active?
+    variables_activation_rate: List[
+        float
+    ]  # conditioned on solutions with at least one active variables in the subset, whats
+    # the proportion of variables in the subset that are active on average?
+    usage_count: List[
+        int
+    ]  # how often was the FOS used? (without FI, - should be the population size)
+    evaluation_count: List[
+        int
+    ]  # how often was an evaluation needed? (i.e. active parts were modified)
+    acceptance_count: List[int]  # how often was the change accepted? (after evaluation)
+    cumulative_fitness_difference: List[
+        float
+    ]  # how big were the accepted improvements?
+    finite_acceptance_count: List[
+        int
+    ]  # how many improvements had a finite fitness difference to their parent?
+    # (inf/nan mess up the average...)
+    similarity: Mat[float]
+    def __init__(
+        self,
+        solution_activation_rate: List[float] = List[float](),
+        variables_activation_rate: List[float] = List[float](),
+        usage_count: List[int] = List[int](),
+        evaluation_count: List[int] = List[int](),
+        acceptance_count: List[int] = List[int](),
+        cumulative_fitness_difference: List[float] = List[float](),
+        finite_acceptance_count: List[int] = List[int](),
+        similarity: Mat[float] = Mat < float > (),
+    ) -> None:
+        """Auto-generated default constructor with named params"""
+        pass
+
 class PopulationOptions:
     donor_pool_size_multiplier: float = 2.0
     max_nis: Optional[int] = None
@@ -4024,6 +4087,12 @@ class PopulationOptions:
         0.0  # the fraction of solutions to consider before skipping an evaluation in case
     )
     # of all subset variables being identical between the solution and donor
+    subset_logfile: Optional[str] = None
+    generation: int = 0
+    initial_generations_until_next_fos_log: int = (
+        5  # > 0, subset stats are logged every
+    )
+    fos_log_factor: int = 2  # 1 is linear, 2 is exponential log spacing
 
     # Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
     continuous_mutation_probability: float = 0.0
@@ -4043,6 +4112,10 @@ class PopulationOptions:
         sequential_gom: bool = False,
         strict_elite_acceptance: bool = False,
         donor_search_proportion: float = 0.0,
+        subset_logfile: Optional[str] = None,
+        generation: int = 0,
+        initial_generations_until_next_fos_log: int = 5,
+        fos_log_factor: int = 2,
         continuous_mutation_probability: float = 0.0,
         continuous_mutation_temperature: float = 0.1,
         continuous_mutation_decay_factor: float = 0.9,

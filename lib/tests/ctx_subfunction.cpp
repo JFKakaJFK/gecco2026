@@ -1,6 +1,9 @@
 #include <print>
 #include <iostream>
 
+#define EIGEN_DONT_ALIGN
+#define EIGEN_MAX_ALIGN_BYTES 0
+#define EIGEN_DONT_VECTORIZE
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
 

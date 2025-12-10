@@ -36,7 +36,9 @@ def run_one(
     try:
         seed = task.get("seed", seed)
         if seed and run is not None:
-            seed += run
+            rng = np.random.default_rng(seed=seed)
+            # get the run-th seed (seed + run is also fine if the rng is fully decorrelated which it should be...)
+            seed = int(rng.integers(0, 2**32, size=run + 1)[run])
         Tracked.run(
             instance=task["instance"],
             method=task["method"],
@@ -47,9 +49,9 @@ def run_one(
                 # report_intermediate_results=False,
                 max_generations_until_next_report=1,
                 generation_factor=1,
-                initial_evaluations_until_next_report=100,
-                max_evaluations_until_next_report=5000,
-                eval_factor=1,
+                initial_evaluations_until_next_report=1,
+                max_evaluations_until_next_report=100000,
+                eval_factor=100000,
                 initial_time_until_next_report=datetime.timedelta(hours=1),
             ),
             seed=seed,

@@ -32,6 +32,17 @@
 #ifndef _GOBLIN_LIB_TYPES_H
 #define _GOBLIN_LIB_TYPES_H
 
+#ifndef NDEBUG
+#ifndef EIGEN_DONT_ALIGN
+#define EIGEN_DONT_ALIGN
+#endif
+#ifndef EIGEN_MAX_ALIGN_BYTES
+#define EIGEN_MAX_ALIGN_BYTES 0
+#endif
+#ifndef EIGEN_DONT_VECTORIZE
+#define EIGEN_DONT_VECTORIZE
+#endif
+#endif
 
 #include <Eigen/Dense>
 #include <cstdint>
@@ -372,9 +383,6 @@ class MOFitness final : public ArchiveFitnessBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
-
-#include "fitness.h"
-#include "types.h"
 
 #include <cstdlib>
 #include <functional>
@@ -2547,7 +2555,7 @@ class FullFOS final : public LinkageModelBase {
 
 class LinkageTreeFOS final : public LinkageModelBase {
  public:
-  LinkageTreeFOS(std::string metric = "mi",  // nmi, pearson_r2
+  LinkageTreeFOS(std::string metric = "mi",  // nmi, pearson_r2, random
 
                  /// The intron strategy determines how knowledge about inactive variables
                  /// is used to modify the estimation of linkage when learning the linkage
@@ -2568,19 +2576,41 @@ class LinkageTreeFOS final : public LinkageModelBase {
                                                                   // continuous/mixed
                  std::optional<usize> max_subset_size = std::nullopt,
                  bool normalize_initial_linkage_bias = false,
-                 std::optional<Subset> subset = std::nullopt)
-      : metric(metric),
+                 std::optional<Subset> subset = std::nullopt,
+                 std::optional<Mat<CType>> custom_similarity = std::nullopt,
+                 std::optional<CType> eta_custom_similarity = std::nullopt,
+                 std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback = std::nullopt,
+                 bool freeze = false)
+      : subset(subset.value_or(Subset{})),
+        custom_similarity(custom_similarity),
+        similarity_callback(similarity_callback),
+        metric(metric),
         intron_strategy(intron_strategy),
-        merge_continuous(merge_continuous),
         num_continuous_bins(num_continuous_bins),
         filter_parent_threshold(filter_parent_threshold),
         filter_children_threshold(filter_children_threshold),
         filter_root(filter_root),
         max_subset_size(max_subset_size),
+        eta_custom_similarity(eta_custom_similarity),
+        merge_continuous(merge_continuous),
         normalize_initial_linkage_bias(normalize_initial_linkage_bias),
-        subset(subset.value_or(Subset{})) {};
+        freeze(freeze) {
+    if (this->eta_custom_similarity.has_value()) {
+      if (!(0.0 < this->eta_custom_similarity.value() && this->eta_custom_similarity.value() < 1.0)) {
+        throw std::runtime_error("Invalid eta_custom_similarity, must be in (0, 1) if provided.");
+      }
+    }
+  };
 
   std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<LinkageTreeFOS>(*this); }
+
+  bool is_static() const override final { return freeze; };
+
+  void register_similarity_callback(std::function<void(CRef<Mat<CType>>)>&& similarity_callback) {
+    this->similarity_callback = similarity_callback;
+  };
+
+  void unregister_similarity_callback() { this->similarity_callback = std::nullopt; };
 
   void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
     if (subset.empty()) {
@@ -2595,6 +2625,15 @@ class LinkageTreeFOS final : public LinkageModelBase {
         for (usize i = 0; i < problem.num_continuous(); i++) {
           subset.continuous.push_back(i);
         }
+      }
+    }
+
+    if (custom_similarity.has_value()) {
+      if (static_cast<usize>(custom_similarity.value().rows()) != subset.size() ||
+          static_cast<usize>(custom_similarity.value().cols()) != subset.size()) {
+        throw std::runtime_error(
+            "Custom similarity matrix has invalid dimensions, expected a square matrix corresponding to the subset "
+            "size.");
       }
     }
 
@@ -2641,11 +2680,22 @@ class LinkageTreeFOS final : public LinkageModelBase {
     const bool is_continuous = subset.continuous.size() > 0;
 
     Mat<CType> similarity;
-    if (is_discrete && is_continuous) {
+    if (custom_similarity.has_value() && !eta_custom_similarity.has_value()) {
+      similarity = custom_similarity.value();
+    } else if (metric == "random") {
+      similarity.resize(l, l);
+      std::uniform_real_distribution<CType> U(0.0, 1.0);
+      for (isize i = 0; i < l; i++) {
+        for (isize j = 0; j <= i; j++) {
+          similarity(i, j) = U(rng);
+          similarity(j, i) = similarity(i, j);
+        }
+      }
+    } else if (is_discrete && is_continuous) {
       similarity.resize(l, l);
       // No mixed subset learning (yet?)
       // https://homepages.cwi.nl/~bosman/publications/2016_learningandexploiting.pdf
-      __goblin_runtime_assert(false);
+      throw std::runtime_error("Mixed linkage learning isn't supported.");
     } else if (is_discrete) {
       similarity = estimate_entropy(problem, solutions, indices, subset.discrete, intron_strategy, merge_continuous,
                                     num_continuous_bins);
@@ -2655,11 +2705,14 @@ class LinkageTreeFOS final : public LinkageModelBase {
       entropy2similarity(similarity);
     } else if (is_continuous) {
       similarity.resize(l, l);
-      __goblin_runtime_assert(covariance.has_value());
+      if (!covariance.has_value()) {
+        throw std::runtime_error("Continuous linkage learning requires a covariance matrix.");
+      } else if (covariance.value().get().rows() != l || covariance.value().get().cols() != l) {
+        throw std::runtime_error(
+            "Covariance matrix has invalid dimensions, expected a square matrix corresponding to the subset size.");
+      }
 
       Mat<CType> cov = covariance.value();
-      __goblin_runtime_assert(cov.rows() == l);
-      __goblin_runtime_assert(cov.cols() == l);
       for (isize i = 0; i < l; i++) {
         for (isize j = 0; j < i; j++) {
           // https://en.wikipedia.org/wiki/Pearson_correlation_coefficient
@@ -2669,7 +2722,16 @@ class LinkageTreeFOS final : public LinkageModelBase {
         }
       }
     } else {
-      __goblin_runtime_assert(false && "Unknown subset of variables to learn a LT for.");
+      throw std::runtime_error("Unknown subset of variables to learn a LT for.");
+    }
+
+    if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
+      similarity = (1.0 - eta_custom_similarity.value()) * similarity +
+                   eta_custom_similarity.value() * custom_similarity.value();
+    }
+
+    if (similarity_callback.has_value()) {
+      similarity_callback.value()(similarity);
     }
     return similarity;
   };
@@ -3032,16 +3094,20 @@ class LinkageTreeFOS final : public LinkageModelBase {
     }
   };
 
+  Subset subset;
+  std::optional<Mat<CType>> custom_similarity;
+  std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback;
   std::string metric;
   std::string intron_strategy;
-  bool merge_continuous;
   std::optional<usize> num_continuous_bins;
   std::optional<CType> filter_parent_threshold;
   std::optional<CType> filter_children_threshold;
   std::optional<bool> filter_root;
   std::optional<usize> max_subset_size;
+  std::optional<CType> eta_custom_similarity;
+  bool merge_continuous;
   bool normalize_initial_linkage_bias;
-  Subset subset;
+  bool freeze;
 
   Mat<CType> initial_bias_adjustments;
 };
@@ -4463,6 +4529,7 @@ class GPContext {
         max_expression_size(max_expression_size),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
+        enable_subfunctions(enable_subfunctions),
         operators(std::move(operators)) {
     __goblin_runtime_assert(expression_template.is_valid());
     usize num_constant_values = const_repr == ConstantRepr::ERCs   ? 1
@@ -4701,7 +4768,12 @@ class GPContext {
 
     // in the modular GP-GOMEA paper (https://arxiv.org/pdf/2505.01262v1) there is this concept of "discounted" size to
     // not punish re-using subfunctions by only counting the subfunction nodes once.
-    Array<u32> visited = Array<u32>::Zero(num_discrete);
+    // unless subfunctions are enabled, the discounting has no effect
+    discount_size = discount_size && enable_subfunctions;
+    Array<u32> visited;
+    if (discount_size) {
+      visited = Array<u32>::Zero(num_discrete);
+    }
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
@@ -4766,7 +4838,9 @@ class GPContext {
           }
 
           if (value_kind[value] == ValueKind::Arg) {
-            visited(idx) = 0;
+            if (discount_size) {
+              visited(idx) = 0;
+            }
 
             // we need to replace the argument with the corresponding child of the caller
             // and then replace the stack entry with with the actual argument
@@ -4805,7 +4879,9 @@ class GPContext {
                                     call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
-            visited(idx) = 0;
+            if (discount_size) {
+              visited(idx) = 0;
+            }
             assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
@@ -4932,8 +5008,15 @@ class GPContext {
 
           // the arguments are in the correct order on the stack, so we just need to get the last arity indices on the
           // arg_stack
-          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
-          arg_stack[arg_stack_idx] = operators[v_idx]->format(args);
+          // std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()}; // TODO why does this trigger
+          // the address sanitizer even when the result is explicitly evaluated before overwriting anything in the
+          // arg_stack?
+          std::vector<std::string> args;
+          for (usize k = 0; k < arity; k++) {
+            args.push_back(arg_stack[arg_stack.size() - arity + k]);
+          }
+          std::string op = operators[v_idx]->format(args);
+          arg_stack[arg_stack_idx] = op;
 
           // pop the now used arguments from the stack, but keep the op result
           arg_stack.resize(arg_stack_idx + 1);
@@ -5012,7 +5095,8 @@ class GPContext {
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
-          eval_buffer.col(j) = X.col(v_idx);
+          eval_buffer.col(j) = X.col(
+              v_idx);  // @claude: runtime error: assumption of 128 byte alignment for pointer of type 'double *' failed
         } else if (value_kind[value] == ValueKind::Parameter) {
           eval_buffer.col(j) = params(v_idx);
         } else if (value_kind[value] == ValueKind::Constant) {
@@ -5051,6 +5135,72 @@ class GPContext {
     return outputs;
   }
 
+  // Matrix of size `num_discrete x num_discrete`, where the entry i,j
+  // corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)
+  // if both are from the same tree, otherwise 0
+  Mat<CType> normalized_root_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      CType di = static_cast<CType>(depth[i]);
+      if (di > norm) {
+        norm = di;
+      }
+    }
+    norm += 1.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) =
+            root[i] == root[j] ? (static_cast<CType>(depth[i]) + static_cast<CType>(depth[j])) * 0.5 : norm;
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+  };
+
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_node_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;  // = max distance + 1
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the earliest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+        } else {
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+    norm += 1.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (proximity(i, j) < 0.0) {
+          proximity(i, j) = norm;
+        }
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+  };
+  
   void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
 
@@ -5147,6 +5297,7 @@ class GPContext {
   usize max_expression_size;
   usize num_parameters;
   usize max_num_children;
+  bool enable_subfunctions;
 
   std::vector<std::shared_ptr<OperatorBase>> operators;
   std::vector<usize> op_idx2value;
@@ -5305,7 +5456,8 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
             }
           }
 
-          // TODO is it better to maximize the number of active variables by sampling terminals only once?
+          // NOTE it could be better to maximize the number of active variables by sampling terminals only once (this
+          // definitely holds for the root, but not necessarily for other nodes, so this is not done here)
           std::vector<DType> perm(problem.discrete_domain_sizes()(current));
           std::iota(perm.begin(), perm.end(), 0);
 
@@ -10090,6 +10242,21 @@ create_and_register_clusters(Rng& rng,
   return std::make_tuple(solution_clusters, cluster_solutions, cluster_donors);
 };
 
+struct FosStats {
+  std::vector<CType> solution_activation_rate;  // whats the proportion of solutions where initially at least one of the
+                                                // variables in the subset is active?
+  std::vector<CType>
+      variables_activation_rate;  // conditioned on solutions with at least one active variables in the subset, whats
+                                  // the proportion of variables in the subset that are active on average?
+  std::vector<u64> usage_count;   // how often was the FOS used? (without FI, - should be the population size)
+  std::vector<u64> evaluation_count;  // how often was an evaluation needed? (i.e. active parts were modified)
+  std::vector<u64> acceptance_count;  // how often was the change accepted? (after evaluation)
+  std::vector<CType> cumulative_fitness_difference;  // how big were the accepted improvements?
+  std::vector<u64> finite_acceptance_count;  // how many improvements had a finite fitness difference to their parent?
+                                             // (inf/nan mess up the average...)
+  Mat<CType> similarity;
+};
+
 struct PopulationOptions {
   double donor_pool_size_multiplier = 2.0;
   std::optional<usize> max_nis = std::nullopt;
@@ -10101,6 +10268,10 @@ struct PopulationOptions {
 
   double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
                                          // of all subset variables being identical between the solution and donor
+  std::optional<std::string> subset_logfile = std::nullopt;
+  u64 generation = 0;
+  u64 initial_generations_until_next_fos_log = 5;  // > 0, subset stats are logged every
+  u64 fos_log_factor = 2;                          // 1 is linear, 2 is exponential log spacing
 
   // Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
   double continuous_mutation_probability = 0.0;
@@ -10196,16 +10367,7 @@ class Population {
 
     usize max_discrete_subset_count = 0;
     if (is_discrete) {
-      // learn per cluster linkage models
-      if (cluster_FOS.empty() || !discrete_model->is_static()) {
-        cluster_FOS.clear();
-        for (usize k = 0; k < num_clusters; k++) {
-          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
-        }
-      }
-      for (usize k = 0; k < num_clusters; k++) {
-        max_discrete_subset_count = std::max(max_discrete_subset_count, cluster_FOS[k].size());
-      }
+      max_discrete_subset_count = learn_discrete_linkage(rng);
 
       solution_changed.clear();
       solution_changed.resize(size, false);
@@ -10341,6 +10503,10 @@ class Population {
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
+    if (!fos_stats.empty()) {  // options.subset_logfile.has_value()) {
+      log_subset_statistics();
+    }
+
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
       evaluations += gradient_step(rng);
@@ -10374,6 +10540,8 @@ class Population {
       options.continuous_mutation_temperature *= options.continuous_mutation_decay_factor;
     }
     no_evaluations_performed = evaluations == 0;
+
+    generation++;
 
     return evaluations;
   };
@@ -10438,6 +10606,108 @@ class Population {
   const ArchiveBase& archive() const { return *local_archive; };
 
  private:
+  void log_subset_statistics() {
+    generations_until_next_fos_log =
+        options.initial_generations_until_next_fos_log > 0 ? options.initial_generations_until_next_fos_log : 1;
+    options.initial_generations_until_next_fos_log *= options.fos_log_factor;
+
+    AoSSet s;
+    s.add(local_archive->so_solution(0));  // solution does not matter, but there should only be a single one...
+    assert(fos_stats.size() == num_clusters);
+    for (usize k = 0; k < num_clusters; k++) {
+      const auto& stats = fos_stats[k];
+      std::vector<CType> evaluation_rates(cluster_FOS[k].size());
+      std::vector<CType> acceptance_rates(cluster_FOS[k].size());
+      std::vector<CType> avg_improvements(cluster_FOS[k].size());
+      std::stringstream os;
+      os << "\"[";
+      for (usize i = 0; i < cluster_FOS[k].size(); i++) {
+        evaluation_rates[i] = stats.usage_count[i] > 0 ? static_cast<CType>(stats.evaluation_count[i]) /
+                                                             static_cast<CType>(stats.usage_count[i])
+                                                       : 0.0;
+        acceptance_rates[i] = stats.evaluation_count[i] > 0 ? static_cast<CType>(stats.acceptance_count[i]) /
+                                                                  static_cast<CType>(stats.evaluation_count[i])
+                                                            : 0.0;
+        avg_improvements[i] =
+            stats.finite_acceptance_count[i] > 0
+                ? stats.cumulative_fitness_difference[i] / static_cast<CType>(stats.finite_acceptance_count[i])
+                : 0.0;
+        if (i > 0) {
+          os << ',';
+        }
+        log_helper(os, cluster_FOS[k][i].discrete, /* escape = */ false);
+      }
+      os << "]\"";
+      debug_log(problem, options.subset_logfile.value(),
+                "population_size,cluster,similarity,subsets,usage_count,evaluation_rate,acceptance_rate,avg_"
+                "improvement,solution_activation_rate,variables_activation_rate,",
+                std::format("{},{},{},{},{},{},{},{},{},{},", size, k, log_helper(stats.similarity), os.str(),
+                            log_helper(stats.usage_count), log_helper(evaluation_rates), log_helper(acceptance_rates),
+                            log_helper(avg_improvements), log_helper(stats.solution_activation_rate),
+                            log_helper(stats.variables_activation_rate)),
+                s);
+      fos_stats.clear();
+    }
+  };
+  usize learn_discrete_linkage(Rng& rng) {
+    // learn per cluster linkage models
+    if (cluster_FOS.empty() || !discrete_model->is_static()) {
+      cluster_FOS.clear();
+
+      if (options.subset_logfile.has_value() && generation == generations_until_next_fos_log) {
+        Mat<CType> sim(0, 0);
+        if (auto p = dynamic_cast<LinkageTreeFOS*>(discrete_model.get()); p != nullptr) {
+          p->register_similarity_callback([&sim](const auto& s) { sim = s; });
+        }
+
+        fos_stats.clear();
+        fos_stats.resize(num_clusters);
+        for (usize k = 0; k < num_clusters; k++) {
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
+
+          fos_stats[k].similarity = sim;
+          fos_stats[k].usage_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].evaluation_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].acceptance_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].cumulative_fitness_difference.resize(cluster_FOS[k].size(), 0.0);
+          fos_stats[k].finite_acceptance_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].solution_activation_rate.resize(cluster_FOS[k].size(), 0.0);
+          fos_stats[k].variables_activation_rate.resize(cluster_FOS[k].size(), 0.0);
+          for (usize i = 0; i < cluster_solutions[k].size(); i++) {
+            const RefS<Active> s_a = solutions[cluster_solutions[k][i]].discrete_active();
+            for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
+              Array<BType> subset_active = s_a(cluster_FOS[k][fos_idx].discrete);
+              if (subset_active.any()) {
+                fos_stats[k].variables_activation_rate[fos_idx] +=
+                    subset_active.template cast<CType>().sum() /
+                    static_cast<CType>(cluster_FOS[k][fos_idx].discrete.size());
+                fos_stats[k].solution_activation_rate[fos_idx] += 1.0;
+              }
+            }
+          }
+          for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
+            fos_stats[k].variables_activation_rate[fos_idx] /= fos_stats[k].solution_activation_rate[fos_idx];
+            fos_stats[k].solution_activation_rate[fos_idx] /= static_cast<CType>(cluster_solutions[k].size());
+          }
+        }
+
+        if (auto p = dynamic_cast<LinkageTreeFOS*>(discrete_model.get()); p != nullptr) {
+          p->unregister_similarity_callback();
+        }
+      } else {
+        for (usize k = 0; k < num_clusters; k++) {
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
+        }
+      }
+    }
+
+    usize max_discrete_subset_count = 0;
+    for (usize k = 0; k < num_clusters; k++) {
+      max_discrete_subset_count = std::max(max_discrete_subset_count, cluster_FOS[k].size());
+    }
+    return max_discrete_subset_count;
+  };
+
   void check_gom_backups(std::string_view info) {
     assert(solutions.size() == parents.size());
     for (usize i = 0; i < solutions.size(); i++) {
@@ -10581,6 +10851,9 @@ class Population {
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
 
+    generation = 0;
+    generations_until_next_fos_log = 0;
+
     return solutions_to_evaluate.size();
   };
 
@@ -10597,6 +10870,8 @@ class Population {
       std::iota(donor_pool.begin(), donor_pool.end(), 0);
     }
 
+    bool record_fos_stats = !fos_stats.empty();
+
     solutions_to_evaluate.clear();
 
     // TODO parallel?
@@ -10607,6 +10882,10 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
+        if (record_fos_stats) {
+          assert(fos_idx < fos_stats[k].usage_count.size());
+          fos_stats[k].usage_count[fos_idx]++;
+        }
         subsets[i] = &cluster_FOS[k][fos_idx];
         assert(subsets[i]->discrete.size() > 0);
 
@@ -10631,6 +10910,10 @@ class Population {
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
+
+            if (record_fos_stats) {
+              fos_stats[k].evaluation_count[fos_idx]++;
+            }
           } else if (anything_changed) {  // no acceptance, parent has to be updated now
             parents[i] = solutions[i];
           }
@@ -10656,7 +10939,19 @@ class Population {
         //     parents[i], problem.always_inherit_continuous(),
         //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
         solutions[i] = parents[i];
+
       } else {
+        if (record_fos_stats) {
+          auto fos_idx = subset_orders(i, subset_idx);
+
+          assert(fos_idx < cluster_FOS[k].size());
+          fos_stats[k].acceptance_count[fos_idx]++;
+          CType dist = problem.fitness().distance(solutions[i].quality(), parents[i].quality(), objective);
+          if (!isna(dist)) {
+            fos_stats[k].finite_acceptance_count[fos_idx]++;
+            fos_stats[k].cumulative_fitness_difference[fos_idx] += dist;
+          }
+        }
         solution_changed[i] = true;
         parents[i] = solutions[i];
       }
@@ -10950,6 +11245,10 @@ class Population {
   Mat<usize> subset_orders;            // per solution subset permutations
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
+  std::vector<FosStats> fos_stats;
+
+  u64 generation;
+  u64 generations_until_next_fos_log;
 };
 
 class MixedGOMEA : public MethodBase {

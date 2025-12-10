@@ -69,6 +69,7 @@ class GPContext {
         max_expression_size(max_expression_size),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
+        enable_subfunctions(enable_subfunctions),
         operators(std::move(operators)) {
     __goblin_runtime_assert(expression_template.is_valid());
     usize num_constant_values = const_repr == ConstantRepr::ERCs   ? 1
@@ -307,7 +308,12 @@ class GPContext {
 
     // in the modular GP-GOMEA paper (https://arxiv.org/pdf/2505.01262v1) there is this concept of "discounted" size to
     // not punish re-using subfunctions by only counting the subfunction nodes once.
-    Array<u32> visited = Array<u32>::Zero(num_discrete);
+    // unless subfunctions are enabled, the discounting has no effect
+    discount_size = discount_size && enable_subfunctions;
+    Array<u32> visited;
+    if (discount_size) {
+      visited = Array<u32>::Zero(num_discrete);
+    }
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
@@ -372,7 +378,9 @@ class GPContext {
           }
 
           if (value_kind[value] == ValueKind::Arg) {
-            visited(idx) = 0;
+            if (discount_size) {
+              visited(idx) = 0;
+            }
 
             // we need to replace the argument with the corresponding child of the caller
             // and then replace the stack entry with with the actual argument
@@ -411,7 +419,9 @@ class GPContext {
                                     call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
-            visited(idx) = 0;
+            if (discount_size) {
+              visited(idx) = 0;
+            }
             assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
@@ -538,8 +548,15 @@ class GPContext {
 
           // the arguments are in the correct order on the stack, so we just need to get the last arity indices on the
           // arg_stack
-          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
-          arg_stack[arg_stack_idx] = operators[v_idx]->format(args);
+          // std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()}; // TODO why does this trigger
+          // the address sanitizer even when the result is explicitly evaluated before overwriting anything in the
+          // arg_stack?
+          std::vector<std::string> args;
+          for (usize k = 0; k < arity; k++) {
+            args.push_back(arg_stack[arg_stack.size() - arity + k]);
+          }
+          std::string op = operators[v_idx]->format(args);
+          arg_stack[arg_stack_idx] = op;
 
           // pop the now used arguments from the stack, but keep the op result
           arg_stack.resize(arg_stack_idx + 1);
@@ -618,7 +635,8 @@ class GPContext {
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
-          eval_buffer.col(j) = X.col(v_idx);
+          eval_buffer.col(j) = X.col(
+              v_idx);  // @claude: runtime error: assumption of 128 byte alignment for pointer of type 'double *' failed
         } else if (value_kind[value] == ValueKind::Parameter) {
           eval_buffer.col(j) = params(v_idx);
         } else if (value_kind[value] == ValueKind::Constant) {
@@ -657,6 +675,72 @@ class GPContext {
     return outputs;
   }
 
+  // Matrix of size `num_discrete x num_discrete`, where the entry i,j
+  // corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)
+  // if both are from the same tree, otherwise 0
+  Mat<CType> normalized_root_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      CType di = static_cast<CType>(depth[i]);
+      if (di > norm) {
+        norm = di;
+      }
+    }
+    norm += 1.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) =
+            root[i] == root[j] ? (static_cast<CType>(depth[i]) + static_cast<CType>(depth[j])) * 0.5 : norm;
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+  };
+
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_node_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;  // = max distance + 1
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the earliest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+        } else {
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+    norm += 1.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (proximity(i, j) < 0.0) {
+          proximity(i, j) = norm;
+        }
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+  };
+  
   void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
 
@@ -753,6 +837,7 @@ class GPContext {
   usize max_expression_size;
   usize num_parameters;
   usize max_num_children;
+  bool enable_subfunctions;
 
   std::vector<std::shared_ptr<OperatorBase>> operators;
   std::vector<usize> op_idx2value;

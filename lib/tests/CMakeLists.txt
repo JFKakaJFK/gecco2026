@@ -34,6 +34,7 @@ set(
     mixed_mixed
     gp_operators
     sr
+    sr_stats
     sr_gradient_step
     archive_objectives
     evaluate
@@ -53,6 +54,7 @@ endforeach()
 
 target_compile_options(lib_test_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_sr PRIVATE -O2 -g)
+target_compile_options(lib_test_sr_stats PRIVATE -O2 -g)
 target_compile_options(lib_test_ga_sr PRIVATE -O2 -g)
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)

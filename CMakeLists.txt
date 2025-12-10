@@ -41,6 +41,7 @@ endif()
 
 include(CheckCXXCompilerFlag)
 # sanitizers don't work e.g. on arm macos
+# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined")
 if(GOBLIN_USE_ASAN)
     check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
     if(COMPILER_SUPPORTS_ASAN)
@@ -66,7 +67,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(
         CMAKE_CXX_FLAGS_DEBUG
-        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
+        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g -fno-vectorize -fno-slp-vectorize" # -fsanitize=bounds -fsanitize=alignment"
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
@@ -98,6 +99,7 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
 
     include(cmake/litgen_cmake.cmake)
 
+    set(NB_USE_SUBMODULE_DEPS ON) # hotfix for https://github.com/wjakob/nanobind/issues/1237
     litgen_find_nanobind()
     set(python_module_sources
         pylib/nanobind/module.cpp                  # The python module entry point
