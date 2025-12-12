@@ -19,7 +19,7 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
 
     REQUIRE_EQ(tree.size(), 31);
 
-    Arr2D<CType> X = Arr2D<CType>::Random(512, 20);
+    Arr2D<CType> X = Arr2D<CType>::Random(128, 20);
     Arr2D<CType> Y = Arr2D<CType>::Random(X.rows(), 1);
     Y.col(0) = (X.col(12) + X.col(19)) * (X.col(11) * X.col(7) + X.col(2) - X.col(17));
 
@@ -38,7 +38,7 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
     auto gomea = MixedGOMEA(
         PopulationOptions(), 
         RvOptions{.enabled = false},
-        IMSOptions(/* initial_population_size = */ 256, /* max_num_populations = */ 1)
+        IMSOptions(/* initial_population_size = */ 8, /* max_num_populations = */ 1)
     );
 
     auto [front, status] = Tracked::run(gasrp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);

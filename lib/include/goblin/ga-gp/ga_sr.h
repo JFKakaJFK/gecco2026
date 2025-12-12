@@ -4,6 +4,7 @@
 
 #include "goblin/ga-gp/evaluate.h"
 #include "goblin/ga-gp/helper.h"
+#include "goblin/ga-gp/misc.h"
 #include "goblin/ga-gp/types.h"
 #include "goblin/gp/context.h"
 #include "goblin/gp/init.h"
@@ -54,11 +55,16 @@ class GASRProblem : public GPInstanceBase {
             // Copy data to GPU
             _copy_data_to_gpu(X_train, Y_train);
             _num_solutions_allocated = 0;
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
 
         ~GASRProblem() {
             free_gpu();
+        }
+
+        void set_kernel_version(KernelVersion kernel_version) {
+            _kernel_version = kernel_version;
         }
 
         void free_gpu() {
@@ -79,7 +85,7 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-            int num_solutions = indices.size();
+            size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
                 return;
@@ -95,11 +101,16 @@ class GASRProblem : public GPInstanceBase {
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
+            // Determine launch config
+            const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, _kernel_version);
+            // Sanity check
+            config.check();
+
             // Copy solution data to GPU
             _copy_solutions_to_gpu(node_type, node_value);
 
-            // Allocate memory for se and mse on device
-            _allocate_results_on_gpu(num_solutions);
+            // Allocate memory for results on device
+            _allocate_results_on_gpu(&config, num_solutions);
 
             // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
             evaluate_kernel_wrapper(
@@ -107,23 +118,25 @@ class GASRProblem : public GPInstanceBase {
                 d_Y,
                 d_type,
                 d_value,
+                d_partial,
                 _solution_length,
                 num_solutions,
                 _num_datapoints,
-                d_se
+                &config
             );
 
             // Launch mse kernel that calculates the mse over all datapoints for each solution
-            compute_mse_kernel_wrapper(
-                d_se,
-                d_mse,
+            mse_kernel_wrapper(
+                d_partial,
+                d_result,
                 num_solutions,
-                _num_datapoints
+                _num_datapoints,
+                &config
             );
 
             // Retrieve the results from the GPU
             std::vector<float> result(num_solutions);
-            copy_from_device(result.data(), d_mse, num_solutions);
+            copy_from_device(result.data(), d_result, num_solutions);
 
             size_t k = 0;
             for (auto i : indices) {
@@ -232,10 +245,25 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(size_t num_solutions) {
+        void _allocate_results_on_gpu(const LaunchConfig* config, size_t num_solutions) {
+            const size_t num_partials = 
+                (config->kernel_version == KernelVersion::BlockReduce)
+                    ? num_solutions * config->eval.grid.y
+                    : num_solutions * _num_datapoints;
+
+            // Check if we need more memory than we currently have allocated
+            if (_num_partials_allocated < num_partials) {
+                free_on_gpu(d_partial);
+
+                d_partial = allocate_on_gpu<float>(num_partials);
+                _num_partials_allocated = num_partials;
+            }
+
+            // Check if we need more memory than we currently have allocated
             if (_num_results_allocated < num_solutions) {
-                d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
-                d_mse = allocate_on_gpu<float>(num_solutions);
+                free_on_gpu(d_result);
+
+                d_result = allocate_on_gpu<float>(num_solutions);
                 _num_results_allocated = num_solutions;
             }
         }
@@ -252,13 +280,15 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _free_results_on_gpu() {
-            free_on_gpu(d_se);
-            free_on_gpu(d_mse);
+            free_on_gpu(d_partial);
+            free_on_gpu(d_result);
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
 
         // bool _solution_allocated;
         size_t _num_solutions_allocated;
+        size_t _num_partials_allocated;
         size_t _num_results_allocated;
 
         // GPU pointers
@@ -266,8 +296,8 @@ class GASRProblem : public GPInstanceBase {
         float* d_Y = nullptr;
         float* d_type = nullptr;
         float* d_value = nullptr;
-        float* d_se = nullptr;
-        float* d_mse = nullptr;
+        float* d_partial = nullptr;
+        float* d_result = nullptr;
 
         MOFitness _archive_fitness;
         MOFitness _fitness;
@@ -279,8 +309,10 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        int _num_datapoints;
-        int _solution_length;
+        size_t _num_datapoints;
+        size_t _solution_length;
+
+        KernelVersion _kernel_version = KernelVersion::BlockReduce;
 };
 
 }

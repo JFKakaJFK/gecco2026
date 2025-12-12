@@ -6,7 +6,14 @@
 
 namespace goblin {
 
-enum class NodeType : u_int8_t {
+enum class KernelVersion : uint8_t {
+    Baseline,
+    Restrict,
+    SharedMemory,
+    BlockReduce,
+};
+
+enum class NodeType : uint8_t {
     Input,
     Constant,
     Operator,

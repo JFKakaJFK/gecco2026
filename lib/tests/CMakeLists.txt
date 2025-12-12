@@ -40,7 +40,7 @@ set(
     ctx_subfunction
     ctx_introns
     context
-    helper
+    misc
     ga_sr
     kernel
 )
