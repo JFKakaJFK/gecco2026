@@ -191,3 +191,18 @@ def prepare_problem(
             y_fold,
             is_synthetic,
         )
+
+
+def problem_info(name: str, X: np.ndarray, y: np.ndarray):
+    y_mean = float(np.mean(y))
+    y_var = float(np.var(y))
+    # LS
+    X_ls = np.ones((X.shape[0], X.shape[1] + 1))
+    X_ls[:, :-1] = X
+    b = np.linalg.lstsq(X_ls, y)[0]
+    y_ls = X_ls @ b
+    r2_ls = 1 - np.mean((y_ls - y) ** 2) / y_var
+
+    print(
+        f"{name}:\n - #rows: {X.shape[0]}\n - #features: {X.shape[1]}\n - mean_y: {y_mean}\n - var_y: {y_var}\n - Linear regression R2: {r2_ls}"
+    )

@@ -42,7 +42,7 @@ def run_one(
                 logfile,  #
                 loginfo,
                 # report_intermediate_results=False,
-                max_generations_until_next_report=1,
+                max_generations_until_next_report=10,
                 generation_factor=1,
                 initial_evaluations_until_next_report=1,
                 max_evaluations_until_next_report=100000,

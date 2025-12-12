@@ -34,6 +34,7 @@ def plot_convergence_so(
     nsamples: int = 25,
     ymin: float | str | None = None,
     ymax: float | str | None = None,
+    y_truncation_quantile: float = 0.975,
     **kwargs,
 ):
     if methods is None:
@@ -245,16 +246,15 @@ def plot_convergence_so(
                     else:
                         ax.set_ylabel("")
 
-                    q = 0.975
                     if global_ymin == "auto":
-                        ymin = df["value"].quantile(1 - q)
+                        ymin = df["value"].quantile(1 - y_truncation_quantile)
                         if np.isfinite(ymin):  # and np.isfinite(ymax):
                             ax.set_ylim(ymin=ymin)  # , ymax=ymax)
                     elif isinstance(ymin, (int, float)):
                         ax.set_ylim(ymin=ymin)
 
                     if global_ymax == "auto":
-                        ymax = df["value"].quantile(q)
+                        ymax = df["value"].quantile(y_truncation_quantile)
                         if np.isfinite(ymax):
                             ax.set_ylim(ymax=ymax)
                     elif isinstance(ymin, (int, float)):

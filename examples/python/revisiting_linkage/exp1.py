@@ -3,12 +3,13 @@ import pathlib
 import numpy as np
 import pygom
 from pygom import *
+from tqdm import tqdm
 
-from src.config import c, instantiate
-from src.data import prepare_problem
+from src.config import c, extract, instantiate, load_config
+from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
-from src.run import run_tasks
+from src.run import compute_run_path, run_tasks
 
 REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
@@ -55,17 +56,7 @@ def problems(rng):
             NUM_FOLDS,
             DATA_DIR,
         ):
-            y_mean = float(np.mean(y_fold[:, 0]))
-            y_var = float(np.var(y_fold[:, 0]))
-            X_ls = np.ones((X_fold.shape[0], X_fold.shape[1] + 1))
-            X_ls[:, :-1] = X_fold
-            b = np.linalg.lstsq(X_ls, y_fold[:, 0])[0]
-            y_ls = X_ls @ b
-            r2_ls = 1 - np.mean((y_ls - y_fold[:, 0]) ** 2) / y_var
-
-            print(
-                f"{problem} (Fold {fold}):\n - #rows: {X_fold.shape[0]}\n - #features: {X_fold.shape[1]}\n - mean_y: {y_mean}\n - var_y: {y_var}\n - Linear regression R2: {r2_ls}"
-            )
+            # problem_info(f"{problem} (Fold {fold})", X_fold, y_fold[:, 0])
 
             min_y, max_y = (
                 float(np.nanmin(y_fold[:, 0])),
@@ -195,15 +186,52 @@ def all_tasks():
             )
 
 
+def status():
+    import json
+
+    total, completed = 0, 0
+    for run_info, conf in tqdm(all_tasks()):
+        total += 1
+        run_dir = compute_run_path(LOG_DIR, run_info)
+
+        task = extract(conf)
+        task_path = run_dir / "task.yaml"
+
+        logfile = run_dir / "stats.csv"
+
+        done = False
+        if task_path.is_file() and logfile.is_file():
+            existing = load_config(task_path)
+
+            if task == existing or json.dumps(task) == json.dumps(existing):
+                with open(logfile, "r") as f:
+                    *_, last_line = f.readlines()
+                    status = last_line.split(",")[0]
+                    if status != "Running" or status != "Aborted":
+                        done = True
+        if done:
+            completed += 1
+        else:
+            print(run_dir)
+
+    if total > 0:
+        print(
+            f"Status: {100.0 * (completed / total):.2f}% done ({completed} / {total})"
+        )
+
+
 def main():
+    status()
+    exit()
+
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        # max_workers=1,
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,
+    # )
 
     with load_results(
         LOG_DIR,
@@ -218,6 +246,8 @@ def main():
             y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
             y_agg="MAX",  # higher R^2 is better
             y_label="$R^2$ Train",
+            ymin="auto",
+            ymax="auto",
             # merge folds and runs into one seaborn "unit"
             unit_query="format('{}.{}', fold, run)",
             # split up the plot into the following rows
