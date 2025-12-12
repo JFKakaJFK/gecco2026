@@ -102,35 +102,36 @@ def plot_cpu_gpu(datetime, dataset_sizes):
     plt.savefig(f"{path}/speedup_plot.png", dpi=300)
 
 
-def plot_gpu_versions(datetime: list[str]):
+def plot_kernel_versions(datetime: str):
     records = []
 
-    for dt in datetime:
-        path = Path("experiments/results/") / dt
+    path = Path("experiments/results/") / datetime
 
-        for file in path.glob("*-*-pop*-obs*-iter*.csv"):
-            df = pd.read_csv(file)
 
-            # Extract metadata
-            _, version, population, observations, iterations = file.stem.split("-")
+    for file in path.glob("*-*-pop*-obs*-iter*.csv"):
+        df = pd.read_csv(file)
 
-            population = int(population.replace("pop", ""))
-            observations = int(observations.replace("obs", ""))
-            iterations = int(iterations.replace("iter", ""))
+        # Extract metadata
+        dataset, kernel_version, population, observations, iterations = file.stem.split("-")
 
-            converged = df[df["status"] == "Converged"]
-            if converged.empty:
-                continue
+        population = int(population.replace("pop", ""))
+        observations = int(observations.replace("obs", ""))
+        iterations = int(iterations.replace("iter", ""))
 
-            row = converged.iloc[0]
-            threads_per_sec =  (row["evaluations"] * observations * population) / row["eval_time_seconds"]
+        converged = df[df["status"] == "Converged"]
+        if converged.empty:
+            continue
 
-            records.append({
-                "version": version,
-                "observations": observations,
-                "iteration": iterations,
-                "threads_per_sec": threads_per_sec
-            })
+        row = converged.iloc[0]
+        threads_per_sec = (row["evaluations"] * observations * population) / row["eval_time_seconds"]
+
+        records.append({
+            "dataset": dataset,
+            "version": kernel_version,
+            "observations": observations,
+            "iteration": iterations,
+            "threads_per_sec": threads_per_sec
+        })
 
     df_all = pd.DataFrame(records)
 
@@ -140,11 +141,16 @@ def plot_gpu_versions(datetime: list[str]):
         .agg(threads_per_sec=("threads_per_sec", "mean"))
     )
 
+    versions = df_all["version"].unique()
+    palette = sns.color_palette("tab10", n_colors=len(versions))
+    color_map = {v: palette[i] for i, v in enumerate(versions)}
+
     sns.scatterplot(
         data=df_all,
         x="observations",
         y="threads_per_sec",
         hue="version",
+        palette=color_map,
         alpha=0.7
     )
 
@@ -156,7 +162,8 @@ def plot_gpu_versions(datetime: list[str]):
             y="threads_per_sec",
             scatter=False,
             logx=True,
-            label=f"{version} trend"
+            color=color_map[version],
+            label=f"{version} trend",
         )
 
     plt.xscale("log")
@@ -164,7 +171,7 @@ def plot_gpu_versions(datetime: list[str]):
     plt.ylabel("Threads per Second")
     plt.title("Kernel Versions vs Number of Observations")
     plt.tight_layout()
-    plt.savefig("gpu_scaling_log_scatter_regression.png", dpi=300)
+    plt.savefig(f"{path}/kernel_scaling.png", dpi=300)
 
     # Pivot baseline
     baseline = df_mean[df_mean["version"] == "baseline"][["observations", "threads_per_sec"]]
@@ -187,9 +194,9 @@ def plot_gpu_versions(datetime: list[str]):
     plt.xscale("log")
     plt.xlabel("Number of Observations (log scale)")
     plt.ylabel("Relative Performance vs Baseline")
-    plt.title("GPU Versions Relative Performance")
-    plt.axhline(1.0, linestyle="--", color="gray", label="Baseline")
+    plt.title("Kernel Versions Relative Performance")
+    # plt.axhline(1.0, linestyle="--", color="gray", label="Baseline")
     plt.legend()
     plt.tight_layout()
-    plt.savefig("gpu_relative_performance.png", dpi=300)
+    plt.savefig(f"{path}/kernel_relative_performance.png", dpi=300)
     # plt.show()
