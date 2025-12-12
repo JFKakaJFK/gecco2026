@@ -3511,7 +3511,16 @@ class CompleteInit final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/types.h included by goblin/ga-gp/evaluate.h                               //
+//                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_MISC_H
+#define _GOBLIN_GA_GP_MISC_H
+
+#include "assert.h"
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/types.h included by goblin/ga-gp/misc.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_TYPES_H
 #define _GOBLIN_GA_GP_TYPES_H
@@ -3519,7 +3528,14 @@ class CompleteInit final : public DiscreteInitBase {
 
 namespace goblin {
 
-enum class NodeType : u_int8_t {
+enum class KernelVersion : uint8_t {
+    Baseline,
+    Restrict,
+    SharedMemory,
+    BlockReduce,
+};
+
+enum class NodeType : uint8_t {
     Input,
     Constant,
     Operator,
@@ -3551,167 +3567,177 @@ constexpr float Div = Op(Operator::Div);
 #endif /* _GOBLIN_GA_GP_TYPES_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/misc.h continued                                                          //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define MAX_THREADS_PER_BLOCK 1024
+#define WARP_SIZE 32
+
+namespace goblin {
+
+constexpr int round_up(int value, int multiple) { return ((value + multiple - 1) / multiple) * multiple; }
+constexpr int ceil_div(int a, int b) { return (a + b - 1) / b; }
+
+struct KernelDim {
+    unsigned int x = 1;
+    unsigned int y = 1;
+    unsigned int z = 1;
+
+    constexpr KernelDim() = default;
+    constexpr KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1)
+        : x(_x), y(_y), z(_z) {}
+
+    static inline KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
+        KernelDim dim{WARP_SIZE};
+        int min_redundant = max_threads;
+
+        for (int threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+            // Round up division to determine number of blocks needed
+            int blocks_needed = ceil_div(count, threads);
+            int redundant = blocks_needed * threads - count;
+
+            if (redundant < min_redundant) {
+                min_redundant = redundant;
+                dim.x = threads;
+            }
+
+            // Early exit if perfect fit is found
+            if (redundant == 0) break;
+        }
+
+        return dim;
+    }
+
+    void check() const {
+        assert(x * y * z <= MAX_THREADS_PER_BLOCK);
+    }
+
+    constexpr bool operator==(const KernelDim& other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
+
+struct KernelConfig {
+    KernelDim block;
+    KernelDim grid;
+
+    constexpr KernelConfig() = default;
+    constexpr KernelConfig(KernelDim _block, KernelDim _grid)
+        : block(_block), grid(_grid) {}
+
+    static inline KernelConfig for_eval(int num_solutions, int num_datapoints) {
+        KernelConfig config;
+
+        config.block = KernelDim::determine(num_datapoints);
+        config.grid.x = num_solutions;
+        config.grid.y = ceil_div(num_datapoints, config.block.x);
+
+        return config;
+    };
+
+    static inline KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
+        KernelConfig config;
+
+        if (kernel_version == KernelVersion::BlockReduce) {
+            // Number of partial results determines the number of threads in a block
+            // Rounded to a multiple of 32
+            config.block.x = round_up(num_partial, WARP_SIZE);
+            // Each block determine the mse for a single solution
+            config.grid.x = num_solutions;
+        } else {
+            config.block = KernelDim::determine(num_solutions);
+            config.grid.x = ceil_div(num_solutions, config.block.x);
+        }
+
+        return config;
+    }
+
+    void check() const {
+        block.check();
+        // grid.check(); TODO
+    }
+
+    constexpr bool operator==(const KernelConfig& other) const {
+        return block == other.block && grid == other.grid;
+    }
+};
+
+struct LaunchConfig {
+    KernelConfig eval;
+    KernelConfig mse;
+    KernelVersion kernel_version = KernelVersion::Baseline;
+
+    constexpr LaunchConfig() = default;
+    constexpr LaunchConfig(KernelConfig _eval, KernelConfig _mse, KernelVersion version = KernelVersion::Baseline)
+        : eval(_eval), mse(_mse), kernel_version(version) {}
+
+    static inline LaunchConfig determine(
+        int num_solutions,
+        int num_datapoints,
+        KernelVersion kernel_version
+    ) {
+        KernelConfig eval_config = KernelConfig::for_eval(num_solutions, num_datapoints);
+        KernelConfig mse_config = KernelConfig::for_mse(num_solutions, eval_config.grid.y, kernel_version);
+
+        return LaunchConfig(eval_config, mse_config, kernel_version);
+    }
+
+    void check() const {
+        eval.check();
+        mse.check();
+    }
+
+    constexpr bool operator==(const LaunchConfig& other) const {
+        return eval == other.eval && mse == other.mse && kernel_version == other.kernel_version;
+    }
+};
+
+}
+
+#endif /* _GOBLIN_GA_GP_MISC_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/evaluate.h continued                                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace goblin {
 
 #ifdef __CUDACC__
-
-/**
- * @brief Evaluate all solutions over all datapoints and compute per-datapoint squared error.
- *
- * This kernel evaluates a population of solutions (assumed to be expression trees) over
- * a dataset and computes the squared error for every (solution, datapoint) pair.
- *
- * The CUDA grid is structured as follows:
- * - gridDim.x -> number of solutions
- * - gridDim.y -> tiles of datapoints
- * The CUDA blocks are structured as follows:
- * - blockDim.x -> number of datapoints in a tile
- *
- * This structure guarantees that all threads in a block evaluate the same solution, thus
- * minimizing divergence.
- *
- * Each active thread within a block evaluates at most one datapoint.
- *
- * ---
- * ### Shared memory
- * For efficient reading of solution data, the solution data is read from global memory and
- * written into shared memory. Shared memory is available to all threads in a block, so every
- * thread has access to the solution data. The type and value arrays are laid out consecutively
- * and are loaded using a cooperative strided load. This means that all threads in the block
- * (if required) cooperate with the load, hiding some of the read latencies. Only after all data
- * is loaded are threads allowed to continue.
- *
- * ---
- * ### Output and squared error computation
- * Every thread that corresponds to a datapoint computes the output of the solution using
- * the 'compute_tree_output' device function. The output is then used to compute the squared error
- * and the final result is stored in global memory.
- *
- * ---
- * ### Thread mapping
- * - solution_index  = blockIdx.x
- * - datapoint_index = blockIdx.y * blockDim.x + threadIdx.x
- *
- * ---
- * ### Global Memory Access Pattern
- * Input layout:
- *   v_type  [solution_index * solution_length + i]
- *   v_value [solution_index * solution_length + i]
- *   X       [datapoint_index]
- *   Y       [datapoint_index]
- *
- * Output layout:
- *   result[solution_index * num_datapoints + datapoint_index]
- *
- * ---
- * ### Assumptions & Requirements
- * - Grid dimensions must be:
- *     grid.x = num_solutions
- *     grid.y = ceil(num_datapoints / blockDim.x)
- * - X must be in column-major order: X[datapoint + feature * num_datapoints].
- * - MAX_NUM_NODES must be >= solution_length.
- * - MAX_STACK_DEPTH must be >= maximum expression evaluation stack depth.
- * - Only binary operators (arity = 2) are currently supported.
- * - Division by zero returns 0.0f.
- * - v_type encodes NodeType as float-cast enum values.
- * - v_value encodes:
- *     - input indices for Input nodes,
- *     - literal values for Constant nodes,
- *     - operator IDs (float-cast enums) for Operator nodes.
- * - result must have size >= num_solutions * num_datapoints.
- *
- * ---
- * @param[in]  X               Flattened input datapoint array of length num_datapoints * num_features (column-major)
- * @param[in]  Y               Target output array of length num_datapoints
- * @param[in]  v_type          Concatenated node-type arrays for all solutions
- * @param[in]  v_value         Concatenated node-value arrays for all solutions
- * @param[in]  solution_length Number of nodes per solution
- * @param[in]  num_datapoints  Total number of datapoints
- * @param[out] result          Output squared-error matrix of size [num_solutions * num_datapoints]
- */
 __global__
-void evaluate_kernel(
+void evaluate_kernel_baseline(
     float* X,
     float* Y,
     float* v_type,
     float* v_value,
+    float* result,
     int solution_length,
-    int num_datapoints,
-    float* result
+    int num_datapoints
 );
 
-/**
- * @brief Evaluate a single solution (expression tree) for one datapoint.
- *
- * This device function interprets a linearized expression tree in postfix
- * (stack-based) form and evaluates it for a single datapoint. The evaluation
- * is performed using a per-thread stack stored in registers/local memory.
- *
- * Each node in the solution is processed sequentially from left to right:
- *  - Input nodes push a feature value from X onto the stack.
- *  - Constant nodes push a literal value onto the stack.
- *  - Operator nodes pop operands from the stack, apply a binary operation,
- *    and push the result back onto the stack.
- *
- * At the end of evaluation, the final result is expected to be at the top
- * of the stack and is returned to the caller.
- *
- * ---
- * ### Expression Encoding
- * The solution is encoded using two parallel arrays:
- *  - type[i]  -> NodeType enum value (cast to float)
- *  - value[i] -> Node-dependent value:
- *      - Input:    feature index
- *      - Constant: literal floating-point constant
- *      - Operator: Operator enum value (cast to float)
- *
- * ---
- * ### Memory Access Pattern
- * Feature values are loaded from X using (column-major) layout:
- *
- *     X[input_index][datapoint] = X[datapoint + input_index * num_datapoints]
- *
- * This guarantees coalesced memory access when consecutive threads evaluate
- * the same feature across consecutive datapoints.
- *
- * ---
- * ### Operator Semantics
- * Currently supported binary operators:
- *  - Add: a + b
- *  - Sub: a - b
- *  - Mul: a * b
- *  - Div: (b == 0) ? 0 : a / b
- *
- * Division by zero deterministically returns 0.0f.
- *
- * ---
- * ### Stack Semantics & Safety
- * - A fixed-size per-thread evaluation stack of size MAX_STACK_DEPTH is used.
- * - The stack pointer grows upward on push and downward on pop.
- * - The expression is assumed to be well-formed:
- *     - No stack underflow during operator evaluation.
- *     - Exactly one final value remains on the stack at termination.
- * - MAX_STACK_DEPTH must be >= the maximum runtime stack depth of any solution.
- *
- * ---
- * @param[in] X               Column-major input data array of size num_features * num_datapoints
- * @param[in] type            Node type array for a single solution
- * @param[in] value           Node value array for a single solution
- * @param[in] solution_length Number of nodes in the solution
- * @param[in] num_datapoints  Total number of datapoints (used for addressing X)
- * @param[in] datapoint_index Index of the datapoint to evaluate
- *
- * @return Evaluated floating-point output of the solution for the given datapoint
- *
- * @note This function performs no bounds checking on the evaluation stack.
- *       Incorrectly encoded expressions may cause stack underflow, overflow,
- *       or undefined behavior.
- */
+__global__
+void evaluate_kernel_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ result,
+    int solution_length,
+    int num_datapoints
+);
+
+__global__
+void evaluate_kernel_shared_memory(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ result,
+    int solution_length,
+    int num_datapoints
+);
+
 __device__
-float compute_tree_output(
+float compute_tree_output_baseline(
     float* X,
     float* type,
     float* value,
@@ -3720,10 +3746,28 @@ float compute_tree_output(
     int datapoint_index
 );
 
+__device__
+float compute_tree_output_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    int solution_length,
+    int num_datapoints,
+    int datapoint_index
+);
+
 __global__
-void compute_mse_kernel(
-    float* se,
-    float* mse,
+void compute_mse_kernel_baseline(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    int num_solutions,
+    int num_datapoints
+);
+
+__global__
+void mse_kernel_restrict(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
     int num_solutions,
     int num_datapoints
 );
@@ -3733,10 +3777,10 @@ void compute_tree_output_wrapper(
     float* X,
     float* type,
     float* value,
+    float* result,
     int solution_length,
     int num_datapoints,
-    int datapoint_index,
-    float* result
+    int datapoint_index
 );
 #endif
 
@@ -3745,17 +3789,19 @@ void evaluate_kernel_wrapper(
     float* Y,
     float* type,
     float* value,
+    float* partial,
     int solution_length,
     int num_solutions,
     int num_datapoints,
-    float* se
+    const LaunchConfig* config
 );
 
-void compute_mse_kernel_wrapper(
-    float* se,
-    float* mse,
+void mse_kernel_wrapper(
+    float* partial,
+    float* result,
     int num_solutions,
-    int num_datapoints
+    int num_datapoints,
+    const LaunchConfig* config
 );
 
 float test_compute_output_kernel(
@@ -3772,23 +3818,15 @@ std::vector<float> test_evaluate_kernel(
     std::vector<float> h_type,
     std::vector<float> h_value,
     int num_solutions,
-    int num_datapoints
+    int num_datapoints,
+    KernelVersion version
 );
 
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se,
     int num_solutions,
-    int num_datapoints
-);
-
-void test_evaluate_and_mse_kernel(
-    std::vector<float> h_X,
-    std::vector<float> h_Y,
-    std::vector<float> h_type,
-    std::vector<float> h_value,
-    int num_solutions,
     int num_datapoints,
-    float* result
+    KernelVersion version
 );
 
 }
@@ -3810,7 +3848,7 @@ void test_evaluate_and_mse_kernel(
 
 // Maximum number of threads per CUDA block, currently defined as 1024,
 // which is the maximum for modern NVIDIA GPUs.
-#define MAX_THREADS_PER_BLOCK 1024
+
 
 namespace goblin {
 
@@ -3828,11 +3866,9 @@ template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count
 
 template <typename T> void free_on_gpu(T* d_ptr);
 
-int compute_block_size(int count);
+template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
 
 };
-
-
 
 #endif /* _GOBLIN_GA_GP_HELPER_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5575,11 +5611,16 @@ class GASRProblem : public GPInstanceBase {
             // Copy data to GPU
             _copy_data_to_gpu(X_train, Y_train);
             _num_solutions_allocated = 0;
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
 
         ~GASRProblem() {
             free_gpu();
+        }
+
+        void set_kernel_version(KernelVersion kernel_version) {
+            _kernel_version = kernel_version;
         }
 
         void free_gpu() {
@@ -5600,7 +5641,7 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-            int num_solutions = indices.size();
+            size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
                 return;
@@ -5616,11 +5657,16 @@ class GASRProblem : public GPInstanceBase {
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
+            // Determine launch config
+            const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, _kernel_version);
+            // Sanity check
+            config.check();
+
             // Copy solution data to GPU
             _copy_solutions_to_gpu(node_type, node_value);
 
-            // Allocate memory for se and mse on device
-            _allocate_results_on_gpu(num_solutions);
+            // Allocate memory for results on device
+            _allocate_results_on_gpu(&config, num_solutions);
 
             // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
             evaluate_kernel_wrapper(
@@ -5628,23 +5674,25 @@ class GASRProblem : public GPInstanceBase {
                 d_Y,
                 d_type,
                 d_value,
+                d_partial,
                 _solution_length,
                 num_solutions,
                 _num_datapoints,
-                d_se
+                &config
             );
 
             // Launch mse kernel that calculates the mse over all datapoints for each solution
-            compute_mse_kernel_wrapper(
-                d_se,
-                d_mse,
+            mse_kernel_wrapper(
+                d_partial,
+                d_result,
                 num_solutions,
-                _num_datapoints
+                _num_datapoints,
+                &config
             );
 
             // Retrieve the results from the GPU
             std::vector<float> result(num_solutions);
-            copy_from_device(result.data(), d_mse, num_solutions);
+            copy_from_device(result.data(), d_result, num_solutions);
 
             size_t k = 0;
             for (auto i : indices) {
@@ -5753,10 +5801,25 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(size_t num_solutions) {
+        void _allocate_results_on_gpu(const LaunchConfig* config, size_t num_solutions) {
+            const size_t num_partials =
+                (config->kernel_version == KernelVersion::BlockReduce)
+                    ? num_solutions * config->eval.grid.y
+                    : num_solutions * _num_datapoints;
+
+            // Check if we need more memory than we currently have allocated
+            if (_num_partials_allocated < num_partials) {
+                free_on_gpu(d_partial);
+
+                d_partial = allocate_on_gpu<float>(num_partials);
+                _num_partials_allocated = num_partials;
+            }
+
+            // Check if we need more memory than we currently have allocated
             if (_num_results_allocated < num_solutions) {
-                d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
-                d_mse = allocate_on_gpu<float>(num_solutions);
+                free_on_gpu(d_result);
+
+                d_result = allocate_on_gpu<float>(num_solutions);
                 _num_results_allocated = num_solutions;
             }
         }
@@ -5773,13 +5836,15 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _free_results_on_gpu() {
-            free_on_gpu(d_se);
-            free_on_gpu(d_mse);
+            free_on_gpu(d_partial);
+            free_on_gpu(d_result);
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
 
         // bool _solution_allocated;
         size_t _num_solutions_allocated;
+        size_t _num_partials_allocated;
         size_t _num_results_allocated;
 
         // GPU pointers
@@ -5787,8 +5852,8 @@ class GASRProblem : public GPInstanceBase {
         float* d_Y = nullptr;
         float* d_type = nullptr;
         float* d_value = nullptr;
-        float* d_se = nullptr;
-        float* d_mse = nullptr;
+        float* d_partial = nullptr;
+        float* d_result = nullptr;
 
         MOFitness _archive_fitness;
         MOFitness _fitness;
@@ -5800,8 +5865,10 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        int _num_datapoints;
-        int _solution_length;
+        size_t _num_datapoints;
+        size_t _solution_length;
+
+        KernelVersion _kernel_version = KernelVersion::BlockReduce;
 };
 
 }

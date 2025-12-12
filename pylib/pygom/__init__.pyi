@@ -1255,10 +1255,22 @@ class CompleteInit(DiscreteInitBase):
 #
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/types.h included by goblin/ga-gp/evaluate.h                               //
+#                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_MISC_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/types.h included by goblin/ga-gp/misc.h                                   //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_TYPES_H
 #
+
+class KernelVersion(enum.IntEnum):
+    baseline = enum.auto()  # (= 0)
+    restrict = enum.auto()  # (= 1)
+    shared_memory = enum.auto()  # (= 2)
+    block_reduce = enum.auto()  # (= 3)
 
 class NodeType(enum.IntEnum):
     input = enum.auto()  # (= 0)
@@ -1288,6 +1300,99 @@ def op(op: Operator) -> float:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/misc.h continued                                                          //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+def round_up(value: int, multiple: int) -> int:
+    pass
+
+def ceil_div(a: int, b: int) -> int:
+    pass
+
+class KernelDim:
+    x: int = 1
+    y: int = 1
+    z: int = 1
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(self, _x: int, _y: int = 1, _z: int = 1) -> None:
+        pass
+
+    @staticmethod
+    def determine(count: int, max_threads: int = MAX_THREADS_PER_BLOCK) -> KernelDim:
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: KernelDim) -> bool:
+        pass
+
+class KernelConfig:
+    block: KernelDim
+    grid: KernelDim
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(self, _block: KernelDim, _grid: KernelDim) -> None:
+        pass
+
+    @staticmethod
+    def for_eval(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        pass
+
+    @staticmethod
+    def for_mse(
+        num_solutions: int, num_partial: int, kernel_version: KernelVersion
+    ) -> KernelConfig:
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: KernelConfig) -> bool:
+        pass
+
+class LaunchConfig:
+    eval: KernelConfig
+    mse: KernelConfig
+    kernel_version: KernelVersion = KernelVersion.baseline
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(
+        self,
+        _eval: KernelConfig,
+        _mse: KernelConfig,
+        version: KernelVersion = KernelVersion.baseline,
+    ) -> None:
+        pass
+
+    @staticmethod
+    def determine(
+        num_solutions: int, num_datapoints: int, kernel_version: KernelVersion
+    ) -> LaunchConfig:
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: LaunchConfig) -> bool:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/evaluate.h continued                                                      //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1296,15 +1401,20 @@ def evaluate_kernel_wrapper(
     y: float,
     type: float,
     value: float,
+    partial: float,
     solution_length: int,
     num_solutions: int,
     num_datapoints: int,
-    se: float,
+    config: LaunchConfig,
 ) -> None:
     pass
 
-def compute_mse_kernel_wrapper(
-    se: float, mse: float, num_solutions: int, num_datapoints: int
+def mse_kernel_wrapper(
+    partial: float,
+    result: float,
+    num_solutions: int,
+    num_datapoints: int,
+    config: LaunchConfig,
 ) -> None:
     pass
 
@@ -1324,23 +1434,13 @@ def test_evaluate_kernel(
     h_value: List[float],
     num_solutions: int,
     num_datapoints: int,
+    version: KernelVersion,
 ) -> List[float]:
     pass
 
 def test_compute_mse_kernel(
-    se: List[float], num_solutions: int, num_datapoints: int
+    se: List[float], num_solutions: int, num_datapoints: int, version: KernelVersion
 ) -> List[float]:
-    pass
-
-def test_evaluate_and_mse_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    result: float,
-) -> None:
     pass
 
 # #endif
@@ -1356,8 +1456,8 @@ def test_evaluate_and_mse_kernel(
 # #ifndef _GOBLIN_GA_GP_HELPER_H
 #
 
-def compute_block_size(count: int) -> int:
-    pass
+# Maximum number of threads per CUDA block, currently defined as 1024,
+# which is the maximum for modern NVIDIA GPUs.
 
 # #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2191,6 +2291,9 @@ class GASRProblem(GPInstanceBase):
         constant_init_upper_bound: float = 1.0,
         target_objectives: Optional[List[float]] = None,
     ) -> None:
+        pass
+
+    def set_kernel_version(self, kernel_version: KernelVersion) -> None:
         pass
 
     def free_gpu(self) -> None:

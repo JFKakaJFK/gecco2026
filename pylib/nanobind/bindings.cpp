@@ -1795,8 +1795,18 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
   //
+  // #ifndef _GOBLIN_GA_GP_MISC_H
+  //
   // #ifndef _GOBLIN_GA_GP_TYPES_H
   //
+
+
+  auto pyEnumKernelVersion =
+      nb::enum_<goblin::KernelVersion>(m, "KernelVersion", nb::is_arithmetic(), "")
+          .value("baseline", goblin::KernelVersion::Baseline, "")
+          .value("restrict", goblin::KernelVersion::Restrict, "")
+          .value("shared_memory", goblin::KernelVersion::SharedMemory, "")
+          .value("block_reduce", goblin::KernelVersion::BlockReduce, "");
 
 
   auto pyEnumNodeType =
@@ -1828,32 +1838,88 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
 
 
-  m.def("evaluate_kernel_wrapper",
-      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("solution_length"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("se"));
+  m.def("round_up",
+      goblin::round_up, nb::arg("value"), nb::arg("multiple"));
 
-  m.def("compute_mse_kernel_wrapper",
-      goblin::compute_mse_kernel_wrapper, nb::arg("se"), nb::arg("mse"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+  m.def("ceil_div",
+      goblin::ceil_div, nb::arg("a"), nb::arg("b"));
+
+
+  auto pyClassKernelDim =
+      nb::class_<goblin::KernelDim>
+          (m, "KernelDim", "")
+      .def_rw("x", &goblin::KernelDim::x, "")
+      .def_rw("y", &goblin::KernelDim::y, "")
+      .def_rw("z", &goblin::KernelDim::z, "")
+      .def(nb::init<>())
+      .def(nb::init<unsigned int, unsigned int, unsigned int>(),
+          nb::arg("_x"), nb::arg("_y") = 1, nb::arg("_z") = 1)
+      .def_static("determine",
+          &goblin::KernelDim::determine, nb::arg("count"), nb::arg("max_threads") = MAX_THREADS_PER_BLOCK)
+      .def("check",
+          &goblin::KernelDim::check)
+      .def("__eq__",
+          &goblin::KernelDim::operator==, nb::arg("other"))
+      ;
+
+
+  auto pyClassKernelConfig =
+      nb::class_<goblin::KernelConfig>
+          (m, "KernelConfig", "")
+      .def_rw("block", &goblin::KernelConfig::block, "")
+      .def_rw("grid", &goblin::KernelConfig::grid, "")
+      .def(nb::init<>())
+      .def(nb::init<goblin::KernelDim, goblin::KernelDim>(),
+          nb::arg("_block"), nb::arg("_grid"))
+      .def_static("for_eval",
+          &goblin::KernelConfig::for_eval, nb::arg("num_solutions"), nb::arg("num_datapoints"))
+      .def_static("for_mse",
+          &goblin::KernelConfig::for_mse, nb::arg("num_solutions"), nb::arg("num_partial"), nb::arg("kernel_version"))
+      .def("check",
+          &goblin::KernelConfig::check)
+      .def("__eq__",
+          &goblin::KernelConfig::operator==, nb::arg("other"))
+      ;
+
+
+  auto pyClassLaunchConfig =
+      nb::class_<goblin::LaunchConfig>
+          (m, "LaunchConfig", "")
+      .def_rw("eval", &goblin::LaunchConfig::eval, "")
+      .def_rw("mse", &goblin::LaunchConfig::mse, "")
+      .def_rw("kernel_version", &goblin::LaunchConfig::kernel_version, "")
+      .def(nb::init<>())
+      .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion>(),
+          nb::arg("_eval"), nb::arg("_mse"), nb::arg("version") = goblin::KernelVersion::Baseline)
+      .def_static("determine",
+          &goblin::LaunchConfig::determine, nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("kernel_version"))
+      .def("check",
+          &goblin::LaunchConfig::check)
+      .def("__eq__",
+          &goblin::LaunchConfig::operator==, nb::arg("other"))
+      ;
+  // #endif
+
+
+  m.def("evaluate_kernel_wrapper",
+      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("solution_length"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("config"));
+
+  m.def("mse_kernel_wrapper",
+      goblin::mse_kernel_wrapper, nb::arg("partial"), nb::arg("result"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("config"));
 
   m.def("test_compute_output_kernel",
       goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"));
 
   m.def("test_evaluate_kernel",
-      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
 
   m.def("test_compute_mse_kernel",
-      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
-
-  m.def("test_evaluate_and_mse_kernel",
-      goblin::test_evaluate_and_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("result"));
+      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
   // #endif
   // #ifndef _GOBLIN_GA_GP_SR_H
   //
   // #ifndef _GOBLIN_GA_GP_HELPER_H
   //
-
-
-  m.def("compute_block_size",
-      goblin::compute_block_size, nb::arg("count"));
   // #endif
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //
@@ -2360,6 +2426,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           (m, "GASRProblem", "")
       .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>>(),
           nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = false, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none())
+      .def("set_kernel_version",
+          &goblin::GASRProblem::set_kernel_version, nb::arg("kernel_version"))
       .def("free_gpu",
           &goblin::GASRProblem::free_gpu)
       .def("num_discrete",

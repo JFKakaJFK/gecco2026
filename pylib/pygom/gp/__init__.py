@@ -12,9 +12,11 @@ import pygom
 # TODO simplification & finetuning...
 
 
+
 class SymbolicRegressor(BaseEstimator, RegressorMixin):
-    def __init__(self, gpu_accelerated=False, **kwargs):
+    def __init__(self, gpu_accelerated=False, kernel_version=pygom.KernelVersion.block_reduce, **kwargs):
         self.gpu_accelerated = gpu_accelerated
+        self.kernel_version = kernel_version
         self.kwargs = kwargs
         self.imputer = None
         self.front = []
@@ -152,6 +154,9 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             **specific_args,
         )
 
+        if self.gpu_accelerated:
+            problem.set_kernel_version(self.kernel_version)
+
         seed = self.kwargs.get("random_state", self.kwargs.get("seed"))
 
         tracking_kwargs = self.kwargs.get("tracking_kwargs", {})
@@ -195,10 +200,5 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             y_pred = np.full((X.shape[0], 1), y_pred)
         elif y_pred.ndim == 1:
             y_pred = y_pred.reshape(-1, 1)
-
-        # print((y_pred, type(y_pred)))
-
-        # if len(y_pred.shape) < 2:
-        #     y_pred = y_pred.reshape(-1, 1)
 
         return y_pred
