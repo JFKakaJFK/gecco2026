@@ -1,7 +1,6 @@
 # Using https://github.com/github/gitignore/blob/master/Python.gitignore + C++.gitignore
 
 profile.json.gz
-*.csv
 *.yaml
 .zed/
 .vscode/
@@ -202,7 +201,6 @@ cmake-build-*/
 plmb_cache/
 
 # Experiment results and plots
-experiments/results/
 examples/python/playground/plots/symbolic_regression_convergence/
 
 # NSight Compute and Nsight Systems files
