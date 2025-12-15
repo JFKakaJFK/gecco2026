@@ -5,12 +5,12 @@ import pygom
 from pygom import *
 
 from src.config import c, instantiate
-from src.data import prepare_problem
+from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
 
-REPEATS_PER_DATASET = 25
+REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
@@ -22,7 +22,7 @@ PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    max_evaluations=int(5e5)
+    max_evaluations=int(1e6)
     # max_evaluations=int(1e7)
 )
 
@@ -49,17 +49,7 @@ def problems(rng):
             NUM_FOLDS,
             DATA_DIR,
         ):
-            y_mean = float(np.mean(y_fold[:, 0]))
-            y_var = float(np.var(y_fold[:, 0]))
-            X_ls = np.ones((X_fold.shape[0], X_fold.shape[1] + 1))
-            X_ls[:, :-1] = X_fold
-            b = np.linalg.lstsq(X_ls, y_fold[:, 0])[0]
-            y_ls = X_ls @ b
-            r2_ls = 1 - np.mean((y_ls - y_fold[:, 0]) ** 2) / y_var
-
-            print(
-                f"{problem} (Fold {fold}):\n - #rows: {X_fold.shape[0]}\n - #features: {X_fold.shape[1]}\n - mean_y: {y_mean}\n - var_y: {y_var}\n - Linear regression R2: {r2_ls}"
-            )
+            # problem_info(f"{problem} (Fold {fold})", X_fold, y_fold[:, 0])
 
             min_y, max_y = (
                 float(np.nanmin(y_fold[:, 0])),
@@ -77,8 +67,8 @@ def problems(rng):
                     )
                 ]:
                     for linear_scaling in [  #
-                        # False,
-                        True
+                        False,
+                        True,
                     ]:
                         ctx = c.GPContext(
                             num_inputs=int(X_fold.shape[1]),
@@ -245,6 +235,8 @@ def main():
             y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
             y_agg="MAX",  # higher R^2 is better
             y_label="$R^2$ Train",
+            ymin="auto",
+            ymax="auto",
             # merge folds and runs into one seaborn "unit"
             unit_query="format('{}.{}', fold, run)",
             # split up the plot into the following rows

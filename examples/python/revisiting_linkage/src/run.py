@@ -43,7 +43,7 @@ def run_one(
                 loginfo,
                 # report_intermediate_results=False,
                 max_generations_until_next_report=10,
-                generation_factor=1,
+                generation_factor=2,
                 initial_evaluations_until_next_report=1,
                 max_evaluations_until_next_report=100000,
                 eval_factor=100000,

@@ -35,11 +35,13 @@ def problems(rng):
         # UCI
         "Airfoil",
         "Bike Sharing",
-        "Breast Cancer",
+        # "Breast Cancer",
         "Concrete Compressive Strength",
-        "Energy Cooling",
-        "Energy Heating",
-        "Yacht Hydrodynamics",
+        "Dow Chemical",
+        "Tower",
+        # "Energy Cooling",
+        # "Energy Heating",
+        # "Yacht Hydrodynamics",
     ]:
         for (
             fold,
@@ -221,8 +223,7 @@ def status():
 
 
 def main():
-    status()
-    exit()
+    # status()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
     # run_tasks(

@@ -81,6 +81,8 @@ def load_results(
         if preprocess or not pdir.exists():
             if pdir.exists():
                 shutil.rmtree(parquet_dir)
+            pdir.mkdir(parents=True, exist_ok=True)
+
             conn.sql(f"""
                 COPY (
                     SELECT * FROM
