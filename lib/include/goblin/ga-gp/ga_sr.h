@@ -13,6 +13,20 @@
 #include "goblin/lib/init.h"
 #include "goblin/lib/types.h"
 
+#ifndef NDEBUG
+constexpr int MAX_ULP_ERROR = 8;
+inline int ulp_diff(float a, float b) {
+    uint32_t ua = std::bit_cast<uint32_t>(a);
+    uint32_t ub = std::bit_cast<uint32_t>(b);
+
+    // Make lexicographically ordered as signed magnitude
+    if (ua & 0x80000000u) ua = 0x80000000u - ua;
+    if (ub & 0x80000000u) ub = 0x80000000u - ub;
+
+    return std::abs((int)ua - (int)ub);
+}
+#endif
+
 namespace goblin {
 
 class GASRProblem : public GPInstanceBase {
@@ -110,7 +124,7 @@ class GASRProblem : public GPInstanceBase {
             _copy_solutions_to_gpu(node_type, node_value);
 
             // Allocate memory for results on device
-            _allocate_results_on_gpu(&config, num_solutions);
+            _allocate_results_on_gpu(config, num_solutions);
 
             // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
             evaluate_kernel_wrapper(
@@ -122,7 +136,7 @@ class GASRProblem : public GPInstanceBase {
                 _solution_length,
                 num_solutions,
                 _num_datapoints,
-                &config
+                config
             );
 
             // Launch mse kernel that calculates the mse over all datapoints for each solution
@@ -131,7 +145,7 @@ class GASRProblem : public GPInstanceBase {
                 d_result,
                 num_solutions,
                 _num_datapoints,
-                &config
+                config
             );
 
             // Retrieve the results from the GPU
@@ -143,6 +157,57 @@ class GASRProblem : public GPInstanceBase {
                 solutions[i].quality().constraint_value = 0.0;
                 solutions[i].quality().objectives(0) = result[k++];
             }
+
+#ifndef NDEBUG
+            if (config.kernel_version != KernelVersion::Baseline) {
+                const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, KernelVersion::Baseline);
+                // Sanity check
+                config.check();
+
+                // Allocate memory for results on device
+                _allocate_results_on_gpu(config, num_solutions);
+
+                // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+                evaluate_kernel_wrapper(
+                    d_X,
+                    d_Y,
+                    d_type,
+                    d_value,
+                    d_partial,
+                    _solution_length,
+                    num_solutions,
+                    _num_datapoints,
+                    config
+                );
+
+                // Launch mse kernel that calculates the mse over all datapoints for each solution
+                mse_kernel_wrapper(
+                    d_partial,
+                    d_result,
+                    num_solutions,
+                    _num_datapoints,
+                    config
+                );
+
+                // Retrieve the results from the GPU
+                std::vector<float> result(num_solutions);
+                copy_from_device(result.data(), d_result, num_solutions);
+
+                size_t k = 0;
+                for (auto i : indices) {
+                    float expected = solutions[i].quality().objectives(0);
+                    float actual = result[k++];
+
+                    int ulps = ulp_diff(expected, actual);
+                    if (ulps > MAX_ULP_ERROR) {
+                        printf("Kernel similarity violated at index %ld\n", i);
+                        printf("Expected: %.9g, Actual: %.9g\n", expected, actual);
+                        printf("ULP diff: %d\n", ulps);
+                        std::abort();
+                    }
+                }
+            }
+#endif
         }
 
         void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
@@ -245,10 +310,10 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(const LaunchConfig* config, size_t num_solutions) {
+        void _allocate_results_on_gpu(const LaunchConfig config, size_t num_solutions) {
             const size_t num_partials = 
-                (config->kernel_version == KernelVersion::BlockReduce)
-                    ? num_solutions * config->eval.grid.y
+                (config.kernel_version == KernelVersion::BlockReduce)
+                    ? num_solutions * config.eval.grid.y
                     : num_solutions * _num_datapoints;
 
             // Check if we need more memory than we currently have allocated
@@ -285,6 +350,18 @@ class GASRProblem : public GPInstanceBase {
             _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
+
+        // void check_kernel_similarity(Rng& rng, SolutionSetBase& set, std::string_view info) {
+        //     std::vector<Solution> copy;
+
+        //     for (usize i = 0; i< set.size(); i++) {
+        //         copy.push_back(set[i]);
+        //     }
+
+        //     std::vector<usize> indices(copy.size());
+        //     std::iota(indices.begin(), indices.end(), 0);
+        //     evaluate(rng, copy, indices);
+        // }
 
         // bool _solution_allocated;
         size_t _num_solutions_allocated;

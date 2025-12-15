@@ -3793,7 +3793,7 @@ void evaluate_kernel_wrapper(
     int solution_length,
     int num_solutions,
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 );
 
 void mse_kernel_wrapper(
@@ -3801,7 +3801,7 @@ void mse_kernel_wrapper(
     float* result,
     int num_solutions,
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 );
 
 float test_compute_output_kernel(
@@ -5666,7 +5666,7 @@ class GASRProblem : public GPInstanceBase {
             _copy_solutions_to_gpu(node_type, node_value);
 
             // Allocate memory for results on device
-            _allocate_results_on_gpu(&config, num_solutions);
+            _allocate_results_on_gpu(config, num_solutions);
 
             // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
             evaluate_kernel_wrapper(
@@ -5678,7 +5678,7 @@ class GASRProblem : public GPInstanceBase {
                 _solution_length,
                 num_solutions,
                 _num_datapoints,
-                &config
+                config
             );
 
             // Launch mse kernel that calculates the mse over all datapoints for each solution
@@ -5687,7 +5687,7 @@ class GASRProblem : public GPInstanceBase {
                 d_result,
                 num_solutions,
                 _num_datapoints,
-                &config
+                config
             );
 
             // Retrieve the results from the GPU
@@ -5801,10 +5801,10 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(const LaunchConfig* config, size_t num_solutions) {
+        void _allocate_results_on_gpu(const LaunchConfig config, size_t num_solutions) {
             const size_t num_partials =
-                (config->kernel_version == KernelVersion::BlockReduce)
-                    ? num_solutions * config->eval.grid.y
+                (config.kernel_version == KernelVersion::BlockReduce)
+                    ? num_solutions * config.eval.grid.y
                     : num_solutions * _num_datapoints;
 
             // Check if we need more memory than we currently have allocated

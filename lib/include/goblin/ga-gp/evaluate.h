@@ -99,7 +99,7 @@ void evaluate_kernel_wrapper(
     int solution_length, 
     int num_solutions,
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 );
 
 void mse_kernel_wrapper(
@@ -107,7 +107,7 @@ void mse_kernel_wrapper(
     float* result, 
     int num_solutions, 
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 );
 
 float test_compute_output_kernel(

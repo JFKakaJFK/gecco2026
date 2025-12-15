@@ -160,6 +160,8 @@ void evaluate_kernel_block_reduce(
     int num_datapoints
 ) {
     // Calculate datapoint index
+    // blockIdx.y = block index of solution
+    // blockDim.x = number of threads in a block
     int datapoint_index = blockIdx.y * blockDim.x + threadIdx.x;
     int solution_index = blockIdx.x;
 
@@ -196,6 +198,8 @@ void evaluate_kernel_block_reduce(
         se = error * error;
     }
 
+    __syncthreads();
+
     using BlockReduce = cub::BlockReduce<float, BLOCK_SIZE, cub::BlockReduceAlgorithm::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
@@ -204,9 +208,9 @@ void evaluate_kernel_block_reduce(
     __syncthreads();
 
     if (threadIdx.x == 0) {
-        // blockDim.y = Number of partial results per solution
+        // gridDim.y = Number of partial results per solution
         // blockIdx.y = Partial result index of current solution
-        partial[blockDim.y * solution_index + blockIdx.y] = block_sum;
+        partial[gridDim.y * solution_index + blockIdx.y] = block_sum;
     }
 }
 
@@ -339,6 +343,8 @@ void mse_kernel_baseline(float* partial, float* result, int num_solutions, int n
             sum += partial[i];
         }
 
+        // printf("Baseline Thread: %d, MSE: %f\n", threadIdx.x, sum);
+
         // Divide by num_datapoints to get the mean
         result[solution_index] = sum / num_datapoints;
     }
@@ -397,12 +403,12 @@ void mse_kernel_block_reduce(
 
     __syncthreads();
 
-    // Use block reduction to add all the partial results together
     float sum = BlockReduce(temp_storage.reduce).Sum(thread_data);
 
     __syncthreads();
 
     if (threadIdx.x == 0) {
+        // printf("Reduce Block: %d, Sum: %f\n", blockIdx.x, sum);
         result[solution_index] = sum / num_datapoints;
     }
 }
@@ -416,16 +422,13 @@ void evaluate_kernel_wrapper(
     int solution_length, 
     int num_solutions,
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 ) {
-    KernelDim block_config = config->eval.block;
-    KernelDim grid_config = config->eval.grid;
-    
-    dim3 block(block_config.x, block_config.y, block_config.z);
-    dim3 grid(grid_config.x, grid_config.y, grid_config.z);
+    dim3 block(config.eval.block.x, config.eval.block.y, config.eval.block.z);
+    dim3 grid(config.eval.grid.x, config.eval.grid.y, config.eval.grid.z);
 
     // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
-    switch (config->kernel_version) {
+    switch (config.kernel_version) {
         case (KernelVersion::Baseline):
             evaluate_kernel_baseline<<<grid, block>>>(X, Y, type, value, partial, solution_length, num_datapoints);
             break;
@@ -457,6 +460,8 @@ void evaluate_kernel_wrapper(
 
     // Wait until all blocks and threads are done
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
+
+    // printf("\n");
 }
 
 void mse_kernel_wrapper(
@@ -464,17 +469,14 @@ void mse_kernel_wrapper(
     float* result, 
     int num_solutions, 
     int num_datapoints,
-    const LaunchConfig* config
+    const LaunchConfig config
 ) {
-    KernelDim block_config = config->mse.block;
-    KernelDim grid_config = config->mse.grid;
+    dim3 block(config.mse.block.x, config.mse.block.y, config.mse.block.z);
+    dim3 grid(config.mse.grid.x, config.mse.grid.y, config.mse.grid.z);
 
-    dim3 block(block_config.x, block_config.y, block_config.z);
-    dim3 grid(grid_config.x, grid_config.y, grid_config.z);
-
-    int num_partials = config->eval.grid.y;
+    int num_partials = config.eval.grid.y;
     
-    switch(config->kernel_version) {
+    switch(config.kernel_version) {
         case (KernelVersion::Baseline):
             mse_kernel_baseline<<<grid, block>>>(partial, result, num_solutions, num_datapoints);
             break;
@@ -483,7 +485,7 @@ void mse_kernel_wrapper(
             mse_kernel_restrict<<<grid, block>>>(partial, result, num_solutions, num_datapoints);  
             break;
         case (KernelVersion::BlockReduce):
-            switch (block_config.x) {
+            switch (config.mse.block.x) {
                 #define X(BS) \
                 case BS: \
                     mse_kernel_block_reduce<BS><<<grid, block>>>( \
@@ -597,10 +599,12 @@ std::vector<float> test_evaluate_kernel(
 
     LaunchConfig config = LaunchConfig::determine(num_solutions, num_datapoints, version);
 
+    // printf("Config: %d, %d, %d, %d, %d, %d\n", config.eval.grid.x, config.eval.grid.y, config.eval.grid.z, config.eval.block.x, config.eval.block.y, config.eval.block.z);
+
     evaluate_kernel_wrapper(
         d_X, d_Y, d_type, d_value, d_partial,
         solution_length, num_solutions, num_datapoints,
-        &config
+        config
     );
 
     std::vector<float> result(partial_size);
@@ -630,7 +634,7 @@ std::vector<float> test_compute_mse_kernel(
     mse_kernel_wrapper(
         d_partial, d_result,
         num_solutions, num_datapoints,
-        &config
+        config
     );
 
     std::vector<float> result(num_solutions);

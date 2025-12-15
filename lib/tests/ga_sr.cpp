@@ -62,7 +62,7 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
     auto gomea = MixedGOMEA(
         PopulationOptions(), 
         RvOptions{.enabled = false},
-        IMSOptions(/* initial_population_size = */ 256, /* max_num_populations = */ 1)
+        IMSOptions(/* initial_population_size = */ 512, /* max_num_populations = */ 1)
     );
 
     auto [front, status] = Tracked::run(gasrp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
