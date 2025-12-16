@@ -3516,7 +3516,6 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GA_GP_MISC_H
 #define _GOBLIN_GA_GP_MISC_H
 
-#include "assert.h"
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3533,6 +3532,8 @@ enum class KernelVersion : uint8_t {
     Restrict,
     SharedMemory,
     BlockReduce,
+    SingleKernel,
+    SingleKernelFMAF
 };
 
 enum class NodeType : uint8_t {
@@ -3583,11 +3584,11 @@ struct KernelDim {
     unsigned int y = 1;
     unsigned int z = 1;
 
-    constexpr KernelDim() = default;
-    constexpr KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1)
+    KernelDim() = default;
+    KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1)
         : x(_x), y(_y), z(_z) {}
 
-    static inline KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
+    static KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
         int min_redundant = max_threads;
 
@@ -3618,12 +3619,12 @@ struct KernelDim {
 };
 
 struct KernelConfig {
-    KernelDim block;
     KernelDim grid;
+    KernelDim block;
 
-    constexpr KernelConfig() = default;
-    constexpr KernelConfig(KernelDim _block, KernelDim _grid)
-        : block(_block), grid(_grid) {}
+    KernelConfig() = default;
+    KernelConfig(KernelDim _grid, KernelDim _block)
+        : grid(_grid), block(_block) {}
 
     static inline KernelConfig for_eval(int num_solutions, int num_datapoints) {
         KernelConfig config;
@@ -3635,19 +3636,28 @@ struct KernelConfig {
         return config;
     };
 
-    static inline KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
+    static KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
         KernelConfig config;
 
         if (kernel_version == KernelVersion::BlockReduce) {
+            // Each block determine the mse for a single solution
+            config.grid.x = num_solutions;
             // Number of partial results determines the number of threads in a block
             // Rounded to a multiple of 32
             config.block.x = round_up(num_partial, WARP_SIZE);
-            // Each block determine the mse for a single solution
-            config.grid.x = num_solutions;
         } else {
             config.block = KernelDim::determine(num_solutions);
             config.grid.x = ceil_div(num_solutions, config.block.x);
         }
+
+        return config;
+    }
+
+    static KernelConfig for_single(int num_solutions, int num_datapoints) {
+        KernelConfig config;
+
+        config.grid.x = num_solutions;
+        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
 
         return config;
     }
@@ -3658,7 +3668,7 @@ struct KernelConfig {
     }
 
     constexpr bool operator==(const KernelConfig& other) const {
-        return block == other.block && grid == other.grid;
+        return grid == other.grid && block == other.block;
     }
 };
 
@@ -3666,20 +3676,61 @@ struct LaunchConfig {
     KernelConfig eval;
     KernelConfig mse;
     KernelVersion kernel_version = KernelVersion::Baseline;
+    int num_solutions;
+    int num_datapoints;
+    int solution_length;
+    int items_per_thread;
 
-    constexpr LaunchConfig() = default;
-    constexpr LaunchConfig(KernelConfig _eval, KernelConfig _mse, KernelVersion version = KernelVersion::Baseline)
-        : eval(_eval), mse(_mse), kernel_version(version) {}
+    LaunchConfig() = default;
+    LaunchConfig(
+        KernelConfig eval,
+        KernelConfig mse,
+        KernelVersion version = KernelVersion::Baseline,
+        int num_solutions = 1,
+        int num_datapoints = 1,
+        int solution_length = 1,
+        int items_per_thread = 1
+    ) : eval(eval),
+        mse(mse),
+        kernel_version(version),
+        num_solutions(num_solutions),
+        num_datapoints(num_datapoints),
+        solution_length(solution_length),
+        items_per_thread(items_per_thread) {}
 
-    static inline LaunchConfig determine(
+    static LaunchConfig determine(
+        KernelVersion kernel_version,
         int num_solutions,
         int num_datapoints,
-        KernelVersion kernel_version
+        int solution_length
     ) {
-        KernelConfig eval_config = KernelConfig::for_eval(num_solutions, num_datapoints);
-        KernelConfig mse_config = KernelConfig::for_mse(num_solutions, eval_config.grid.y, kernel_version);
+        LaunchConfig config;
 
-        return LaunchConfig(eval_config, mse_config, kernel_version);
+        // Determine grid and block dimensions for kernels
+        switch (kernel_version) {
+            case (KernelVersion::Baseline):
+            case (KernelVersion::Restrict):
+            case (KernelVersion::SharedMemory):
+            case (KernelVersion::BlockReduce):
+                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
+                config.mse = KernelConfig::for_mse(num_solutions, config.eval.grid.y, kernel_version);
+                break;
+            case (KernelVersion::SingleKernel):
+            case (KernelVersion::SingleKernelFMAF):
+                config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
+                config.mse = KernelConfig();
+                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
+                break;
+            default:
+                break;
+        }
+
+        config.kernel_version = kernel_version;
+        config.num_solutions = num_solutions;
+        config.num_datapoints = num_datapoints;
+        config.solution_length = solution_length;
+
+        return config;
     }
 
     void check() const {
@@ -3790,17 +3841,31 @@ void evaluate_kernel_wrapper(
     float* type,
     float* value,
     float* partial,
-    int solution_length,
-    int num_solutions,
-    int num_datapoints,
     const LaunchConfig config
 );
 
 void mse_kernel_wrapper(
     float* partial,
     float* result,
-    int num_solutions,
-    int num_datapoints,
+    const LaunchConfig config
+);
+
+void evaluate_mse_kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* result,
+    const LaunchConfig config
+);
+
+void kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* partial,
+    float* result,
     const LaunchConfig config
 );
 
@@ -3829,6 +3894,15 @@ std::vector<float> test_compute_mse_kernel(
     KernelVersion version
 );
 
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    int num_solutions,
+    int num_datapoints
+);
+
 }
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
@@ -3839,6 +3913,36 @@ std::vector<float> test_compute_mse_kernel(
 #define _GOBLIN_GA_GP_SR_H
 
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/cuda_graph.h included by goblin/ga-gp/ga_sr.h                             //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef __GOBLIN_GA_GP_CUDA_GRAPH_H
+
+
+
+namespace goblin {
+
+using CudaGraphHandle = std::uintptr_t;
+
+CudaGraphHandle create_cuda_graph(
+    float* h_type,
+    float* h_value,
+    float* h_result,
+    float* d_X,
+    float* d_Y,
+    float* d_type,
+    float* d_value,
+    float* d_result,
+    const LaunchConfig config
+);
+
+void launch_cuda_graph(CudaGraphHandle handle);
+
+void destroy_cuda_graph(CudaGraphHandle handle);
+
+}
+
+#endif /* __GOBLIN_GA_GP_CUDA_GRAPH_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5569,6 +5673,20 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 //                       goblin/ga-gp/ga_sr.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef NDEBUG
+constexpr int MAX_ULP_ERROR = 8;
+inline int ulp_diff(float a, float b) {
+    uint32_t ua = std::bit_cast<uint32_t>(a);
+    uint32_t ub = std::bit_cast<uint32_t>(b);
+
+    // Make lexicographically ordered as signed magnitude
+    if (ua & 0x80000000u) ua = 0x80000000u - ua;
+    if (ub & 0x80000000u) ub = 0x80000000u - ub;
+
+    return std::abs((int)ua - (int)ub);
+}
+#endif
+
 namespace goblin {
 
 class GASRProblem : public GPInstanceBase {
@@ -5658,7 +5776,7 @@ class GASRProblem : public GPInstanceBase {
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
             // Determine launch config
-            const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, _kernel_version);
+            const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
             // Sanity check
             config.check();
 
@@ -5666,27 +5784,14 @@ class GASRProblem : public GPInstanceBase {
             _copy_solutions_to_gpu(node_type, node_value);
 
             // Allocate memory for results on device
-            _allocate_results_on_gpu(config, num_solutions);
+            _allocate_results_on_gpu(config);
 
-            // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
-            evaluate_kernel_wrapper(
-                d_X,
-                d_Y,
-                d_type,
-                d_value,
-                d_partial,
-                _solution_length,
-                num_solutions,
-                _num_datapoints,
-                config
-            );
+            // Copy solution data to GPU
+            _copy_solutions_to_gpu(node_type, node_value);
 
-            // Launch mse kernel that calculates the mse over all datapoints for each solution
-            mse_kernel_wrapper(
-                d_partial,
-                d_result,
-                num_solutions,
-                _num_datapoints,
+            kernel_wrapper(
+                d_X, d_Y, d_type, d_value,
+                d_partial, d_result,
                 config
             );
 
@@ -5699,6 +5804,52 @@ class GASRProblem : public GPInstanceBase {
                 solutions[i].quality().constraint_value = 0.0;
                 solutions[i].quality().objectives(0) = result[k++];
             }
+
+#ifndef NDEBUG
+            if (config.kernel_version != KernelVersion::Baseline) {
+                const LaunchConfig config = LaunchConfig::determine(KernelVersion::Baseline, num_solutions, _num_datapoints, _solution_length);
+                // Sanity check
+                config.check();
+
+                // Allocate memory for results on device
+                _allocate_results_on_gpu(config);
+
+                // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+                evaluate_kernel_wrapper(
+                    d_X,
+                    d_Y,
+                    d_type,
+                    d_value,
+                    d_partial,
+                    config
+                );
+
+                // Launch mse kernel that calculates the mse over all datapoints for each solution
+                mse_kernel_wrapper(
+                    d_partial,
+                    d_result,
+                    config
+                );
+
+                // Retrieve the results from the GPU
+                std::vector<float> result(num_solutions);
+                copy_from_device(result.data(), d_result, num_solutions);
+
+                size_t k = 0;
+                for (auto i : indices) {
+                    float expected = solutions[i].quality().objectives(0);
+                    float actual = result[k++];
+
+                    int ulps = ulp_diff(expected, actual);
+                    if (ulps > MAX_ULP_ERROR) {
+                        printf("Kernel similarity violated at index %ld\n", i);
+                        printf("Expected: %.9g, Actual: %.9g\n", expected, actual);
+                        printf("ULP diff: %d\n", ulps);
+                        std::abort();
+                    }
+                }
+            }
+#endif
         }
 
         void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
@@ -5784,7 +5935,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
-            size_t num_solutions = node_type.size();
+            const int num_solutions = node_type.size();
 
             // Allocate memory if not allocated or size has increased
             if (_num_solutions_allocated < num_solutions) {
@@ -5801,11 +5952,11 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(const LaunchConfig config, size_t num_solutions) {
-            const size_t num_partials =
+        void _allocate_results_on_gpu(const LaunchConfig config) {
+            const int num_partials =
                 (config.kernel_version == KernelVersion::BlockReduce)
-                    ? num_solutions * config.eval.grid.y
-                    : num_solutions * _num_datapoints;
+                    ? config.num_solutions * config.eval.grid.y
+                    : config.num_solutions * config.num_datapoints;
 
             // Check if we need more memory than we currently have allocated
             if (_num_partials_allocated < num_partials) {
@@ -5816,11 +5967,11 @@ class GASRProblem : public GPInstanceBase {
             }
 
             // Check if we need more memory than we currently have allocated
-            if (_num_results_allocated < num_solutions) {
+            if (_num_results_allocated < config.num_solutions) {
                 free_on_gpu(d_result);
 
-                d_result = allocate_on_gpu<float>(num_solutions);
-                _num_results_allocated = num_solutions;
+                d_result = allocate_on_gpu<float>(config.num_solutions);
+                _num_results_allocated = config.num_solutions;
             }
         }
 
@@ -5842,19 +5993,6 @@ class GASRProblem : public GPInstanceBase {
             _num_results_allocated = 0;
         }
 
-        // bool _solution_allocated;
-        size_t _num_solutions_allocated;
-        size_t _num_partials_allocated;
-        size_t _num_results_allocated;
-
-        // GPU pointers
-        float* d_X = nullptr;
-        float* d_Y = nullptr;
-        float* d_type = nullptr;
-        float* d_value = nullptr;
-        float* d_partial = nullptr;
-        float* d_result = nullptr;
-
         MOFitness _archive_fitness;
         MOFitness _fitness;
         std::shared_ptr<InitBase> _init;
@@ -5865,8 +6003,19 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        size_t _num_datapoints;
-        size_t _solution_length;
+        int _num_datapoints;
+        int _solution_length;
+        int _num_solutions_allocated;
+        int _num_partials_allocated;
+        int _num_results_allocated;
+
+        // GPU pointers
+        float* d_X = nullptr;
+        float* d_Y = nullptr;
+        float* d_type = nullptr;
+        float* d_value = nullptr;
+        float* d_partial = nullptr;
+        float* d_result = nullptr;
 
         KernelVersion _kernel_version = KernelVersion::BlockReduce;
 };

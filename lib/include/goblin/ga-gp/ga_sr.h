@@ -2,6 +2,7 @@
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
+#include "goblin/ga-gp/cuda_graph.h"
 #include "goblin/ga-gp/evaluate.h"
 #include "goblin/ga-gp/helper.h"
 #include "goblin/ga-gp/misc.h"
@@ -116,7 +117,7 @@ class GASRProblem : public GPInstanceBase {
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
             // Determine launch config
-            const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, _kernel_version);
+            const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
             // Sanity check
             config.check();
 
@@ -124,27 +125,14 @@ class GASRProblem : public GPInstanceBase {
             _copy_solutions_to_gpu(node_type, node_value);
 
             // Allocate memory for results on device
-            _allocate_results_on_gpu(config, num_solutions);
+            _allocate_results_on_gpu(config);
+            
+            // Copy solution data to GPU
+            _copy_solutions_to_gpu(node_type, node_value);
 
-            // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
-            evaluate_kernel_wrapper(
-                d_X,
-                d_Y,
-                d_type,
-                d_value,
-                d_partial,
-                _solution_length,
-                num_solutions,
-                _num_datapoints,
-                config
-            );
-
-            // Launch mse kernel that calculates the mse over all datapoints for each solution
-            mse_kernel_wrapper(
-                d_partial,
-                d_result,
-                num_solutions,
-                _num_datapoints,
+            kernel_wrapper(
+                d_X, d_Y, d_type, d_value,
+                d_partial, d_result,
                 config
             );
 
@@ -160,12 +148,12 @@ class GASRProblem : public GPInstanceBase {
 
 #ifndef NDEBUG
             if (config.kernel_version != KernelVersion::Baseline) {
-                const LaunchConfig config = LaunchConfig::determine(num_solutions, _num_datapoints, KernelVersion::Baseline);
+                const LaunchConfig config = LaunchConfig::determine(KernelVersion::Baseline, num_solutions, _num_datapoints, _solution_length);
                 // Sanity check
                 config.check();
 
                 // Allocate memory for results on device
-                _allocate_results_on_gpu(config, num_solutions);
+                _allocate_results_on_gpu(config);
 
                 // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
                 evaluate_kernel_wrapper(
@@ -174,9 +162,6 @@ class GASRProblem : public GPInstanceBase {
                     d_type,
                     d_value,
                     d_partial,
-                    _solution_length,
-                    num_solutions,
-                    _num_datapoints,
                     config
                 );
 
@@ -184,8 +169,6 @@ class GASRProblem : public GPInstanceBase {
                 mse_kernel_wrapper(
                     d_partial,
                     d_result,
-                    num_solutions,
-                    _num_datapoints,
                     config
                 );
 
@@ -293,7 +276,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
-            size_t num_solutions = node_type.size();
+            const int num_solutions = node_type.size();
             
             // Allocate memory if not allocated or size has increased
             if (_num_solutions_allocated < num_solutions) {
@@ -310,11 +293,11 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(const LaunchConfig config, size_t num_solutions) {
-            const size_t num_partials = 
+        void _allocate_results_on_gpu(const LaunchConfig config) {
+            const int num_partials = 
                 (config.kernel_version == KernelVersion::BlockReduce)
-                    ? num_solutions * config.eval.grid.y
-                    : num_solutions * _num_datapoints;
+                    ? config.num_solutions * config.eval.grid.y
+                    : config.num_solutions * config.num_datapoints;
 
             // Check if we need more memory than we currently have allocated
             if (_num_partials_allocated < num_partials) {
@@ -325,11 +308,11 @@ class GASRProblem : public GPInstanceBase {
             }
 
             // Check if we need more memory than we currently have allocated
-            if (_num_results_allocated < num_solutions) {
+            if (_num_results_allocated < config.num_solutions) {
                 free_on_gpu(d_result);
 
-                d_result = allocate_on_gpu<float>(num_solutions);
-                _num_results_allocated = num_solutions;
+                d_result = allocate_on_gpu<float>(config.num_solutions);
+                _num_results_allocated = config.num_solutions;
             }
         }
 
@@ -351,31 +334,6 @@ class GASRProblem : public GPInstanceBase {
             _num_results_allocated = 0;
         }
 
-        // void check_kernel_similarity(Rng& rng, SolutionSetBase& set, std::string_view info) {
-        //     std::vector<Solution> copy;
-
-        //     for (usize i = 0; i< set.size(); i++) {
-        //         copy.push_back(set[i]);
-        //     }
-
-        //     std::vector<usize> indices(copy.size());
-        //     std::iota(indices.begin(), indices.end(), 0);
-        //     evaluate(rng, copy, indices);
-        // }
-
-        // bool _solution_allocated;
-        size_t _num_solutions_allocated;
-        size_t _num_partials_allocated;
-        size_t _num_results_allocated;
-
-        // GPU pointers
-        float* d_X = nullptr;
-        float* d_Y = nullptr;
-        float* d_type = nullptr;
-        float* d_value = nullptr;
-        float* d_partial = nullptr;
-        float* d_result = nullptr;
-
         MOFitness _archive_fitness;
         MOFitness _fitness;
         std::shared_ptr<InitBase> _init;
@@ -386,8 +344,19 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        size_t _num_datapoints;
-        size_t _solution_length;
+        int _num_datapoints;
+        int _solution_length;
+        int _num_solutions_allocated;
+        int _num_partials_allocated;
+        int _num_results_allocated;
+
+        // GPU pointers
+        float* d_X = nullptr;
+        float* d_Y = nullptr;
+        float* d_type = nullptr;
+        float* d_value = nullptr;
+        float* d_partial = nullptr;
+        float* d_result = nullptr;
 
         KernelVersion _kernel_version = KernelVersion::BlockReduce;
 };

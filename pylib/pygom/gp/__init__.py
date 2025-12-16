@@ -12,9 +12,13 @@ import pygom
 # TODO simplification & finetuning...
 
 
-
 class SymbolicRegressor(BaseEstimator, RegressorMixin):
-    def __init__(self, gpu_accelerated=False, kernel_version=pygom.KernelVersion.block_reduce, **kwargs):
+    def __init__(
+        self,
+        gpu_accelerated=False,
+        kernel_version=pygom.KernelVersion.single_kernel,
+        **kwargs,
+    ):
         self.gpu_accelerated = gpu_accelerated
         self.kernel_version = kernel_version
         self.kwargs = kwargs

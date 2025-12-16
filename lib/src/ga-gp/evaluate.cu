@@ -214,6 +214,132 @@ void evaluate_kernel_block_reduce(
     }
 }
 
+// https://nvidia.github.io/cccl/cub/index.html#flexible-data-arrangement
+template <int BLOCK_THREADS>
+__global__
+void evaluate_mse_kernel(
+    const float* __restrict__ X, 
+    const float* __restrict__ Y, 
+    const float* __restrict__ v_type, 
+    const float* __restrict__ v_value, 
+    float* __restrict__ result,
+    const int solution_length, 
+    const int num_datapoints,
+    const int datapoints_per_thread
+) {
+    using BlockReduce = cub::BlockReduce<float, BLOCK_THREADS, cub::BlockReduceAlgorithm::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+
+    int solution_index = blockIdx.x;
+
+    // Calculate offset for solution
+    int solution_offset = solution_index * solution_length;
+
+    // Layout shared memory
+    __shared__ float shmem[MAX_NUM_NODES * 2];
+    float* sh_type = (float*)shmem;
+    float* sh_value = (float*)(sh_type + solution_length);
+
+    // Cooperative load of solution data into shared memory
+    for (int i = threadIdx.x; i < solution_length; i+= blockDim.x) {
+        sh_type[i] = v_type[solution_offset + i];
+        sh_value[i] = v_value[solution_offset + i];
+    }
+
+    __syncthreads();
+
+    float se = 0.0f;
+
+    for (int i = 0; i < datapoints_per_thread; i++) {
+        // Calculate datapoint index
+        int datapoint_index = i * blockDim.x + threadIdx.x;
+
+        // Check if datapoint_index corresponds to actual datapoint
+        if (datapoint_index < num_datapoints) {
+            // Compute output of solution
+            float output = compute_tree_output_restrict(
+                X, sh_type, sh_value, 
+                solution_length, 
+                num_datapoints, 
+                datapoint_index
+            );
+
+            // Determine squared error
+            float error = output - Y[datapoint_index];
+            se += error * error;
+        }
+    }
+
+    float sum = BlockReduce(temp_storage).Sum(se);
+
+    if (threadIdx.x == 0) {
+        result[solution_index] = sum / num_datapoints;
+    }
+}
+
+template <int BLOCK_THREADS>
+__global__
+void evaluate_mse_kernel_fmaf(
+    const float* __restrict__ X, 
+    const float* __restrict__ Y, 
+    const float* __restrict__ v_type, 
+    const float* __restrict__ v_value, 
+    float* __restrict__ result,
+    const int solution_length, 
+    const int num_datapoints,
+    const int datapoints_per_thread
+) {
+    using BlockReduce = cub::BlockReduce<float, BLOCK_THREADS, cub::BlockReduceAlgorithm::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+
+    int solution_index = blockIdx.x;
+
+    // Calculate offset for solution
+    int solution_offset = solution_index * solution_length;
+
+    // Layout shared memory
+    __shared__ float shmem[MAX_NUM_NODES * 2];
+    float* sh_type = (float*)shmem;
+    float* sh_value = (float*)(sh_type + solution_length);
+
+    // Cooperative load of solution data into shared memory
+    for (int i = threadIdx.x; i < solution_length; i+= blockDim.x) {
+        sh_type[i] = v_type[solution_offset + i];
+        sh_value[i] = v_value[solution_offset + i];
+    }
+
+    __syncthreads();
+
+    float se = 0.0f;
+
+    for (int i = 0; i < datapoints_per_thread; i++) {
+        // Calculate datapoint index
+        int datapoint_index = i * blockDim.x + threadIdx.x;
+
+        // Check if datapoint_index corresponds to actual datapoint
+        if (datapoint_index < num_datapoints) {
+            // Compute output of solution
+            float output = compute_tree_output_restrict(
+                X, sh_type, sh_value, 
+                solution_length, 
+                num_datapoints, 
+                datapoint_index
+            );
+
+            // Determine squared error
+            float error = output - Y[datapoint_index];
+            // se += error * error;
+            se = __fmaf_rn(error, error, se); // TODO check SASS code
+        }
+    }
+
+    float sum = BlockReduce(temp_storage).Sum(se);
+
+    if (threadIdx.x == 0) {
+        result[solution_index] = sum / num_datapoints;
+    }
+}
+
 __device__
 float compute_tree_output_baseline(
     float* X, 
@@ -343,8 +469,6 @@ void mse_kernel_baseline(float* partial, float* result, int num_solutions, int n
             sum += partial[i];
         }
 
-        // printf("Baseline Thread: %d, MSE: %f\n", threadIdx.x, sum);
-
         // Divide by num_datapoints to get the mean
         result[solution_index] = sum / num_datapoints;
     }
@@ -408,7 +532,6 @@ void mse_kernel_block_reduce(
     __syncthreads();
 
     if (threadIdx.x == 0) {
-        // printf("Reduce Block: %d, Sum: %f\n", blockIdx.x, sum);
         result[solution_index] = sum / num_datapoints;
     }
 }
@@ -419,9 +542,6 @@ void evaluate_kernel_wrapper(
     float* type, 
     float* value, 
     float* partial,
-    int solution_length, 
-    int num_solutions,
-    int num_datapoints,
     const LaunchConfig config
 ) {
     dim3 block(config.eval.block.x, config.eval.block.y, config.eval.block.z);
@@ -430,20 +550,20 @@ void evaluate_kernel_wrapper(
     // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
     switch (config.kernel_version) {
         case (KernelVersion::Baseline):
-            evaluate_kernel_baseline<<<grid, block>>>(X, Y, type, value, partial, solution_length, num_datapoints);
+            evaluate_kernel_baseline<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
             break;
         case (KernelVersion::Restrict):
-            evaluate_kernel_restrict<<<grid, block>>>(X, Y, type, value, partial, solution_length, num_datapoints);
+            evaluate_kernel_restrict<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
             break;
         case (KernelVersion::SharedMemory):
-            evaluate_kernel_shared_memory<<<grid, block>>>(X, Y, type, value, partial, solution_length, num_datapoints);
+            evaluate_kernel_shared_memory<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
             break;
         case (KernelVersion::BlockReduce):
             switch (block.x) {
                 #define X(BS) \
                 case BS: \
                     evaluate_kernel_block_reduce<BS><<<grid, block>>>( \
-                        X, Y, type, value, partial, solution_length, num_datapoints); \
+                        X, Y, type, value, partial, config.solution_length, config.num_datapoints); \
                     break;
                 BLOCK_SIZE_LIST
                 #undef X
@@ -460,15 +580,11 @@ void evaluate_kernel_wrapper(
 
     // Wait until all blocks and threads are done
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
-
-    // printf("\n");
 }
 
 void mse_kernel_wrapper(
     float* partial, 
     float* result, 
-    int num_solutions, 
-    int num_datapoints,
     const LaunchConfig config
 ) {
     dim3 block(config.mse.block.x, config.mse.block.y, config.mse.block.z);
@@ -478,18 +594,18 @@ void mse_kernel_wrapper(
     
     switch(config.kernel_version) {
         case (KernelVersion::Baseline):
-            mse_kernel_baseline<<<grid, block>>>(partial, result, num_solutions, num_datapoints);
+            mse_kernel_baseline<<<grid, block>>>(partial, result, config.num_solutions, config.num_datapoints);
             break;
         case (KernelVersion::Restrict):
         case (KernelVersion::SharedMemory):
-            mse_kernel_restrict<<<grid, block>>>(partial, result, num_solutions, num_datapoints);  
+            mse_kernel_restrict<<<grid, block>>>(partial, result, config.num_solutions, config.num_datapoints);  
             break;
         case (KernelVersion::BlockReduce):
             switch (config.mse.block.x) {
                 #define X(BS) \
                 case BS: \
                     mse_kernel_block_reduce<BS><<<grid, block>>>( \
-                        partial, result, num_partials, num_datapoints); \
+                        partial, result, num_partials, config.num_datapoints); \
                     break;
                 BLOCK_SIZE_LIST
                 #undef X
@@ -506,6 +622,76 @@ void mse_kernel_wrapper(
 
     // Wait until all blocks and threads are done
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
+}
+
+void evaluate_mse_kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* result,
+    const LaunchConfig config
+) {
+    dim3 block(config.eval.block.x, config.eval.block.y, config.eval.block.z);
+    dim3 grid(config.eval.grid.x, config.eval.grid.y, config.eval.grid.z);
+
+    switch(config.kernel_version) {
+        case (KernelVersion::SingleKernel):
+            switch (block.x) {
+                #define X(BS) \
+                case BS: \
+                    evaluate_mse_kernel<BS><<<grid, block>>>( \
+                        X, Y, type, value, result, config.solution_length, config.num_datapoints, config.items_per_thread); \
+                    break;
+                BLOCK_SIZE_LIST
+                #undef X
+
+                default: 
+                    assert(false && "Unsupported block size");
+            }
+            break;
+        case (KernelVersion::SingleKernelFMAF):
+            switch (block.x) {
+                #define X(BS) \
+                case BS: \
+                    evaluate_mse_kernel_fmaf<BS><<<grid, block>>>( \
+                        X, Y, type, value, result, config.solution_length, config.num_datapoints, config.items_per_thread); \
+                    break;
+                BLOCK_SIZE_LIST
+                #undef X
+
+                default: 
+                    assert(false && "Unsupported block size");
+            }
+            break;
+        default:
+            break;
+    }
+
+    __CHECK_CUDA_ERR__(cudaGetLastError());
+
+    // Wait until all blocks and threads are done
+    __CHECK_CUDA_ERR__(cudaDeviceSynchronize());
+}
+
+void kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* partial,
+    float* result,
+    const LaunchConfig config
+) {
+    if (config.kernel_version == KernelVersion::SingleKernel || config.kernel_version == KernelVersion::SingleKernelFMAF) {
+        evaluate_mse_kernel_wrapper(X, Y, type, value, result, config);
+    } else {
+        // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+        evaluate_kernel_wrapper(X, Y, type, value, partial, config);
+
+        // Launch mse kernel that calculates the mse over all datapoints for each solution
+        mse_kernel_wrapper(partial, result, config);
+    }
 }
 
 /* 
@@ -597,15 +783,9 @@ std::vector<float> test_evaluate_kernel(
 
     float* d_partial = allocate_on_gpu<float>(partial_size);    
 
-    LaunchConfig config = LaunchConfig::determine(num_solutions, num_datapoints, version);
+    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_datapoints, solution_length);
 
-    // printf("Config: %d, %d, %d, %d, %d, %d\n", config.eval.grid.x, config.eval.grid.y, config.eval.grid.z, config.eval.block.x, config.eval.block.y, config.eval.block.z);
-
-    evaluate_kernel_wrapper(
-        d_X, d_Y, d_type, d_value, d_partial,
-        solution_length, num_solutions, num_datapoints,
-        config
-    );
+    evaluate_kernel_wrapper(d_X, d_Y, d_type, d_value, d_partial, config);
 
     std::vector<float> result(partial_size);
     __CHECK_CUDA_ERR__(cudaMemcpy(result.data(), d_partial, partial_size * sizeof(float), cudaMemcpyDeviceToHost));
@@ -629,18 +809,46 @@ std::vector<float> test_compute_mse_kernel(
     // Allocate memory
     float* d_result = allocate_on_gpu<float>(num_solutions);
 
-    LaunchConfig config = LaunchConfig::determine(num_solutions, num_datapoints, version);
+    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_datapoints, 0);
 
-    mse_kernel_wrapper(
-        d_partial, d_result,
-        num_solutions, num_datapoints,
-        config
-    );
+    mse_kernel_wrapper(d_partial, d_result, config);
 
     std::vector<float> result(num_solutions);
     __CHECK_CUDA_ERR__(cudaMemcpy(result.data(), d_result, num_solutions * sizeof(float), cudaMemcpyDeviceToHost));
 
     free_on_gpu(d_partial);
+    free_on_gpu(d_result);
+
+    return result;
+}
+
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X, 
+    std::vector<float> h_Y, 
+    std::vector<float> h_type, 
+    std::vector<float> h_value, 
+    int num_solutions,
+    int num_datapoints
+) {
+    int solution_length = h_type.size() / num_solutions;
+
+    // Allocate memory and copy data
+    float* d_X = allocate_and_copy(h_X.data(), h_X.size());
+    float* d_Y = allocate_and_copy(h_Y.data(), h_Y.size());
+    float* d_type = allocate_and_copy(h_type.data(), h_type.size());
+    float* d_value = allocate_and_copy(h_value.data(), h_value.size());
+
+    float* d_result = allocate_on_gpu<float>(num_solutions);    
+
+    LaunchConfig config = LaunchConfig::determine(KernelVersion::SingleKernel, num_solutions, num_datapoints, solution_length);
+
+    evaluate_mse_kernel_wrapper(d_X, d_Y, d_type, d_value, d_result, config);
+
+    std::vector<float> result(num_solutions);
+    __CHECK_CUDA_ERR__(cudaMemcpy(result.data(), d_result, num_solutions * sizeof(float), cudaMemcpyDeviceToHost));
+
+    free_on_gpu(d_type);
+    free_on_gpu(d_value);
     free_on_gpu(d_result);
 
     return result;

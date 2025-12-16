@@ -96,17 +96,31 @@ void evaluate_kernel_wrapper(
     float* type, 
     float* value, 
     float* partial,
-    int solution_length, 
-    int num_solutions,
-    int num_datapoints,
     const LaunchConfig config
 );
 
 void mse_kernel_wrapper(
     float* partial, 
     float* result, 
-    int num_solutions, 
-    int num_datapoints,
+    const LaunchConfig config
+);
+
+void evaluate_mse_kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* result,
+    const LaunchConfig config
+);
+
+void kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* partial,
+    float* result,
     const LaunchConfig config
 );
 
@@ -133,6 +147,15 @@ std::vector<float> test_compute_mse_kernel(
     int num_solutions, 
     int num_datapoints,
     KernelVersion version
+);
+
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X, 
+    std::vector<float> h_Y, 
+    std::vector<float> h_type, 
+    std::vector<float> h_value, 
+    int num_solutions,
+    int num_datapoints
 );
 
 }

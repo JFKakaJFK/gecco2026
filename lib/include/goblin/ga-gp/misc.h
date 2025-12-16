@@ -2,7 +2,8 @@
 #ifndef _GOBLIN_GA_GP_MISC_H
 #define _GOBLIN_GA_GP_MISC_H
 
-#include "assert.h"
+#include <algorithm>
+#include <cassert>
 
 #include "goblin/ga-gp/types.h"
 
@@ -19,11 +20,11 @@ struct KernelDim {
     unsigned int y = 1;
     unsigned int z = 1;
 
-    constexpr KernelDim() = default;
-    constexpr KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1) 
+    KernelDim() = default;
+    KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1) 
         : x(_x), y(_y), z(_z) {}
 
-    static inline KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
+    static KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
         int min_redundant = max_threads;
 
@@ -54,12 +55,12 @@ struct KernelDim {
 };
 
 struct KernelConfig {
-    KernelDim block;
     KernelDim grid;
-
-    constexpr KernelConfig() = default;
-    constexpr KernelConfig(KernelDim _block, KernelDim _grid) 
-        : block(_block), grid(_grid) {}
+    KernelDim block;
+    
+    KernelConfig() = default;
+    KernelConfig(KernelDim _grid, KernelDim _block) 
+        : grid(_grid), block(_block) {}
 
     static inline KernelConfig for_eval(int num_solutions, int num_datapoints) {
         KernelConfig config;
@@ -71,19 +72,28 @@ struct KernelConfig {
         return config;
     };
 
-    static inline KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
+    static KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
         KernelConfig config;
 
         if (kernel_version == KernelVersion::BlockReduce) {
+            // Each block determine the mse for a single solution
+            config.grid.x = num_solutions;
             // Number of partial results determines the number of threads in a block
             // Rounded to a multiple of 32
             config.block.x = round_up(num_partial, WARP_SIZE); 
-            // Each block determine the mse for a single solution
-            config.grid.x = num_solutions;
         } else {
             config.block = KernelDim::determine(num_solutions);
             config.grid.x = ceil_div(num_solutions, config.block.x);
         }
+
+        return config;
+    }
+
+    static KernelConfig for_single(int num_solutions, int num_datapoints) {
+        KernelConfig config;
+
+        config.grid.x = num_solutions;
+        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
 
         return config;
     }
@@ -94,7 +104,7 @@ struct KernelConfig {
     }
 
     constexpr bool operator==(const KernelConfig& other) const {
-        return block == other.block && grid == other.grid;
+        return grid == other.grid && block == other.block;
     }
 };
 
@@ -102,20 +112,61 @@ struct LaunchConfig {
     KernelConfig eval;
     KernelConfig mse;
     KernelVersion kernel_version = KernelVersion::Baseline;
+    int num_solutions;
+    int num_datapoints;
+    int solution_length;
+    int items_per_thread;
 
-    constexpr LaunchConfig() = default;
-    constexpr LaunchConfig(KernelConfig _eval, KernelConfig _mse, KernelVersion version = KernelVersion::Baseline)
-        : eval(_eval), mse(_mse), kernel_version(version) {}
+    LaunchConfig() = default;
+    LaunchConfig(
+        KernelConfig eval, 
+        KernelConfig mse, 
+        KernelVersion version = KernelVersion::Baseline,
+        int num_solutions = 1,
+        int num_datapoints = 1,
+        int solution_length = 1,
+        int items_per_thread = 1
+    ) : eval(eval), 
+        mse(mse), 
+        kernel_version(version),
+        num_solutions(num_solutions),
+        num_datapoints(num_datapoints),
+        solution_length(solution_length),
+        items_per_thread(items_per_thread) {}
 
-    static inline LaunchConfig determine(
+    static LaunchConfig determine(
+        KernelVersion kernel_version,
         int num_solutions, 
         int num_datapoints, 
-        KernelVersion kernel_version
+        int solution_length
     ) {
-        KernelConfig eval_config = KernelConfig::for_eval(num_solutions, num_datapoints);
-        KernelConfig mse_config = KernelConfig::for_mse(num_solutions, eval_config.grid.y, kernel_version);
+        LaunchConfig config;
 
-        return LaunchConfig(eval_config, mse_config, kernel_version);
+        // Determine grid and block dimensions for kernels
+        switch (kernel_version) {
+            case (KernelVersion::Baseline):
+            case (KernelVersion::Restrict):
+            case (KernelVersion::SharedMemory):
+            case (KernelVersion::BlockReduce):
+                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
+                config.mse = KernelConfig::for_mse(num_solutions, config.eval.grid.y, kernel_version);
+                break;
+            case (KernelVersion::SingleKernel):
+            case (KernelVersion::SingleKernelFMAF):
+                config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
+                config.mse = KernelConfig();
+                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x; 
+                break;
+            default:
+                break;
+        }
+
+        config.kernel_version = kernel_version;
+        config.num_solutions = num_solutions;
+        config.num_datapoints = num_datapoints;
+        config.solution_length = solution_length;
+        
+        return config;
     }
 
     void check() const {

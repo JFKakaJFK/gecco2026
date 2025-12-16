@@ -11,6 +11,8 @@ enum class KernelVersion : uint8_t {
     Restrict,
     SharedMemory,
     BlockReduce,
+    SingleKernel,
+    SingleKernelFMAF
 };
 
 enum class NodeType : uint8_t {

@@ -1271,6 +1271,8 @@ class KernelVersion(enum.IntEnum):
     restrict = enum.auto()  # (= 1)
     shared_memory = enum.auto()  # (= 2)
     block_reduce = enum.auto()  # (= 3)
+    single_kernel = enum.auto()  # (= 4)
+    single_kernel_fmaf = enum.auto()  # (= 5)
 
 class NodeType(enum.IntEnum):
     input = enum.auto()  # (= 0)
@@ -1333,15 +1335,15 @@ class KernelDim:
         pass
 
 class KernelConfig:
-    block: KernelDim
     grid: KernelDim
+    block: KernelDim
 
     @overload
     def __init__(self) -> None:
         pass
 
     @overload
-    def __init__(self, _block: KernelDim, _grid: KernelDim) -> None:
+    def __init__(self, _grid: KernelDim, _block: KernelDim) -> None:
         pass
 
     @staticmethod
@@ -1354,6 +1356,10 @@ class KernelConfig:
     ) -> KernelConfig:
         pass
 
+    @staticmethod
+    def for_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        pass
+
     def check(self) -> None:
         pass
 
@@ -1364,6 +1370,10 @@ class LaunchConfig:
     eval: KernelConfig
     mse: KernelConfig
     kernel_version: KernelVersion = KernelVersion.baseline
+    num_solutions: int
+    num_datapoints: int
+    solution_length: int
+    items_per_thread: int
 
     @overload
     def __init__(self) -> None:
@@ -1372,15 +1382,22 @@ class LaunchConfig:
     @overload
     def __init__(
         self,
-        _eval: KernelConfig,
-        _mse: KernelConfig,
+        eval: KernelConfig,
+        mse: KernelConfig,
         version: KernelVersion = KernelVersion.baseline,
+        num_solutions: int = 1,
+        num_datapoints: int = 1,
+        solution_length: int = 1,
+        items_per_thread: int = 1,
     ) -> None:
         pass
 
     @staticmethod
     def determine(
-        num_solutions: int, num_datapoints: int, kernel_version: KernelVersion
+        kernel_version: KernelVersion,
+        num_solutions: int,
+        num_datapoints: int,
+        solution_length: int,
     ) -> LaunchConfig:
         pass
 
@@ -1397,23 +1414,25 @@ class LaunchConfig:
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def evaluate_kernel_wrapper(
+    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
+) -> None:
+    pass
+
+def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
+    pass
+
+def evaluate_mse_kernel_wrapper(
+    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
+) -> None:
+    pass
+
+def kernel_wrapper(
     x: float,
     y: float,
     type: float,
     value: float,
     partial: float,
-    solution_length: int,
-    num_solutions: int,
-    num_datapoints: int,
-    config: LaunchConfig,
-) -> None:
-    pass
-
-def mse_kernel_wrapper(
-    partial: float,
     result: float,
-    num_solutions: int,
-    num_datapoints: int,
     config: LaunchConfig,
 ) -> None:
     pass
@@ -1443,6 +1462,16 @@ def test_compute_mse_kernel(
 ) -> List[float]:
     pass
 
+def test_evaluate_mse_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+) -> List[float]:
+    pass
+
 # #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
@@ -1450,6 +1479,32 @@ def test_compute_mse_kernel(
 # #ifndef _GOBLIN_GA_GP_SR_H
 #
 
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/cuda_graph.h included by goblin/ga-gp/ga_sr.h                             //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef __GOBLIN_GA_GP_CUDA_GRAPH_H
+#
+
+def create_cuda_graph(
+    h_type: float,
+    h_value: float,
+    h_result: float,
+    d_x: float,
+    d_y: float,
+    d_type: float,
+    d_value: float,
+    d_result: float,
+    config: LaunchConfig,
+) -> CudaGraphHandle:
+    pass
+
+def launch_cuda_graph(handle: CudaGraphHandle) -> None:
+    pass
+
+def destroy_cuda_graph(handle: CudaGraphHandle) -> None:
+    pass
+
+# #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
