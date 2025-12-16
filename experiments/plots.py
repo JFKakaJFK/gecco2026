@@ -6,7 +6,8 @@ import seaborn as sns
 
 from pathlib import Path
 
-def plot_cpu_gpu(datetime, dataset_sizes):
+
+def plot_cpu_gpu(datetime: str, dataset_sizes: dict[str, dict[str, int]]):
     path = Path("experiments/results/") / datetime
 
     records = []
@@ -30,13 +31,15 @@ def plot_cpu_gpu(datetime, dataset_sizes):
 
         evals_per_sec = row["evaluations"] / row["eval_time_seconds"]
 
-        records.append({
-            "dataset": dataset,
-            "device": device,
-            "population": population,
-            "iteration": iteration,
-            "evals_per_sec": evals_per_sec,
-        })
+        records.append(
+            {
+                "dataset": dataset,
+                "device": device,
+                "population": population,
+                "iteration": iteration,
+                "evals_per_sec": evals_per_sec,
+            }
+        )
 
     df_all = pd.DataFrame(records)
 
@@ -63,34 +66,24 @@ def plot_cpu_gpu(datetime, dataset_sizes):
     plt.savefig(f"{path}/evals_per_second_barplot.png", dpi=300)
 
     # Speedup plot (GPU / CPU)
-    df_mean = (
-        df_all
-        .groupby(["dataset", "device", "population"], as_index=False)
-        .agg(evals_per_sec=("evals_per_sec", "mean"))
-    )
+    df_mean = df_all.groupby(
+        ["dataset", "device", "population"], as_index=False
+    ).agg(evals_per_sec=("evals_per_sec", "mean"))
 
     cpu = df_mean[df_mean["device"] == "cpu"]
     gpu = df_mean[df_mean["device"] == "gpu"]
 
     df_speedup = pd.merge(
-        cpu,
-        gpu,
-        on=["dataset", "population"],
-        suffixes=("_cpu", "_gpu")
+        cpu, gpu, on=["dataset", "population"], suffixes=("_cpu", "_gpu")
     )
 
     df_speedup["speedup"] = (
-        df_speedup["evals_per_sec_gpu"] /
-        df_speedup["evals_per_sec_cpu"]
+        df_speedup["evals_per_sec_gpu"] / df_speedup["evals_per_sec_cpu"]
     )
 
     plt.figure(figsize=(8, 5))
     sns.lineplot(
-        data=df_speedup,
-        x="population",
-        y="speedup",
-        hue="dataset",
-        marker="o"
+        data=df_speedup, x="population", y="speedup", hue="dataset", marker="o"
     )
 
     plt.xscale("log", base=2)
@@ -107,12 +100,13 @@ def plot_kernel_versions(datetime: str):
 
     path = Path("experiments/results/") / datetime
 
-
     for file in path.glob("*-*-pop*-obs*-iter*.csv"):
         df = pd.read_csv(file)
 
         # Extract metadata
-        dataset, kernel_version, population, observations, iterations = file.stem.split("-")
+        dataset, kernel_version, population, observations, iterations = (
+            file.stem.split("-")
+        )
 
         population = int(population.replace("pop", ""))
         observations = int(observations.replace("obs", ""))
@@ -123,22 +117,24 @@ def plot_kernel_versions(datetime: str):
             continue
 
         row = converged.iloc[0]
-        threads_per_sec = (row["evaluations"] * observations * population) / row["eval_time_seconds"]
+        threads_per_sec = (
+            row["evaluations"] * observations * population
+        ) / row["eval_time_seconds"]
 
-        records.append({
-            "dataset": dataset,
-            "version": kernel_version,
-            "observations": observations,
-            "iteration": iterations,
-            "threads_per_sec": threads_per_sec
-        })
+        records.append(
+            {
+                "dataset": dataset,
+                "version": kernel_version,
+                "observations": observations,
+                "iteration": iterations,
+                "threads_per_sec": threads_per_sec,
+            }
+        )
 
     df_all = pd.DataFrame(records)
 
-    df_mean = (
-        df_all
-        .groupby(["version", "observations"], as_index=False)
-        .agg(threads_per_sec=("threads_per_sec", "mean"))
+    df_mean = df_all.groupby(["version", "observations"], as_index=False).agg(
+        threads_per_sec=("threads_per_sec", "mean")
     )
 
     versions = df_all["version"].unique()
@@ -151,7 +147,7 @@ def plot_kernel_versions(datetime: str):
         y="threads_per_sec",
         hue="version",
         palette=color_map,
-        alpha=0.7
+        alpha=0.7,
     )
 
     for version in df_mean["version"].unique():
@@ -174,12 +170,16 @@ def plot_kernel_versions(datetime: str):
     plt.savefig(f"{path}/kernel_scaling.png", dpi=300)
 
     # Pivot baseline
-    baseline = df_mean[df_mean["version"] == "baseline"][["observations", "threads_per_sec"]]
+    baseline = df_mean[df_mean["version"] == "baseline"][
+        ["observations", "threads_per_sec"]
+    ]
     baseline = baseline.rename(columns={"threads_per_sec": "baseline_threads"})
 
     # Merge baseline back
     df_relative = pd.merge(df_mean, baseline, on="observations")
-    df_relative["relative_perf"] = df_relative["threads_per_sec"] / df_relative["baseline_threads"]
+    df_relative["relative_perf"] = (
+        df_relative["threads_per_sec"] / df_relative["baseline_threads"]
+    )
 
     # Plot
     plt.figure(figsize=(8, 5))
@@ -188,7 +188,7 @@ def plot_kernel_versions(datetime: str):
         x="observations",
         y="relative_perf",
         hue="version",
-        marker="o"
+        marker="o",
     )
 
     plt.xscale("log")
