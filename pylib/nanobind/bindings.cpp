@@ -1935,19 +1935,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_GA_GP_SR_H
   //
-  // #ifndef __GOBLIN_GA_GP_CUDA_GRAPH_H
-  //
-
-
-  m.def("create_cuda_graph",
-      goblin::create_cuda_graph, nb::arg("h_type"), nb::arg("h_value"), nb::arg("h_result"), nb::arg("d_x"), nb::arg("d_y"), nb::arg("d_type"), nb::arg("d_value"), nb::arg("d_result"), nb::arg("config"));
-
-  m.def("launch_cuda_graph",
-      goblin::launch_cuda_graph, nb::arg("handle"));
-
-  m.def("destroy_cuda_graph",
-      goblin::destroy_cuda_graph, nb::arg("handle"));
-  // #endif
   // #ifndef _GOBLIN_GA_GP_HELPER_H
   //
   // #endif

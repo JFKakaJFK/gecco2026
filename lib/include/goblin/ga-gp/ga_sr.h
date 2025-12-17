@@ -2,7 +2,6 @@
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
-#include "goblin/ga-gp/cuda_graph.h"
 #include "goblin/ga-gp/evaluate.h"
 #include "goblin/ga-gp/helper.h"
 #include "goblin/ga-gp/misc.h"

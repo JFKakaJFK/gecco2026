@@ -3914,36 +3914,6 @@ std::vector<float> test_evaluate_mse_kernel(
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/cuda_graph.h included by goblin/ga-gp/ga_sr.h                             //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef __GOBLIN_GA_GP_CUDA_GRAPH_H
-
-
-
-namespace goblin {
-
-using CudaGraphHandle = std::uintptr_t;
-
-CudaGraphHandle create_cuda_graph(
-    float* h_type,
-    float* h_value,
-    float* h_result,
-    float* d_X,
-    float* d_Y,
-    float* d_type,
-    float* d_value,
-    float* d_result,
-    const LaunchConfig config
-);
-
-void launch_cuda_graph(CudaGraphHandle handle);
-
-void destroy_cuda_graph(CudaGraphHandle handle);
-
-}
-
-#endif /* __GOBLIN_GA_GP_CUDA_GRAPH_H */
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_HELPER_H

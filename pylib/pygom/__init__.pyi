@@ -1480,32 +1480,6 @@ def test_evaluate_mse_kernel(
 #
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/cuda_graph.h included by goblin/ga-gp/ga_sr.h                             //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef __GOBLIN_GA_GP_CUDA_GRAPH_H
-#
-
-def create_cuda_graph(
-    h_type: float,
-    h_value: float,
-    h_result: float,
-    d_x: float,
-    d_y: float,
-    d_type: float,
-    d_value: float,
-    d_result: float,
-    config: LaunchConfig,
-) -> CudaGraphHandle:
-    pass
-
-def launch_cuda_graph(handle: CudaGraphHandle) -> None:
-    pass
-
-def destroy_cuda_graph(handle: CudaGraphHandle) -> None:
-    pass
-
-# #endif
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_HELPER_H

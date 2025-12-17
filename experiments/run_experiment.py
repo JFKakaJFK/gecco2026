@@ -3,9 +3,6 @@ import pmlb
 
 import numpy as np
 import pygom.gp as gp
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 from datetime import datetime
 from pathlib import Path
@@ -13,7 +10,8 @@ from pygom import KernelVersion
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
 
-import plots
+import src.db as db
+import src.plots as plots
 
 
 def run_single_experiment(
@@ -52,11 +50,22 @@ def run_single_experiment(
 
     est.fit(X_train, y_train)
 
-    r2_train = r2_score(y_train, est.predict(X_train))
-    r2_test = r2_score(y_test, est.predict(X_test))
+    y_pred_train = est.predict(X_train)
+    y_pred_test = est.predict(X_test)
 
-    mse_train = mean_squared_error(y_train, est.predict(X_train))
-    mse_test = mean_squared_error(y_test, est.predict(X_test))
+    if not np.all(np.isfinite(y_pred_train)):
+        r2_train = np.nan
+        mse_train = np.nan
+    else:
+        r2_train = r2_score(y_train, est.predict(X_train))
+        mse_train = mean_squared_error(y_train, est.predict(X_train))
+
+    if not np.all(np.isfinite(y_pred_test)):
+        r2_test = np.nan
+        mse_test = np.nan
+    else:
+        r2_test = r2_score(y_test, est.predict(X_test))
+        mse_test = mean_squared_error(y_test, est.predict(X_test))
 
     return [r2_train, r2_test, mse_train, mse_test]
 
@@ -66,7 +75,7 @@ def run_experiments(
     pop_sizes: list[int],
     results_dir: Path,
     include_cpu: bool = False,
-    iterations: int = 3,
+    iterations: int = 5,
 ):
     results = [
         [
@@ -107,7 +116,7 @@ def run_experiments(
                         y_test,
                         p,
                         acc,
-                        KernelVersion.block_reduce,
+                        KernelVersion.single_kernel,
                         seed,
                         logpath,
                     )
@@ -120,32 +129,32 @@ def run_experiments(
 
 
 def run_kernel_version_experiment(
-    benchmarks: dict[str, dict[str, int]],
+    benchmark: str,
+    pop_sizes: list[int],
     kernel_versions: list[KernelVersion],
     results_dir: Path,
     iterations: int = 5,
 ):
-    p = 256
-
     rng = np.random.default_rng(42)
     seeds = rng.integers(0, 2**16, size=iterations)
 
-    for b in benchmarks:
-        print("Fetching dataset")
-        X, y = pmlb.fetch_data(
-            b, return_X_y=True, local_cache_dir="./plmb_cache"
-        )
+    print("Fetching dataset")
+    X, y = pmlb.fetch_data(
+        benchmark, return_X_y=True, local_cache_dir="./plmb_cache"
+    )
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, random_state=42
-        )
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, random_state=42
+    )
 
-        for kernel_version in kernel_versions:
-            v = str(kernel_version).replace("KernelVersion.", "")
+    for kernel_version in kernel_versions:
+        v = str(kernel_version).replace("KernelVersion.", "")
 
-            for obs in [10, 100, 1_000, 10_000, 100_000]:
+        for p in pop_sizes:
+            for obs in [10, 100, 1_000]:
+            # for obs in [10, 100, 1_000, 10_000, 100_000, 1_000_000]:
                 for i, seed in enumerate(seeds):
-                    test_name = f"{b}-{v}-pop{p}-obs{obs}-iter{i}"
+                    test_name = f"{benchmark}-{v}-pop{p}-obs{obs}-iter{i}"
                     logpath = f"{results_dir}/{test_name}.csv"
 
                     print(f"Starting experiment: {test_name}")
@@ -183,21 +192,25 @@ def main():
         "505_tecator": {"observations": 240, "features": 124},
     }
 
-    pop_sizes = [256, 512, 1024, 2048]
+    pop_sizes = [256]#, 512, 1024, 2048]
 
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     results_dir = Path("experiments/results") / run_date
 
-    run_experiments(benchmarks, pop_sizes, results_dir, include_cpu=True)
-    plots.plot_cpu_gpu(run_date, benchmarks)
+    run_experiments(benchmarks, pop_sizes, results_dir, include_cpu=True, iterations=2)
+    # plots.plot_cpu_gpu(run_date, benchmarks)
 
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     results_dir = Path("experiments/results") / run_date
 
-    run_kernel_version_experiment(
-        benchmarks, kernel_versions, results_dir, iterations=5
-    )
-    plots.plot_kernel_versions(run_date)
+    benchmark = "1191_BNG_pbc"
+    pop_sizes = [256, 512, 1024, 2048, 4096, 8192]
+
+    # run_kernel_version_experiment(
+    #     benchmark, pop_sizes, kernel_versions, results_dir, iterations=2
+    # )
+    db.create_db(Path("experiments/results/2025-12-17_09:49:08"))
+    # plots.plot_kernel_versions(run_date)
 
 
 if __name__ == "__main__":
