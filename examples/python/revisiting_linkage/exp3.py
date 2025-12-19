@@ -11,7 +11,7 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
 
-REPEATS_PER_DATASET = 30
+REPEATS_PER_DATASET = 15
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
@@ -23,8 +23,8 @@ PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    # max_evaluations=int(1e4)
-    max_evaluations=int(1e7)
+    max_evaluations=int(1e6)
+    # max_evaluations=int(1e7)
 )
 
 
@@ -32,14 +32,18 @@ def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     for problem in [
-        # UCI
-        "Airfoil",
-        "Bike Sharing",
-        "Breast Cancer",
+        "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
+        # "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
+        # "sin(3.141 * x0)/(3.141 * x0)",
+        "sin(3.141 * x0 + 2.72)",
+        # "sin(1.772 * x0) + sin(2.035 * x2)",
+        # "Airfoil",
+        # "Bike Sharing",
+        # "Breast Cancer",
         "Concrete Compressive Strength",
-        "Energy Cooling",
-        "Energy Heating",
-        "Yacht Hydrodynamics",
+        # "Energy Cooling",
+        # "Energy Heating",
+        # "Yacht Hydrodynamics",
     ]:
         for (
             fold,
@@ -63,7 +67,10 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [5, 7]:
+            for height in [  #
+                5
+                # , 7
+            ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
                 )
@@ -73,7 +80,10 @@ def problems(rng):
                         [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
                     )
                 ]:
-                    for linear_scaling in [False, True]:
+                    for linear_scaling in [
+                        False,
+                        # True
+                    ]:
                         for constant_representation in ["ercs", "pool"]:
                             ctx = c.GPContext(
                                 num_inputs=int(X_fold.shape[1]),
@@ -103,7 +113,9 @@ def problems(rng):
                                         y_test=c.np.load(str(y_test_path.absolute())),
                                         objectives="nmse",  # = MSE / var(y_train)
                                         linear_scaling=linear_scaling,
-                                        init=c.HalfHalfInit(),
+                                        init=c.HalfHalfInit(
+                                            p_terminal=0.5, p_constant=0.5
+                                        ),
                                         constant_init_lower_bound=min_y,
                                         constant_init_upper_bound=max_y,
                                         # early termination condition for "perfect" expression recovery
@@ -126,6 +138,10 @@ def methods(info, ctx):
     subgeneration_factor = 6
     max_num_populations = 25  # int(np.log2(2048 / initial_population_size)) + 1
     restart_stale_populations = True  # restart the last population if it has converged
+
+    initial_population_size = 1024
+    max_num_populations = 1
+    restart_stale_populations = False
 
     constant_representation = info["constant_representation"]
     variants = []
@@ -171,6 +187,7 @@ def methods(info, ctx):
             if "LM" in copt:
                 copt_population_kwargs = dict(
                     gradient_step_frequency=1,
+                    mutate_before_gradient_step=False,
                     **copt_population_kwargs,
                 )
 
@@ -206,7 +223,8 @@ def methods(info, ctx):
                 c.MixedGOMEA(
                     discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                     population_options=c.PopulationOptions(
-                        forced_improvements=False,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        forced_improvements=True,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        **copt_population_kwargs,
                     ),
                     rv_options=c.RvOptions(**rv_options),
                     continuous_model=c.FullFOS(),
@@ -271,13 +289,13 @@ def main():
     # status()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     clean=True,
-    #     # limit=1,
-    #     max_workers=44,
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        clean=True,
+        # limit=1,
+        # max_workers=44,
+    )
 
     with load_results(
         LOG_DIR,
@@ -289,10 +307,14 @@ def main():
         plot_convergence_so(
             PLOT_DIR / "convergence",
             conn,
-            y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-            y_agg="MAX",  # higher R^2 is better
-            y_label="$R^2$ Train",
-            ymin="auto",
+            # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
+            # y_agg="MAX",  # higher R^2 is better
+            # y_label="$R^2$ Train",
+            y_var="objectives[1]::DOUBLE",  # transform NMSE into R2
+            y_agg="MIN",  # higher R^2 is better
+            y_label="$NMSE$ Train",
+            ylog=True,
+            # ymin="auto",
             ymax="auto",
             # merge folds and runs into one seaborn "unit"
             unit_query="format('{}.{}', fold, run)",

@@ -1,5 +1,4 @@
 #pragma once
-#include <optional>
 #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
 #define _GOBLIN_LIB_LINKAGE_MODEL_H
 
@@ -10,6 +9,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <vector>
+#include <optional>
 #include <random>
 
 #include <Eigen/Dense>

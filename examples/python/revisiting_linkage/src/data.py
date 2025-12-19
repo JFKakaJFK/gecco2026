@@ -49,7 +49,7 @@ def synthetic_problem(
     return X, y
 
 
-def load_uci(problem: str, data_dir):
+def load_local(problem: str, data_dir):
     data_dir = pathlib.Path(data_dir)
     # unfortunately, https://github.com/uci-ml-repo/ucimlrepo doesn't handle all of the following datasets correctly...
     if problem == "Bike Sharing":
@@ -113,17 +113,38 @@ def load_uci(problem: str, data_dir):
         return df[features].to_numpy(dtype=np.float64), df["Y2"].to_numpy(
             dtype=np.float64
         )
+    elif problem == "Dow Chemical":
+        # Dow Chemical from the 2010 Evo* competition
+        # https://web.archive.org/web/20120628140646/http%3A//casnew.iti.upv.es/index.php/evocompetitions/105-symregcompetition (download link should still work)
+        # Both the train and test set from the original competition are combined here
+        df = pd.concat(
+            [
+                pd.read_csv(data_dir / "dow_chemical.csv"),
+                pd.read_csv(data_dir / "dow_chemical_test.csv"),
+            ],
+            ignore_index=True,
+        )
+        features = [c for c in df.columns if c not in ["y"]]
+        return df[features].to_numpy(dtype=np.float64), df["y"].to_numpy(
+            dtype=np.float64
+        )
+    elif problem == "Tower":
+        # Tower dataset referenced in https://ieeexplore.ieee.org/document/4632147
+        # Obtained via https://drive.google.com/drive/folders/1cUU7f23z_lBPQCOX7h1unZWKZH3YO_EB (referenced in http://arxiv.org/abs/1904.02050)
+        Xy = pd.read_csv(data_dir / "tower.csv").to_numpy(dtype=np.float64)
+        return Xy[:, :-1], Xy[:, -1]
 
-    raise ValueError(f"Unknown UCI dataset: '{problem}'")
+    raise ValueError(f"Unknown Local dataset: '{problem}'")
 
 
 def load_problem(
-    problem: str, uci_data_dir="data_uci", pmlb_cache_dir=".pmlb", **kwargs
+    problem: str, data_dir="datasets", pmlb_cache_dir=".pmlb", **kwargs
 ) -> tuple[tuple[np.ndarray, np.ndarray], bool]:
     try:
-        return load_uci(problem, uci_data_dir), False
+        return load_local(problem, data_dir), False
     except Exception as e:
-        print(problem, e)
+        # print(problem, e)
+        pass
     try:
         return fetch_data(
             problem, return_X_y=True, local_cache_dir=pmlb_cache_dir

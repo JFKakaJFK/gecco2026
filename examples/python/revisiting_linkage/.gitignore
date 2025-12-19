@@ -1,4 +1,4 @@
 results/
 .pmlb/
 .venv/
-!data_uci/*.csv
+!datasets/*.csv

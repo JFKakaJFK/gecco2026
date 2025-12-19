@@ -2253,10 +2253,21 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
 
 
+  auto pyClassGrowInit =
+      nb::class_<goblin::GrowInit, goblin::DiscreteInitBase>
+          (m, "GrowInit", nb::is_final(), "\n(final class)")
+      .def(nb::init<std::optional<double>, std::optional<double>>(),
+          nb::arg("p_terminal").none() = nb::none(), nb::arg("p_constant").none() = nb::none())
+      .def("sample",
+          &goblin::GrowInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
+      ;
+
+
   auto pyClassFullInit =
       nb::class_<goblin::FullInit, goblin::DiscreteInitBase>
           (m, "FullInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
+      .def(nb::init<std::optional<double>>(),
+          nb::arg("p_constant").none() = nb::none())
       .def("sample",
           &goblin::FullInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
       ;
@@ -2265,7 +2276,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassHalfHalfInit =
       nb::class_<goblin::HalfHalfInit, goblin::DiscreteInitBase>
           (m, "HalfHalfInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
+      .def(nb::init<std::optional<double>, std::optional<double>>(),
+          nb::arg("p_terminal").none() = nb::none(), nb::arg("p_constant").none() = nb::none())
       .def("sample",
           &goblin::HalfHalfInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
       ;

@@ -707,7 +707,7 @@ class GPContext {
         if (root[i] == root[j]) {
           proximity(i, j) = 0.0;
           usize ni = i, nj = j;
-          // while the earliest common ancestor was not found, replace the deeper node with its parent until the paths
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
           // meet at the closest common ancestor
           while (ni != nj) {
             if (depth[ni] > depth[nj]) {
@@ -722,22 +722,27 @@ class GPContext {
             }
             proximity(i, j) += 1.0;
           }
+
+          if (norm < proximity(i, j)) {
+            norm = proximity(i, j);
+          }
         } else {
+          // use -1 as sentinel for disconnected values
           proximity(i, j) = -1.0;
         }
       }
     }
-    norm += 1.0;
+    norm += 1.0;  // norm = max_distance + 1
+
     for (usize i = 0; i < num_discrete; i++) {
       for (usize j = 0; j <= i; j++) {
-        if (proximity(i, j) < 0.0) {
-          proximity(i, j) = norm;
-        }
+        proximity(i, j) = proximity(i, j) < 0.0 ? 0.0 : 1.0 - proximity(i, j) / norm;
+
         proximity(j, i) = proximity(i, j);
       }
     }
 
-    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+    return proximity;
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter

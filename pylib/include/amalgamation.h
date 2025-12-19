@@ -1471,7 +1471,7 @@ struct Budget {
   std::optional<TerminationStatus> constexpr exhausted(usize generations,
                                                        usize evaluations,
                                                        std::chrono::nanoseconds elapsed) const {
-    if (max_generations.has_value() && generations >= max_generations.value()) {
+    if (max_generations.has_value() && generations > max_generations.value()) {
       return std::make_optional(TerminationStatus::GenerationLimitReached);
     }
     if (max_evaluations.has_value() && evaluations >= max_evaluations.value()) {
@@ -4945,7 +4945,7 @@ class GPContext {
         if (root[i] == root[j]) {
           proximity(i, j) = 0.0;
           usize ni = i, nj = j;
-          // while the earliest common ancestor was not found, replace the deeper node with its parent until the paths
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
           // meet at the closest common ancestor
           while (ni != nj) {
             if (depth[ni] > depth[nj]) {
@@ -4960,22 +4960,27 @@ class GPContext {
             }
             proximity(i, j) += 1.0;
           }
+
+          if (norm < proximity(i, j)) {
+            norm = proximity(i, j);
+          }
         } else {
+          // use -1 as sentinel for disconnected values
           proximity(i, j) = -1.0;
         }
       }
     }
-    norm += 1.0;
+    norm += 1.0;  // norm = max_distance + 1
+
     for (usize i = 0; i < num_discrete; i++) {
       for (usize j = 0; j <= i; j++) {
-        if (proximity(i, j) < 0.0) {
-          proximity(i, j) = norm;
-        }
+        proximity(i, j) = proximity(i, j) < 0.0 ? 0.0 : 1.0 - proximity(i, j) / norm;
+
         proximity(j, i) = proximity(i, j);
       }
     }
 
-    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+    return proximity;
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -5054,38 +5059,76 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/init.h included by goblin.h                                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "context.h"
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
 
 
 
 namespace goblin {
-class FullInit final : public DiscreteInitBase {
+
+class GrowInit final : public DiscreteInitBase {
  public:
+  GrowInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt)
+      : p_terminal(p_terminal), p_constant(p_constant) {};
+
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     try {
       const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
 
       Mat<DType> dvals(count, problem.num_discrete());
       for (isize c = 0; c < dvals.cols(); c++) {
-        std::vector<usize> idx2domain;
+        std::vector<usize> const_terminals;      // numeric constant symbols
+        std::vector<usize> non_const_terminals;  // features/args/params
+        std::vector<usize> non_terminals;        // operators/subfunctions
 
-        bool is_leaf = ctx.children[c].empty();
-
-        for (usize domain_value = 0; domain_value < problem.discrete_domain_sizes()(c); domain_value++) {
+        usize domain_size = problem.discrete_domain_sizes()(c);
+        if (domain_size == 0) {
+          throw std::runtime_error("Variable domain must be non-empty.");
+        }
+        for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
           DType value = ctx.domain2value(c, domain_value);
-          if (is_leaf ? ctx.value_min_arity[value] == 0  // terminals only
-                      : ctx.value_min_arity[value] > 0   // non-terminals only
-          ) {
-            idx2domain.push_back(domain_value);
+          if (ctx.value_min_arity[value] > 0) {
+            non_terminals.push_back(domain_value);
+          } else if (ctx.value_kind[value] == ValueKind::Constant) {
+            const_terminals.push_back(domain_value);
+          } else {
+            non_const_terminals.push_back(domain_value);
           }
         }
 
-        __goblin_runtime_assert(idx2domain.size() >= 1);
+        if (const_terminals.empty() && non_const_terminals.empty()) {
+          throw std::runtime_error("Variable domain must include terminal symbols.");
+        }
 
-        std::uniform_int_distribution<DType> d(0, idx2domain.size() - 1);
+        double actual_p_terminal =
+            p_terminal.value_or(1.0 - static_cast<double>(non_terminals.size()) / static_cast<double>(domain_size));
+        double actual_p_constant = p_constant.value_or(
+            static_cast<double>(const_terminals.size()) /
+            (static_cast<double>(const_terminals.size()) + static_cast<double>(non_const_terminals.size())));
+        if (const_terminals.empty()) {
+          actual_p_constant = 0.0;
+        }
+        if (non_terminals.empty()) {
+          actual_p_terminal = 1.0;
+        }
+
+        bool is_leaf = ctx.children[c].empty();
+        std::uniform_real_distribution<double> U(0.0, 1.0);
+        std::uniform_int_distribution<DType> ct_dist(0, const_terminals.size() - 1);
+        std::uniform_int_distribution<DType> nct_dist(0, non_const_terminals.size() - 1);
+        std::uniform_int_distribution<DType> nt_dist(0, non_terminals.size() - 1);
+
         for (usize i = 0; i < count; i++) {
-          dvals(i, c) = idx2domain[d(rng)];
+          if (is_leaf || U(rng) < actual_p_terminal) {
+            if (U(rng) < actual_p_constant) {
+              dvals(i, c) = const_terminals[ct_dist(rng)];
+            } else {
+              dvals(i, c) = non_const_terminals[nct_dist(rng)];
+            }
+          } else {
+            dvals(i, c) = non_terminals[nt_dist(rng)];
+          }
         }
       }
       return dvals;
@@ -5094,23 +5137,110 @@ class FullInit final : public DiscreteInitBase {
       __goblin_runtime_assert(false);
     }
   };
+
+ private:
+  std::optional<double> p_terminal{};
+  std::optional<double> p_constant{};
+};
+
+class FullInit final : public DiscreteInitBase {
+ public:
+  FullInit(std::optional<double> p_constant = std::nullopt) : p_constant(p_constant) {};
+
+  Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
+    try {
+      const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
+
+      Mat<DType> dvals(count, problem.num_discrete());
+      for (isize c = 0; c < dvals.cols(); c++) {
+        std::vector<usize> const_terminals;      // numeric constant symbols
+        std::vector<usize> non_const_terminals;  // features/args/params
+        std::vector<usize> non_terminals;        // operators/subfunctions
+
+        usize domain_size = problem.discrete_domain_sizes()(c);
+        if (domain_size == 0) {
+          throw std::runtime_error("Variable domain must be non-empty.");
+        }
+        for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
+          DType value = ctx.domain2value(c, domain_value);
+          if (ctx.value_min_arity[value] > 0) {
+            non_terminals.push_back(domain_value);
+          } else if (ctx.value_kind[value] == ValueKind::Constant) {
+            const_terminals.push_back(domain_value);
+          } else {
+            non_const_terminals.push_back(domain_value);
+          }
+        }
+
+        bool is_leaf = ctx.children[c].empty();
+        if (is_leaf) {
+          if (const_terminals.empty() && non_const_terminals.empty()) {
+            throw std::runtime_error("Variable domain must include terminal symbols.");
+          }
+
+          double actual_p_constant = p_constant.value_or(
+              static_cast<double>(const_terminals.size()) /
+              (static_cast<double>(const_terminals.size()) + static_cast<double>(non_const_terminals.size())));
+          if (const_terminals.empty()) {
+            actual_p_constant = 0.0;
+          }
+
+          std::uniform_real_distribution<double> U(0.0, 1.0);
+          std::uniform_int_distribution<DType> ct_dist(0, const_terminals.size() - 1);
+          std::uniform_int_distribution<DType> nct_dist(0, non_const_terminals.size() - 1);
+
+          for (usize i = 0; i < count; i++) {
+            if (U(rng) < actual_p_constant) {
+              dvals(i, c) = const_terminals[ct_dist(rng)];
+            } else {
+              dvals(i, c) = non_const_terminals[nct_dist(rng)];
+            }
+          }
+        } else {
+          if (non_terminals.empty()) {
+            throw std::runtime_error("Variable domain must include non-terminal symbols for non-leaf nodes.");
+          }
+
+          std::uniform_int_distribution<DType> nt_dist(0, non_terminals.size() - 1);
+
+          for (usize i = 0; i < count; i++) {
+            dvals(i, c) = non_terminals[nt_dist(rng)];
+          }
+        }
+      }
+      return dvals;
+
+    } catch (const std::bad_cast& e) {
+      __goblin_runtime_assert(false);
+    }
+  };
+
+ private:
+  std::optional<double> p_constant{};
 };
 
 class HalfHalfInit final : public DiscreteInitBase {
  public:
+
+ HalfHalfInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt): grow(GrowInit(p_terminal, p_constant)), full(FullInit(p_constant)) {};
+
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
 
     // Grow is "for each node sample from the full domain"
     // = Random uniform initialization per node
     usize grow_count = count / 2;
-    dvals(Eigen::seq(0, grow_count - 1), Eigen::placeholders::all) = RandomDInit().sample(rng, problem, grow_count);
+    dvals(Eigen::seq(0, grow_count - 1), Eigen::placeholders::all) = grow.sample(rng, problem, grow_count);
 
     usize full_count = count - grow_count;
-    dvals(Eigen::seq(grow_count, count - 1), Eigen::placeholders::all) = FullInit().sample(rng, problem, full_count);
+    dvals(Eigen::seq(grow_count, count - 1), Eigen::placeholders::all) = full.sample(rng, problem, full_count);
 
     return dvals;
   };
+
+  private:
+  GrowInit grow{};
+  FullInit full{};
 };
 
 /// Complete init does not really work as intended for GP, since a lot of the diversity is distributed to inactive
