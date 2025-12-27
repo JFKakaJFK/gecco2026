@@ -243,6 +243,33 @@ class Tracked final : public InstanceBase {
 
   bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
 
+  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
+
+  void log_header(std::ostream& os) const override { instance.log_header(os); }
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    instance.log_solution(os, solution);
+  }
+
+  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    return instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    return instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+  }
+
   /// This can be used by the algorithm to log when debugging to log an
   /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
   /// values need to be empty, or valid csv columns with a ',' separator at the
@@ -472,21 +499,21 @@ class Tracked final : public InstanceBase {
 
       if (fs::is_empty(config.logpath)) {
         // clang-format off
-                    logfile <<
-                        "status,"
-                        "evaluations,"
-                        "generation,"
-                        "total_time_seconds,"
-                        "alg_time_seconds,"
-                        "eval_time_seconds,"
-                        << config.log_info_headers
-                        << debug_headers <<
-                        "seed,"
-                        "discrete,"
-                        "discrete_active,"
-                        "continuous,"
-                        "continuous_active,"
-                    ;
+        logfile <<
+            "status,"
+            "evaluations,"
+            "generation,"
+            "total_time_seconds,"
+            "alg_time_seconds,"
+            "eval_time_seconds,"
+            << config.log_info_headers
+            << debug_headers <<
+            "seed,"
+            "discrete,"
+            "discrete_active,"
+            "continuous,"
+            "continuous_active,"
+        ;
         // clang-format on
         instance.log_header(logfile);
         logfile << std::endl;  // here we want to flush
@@ -510,11 +537,11 @@ class Tracked final : public InstanceBase {
         s = &solutions[i];
       }
       // clang-format off
-                logfile << common;
-                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-                log_helper(logfile, s->continuous_values(), true); logfile << ',';
-                log_helper(logfile, s->continuous_active(), true); logfile << ',';
+        logfile << common;
+        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+        log_helper(logfile, s->continuous_values(), true); logfile << ',';
+        log_helper(logfile, s->continuous_active(), true); logfile << ',';
       // clang-format on
       instance.log(logfile, *s);
       logfile << "\n";

@@ -172,8 +172,8 @@ class FullInit final : public DiscreteInitBase {
 
 class HalfHalfInit final : public DiscreteInitBase {
  public:
-
- HalfHalfInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt): grow(GrowInit(p_terminal, p_constant)), full(FullInit(p_constant)) {};
+  HalfHalfInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt)
+      : grow(GrowInit(p_terminal, p_constant)), full(FullInit(p_constant)) {};
 
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
@@ -189,7 +189,7 @@ class HalfHalfInit final : public DiscreteInitBase {
     return dvals;
   };
 
-  private:
+ private:
   GrowInit grow{};
   FullInit full{};
 };

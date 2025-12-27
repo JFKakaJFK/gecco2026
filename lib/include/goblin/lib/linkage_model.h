@@ -154,6 +154,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
                  std::optional<Subset> subset = std::nullopt,
                  std::optional<Mat<CType>> custom_similarity = std::nullopt,
                  std::optional<CType> eta_custom_similarity = std::nullopt,
+                 std::optional<std::string> custom_similarity_agg = std::nullopt,
                  std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback = std::nullopt,
                  bool freeze = false)
       : subset(subset.value_or(Subset{})),
@@ -167,6 +168,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
         filter_root(filter_root),
         max_subset_size(max_subset_size),
         eta_custom_similarity(eta_custom_similarity),
+        custom_similarity_agg(custom_similarity_agg),
         merge_continuous(merge_continuous),
         normalize_initial_linkage_bias(normalize_initial_linkage_bias),
         freeze(freeze) {
@@ -300,7 +302,18 @@ class LinkageTreeFOS final : public LinkageModelBase {
       throw std::runtime_error("Unknown subset of variables to learn a LT for.");
     }
 
-    if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
+    if (custom_similarity.has_value() && custom_similarity_agg.has_value()) {
+      const auto& agg = custom_similarity_agg.value();
+      if (agg == "add") {
+        similarity = similarity + custom_similarity.value();
+      } else if (agg == "mul") {
+        similarity = similarity.array() * custom_similarity.value().array();
+      } else if (agg == "max") {
+        similarity = similarity.array().max(custom_similarity.value().array());
+      } else {
+        throw std::runtime_error("Unknown or unsupported similarity aggregation method.");
+      }
+    } else if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
       similarity = (1.0 - eta_custom_similarity.value()) * similarity +
                    eta_custom_similarity.value() * custom_similarity.value();
     }
@@ -680,6 +693,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
   std::optional<bool> filter_root;
   std::optional<usize> max_subset_size;
   std::optional<CType> eta_custom_similarity;
+  std::optional<std::string> custom_similarity_agg;
   bool merge_continuous;
   bool normalize_initial_linkage_bias;
   bool freeze;

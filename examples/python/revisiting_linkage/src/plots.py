@@ -51,7 +51,14 @@ def plot_convergence_so(
     if modifier_query is not None:
         assert modifier_labels is not None
 
-        modifiers = sorted(
+        mfs = set(
+            str(m)
+            for m, *_ in conn.sql(f"SELECT {modifier_query} FROM results").fetchall()
+            if m is not None
+        )
+        print(mfs)
+
+        modifiers = sorted(  # list(
             map(
                 literal_eval,
                 set(

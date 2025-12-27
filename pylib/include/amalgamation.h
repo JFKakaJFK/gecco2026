@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -2579,6 +2578,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
                  std::optional<Subset> subset = std::nullopt,
                  std::optional<Mat<CType>> custom_similarity = std::nullopt,
                  std::optional<CType> eta_custom_similarity = std::nullopt,
+                 std::optional<std::string> custom_similarity_agg = std::nullopt,
                  std::optional<std::function<void(CRef<Mat<CType>>)>> similarity_callback = std::nullopt,
                  bool freeze = false)
       : subset(subset.value_or(Subset{})),
@@ -2592,6 +2592,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
         filter_root(filter_root),
         max_subset_size(max_subset_size),
         eta_custom_similarity(eta_custom_similarity),
+        custom_similarity_agg(custom_similarity_agg),
         merge_continuous(merge_continuous),
         normalize_initial_linkage_bias(normalize_initial_linkage_bias),
         freeze(freeze) {
@@ -2725,7 +2726,18 @@ class LinkageTreeFOS final : public LinkageModelBase {
       throw std::runtime_error("Unknown subset of variables to learn a LT for.");
     }
 
-    if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
+    if(custom_similarity.has_value() && custom_similarity_agg.has_value()){
+        const auto& agg = custom_similarity_agg.value();
+        if(agg == "add"){
+            similarity = similarity + custom_similarity.value();
+        } else if(agg == "mul"){
+            similarity = similarity.array() * custom_similarity.value().array();
+        } else if(agg == "max"){
+            similarity = similarity.array().max(custom_similarity.value().array());
+        } else {
+            throw std::runtime_error("Unknown or unsupported similarity aggregation method.");
+        }
+    } else if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
       similarity = (1.0 - eta_custom_similarity.value()) * similarity +
                    eta_custom_similarity.value() * custom_similarity.value();
     }
@@ -3105,6 +3117,7 @@ class LinkageTreeFOS final : public LinkageModelBase {
   std::optional<bool> filter_root;
   std::optional<usize> max_subset_size;
   std::optional<CType> eta_custom_similarity;
+  std::optional<std::string> custom_similarity_agg;
   bool merge_continuous;
   bool normalize_initial_linkage_bias;
   bool freeze;
@@ -5221,8 +5234,8 @@ class FullInit final : public DiscreteInitBase {
 
 class HalfHalfInit final : public DiscreteInitBase {
  public:
-
- HalfHalfInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt): grow(GrowInit(p_terminal, p_constant)), full(FullInit(p_constant)) {};
+  HalfHalfInit(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt)
+      : grow(GrowInit(p_terminal, p_constant)), full(FullInit(p_constant)) {};
 
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     Mat<DType> dvals(count, problem.num_discrete());
@@ -5238,7 +5251,7 @@ class HalfHalfInit final : public DiscreteInitBase {
     return dvals;
   };
 
-  private:
+ private:
   GrowInit grow{};
   FullInit full{};
 };
@@ -5397,7 +5410,10 @@ class SRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt)
+            std::optional<std::vector<CType>> target_objectives = std::nullopt,
+            std::string gradient_mode = "central",
+            CType gradient_epsilon = 1e-5,
+            CType archive_epsilon = 1e-6)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -5405,10 +5421,13 @@ class SRProblem : public GPInstanceBase {
                        : std::get<std::vector<std::string>>(objectives)),
         X_train(X_train.cast<ScalarType>()),
         Y_train(Y_train.cast<ScalarType>()),
-        _archive_fitness(MOFitness(this->objectives.size())),
+        _archive_fitness(MOFitness(this->objectives.size(), /* minimize = */true, archive_epsilon)),
         _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_archive_fitness) {
+        _target(_archive_fitness),
+        _gradient_mode(gradient_mode),
+        _gradient_epsilon(gradient_epsilon)
+        {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
@@ -5672,12 +5691,14 @@ class SRProblem : public GPInstanceBase {
   MOFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
-  usize _num_continuous;
-  Vec<CType> _continuous_lower_bounds;
-  Vec<CType> _continuous_upper_bounds;
-  Vec<CType> _continuous_init_lower_bounds;
-  Vec<CType> _continuous_init_upper_bounds;
-  Arr2D<ScalarType> _eval_buffer;
+  std::string _gradient_mode{};
+  CType _gradient_epsilon{};
+  usize _num_continuous{};
+  Vec<CType> _continuous_lower_bounds{};
+  Vec<CType> _continuous_upper_bounds{};
+  Vec<CType> _continuous_init_lower_bounds{};
+  Vec<CType> _continuous_init_upper_bounds{};
+  Arr2D<ScalarType> _eval_buffer{};
 };
 
 };  // namespace goblin
@@ -7537,21 +7558,21 @@ class Tracked final : public InstanceBase {
 
       if (fs::is_empty(config.logpath)) {
         // clang-format off
-                    logfile <<
-                        "status,"
-                        "evaluations,"
-                        "generation,"
-                        "total_time_seconds,"
-                        "alg_time_seconds,"
-                        "eval_time_seconds,"
-                        << config.log_info_headers
-                        << debug_headers <<
-                        "seed,"
-                        "discrete,"
-                        "discrete_active,"
-                        "continuous,"
-                        "continuous_active,"
-                    ;
+        logfile <<
+            "status,"
+            "evaluations,"
+            "generation,"
+            "total_time_seconds,"
+            "alg_time_seconds,"
+            "eval_time_seconds,"
+            << config.log_info_headers
+            << debug_headers <<
+            "seed,"
+            "discrete,"
+            "discrete_active,"
+            "continuous,"
+            "continuous_active,"
+        ;
         // clang-format on
         instance.log_header(logfile);
         logfile << std::endl;  // here we want to flush
@@ -7575,11 +7596,11 @@ class Tracked final : public InstanceBase {
         s = &solutions[i];
       }
       // clang-format off
-                logfile << common;
-                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-                log_helper(logfile, s->continuous_values(), true); logfile << ',';
-                log_helper(logfile, s->continuous_active(), true); logfile << ',';
+        logfile << common;
+        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+        log_helper(logfile, s->continuous_values(), true); logfile << ',';
+        log_helper(logfile, s->continuous_active(), true); logfile << ',';
       // clang-format on
       instance.log(logfile, *s);
       logfile << "\n";
@@ -7653,15 +7674,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -7783,14 +7800,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8148,9 +8162,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8246,18 +8257,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -9549,7 +9556,6 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -9814,6 +9820,7 @@ struct PopulationOptions {
   double donor_pool_size_multiplier = 2.0;
   std::optional<usize> max_nis = std::nullopt;
   bool forced_improvements = true;
+  bool enable_mixed_forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
   bool sequential_gom = false;  // performs GOM sequentially per solution, incompatible with other mechanisms
   bool strict_elite_acceptance =
@@ -10056,7 +10063,7 @@ class Population {
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
-    if (!fos_stats.empty()) {  // options.subset_logfile.has_value()) {
+    if (!fos_stats.empty()) {
       log_subset_statistics();
     }
 
@@ -10531,32 +10538,82 @@ class Population {
     std::vector<usize> eval2improve_idx;
     eval2improve_idx.reserve(solutions_to_improve.size());
 
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    // RV must be enabled and there need to be continuous values that aren't already inherited...
+    bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
+                           problem.num_continuous() > 0 && !problem.always_inherit_continuous();
+    CType alpha = 0.5;
+    Subset rv_full;
+    if (enable_rv_steps) {
+      for (usize i = 0; i < problem.num_continuous(); i++) {
+        rv_full.continuous.push_back(i);
+      }
+    }
+
     usize subset_idx = 0;
-    while (!solutions_to_improve.empty() && subset_idx < max_discrete_subset_count) {
+    usize rv_fi_tries = 0;
+    while (
+        // not all solutions improved
+        !solutions_to_improve.empty() &&
+        (
+            // discrete FI not done
+            subset_idx < max_discrete_subset_count ||
+            // continuous FI enabled and not done
+            (enable_rv_steps && rv_fi_tries < rv_state.options.num_forced_improvement_tries))) {
       eval2improve_idx.clear();
       solutions_to_evaluate.clear();
+
+      double p_rv = enable_rv_steps
+                        ? (static_cast<double>(rv_state.options.num_forced_improvement_tries - rv_fi_tries) /
+                           static_cast<double>(max_discrete_subset_count - subset_idx +
+                                               rv_state.options.num_forced_improvement_tries - rv_fi_tries))
+                        : 0.0;
+
+      bool is_rv_step = U(rng) < p_rv;
 
       // TODO parallel?
       for (usize j = 0; j < solutions_to_improve.size(); j++) {
         auto i = solutions_to_improve[j];
         auto k = solution_clusters[i];
 
-        auto fos_idx = subset_orders(i, subset_idx);
+        // clang-format off
+        const auto& donor = k < problem.fitness().num_objectives()
+            ? global_archive.so_solution(k)
+            : global_archive.random_solution(rng);
+        // clang-format on
 
-        // due to filtering/max_subset_size, some clusters might have more
-        // subsets...
-        if (fos_idx < cluster_FOS[k].size()) {
-          subsets[i] = &cluster_FOS[k][fos_idx];
+        if (is_rv_step) {
+          // there must be overlap in the active constants...
+          if ((solutions[i].continuous_active() && donor.continuous_active()).any()) {
+            subsets[i] = &rv_full;
 
-          auto [evaluation_needed, anything_changed] =
-              solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
-                                                                          : global_archive.random_solution(rng),
-                                   *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {  // parent will be updated during acceptance
-            eval2improve_idx.push_back(j);
+            for (usize l = 0; l < problem.num_continuous(); l++) {
+              if (solutions[i].continuous_active()(l) && donor.continuous_active()(l)) {
+                solutions[i].continuous_values()(l) =
+                    alpha * parents[i].continuous_values()(l) + (CType(1.0) - alpha) * donor.continuous_values()(l);
+              }
+            }
+            // solutions[i].continuous_values() =
+            //     alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * donor.continuous_values();
             solutions_to_evaluate.push_back(i);
-          } else if (anything_changed) {  // no acceptance, so we need to update the parent
-            parents[i] = solutions[i];
+            eval2improve_idx.push_back(j);
+          }
+        } else {
+          auto fos_idx = subset_orders(i, subset_idx);
+
+          // due to filtering/max_subset_size, some clusters might have more
+          // subsets...
+          if (fos_idx < cluster_FOS[k].size()) {
+            subsets[i] = &cluster_FOS[k][fos_idx];
+
+            auto [evaluation_needed, anything_changed] =
+                solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
+            if (evaluation_needed) {  // parent will be updated during acceptance
+              eval2improve_idx.push_back(j);
+              solutions_to_evaluate.push_back(i);
+            } else if (anything_changed) {  // no acceptance, so we need to update the parent
+              parents[i] = solutions[i];
+            }
           }
         }
       }
@@ -10605,7 +10662,12 @@ class Population {
         }
       }
 
-      subset_idx++;
+      if (is_rv_step) {
+        alpha *= 0.5;
+        rv_fi_tries++;
+      } else {
+        subset_idx++;
+      }
 
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
@@ -10884,7 +10946,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

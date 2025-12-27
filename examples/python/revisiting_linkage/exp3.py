@@ -16,15 +16,17 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization"
+RESULT_DIR = pathlib.Path("results") / "constant_optimization_grad"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    max_evaluations=int(1e6)
+    # max_generations=300,
+    max_evaluations=int(2e6)
     # max_evaluations=int(1e7)
+    # max_time_seconds=30 * 60
 )
 
 
@@ -32,15 +34,17 @@ def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     for problem in [
-        "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
+        # "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
         # "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
         # "sin(3.141 * x0)/(3.141 * x0)",
-        "sin(3.141 * x0 + 2.72)",
+        # # "sin(3.141 * x0 + 2.72)",
         # "sin(1.772 * x0) + sin(2.035 * x2)",
-        # "Airfoil",
-        # "Bike Sharing",
-        # "Breast Cancer",
+        # "sin(1.57 * x0 + 1.04 * x1)",
+        "Airfoil",
+        # # "Bike Sharing",
+        # # "Breast Cancer",
         "Concrete Compressive Strength",
+        "Dow Chemical",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -80,9 +84,10 @@ def problems(rng):
                         [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
                     )
                 ]:
-                    for linear_scaling in [
+                    for linear_scaling in [  #
                         False,
-                        # True
+                        True,
+                        # not is_synthetic
                     ]:
                         for constant_representation in ["ercs", "pool"]:
                             ctx = c.GPContext(
@@ -111,7 +116,9 @@ def problems(rng):
                                         y_train=c.np.load(str(y_path.absolute())),
                                         x_test=c.np.load(str(X_test_path.absolute())),
                                         y_test=c.np.load(str(y_test_path.absolute())),
-                                        objectives="nmse",  # = MSE / var(y_train)
+                                        objectives="mse"
+                                        if is_synthetic
+                                        else "nmse",  # = MSE / var(y_train)
                                         linear_scaling=linear_scaling,
                                         init=c.HalfHalfInit(
                                             p_terminal=0.5, p_constant=0.5
@@ -124,6 +131,9 @@ def problems(rng):
                                             # and (N)MSE < 1e-8 for synthetic problems
                                             0.0001 if not is_synthetic else 1e-8
                                         ],
+                                        gradient_mode="forward",
+                                        # gradient_mode="central",
+                                        archive_epsilon=0.0,  # if is_synthetic else 1e-6,
                                     ),
                                     ctx,
                                 )
@@ -135,26 +145,33 @@ def methods(info, ctx):
 
     # IMS options
     initial_population_size = 64
+    # initial_population_size = 256
     subgeneration_factor = 6
     max_num_populations = 25  # int(np.log2(2048 / initial_population_size)) + 1
     restart_stale_populations = True  # restart the last population if it has converged
 
     initial_population_size = 1024
+    initial_population_size = 10
     max_num_populations = 1
     restart_stale_populations = False
+    # restart_stale_populations = True
 
     constant_representation = info["constant_representation"]
     variants = []
     if constant_representation == "ercs":
         variants += [
             ", ERCs",
-            ", ERCs + Mut",
+            # ", ERCs + Mut",
             ", ERCs + LM",
+            # ", ERCs + LM (mut)",
+            # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
             ", $Pool_{10}$ + LM",
-            ", $Pool_{10}$ + RV",
+            # ", $Pool_{10}$ + RV",
+            # ", $Pool_{10}$ + RVIA",
+            # ", $Pool_{10}$ + LM (mut)",
         ]
 
     for similarity in [  #
@@ -187,7 +204,7 @@ def methods(info, ctx):
             if "LM" in copt:
                 copt_population_kwargs = dict(
                     gradient_step_frequency=1,
-                    mutate_before_gradient_step=False,
+                    mutate_before_gradient_step="mut" in copt,
                     **copt_population_kwargs,
                 )
 
@@ -195,7 +212,7 @@ def methods(info, ctx):
             rv_options = dict(
                 enabled="RV" in copt,
                 max_nis=25,  # + nc
-                intron_aware=False,  # TODO!!!
+                intron_aware="RVIA" in copt,  # TODO!!!
                 enable_partial_ams=False,  # full FOS does not need partial AMS...
                 init_ams_from_population_mean=False,
                 generations_until_full_evaluation=None,
@@ -223,7 +240,9 @@ def methods(info, ctx):
                 c.MixedGOMEA(
                     discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                     population_options=c.PopulationOptions(
-                        forced_improvements=True,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        forced_improvements="RV"
+                        in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        enable_mixed_forced_improvements=True,
                         **copt_population_kwargs,
                     ),
                     rv_options=c.RvOptions(**rv_options),
@@ -294,7 +313,7 @@ def main():
         all_tasks(),
         clean=True,
         # limit=1,
-        # max_workers=44,
+        # max_workers=1,
     )
 
     with load_results(
@@ -307,14 +326,16 @@ def main():
         plot_convergence_so(
             PLOT_DIR / "convergence",
             conn,
-            # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-            # y_agg="MAX",  # higher R^2 is better
-            # y_label="$R^2$ Train",
-            y_var="objectives[1]::DOUBLE",  # transform NMSE into R2
-            y_agg="MIN",  # higher R^2 is better
-            y_label="$NMSE$ Train",
-            ylog=True,
-            # ymin="auto",
+            y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
+            y_agg="MAX",  # higher R^2 is better
+            y_label="$R^2$ Train",
+            # y_var="objectives[1]::DOUBLE",  # transform NMSE into R2
+            # y_agg="MIN",  # higher R^2 is better
+            # y_label="$(N)MSE$ Train",
+            # ylog=True,
+            # ymin=1e-9,
+            # ymax=1e-3,
+            ymin="auto",
             ymax="auto",
             # merge folds and runs into one seaborn "unit"
             unit_query="format('{}.{}', fold, run)",

@@ -288,6 +288,7 @@ struct PopulationOptions {
   double donor_pool_size_multiplier = 2.0;
   std::optional<usize> max_nis = std::nullopt;
   bool forced_improvements = true;
+  bool enable_mixed_forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
   bool sequential_gom = false;  // performs GOM sequentially per solution, incompatible with other mechanisms
   bool strict_elite_acceptance =
@@ -530,7 +531,7 @@ class Population {
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
-    if (!fos_stats.empty()) {  // options.subset_logfile.has_value()) {
+    if (!fos_stats.empty()) {
       log_subset_statistics();
     }
 
@@ -1005,32 +1006,82 @@ class Population {
     std::vector<usize> eval2improve_idx;
     eval2improve_idx.reserve(solutions_to_improve.size());
 
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    // RV must be enabled and there need to be continuous values that aren't already inherited...
+    bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
+                           problem.num_continuous() > 0 && !problem.always_inherit_continuous();
+    CType alpha = 0.5;
+    Subset rv_full;
+    if (enable_rv_steps) {
+      for (usize i = 0; i < problem.num_continuous(); i++) {
+        rv_full.continuous.push_back(i);
+      }
+    }
+
     usize subset_idx = 0;
-    while (!solutions_to_improve.empty() && subset_idx < max_discrete_subset_count) {
+    usize rv_fi_tries = 0;
+    while (
+        // not all solutions improved
+        !solutions_to_improve.empty() &&
+        (
+            // discrete FI not done
+            subset_idx < max_discrete_subset_count ||
+            // continuous FI enabled and not done
+            (enable_rv_steps && rv_fi_tries < rv_state.options.num_forced_improvement_tries))) {
       eval2improve_idx.clear();
       solutions_to_evaluate.clear();
+
+      double p_rv = enable_rv_steps
+                        ? (static_cast<double>(rv_state.options.num_forced_improvement_tries - rv_fi_tries) /
+                           static_cast<double>(max_discrete_subset_count - subset_idx +
+                                               rv_state.options.num_forced_improvement_tries - rv_fi_tries))
+                        : 0.0;
+
+      bool is_rv_step = U(rng) < p_rv;
 
       // TODO parallel?
       for (usize j = 0; j < solutions_to_improve.size(); j++) {
         auto i = solutions_to_improve[j];
         auto k = solution_clusters[i];
 
-        auto fos_idx = subset_orders(i, subset_idx);
+        // clang-format off
+        const auto& donor = k < problem.fitness().num_objectives()
+            ? global_archive.so_solution(k)
+            : global_archive.random_solution(rng);
+        // clang-format on
 
-        // due to filtering/max_subset_size, some clusters might have more
-        // subsets...
-        if (fos_idx < cluster_FOS[k].size()) {
-          subsets[i] = &cluster_FOS[k][fos_idx];
+        if (is_rv_step) {
+          // there must be overlap in the active constants...
+          if ((solutions[i].continuous_active() && donor.continuous_active()).any()) {
+            subsets[i] = &rv_full;
 
-          auto [evaluation_needed, anything_changed] =
-              solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
-                                                                          : global_archive.random_solution(rng),
-                                   *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {  // parent will be updated during acceptance
-            eval2improve_idx.push_back(j);
+            for (usize l = 0; l < problem.num_continuous(); l++) {
+              if (solutions[i].continuous_active()(l) && donor.continuous_active()(l)) {
+                solutions[i].continuous_values()(l) =
+                    alpha * parents[i].continuous_values()(l) + (CType(1.0) - alpha) * donor.continuous_values()(l);
+              }
+            }
+            // solutions[i].continuous_values() =
+            //     alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * donor.continuous_values();
             solutions_to_evaluate.push_back(i);
-          } else if (anything_changed) {  // no acceptance, so we need to update the parent
-            parents[i] = solutions[i];
+            eval2improve_idx.push_back(j);
+          }
+        } else {
+          auto fos_idx = subset_orders(i, subset_idx);
+
+          // due to filtering/max_subset_size, some clusters might have more
+          // subsets...
+          if (fos_idx < cluster_FOS[k].size()) {
+            subsets[i] = &cluster_FOS[k][fos_idx];
+
+            auto [evaluation_needed, anything_changed] =
+                solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
+            if (evaluation_needed) {  // parent will be updated during acceptance
+              eval2improve_idx.push_back(j);
+              solutions_to_evaluate.push_back(i);
+            } else if (anything_changed) {  // no acceptance, so we need to update the parent
+              parents[i] = solutions[i];
+            }
           }
         }
       }
@@ -1079,7 +1130,12 @@ class Population {
         }
       }
 
-      subset_idx++;
+      if (is_rv_step) {
+        alpha *= 0.5;
+        rv_fi_tries++;
+      } else {
+        subset_idx++;
+      }
 
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
@@ -1209,12 +1265,18 @@ class Population {
 
     // acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
+    std::println("Gradient step changed {} solutions ({} evaluations)", changed_indices.size(), evaluations);
+    usize rejections = 0;
     for (usize i : changed_indices) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
+        rejections++;
+        std::println("  GS reject\n  Before: {} ({})\n  After: {} ({})", problem.format_solution(parents[i]),
+                     problem.fitness().format(parents[i].quality()), problem.format_solution(solutions[i]),
+                     problem.fitness().format(solutions[i].quality()));
         // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
         solutions[i] = parents[i];
       } else {
@@ -1222,6 +1284,7 @@ class Population {
         parents[i] = solutions[i];
       }
     }
+    std::println("Gradient step done, rejected {}/{}\n\n\n", rejections, changed_indices.size());
 
     return evaluations;
   }

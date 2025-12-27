@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import pygom
 import seaborn as sns
-from matplotlib.colors import Normalize
+from matplotlib.colors import AsinhNorm, Normalize
 from pygom import *
 from sklearn.externals._packaging.version import SubLocalType
 
@@ -22,7 +22,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage_details2"
+RESULT_DIR = pathlib.Path("results") / "linkage_details3"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -41,8 +41,9 @@ def problems(rng):
 
     for problem in [  #
         "Airfoil",
-        # "Dow Chemical",
-        # "Tower",
+        "Dow Chemical",
+        "Tower",
+        "Bike Sharing",
     ]:
         for (
             fold,
@@ -138,6 +139,7 @@ def methods(info, ctx):
         r"$MI_{mask\ inactive}$",  # Mask inactive
         # r"$NMI_{mask\ inactive}$",
         "Node",  # Normalized pairwise node proximity
+        "Node (static)",
         # r"Node + $MI_{mask\ inactive}$",
         "Random",  # Random similiarty
     ]:
@@ -157,6 +159,7 @@ def methods(info, ctx):
             else None,
             # the full FOS is excluded
             filter_root=True,
+            freeze="static" in similarity,
             # treat continuous nodes semantically by binning them into 25 bins
             # as per https://arxiv.org/pdf/1904.02050
             merge_continuous=False,
@@ -226,6 +229,7 @@ def analyze_subset_stats(conn, odir):
                     "SELECT DISTINCT(method_name) FROM fos_stats WHERE problem_name = $1",
                     [problem],
                 ).fetchall()
+                if "static" not in m
             ]
         )
 
@@ -249,14 +253,19 @@ def analyze_subset_stats(conn, odir):
             figsize=(ncols * 3, nrows * 3),
             gridspec_kw=dict(wspace=0.1, hspace=0.05),
         )
+        axes = axes.reshape(nrows, ncols)
 
         cmap = "Blues"  # "plasma"  # sns.diverging_palette(230, 20, as_cmap=True)
 
+        vmax = 2  # 2  # 0  # 1
         cmap = plt.get_cmap(cmap)
-        norm = Normalize(0, 1)
+        norm = Normalize(0, vmax)
+        norm = AsinhNorm(vmin=0, vmax=vmax, linear_width=1)
         cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
 
         cbar_ax = axes.ravel().tolist()
+
+        actual_vmax = 0
 
         for col, generation in enumerate(generations):
             for row in range(nrows):
@@ -291,6 +300,8 @@ def analyze_subset_stats(conn, odir):
                     similarities = [
                         np.array([r.tolist() for r in s]) for s in stats["similarity"]
                     ]
+                    if len(similarities) < 1:
+                        continue
                     avg_similarity = similarities[0]
                     for s in similarities[1:]:
                         avg_similarity += s
@@ -305,9 +316,11 @@ def analyze_subset_stats(conn, odir):
                         avg_sim += np.tril(avg_similarity, k=0)
                         mask[np.tril_indices(avg_sim.shape[0], k=-1)] = False
 
-                if (avg_sim[~mask] > 1.0).any():
-                    print(problem, ax_methods, "Pairwise similarity > 1.0 found!")
+                if (avg_sim[~mask] > vmax).any():
+                    print(problem, ax_methods, f"Pairwise similarity > {vmax} found!")
                     print(np.max(avg_sim[~mask]))
+
+                    actual_vmax = max(actual_vmax, float(np.max(avg_sim[~mask])))
 
                 sns.heatmap(
                     avg_sim,
@@ -321,7 +334,7 @@ def analyze_subset_stats(conn, odir):
                 )
 
                 def fmt_name(name):
-                    return re.match(r"GP-GOMEA \(([^)]+)\)", name).group(1)
+                    return re.match(r"^GP-GOMEA \((.+)\)$", name).group(1)
 
                 title = (
                     f"Generation {generation:>3d}\n" if row == 0 else ""
@@ -349,7 +362,7 @@ def analyze_subset_stats(conn, odir):
             shrink=0.4,
             aspect=30,
             drawedges=False,
-            # extend="max",
+            extend="max" if actual_vmax > vmax else None,
             label="Similarity",
             ax=cbar_ax,
         )
@@ -365,13 +378,13 @@ def analyze_subset_stats(conn, odir):
 
 def main():
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        # max_workers=1,
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,
+    # )
 
     with load_results(
         LOG_DIR,

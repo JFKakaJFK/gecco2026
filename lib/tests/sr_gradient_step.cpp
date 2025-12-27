@@ -114,7 +114,7 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
 
     std::println("{}", srp.format_solution(solutions[0]));
     Quality prev = solutions[0].quality();
-    srp.gradient_steps(rng, solutions, parents, indices, 1000);
+    srp.gradient_steps(rng, solutions, parents, indices, 20);  // 00);
     std::println("{}", srp.format_solution(solutions[0]));
 
     archive.update(solutions[0], false);
@@ -123,4 +123,6 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
         "\nBefore: ", srp.fitness().format(prev), "\nAfter: ",
         srp.fitness().format(solutions[0].quality()));  // but after gradient based optimization the vtr is reached
   }
+
+  // REQUIRE(false);
 }

@@ -982,6 +982,7 @@ class LinkageTreeFOS(LinkageModelBase):
         subset: Optional[Subset] = None,
         custom_similarity: Optional[Mat[float]] = None,
         eta_custom_similarity: Optional[float] = None,
+        custom_similarity_agg: Optional[str] = None,
         similarity_callback: Optional[Callable[[CRef[Mat[float]]], None]] = None,
         freeze: bool = False,
     ) -> None:
@@ -2080,6 +2081,9 @@ class SRProblem(GPInstanceBase):
         constant_init_lower_bound: float = -1.0,
         constant_init_upper_bound: float = 1.0,
         target_objectives: Optional[List[float]] = None,
+        gradient_mode: str = "central",
+        gradient_epsilon: float = 1e-5,
+        archive_epsilon: float = 1e-6,
     ) -> None:
         pass
 
@@ -3866,6 +3870,7 @@ class PopulationOptions:
     donor_pool_size_multiplier: float = 2.0
     max_nis: Optional[int] = None
     forced_improvements: bool = True
+    enable_mixed_forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
     sequential_gom: bool = (
         False  # performs GOM sequentially per solution, incompatible with other mechanisms
@@ -3899,6 +3904,7 @@ class PopulationOptions:
         donor_pool_size_multiplier: float = 2.0,
         max_nis: Optional[int] = None,
         forced_improvements: bool = True,
+        enable_mixed_forced_improvements: bool = True,
         target_continuous_to_discrete_balance: float = 1.0,
         sequential_gom: bool = False,
         strict_elite_acceptance: bool = False,

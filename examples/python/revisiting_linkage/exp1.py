@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage"
+RESULT_DIR = pathlib.Path("results") / "linkage1"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,7 +24,8 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_evaluations=int(1e4)
-    max_evaluations=int(1e7)
+    max_evaluations=int(2e6)
+    # max_evaluations=int(1e7)
 )
 
 
@@ -130,10 +131,14 @@ def methods(info, ctx):
     for similarity in [  #
         "$MI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
+        # r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
         r"$MI_{mask\ inactive}$",  # Mask inactive
         "Node",  # Normalized pairwise node proximity
+        "Node (static)",
+        r"Node * $MI_{mask\ inactive}$",
+        r"max(Node, $MI_{mask\ inactive}$)",
         "Random",  # Random similiarty
+        # r"Node * $NMI_{mask\ inactive}$",
     ]:
         discrete_model_kwargs = dict(
             # linkage learning parameters
@@ -147,12 +152,18 @@ def methods(info, ctx):
             custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
             if "Node" in similarity
             else None,
+            custom_similarity_agg="mul"
+            if "*" in similarity
+            else (
+                "max" if "max" in similarity else ("add" if "+" in similarity else None)
+            ),
             # the full FOS is excluded
             filter_root=True,
             # treat continuous nodes semantically by binning them into 25 bins
             # as per https://arxiv.org/pdf/1904.02050
             merge_continuous=False,
             num_continuous_bins=25,
+            freeze="static" in similarity,
         )
 
         yield (
@@ -229,7 +240,7 @@ def main():
     # run_tasks(
     #     LOG_DIR,
     #     all_tasks(),
-    #     # clean=True,
+    #     clean=True,
     #     # limit=1,
     #     # max_workers=1,
     # )

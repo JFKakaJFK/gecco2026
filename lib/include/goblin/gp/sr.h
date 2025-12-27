@@ -59,7 +59,11 @@ class SRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt)
+            std::optional<std::vector<CType>> target_objectives = std::nullopt,
+            std::string gradient_mode = "central",
+            CType gradient_epsilon = 1e-5,
+            CType archive_epsilon = 1e-6,
+            bool always_inherit_continuous = false)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -67,10 +71,13 @@ class SRProblem : public GPInstanceBase {
                        : std::get<std::vector<std::string>>(objectives)),
         X_train(X_train.cast<ScalarType>()),
         Y_train(Y_train.cast<ScalarType>()),
-        _archive_fitness(MOFitness(this->objectives.size())),
+        _archive_fitness(MOFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
         _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_archive_fitness) {
+        _target(_archive_fitness),
+        _gradient_mode(gradient_mode),
+        _gradient_epsilon(gradient_epsilon),
+        _always_inherit_continuous(always_inherit_continuous) {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
@@ -159,7 +166,7 @@ class SRProblem : public GPInstanceBase {
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final {
-    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
+    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges || _always_inherit_continuous;
   };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
@@ -334,12 +341,15 @@ class SRProblem : public GPInstanceBase {
   MOFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
-  usize _num_continuous;
-  Vec<CType> _continuous_lower_bounds;
-  Vec<CType> _continuous_upper_bounds;
-  Vec<CType> _continuous_init_lower_bounds;
-  Vec<CType> _continuous_init_upper_bounds;
-  Arr2D<ScalarType> _eval_buffer;
+  std::string _gradient_mode{};
+  CType _gradient_epsilon{};
+  bool _always_inherit_continuous{};
+  usize _num_continuous{};
+  Vec<CType> _continuous_lower_bounds{};
+  Vec<CType> _continuous_upper_bounds{};
+  Vec<CType> _continuous_init_lower_bounds{};
+  Vec<CType> _continuous_init_upper_bounds{};
+  Arr2D<ScalarType> _eval_buffer{};
 };
 
 };  // namespace goblin
