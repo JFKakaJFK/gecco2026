@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization_grad"
+RESULT_DIR = pathlib.Path("results") / "constant_optimization_rv"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -34,14 +34,18 @@ def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     for problem in [
-        # "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
+        "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
         # "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
         # "sin(3.141 * x0)/(3.141 * x0)",
         # # "sin(3.141 * x0 + 2.72)",
         # "sin(1.772 * x0) + sin(2.035 * x2)",
         # "sin(1.57 * x0 + 1.04 * x1)",
+        "1028_SWD",
+        # "1089_USCrime",
+        "210_cloud",
+        "522_pm10",
         "Airfoil",
-        # # "Bike Sharing",
+        "Bike Sharing",
         # # "Breast Cancer",
         "Concrete Compressive Strength",
         "Dow Chemical",
@@ -130,7 +134,7 @@ def problems(rng):
                                             # R2 >= 0.999 for black-box problems
                                             # and (N)MSE < 1e-8 for synthetic problems
                                             0.0001 if not is_synthetic else 1e-8
-                                        ],
+                                        ],  # if is_synthetic else None,
                                         gradient_mode="forward",
                                         # gradient_mode="central",
                                         archive_epsilon=0.0,  # if is_synthetic else 1e-6,
@@ -150,10 +154,9 @@ def methods(info, ctx):
     max_num_populations = 25  # int(np.log2(2048 / initial_population_size)) + 1
     restart_stale_populations = True  # restart the last population if it has converged
 
-    initial_population_size = 1024
-    initial_population_size = 10
-    max_num_populations = 1
-    restart_stale_populations = False
+    # initial_population_size = 1024
+    # max_num_populations = 1
+    # restart_stale_populations = False
     # restart_stale_populations = True
 
     constant_representation = info["constant_representation"]
@@ -168,9 +171,14 @@ def methods(info, ctx):
         ]
     if constant_representation == "pool":
         variants += [
-            ", $Pool_{10}$ + LM",
-            # ", $Pool_{10}$ + RV",
-            # ", $Pool_{10}$ + RVIA",
+            # ", $Pool_{10}$ + LM",
+            ", $Pool_{10}$ + RV",
+            ", $Pool_{10}$ + RVIA",
+            ", $Pool_{10}$ + RV (iu)",
+            ", $Pool_{10}$ + RV (ai)",
+            ", $Pool_{10}$ + RV (me,ce)",
+            ", $Pool_{10}$ + RV (iu,me,ce)",
+            ", $Pool_{10}$ + RV (nfi)",
             # ", $Pool_{10}$ + LM (mut)",
         ]
 
@@ -213,6 +221,10 @@ def methods(info, ctx):
                 enabled="RV" in copt,
                 max_nis=25,  # + nc
                 intron_aware="RVIA" in copt,  # TODO!!!
+                intron_aware_intermediate_updates="RV" in copt and "iu" in copt,
+                intron_aware_mean_estimation="RV" in copt and "me" in copt,
+                intron_aware_cov_estimation="RV" in copt and "ce" in copt,
+                intron_aware_ams="RV" in copt and "ai" in copt,
                 enable_partial_ams=False,  # full FOS does not need partial AMS...
                 init_ams_from_population_mean=False,
                 generations_until_full_evaluation=None,
@@ -240,8 +252,10 @@ def methods(info, ctx):
                 c.MixedGOMEA(
                     discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                     population_options=c.PopulationOptions(
-                        forced_improvements="RV"
-                        in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        target_continuous_to_discrete_balance=0.5,
+                        forced_improvements="RV" in copt
+                        and "nfi"
+                        not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
                         enable_mixed_forced_improvements=True,
                         **copt_population_kwargs,
                     ),
@@ -305,16 +319,16 @@ def status():
 
 
 def main():
-    # status()
+    status()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        # max_workers=1,
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,
+    # )
 
     with load_results(
         LOG_DIR,
@@ -329,14 +343,15 @@ def main():
             y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
             y_agg="MAX",  # higher R^2 is better
             y_label="$R^2$ Train",
+            ymin="auto",
+            ymax="auto",
             # y_var="objectives[1]::DOUBLE",  # transform NMSE into R2
             # y_agg="MIN",  # higher R^2 is better
             # y_label="$(N)MSE$ Train",
             # ylog=True,
             # ymin=1e-9,
-            # ymax=1e-3,
-            ymin="auto",
-            ymax="auto",
+            # # ymax=1e-3,
+            # ymax=1e-6,
             # merge folds and runs into one seaborn "unit"
             unit_query="format('{}.{}', fold, run)",
             # split up the plot into the following rows

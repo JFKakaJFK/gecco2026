@@ -58,7 +58,7 @@ def plot_convergence_so(
         )
         print(mfs)
 
-        modifiers = sorted(  # list(
+        modifiers = list(
             map(
                 literal_eval,
                 set(
@@ -70,6 +70,10 @@ def plot_convergence_so(
                 ),
             )
         )
+        try:
+            modifiers = sorted(modifiers)
+        except Exception as e:
+            print(e)
 
         assert len(modifiers) > 0
         num_modifiers = len(modifiers[0])

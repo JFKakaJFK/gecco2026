@@ -135,13 +135,15 @@ def methods(info, ctx):
         "$MI$",  # plain MI
         "$NMI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        # r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
         r"$MI_{mask\ inactive}$",  # Mask inactive
         # r"$NMI_{mask\ inactive}$",
         "Node",  # Normalized pairwise node proximity
         "Node (static)",
         # r"Node + $MI_{mask\ inactive}$",
         "Random",  # Random similiarty
+        r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
+        r"$MI_{wany\ active}$",
+        r"max(Node, $MI_{any\ active}$)",
     ]:
         discrete_model_kwargs = dict(
             # linkage learning parameters
@@ -149,7 +151,9 @@ def methods(info, ctx):
             if "Random" in similarity
             else ("nmi" if "+" in similarity or "nmi" in similarity.lower() else "mi"),
             intron_strategy=(
-                "weighted_any_active" if "any" in similarity else "mark_only"
+                ("weighted_any_active" if "wany" in similarity else "any_active")
+                if "any" in similarity
+                else "mark_only"
             )
             if "active" in similarity
             else "none",
@@ -164,7 +168,12 @@ def methods(info, ctx):
             # as per https://arxiv.org/pdf/1904.02050
             merge_continuous=False,
             num_continuous_bins=25,
-            eta_custom_similarity=0.5 if "+" in similarity else None,
+            custom_similarity_agg="mul"
+            if "*" in similarity
+            else (
+                "max" if "max" in similarity else ("add" if "+" in similarity else None)
+            ),
+            # eta_custom_similarity=0.5 if "+" in similarity else None,
         )
 
         yield (
@@ -378,13 +387,13 @@ def analyze_subset_stats(conn, odir):
 
 def main():
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     # clean=True,
-    #     # limit=1,
-    #     # max_workers=1,
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        # clean=True,
+        # limit=1,
+        # max_workers=1,
+    )
 
     with load_results(
         LOG_DIR,

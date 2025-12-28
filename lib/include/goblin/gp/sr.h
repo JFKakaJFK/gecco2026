@@ -63,7 +63,7 @@ class SRProblem : public GPInstanceBase {
             std::string gradient_mode = "central",
             CType gradient_epsilon = 1e-5,
             CType archive_epsilon = 1e-6,
-            bool always_inherit_continuous = false)
+            std::optional<bool> always_inherit_continuous = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -166,7 +166,8 @@ class SRProblem : public GPInstanceBase {
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final {
-    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges || _always_inherit_continuous;
+    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
+                                               ctx.const_repr == ConstantRepr::Edges);
   };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
@@ -234,7 +235,7 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
@@ -343,7 +344,7 @@ class SRProblem : public GPInstanceBase {
   UnboundedArchive _target;
   std::string _gradient_mode{};
   CType _gradient_epsilon{};
-  bool _always_inherit_continuous{};
+  std::optional<bool> _always_inherit_continuous{};
   usize _num_continuous{};
   Vec<CType> _continuous_lower_bounds{};
   Vec<CType> _continuous_upper_bounds{};

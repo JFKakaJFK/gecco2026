@@ -477,9 +477,8 @@ class Population {
     } else {
       usize subset_idx = 0;
       std::uniform_real_distribution<double> U(0.0, 1.0);
-      bool can_do_discrete_step;
+      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
-        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
         bool do_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
@@ -528,6 +527,8 @@ class Population {
         if (should_terminate(evaluations).has_value()) {
           return evaluations;
         }
+
+        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
@@ -1265,18 +1266,12 @@ class Population {
 
     // acceptance is still needed since the gradient step isn't guaranteed to be an improvement - e.g. too large
     // steps can be regressions
-    std::println("Gradient step changed {} solutions ({} evaluations)", changed_indices.size(), evaluations);
-    usize rejections = 0;
     for (usize i : changed_indices) {
       auto k = solution_clusters[i];
       std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        rejections++;
-        std::println("  GS reject\n  Before: {} ({})\n  After: {} ({})", problem.format_solution(parents[i]),
-                     problem.fitness().format(parents[i].quality()), problem.format_solution(solutions[i]),
-                     problem.fitness().format(solutions[i].quality()));
         // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
         solutions[i] = parents[i];
       } else {
@@ -1284,7 +1279,6 @@ class Population {
         parents[i] = solutions[i];
       }
     }
-    std::println("Gradient step done, rejected {}/{}\n\n\n", rejections, changed_indices.size());
 
     return evaluations;
   }

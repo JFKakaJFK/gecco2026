@@ -1,8 +1,11 @@
 ---
 BasedOnStyle: Chromium
-ColumnLimit:  120
+ColumnLimit: 120
+AlignAfterOpenBracket: BlockIndent
+BinPackParameters: false
+AllowAllParametersOfDeclarationOnNextLine: true
 ---
-Language:     Cpp
+Language: Cpp
 BasedOnStyle: Chromium
-ColumnLimit:  120
+ColumnLimit: 120
 SortIncludes: false

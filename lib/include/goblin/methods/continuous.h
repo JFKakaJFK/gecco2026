@@ -140,10 +140,8 @@ static Mat<CType> estimate_cov(const SolutionSetBase& solutions,
 // Performs an inplace cholesky decomposition. If the decomposition fails, jitter is added to the diagonal to increase
 // the rank until finally the univariate diagonal is used.
 template <typename Derived>
-inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out) {
+inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out, const usize num_tries = 1) {
   using S = typename Derived::Scalar;
-  const usize num_tries = 1;
-  // const usize num_tries = 10;
 
 #ifdef DEBUG
   Mat<S> cov = out;
@@ -250,18 +248,21 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
                        CType std_deviation_ratio_threshold = 1.0,
                        CType distribution_multiplier_decrease = 0.9,
                        CType distribution_multiplier_increase = 1.0 / 0.9,
-                       CType min_distribution_multiplier = 1e-10)
+                       CType min_distribution_multiplier = 1e-10,
+                       usize num_cholesky_tries = 1)
       : use_mahalanobis_distance_for_sdr(use_mahalanobis_distance_for_sdr),
         eta_cov(eta_cov),
         std_deviation_ratio_threshold(std_deviation_ratio_threshold),
         distribution_multiplier_decrease(distribution_multiplier_decrease),
         distribution_multiplier_increase(distribution_multiplier_increase),
-        min_distribution_multiplier(min_distribution_multiplier) {
+        min_distribution_multiplier(min_distribution_multiplier),
+        num_cholesky_tries(num_cholesky_tries) {
     __goblin_runtime_assert(0.0 < eta_cov && eta_cov <= 1.0);
     __goblin_runtime_assert(std_deviation_ratio_threshold >= 0.0);
     __goblin_runtime_assert(0.0 < distribution_multiplier_decrease && distribution_multiplier_decrease <= 1.0);
     __goblin_runtime_assert(1.0 <= distribution_multiplier_increase);
     __goblin_runtime_assert(min_distribution_multiplier >= 0.0);
+    __goblin_runtime_assert(num_cholesky_tries >= 1);
   };
 
   std::unique_ptr<RvSubsetStateBase> init(const Subset& subset) const override final {
@@ -363,7 +364,7 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     //   cholesky_inplace(s.L);
     // }
 
-    cholesky_inplace(s.L);
+    cholesky_inplace(s.L, num_cholesky_tries);
   };
 
   Vec<CType> sample(Rng& rng, const RvSubsetStateBase& state) const override final {
@@ -469,11 +470,16 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
   CType distribution_multiplier_decrease;
   CType distribution_multiplier_increase;
   CType min_distribution_multiplier;
+  usize num_cholesky_tries;
 };
 
 struct RvOptions {
   bool enabled = true;
   bool intron_aware = false;
+  bool intron_aware_intermediate_updates = false;
+  bool intron_aware_mean_estimation = false;
+  bool intron_aware_cov_estimation = false;
+  bool intron_aware_ams = false;
 
   double selection_percentile = 0.35;
   double p_accept = 0.05;
@@ -726,7 +732,7 @@ class RvState {
       active_indices[k].reserve(cluster_solutions[k].size());
       std::vector<usize> active_counts(num_continuous, 0);
       for (auto i : by_fitness) {
-        if (options.intron_aware) {
+        if (options.intron_aware || options.intron_aware_mean_estimation || options.intron_aware_cov_estimation) {
           bool any_active = false;
           for (isize j = 0; j < num_continuous; j++) {
             if (solutions[i].continuous_active()(j)) {
@@ -760,8 +766,9 @@ class RvState {
         }
       }
 
-      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                          full.continuous, options.intron_aware);
+      Vec<CType> new_mean =
+          estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile, full.continuous,
+                        options.intron_aware || options.intron_aware_mean_estimation);
 
       // initialize the (previous) cluster mean
       if (mean[k].size() != num_continuous) {
@@ -779,16 +786,18 @@ class RvState {
 
       // update subsets
       if (subsets[k].empty()) {  // init if empty
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                      mean[k], full.continuous, options.intron_aware);
+        Mat<CType> cov =
+            estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile, mean[k],
+                         full.continuous, options.intron_aware || options.intron_aware_cov_estimation);
         subsets[k] = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         for (usize i = 0; i < subsets[k].size(); i++) {
           subset_states[k].push_back(sampling_model.init(subsets[k][i]));
         }
       } else if (!linkage_model->is_static()) {  // update only if the fos is not static
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                      mean[k], full.continuous, options.intron_aware);
+        Mat<CType> cov =
+            estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile, mean[k],
+                         full.continuous, options.intron_aware || options.intron_aware_cov_estimation);
         FOS new_fos = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         std::vector<std::unique_ptr<RvSubsetStateBase>> new_subset_states;
@@ -831,7 +840,8 @@ class RvState {
       }
 
       {  // assign ams indices
-        usize ams_pool_size = options.intron_aware ? active_indices[k].size() : cluster_solutions[k].size();
+        usize ams_pool_size =
+            options.intron_aware || options.intron_aware_ams ? active_indices[k].size() : cluster_solutions[k].size();
         usize num_ams_solutions = 0.5 * options.selection_percentile * ams_pool_size;
         std::vector<usize> perm;
         if (options.randomize_ams_indices) {
@@ -969,7 +979,7 @@ class RvState {
           }
         }
 
-        bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active()(s).array().any();
+        bool evaluation_needed = solutions[i].continuous_active()(s).array().any();
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
         } else {  // the parent needs to be updated even if we don't evaluate so that when a change is rejected in the
@@ -1011,7 +1021,8 @@ class RvState {
           improved_indices[k].push_back(i);
         }
       } else {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+        solutions[i] = parents[i];
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
 
@@ -1022,7 +1033,8 @@ class RvState {
         if (fos_idx < subsets[k].size()) {
           sampling_model.adapt(solutions, improved_indices[k],
                                static_cast<double>(num_oob[k]) / static_cast<double>(num_samples[k]),
-                               no_improvement_stretch[k] >= options.max_nis, options.intron_aware, subsets[k][fos_idx],
+                               no_improvement_stretch[k] >= options.max_nis,
+                               options.intron_aware || options.intron_aware_intermediate_updates, subsets[k][fos_idx],
                                *subset_states[k][fos_idx]);
         }
       }
@@ -1119,7 +1131,8 @@ class RvState {
           archive.update(solutions[i], false);
         }
       } else {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+        solutions[i] = parents[i];
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
 
@@ -1249,7 +1262,8 @@ class RvState {
                 archive.update(solutions[i], false);
               }
             } else {
-              solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+              solutions[i] = parents[i];
+              // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
             }
           }
           // sort indices in reverse - otherwise removing smaller indices might

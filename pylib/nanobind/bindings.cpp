@@ -1771,14 +1771,14 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>,
                         std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>,
                         std::optional<usize>, bool, std::optional<AnyInit>, CType, CType,
-                        std::optional<std::vector<CType>>, std::string, CType, CType>(),
+                        std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>>(),
                nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(),
                nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse",
                nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true,
                nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0,
                nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(),
                nb::arg("gradient_mode") = "central", nb::arg("gradient_epsilon") = 1e-5,
-               nb::arg("archive_epsilon") = 1e-6)
+               nb::arg("archive_epsilon") = 1e-6, nb::arg("always_inherit_continuous").none() = nb::none())
           .def("num_discrete", &goblin::SRProblem::num_discrete)
           .def("discrete_domain_sizes", &goblin::SRProblem::discrete_domain_sizes)
           .def("num_continuous", &goblin::SRProblem::num_continuous)
@@ -2228,6 +2228,14 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def("fitness", &goblin::Tracked::fitness)
           .def("archive_fitness", &goblin::Tracked::archive_fitness)
           .def("target_reached", &goblin::Tracked::target_reached, nb::arg("archive"))
+          .def("always_inherit_continuous", &goblin::Tracked::always_inherit_continuous)
+          .def("log_header", &goblin::Tracked::log_header, nb::arg("os"))
+          .def("log_solution", &goblin::Tracked::log_solution, nb::arg("os"), nb::arg("solution"))
+          .def("log", &goblin::Tracked::log, nb::arg("os"), nb::arg("solution"))
+          .def("gradients", &goblin::Tracked::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"),
+               nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
+          .def("gradient_steps", &goblin::Tracked::gradient_steps, nb::arg("rng"), nb::arg("solutions"),
+               nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
           .def_static("run", &goblin::Tracked::run, nb::arg("instance"), nb::arg("method"), nb::arg("budget"),
                       nb::arg("config"), nb::arg("seed").none() = nb::none(),
                       nb::arg("population_size").none() = nb::none());
@@ -2352,10 +2360,11 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassAMaLGaMSamplingModel =
       nb::class_<goblin::AMaLGaMSamplingModel, goblin::RvSamplingModelBase>(m, "AMaLGaMSamplingModel", nb::is_final(),
                                                                             "\n(final class)")
-          .def(nb::init<bool, CType, CType, CType, CType, CType>(), nb::arg("use_mahalanobis_distance_for_sdr") = false,
-               nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0,
-               nb::arg("distribution_multiplier_decrease") = 0.9,
-               nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10)
+          .def(nb::init<bool, CType, CType, CType, CType, CType, usize>(),
+               nb::arg("use_mahalanobis_distance_for_sdr") = false, nb::arg("eta_cov") = 1.0,
+               nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9,
+               nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10,
+               nb::arg("num_cholesky_tries") = 1)
           .def("init", &goblin::AMaLGaMSamplingModel::init, nb::arg("subset"))
           .def("inherit", &goblin::AMaLGaMSamplingModel::inherit, nb::arg("subset"), nb::arg("previous_subset"),
                nb::arg("previous_state"))
@@ -2373,6 +2382,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def(
               "__init__",
               [](goblin::RvOptions* self, bool enabled = true, bool intron_aware = false,
+                 bool intron_aware_intermediate_updates = false, bool intron_aware_mean_estimation = false,
+                 bool intron_aware_cov_estimation = false, bool intron_aware_ams = false,
                  double selection_percentile = 0.35, double p_accept = 0.05, bool init_ams_from_population_mean = true,
                  bool randomize_ams_indices = false, bool enable_partial_ams = true, CType delta_ams = 2.0,
                  CType eta_ams = 1.0, usize max_nis = 100, usize num_forced_improvement_tries = 8,
@@ -2385,6 +2396,10 @@ void py_init_module_pygoblin(nb::module_& m) {
                 auto r_ctor_ = self;
                 r_ctor_->enabled = enabled;
                 r_ctor_->intron_aware = intron_aware;
+                r_ctor_->intron_aware_intermediate_updates = intron_aware_intermediate_updates;
+                r_ctor_->intron_aware_mean_estimation = intron_aware_mean_estimation;
+                r_ctor_->intron_aware_cov_estimation = intron_aware_cov_estimation;
+                r_ctor_->intron_aware_ams = intron_aware_ams;
                 r_ctor_->selection_percentile = selection_percentile;
                 r_ctor_->p_accept = p_accept;
                 r_ctor_->init_ams_from_population_mean = init_ams_from_population_mean;
@@ -2400,16 +2415,22 @@ void py_init_module_pygoblin(nb::module_& m) {
                 r_ctor_->subset_logfile = subset_logfile;
                 r_ctor_->sample_logfile = sample_logfile;
               },
-              nb::arg("enabled") = true, nb::arg("intron_aware") = false, nb::arg("selection_percentile") = 0.35,
-              nb::arg("p_accept") = 0.05, nb::arg("init_ams_from_population_mean") = true,
-              nb::arg("randomize_ams_indices") = false, nb::arg("enable_partial_ams") = true,
-              nb::arg("delta_ams") = 2.0, nb::arg("eta_ams") = 1.0, nb::arg("max_nis") = 100,
-              nb::arg("num_forced_improvement_tries") = 8,
+              nb::arg("enabled") = true, nb::arg("intron_aware") = false,
+              nb::arg("intron_aware_intermediate_updates") = false, nb::arg("intron_aware_mean_estimation") = false,
+              nb::arg("intron_aware_cov_estimation") = false, nb::arg("intron_aware_ams") = false,
+              nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05,
+              nb::arg("init_ams_from_population_mean") = true, nb::arg("randomize_ams_indices") = false,
+              nb::arg("enable_partial_ams") = true, nb::arg("delta_ams") = 2.0, nb::arg("eta_ams") = 1.0,
+              nb::arg("max_nis") = 100, nb::arg("num_forced_improvement_tries") = 8,
               nb::arg("generations_until_full_evaluation").none() = nb::none(),
               nb::arg("population_logfile").none() = nb::none(), nb::arg("selection_logfile").none() = nb::none(),
               nb::arg("subset_logfile").none() = nb::none(), nb::arg("sample_logfile").none() = nb::none())
           .def_rw("enabled", &goblin::RvOptions::enabled, "")
           .def_rw("intron_aware", &goblin::RvOptions::intron_aware, "")
+          .def_rw("intron_aware_intermediate_updates", &goblin::RvOptions::intron_aware_intermediate_updates, "")
+          .def_rw("intron_aware_mean_estimation", &goblin::RvOptions::intron_aware_mean_estimation, "")
+          .def_rw("intron_aware_cov_estimation", &goblin::RvOptions::intron_aware_cov_estimation, "")
+          .def_rw("intron_aware_ams", &goblin::RvOptions::intron_aware_ams, "")
           .def_rw("selection_percentile", &goblin::RvOptions::selection_percentile, "")
           .def_rw("p_accept", &goblin::RvOptions::p_accept, "")
           .def_rw("init_ams_from_population_mean", &goblin::RvOptions::init_ams_from_population_mean, "")

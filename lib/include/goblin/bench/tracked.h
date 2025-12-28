@@ -259,7 +259,10 @@ class Tracked final : public InstanceBase {
                        const std::vector<const Subset*>& subsets,
                        const std::span<const usize>& indices,
                        u64& evaluations) override {
-    return instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    u64 evals_before = this->evaluations, _evals = evaluations;
+    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
+    return res;
   }
 
   std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
@@ -267,7 +270,23 @@ class Tracked final : public InstanceBase {
                                                      SolutionSetBase& parents,
                                                      const std::span<const usize>& indices,
                                                      usize num_steps) override {
-    return instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+    u64 evals_before = evaluations;
+    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+
+    alg_timer.stop();
+    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
+
+    for (usize i : /* changed_indices */ std::get<0>(res)) {
+      archive.update(solutions[i], true);
+    }
+
+    if (instance.target_reached(archive)) {
+      status = TerminationStatus::TargetReached;
+      throw TrackingException("");
+    }
+
+    alg_timer.start();
+    return res;
   }
 
   /// This can be used by the algorithm to log when debugging to log an

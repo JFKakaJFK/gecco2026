@@ -2726,17 +2726,17 @@ class LinkageTreeFOS final : public LinkageModelBase {
       throw std::runtime_error("Unknown subset of variables to learn a LT for.");
     }
 
-    if(custom_similarity.has_value() && custom_similarity_agg.has_value()){
-        const auto& agg = custom_similarity_agg.value();
-        if(agg == "add"){
-            similarity = similarity + custom_similarity.value();
-        } else if(agg == "mul"){
-            similarity = similarity.array() * custom_similarity.value().array();
-        } else if(agg == "max"){
-            similarity = similarity.array().max(custom_similarity.value().array());
-        } else {
-            throw std::runtime_error("Unknown or unsupported similarity aggregation method.");
-        }
+    if (custom_similarity.has_value() && custom_similarity_agg.has_value()) {
+      const auto& agg = custom_similarity_agg.value();
+      if (agg == "add") {
+        similarity = similarity + custom_similarity.value();
+      } else if (agg == "mul") {
+        similarity = similarity.array() * custom_similarity.value().array();
+      } else if (agg == "max") {
+        similarity = similarity.array().max(custom_similarity.value().array());
+      } else {
+        throw std::runtime_error("Unknown or unsupported similarity aggregation method.");
+      }
     } else if (custom_similarity.has_value() && eta_custom_similarity.has_value()) {
       similarity = (1.0 - eta_custom_similarity.value()) * similarity +
                    eta_custom_similarity.value() * custom_similarity.value();
@@ -5413,7 +5413,8 @@ class SRProblem : public GPInstanceBase {
             std::optional<std::vector<CType>> target_objectives = std::nullopt,
             std::string gradient_mode = "central",
             CType gradient_epsilon = 1e-5,
-            CType archive_epsilon = 1e-6)
+            CType archive_epsilon = 1e-6,
+            std::optional<bool> always_inherit_continuous = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -5421,13 +5422,13 @@ class SRProblem : public GPInstanceBase {
                        : std::get<std::vector<std::string>>(objectives)),
         X_train(X_train.cast<ScalarType>()),
         Y_train(Y_train.cast<ScalarType>()),
-        _archive_fitness(MOFitness(this->objectives.size(), /* minimize = */true, archive_epsilon)),
+        _archive_fitness(MOFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
         _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
         _target(_archive_fitness),
         _gradient_mode(gradient_mode),
-        _gradient_epsilon(gradient_epsilon)
-        {
+        _gradient_epsilon(gradient_epsilon),
+        _always_inherit_continuous(always_inherit_continuous) {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
@@ -5516,7 +5517,7 @@ class SRProblem : public GPInstanceBase {
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final {
-    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
+    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges);
   };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
@@ -5584,7 +5585,7 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
@@ -5693,6 +5694,7 @@ class SRProblem : public GPInstanceBase {
   UnboundedArchive _target;
   std::string _gradient_mode{};
   CType _gradient_epsilon{};
+  std::optional<bool> _always_inherit_continuous{};
   usize _num_continuous{};
   Vec<CType> _continuous_lower_bounds{};
   Vec<CType> _continuous_upper_bounds{};
@@ -7329,6 +7331,53 @@ class Tracked final : public InstanceBase {
 
   bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
 
+  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
+
+  void log_header(std::ostream& os) const override { instance.log_header(os); }
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    instance.log_solution(os, solution);
+  }
+
+  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    u64 evals_before = this->evaluations, _evals = evaluations;
+    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
+    return res;
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    u64 evals_before = evaluations;
+    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+
+
+    alg_timer.stop();
+    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
+
+    for (usize i: /* changed_indices */ std::get<0>(res)) {
+      archive.update(solutions[i], true);
+    }
+
+    if (instance.target_reached(archive)) {
+      status = TerminationStatus::TargetReached;
+      throw TrackingException("");
+    }
+
+    alg_timer.start();
+    return res;
+  }
+
   /// This can be used by the algorithm to log when debugging to log an
   /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
   /// values need to be empty, or valid csv columns with a ',' separator at the
@@ -8377,10 +8426,8 @@ static Mat<CType> estimate_cov(const SolutionSetBase& solutions,
 // Performs an inplace cholesky decomposition. If the decomposition fails, jitter is added to the diagonal to increase
 // the rank until finally the univariate diagonal is used.
 template <typename Derived>
-inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out) {
+inline void cholesky_inplace(Eigen::MatrixBase<Derived>& out, const usize num_tries = 1) {
   using S = typename Derived::Scalar;
-  const usize num_tries = 1;
-  // const usize num_tries = 10;
 
 #ifdef DEBUG
   Mat<S> cov = out;
@@ -8487,18 +8534,21 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
                        CType std_deviation_ratio_threshold = 1.0,
                        CType distribution_multiplier_decrease = 0.9,
                        CType distribution_multiplier_increase = 1.0 / 0.9,
-                       CType min_distribution_multiplier = 1e-10)
+                       CType min_distribution_multiplier = 1e-10,
+                       usize num_cholesky_tries = 1)
       : use_mahalanobis_distance_for_sdr(use_mahalanobis_distance_for_sdr),
         eta_cov(eta_cov),
         std_deviation_ratio_threshold(std_deviation_ratio_threshold),
         distribution_multiplier_decrease(distribution_multiplier_decrease),
         distribution_multiplier_increase(distribution_multiplier_increase),
-        min_distribution_multiplier(min_distribution_multiplier) {
+        min_distribution_multiplier(min_distribution_multiplier),
+        num_cholesky_tries(num_cholesky_tries) {
     __goblin_runtime_assert(0.0 < eta_cov && eta_cov <= 1.0);
     __goblin_runtime_assert(std_deviation_ratio_threshold >= 0.0);
     __goblin_runtime_assert(0.0 < distribution_multiplier_decrease && distribution_multiplier_decrease <= 1.0);
     __goblin_runtime_assert(1.0 <= distribution_multiplier_increase);
     __goblin_runtime_assert(min_distribution_multiplier >= 0.0);
+    __goblin_runtime_assert(num_cholesky_tries >= 1);
   };
 
   std::unique_ptr<RvSubsetStateBase> init(const Subset& subset) const override final {
@@ -8600,7 +8650,7 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
     //   cholesky_inplace(s.L);
     // }
 
-    cholesky_inplace(s.L);
+    cholesky_inplace(s.L, num_cholesky_tries);
   };
 
   Vec<CType> sample(Rng& rng, const RvSubsetStateBase& state) const override final {
@@ -8706,11 +8756,16 @@ class AMaLGaMSamplingModel final : public RvSamplingModelBase {
   CType distribution_multiplier_decrease;
   CType distribution_multiplier_increase;
   CType min_distribution_multiplier;
+  usize num_cholesky_tries;
 };
 
 struct RvOptions {
   bool enabled = true;
   bool intron_aware = false;
+  bool intron_aware_intermediate_updates = false;
+  bool intron_aware_mean_estimation = false;
+  bool intron_aware_cov_estimation = false;
+  bool intron_aware_ams = false;
 
   double selection_percentile = 0.35;
   double p_accept = 0.05;
@@ -8963,7 +9018,7 @@ class RvState {
       active_indices[k].reserve(cluster_solutions[k].size());
       std::vector<usize> active_counts(num_continuous, 0);
       for (auto i : by_fitness) {
-        if (options.intron_aware) {
+        if (options.intron_aware || options.intron_aware_mean_estimation || options.intron_aware_cov_estimation) {
           bool any_active = false;
           for (isize j = 0; j < num_continuous; j++) {
             if (solutions[i].continuous_active()(j)) {
@@ -8997,8 +9052,9 @@ class RvState {
         }
       }
 
-      Vec<CType> new_mean = estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                          full.continuous, options.intron_aware);
+      Vec<CType> new_mean =
+          estimate_mean(solutions, active_indices[k], active_counts, options.selection_percentile, full.continuous,
+                        options.intron_aware || options.intron_aware_mean_estimation);
 
       // initialize the (previous) cluster mean
       if (mean[k].size() != num_continuous) {
@@ -9016,16 +9072,18 @@ class RvState {
 
       // update subsets
       if (subsets[k].empty()) {  // init if empty
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                      mean[k], full.continuous, options.intron_aware);
+        Mat<CType> cov =
+            estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile, mean[k],
+                         full.continuous, options.intron_aware || options.intron_aware_cov_estimation);
         subsets[k] = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         for (usize i = 0; i < subsets[k].size(); i++) {
           subset_states[k].push_back(sampling_model.init(subsets[k][i]));
         }
       } else if (!linkage_model->is_static()) {  // update only if the fos is not static
-        Mat<CType> cov = estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile,
-                                      mean[k], full.continuous, options.intron_aware);
+        Mat<CType> cov =
+            estimate_cov(solutions, active_indices[k], active_counts, options.selection_percentile, mean[k],
+                         full.continuous, options.intron_aware || options.intron_aware_cov_estimation);
         FOS new_fos = linkage_model->subsets(rng, problem, solutions, cluster_solutions[k], cov);
 
         std::vector<std::unique_ptr<RvSubsetStateBase>> new_subset_states;
@@ -9068,7 +9126,8 @@ class RvState {
       }
 
       {  // assign ams indices
-        usize ams_pool_size = options.intron_aware ? active_indices[k].size() : cluster_solutions[k].size();
+        usize ams_pool_size =
+            options.intron_aware || options.intron_aware_ams ? active_indices[k].size() : cluster_solutions[k].size();
         usize num_ams_solutions = 0.5 * options.selection_percentile * ams_pool_size;
         std::vector<usize> perm;
         if (options.randomize_ams_indices) {
@@ -9206,7 +9265,7 @@ class RvState {
           }
         }
 
-        bool evaluation_needed = !options.intron_aware || solutions[i].continuous_active()(s).array().any();
+        bool evaluation_needed = solutions[i].continuous_active()(s).array().any();
         if (evaluation_needed) {
           solutions_to_evaluate.push_back(i);
         } else {  // the parent needs to be updated even if we don't evaluate so that when a change is rejected in the
@@ -9248,7 +9307,8 @@ class RvState {
           improved_indices[k].push_back(i);
         }
       } else {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+        solutions[i] = parents[i];
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
 
@@ -9259,7 +9319,8 @@ class RvState {
         if (fos_idx < subsets[k].size()) {
           sampling_model.adapt(solutions, improved_indices[k],
                                static_cast<double>(num_oob[k]) / static_cast<double>(num_samples[k]),
-                               no_improvement_stretch[k] >= options.max_nis, options.intron_aware, subsets[k][fos_idx],
+                               no_improvement_stretch[k] >= options.max_nis,
+                               options.intron_aware || options.intron_aware_intermediate_updates, subsets[k][fos_idx],
                                *subset_states[k][fos_idx]);
         }
       }
@@ -9356,7 +9417,8 @@ class RvState {
           archive.update(solutions[i], false);
         }
       } else {
-        solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+        solutions[i] = parents[i];
+        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
       }
     }
 
@@ -9486,7 +9548,8 @@ class RvState {
                 archive.update(solutions[i], false);
               }
             } else {
-              solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
+              solutions[i] = parents[i];
+              // solutions[i].reject(parents[i], problem.always_inherit_continuous(), *eval_subsets[i]);
             }
           }
           // sort indices in reverse - otherwise removing smaller indices might
@@ -10009,9 +10072,8 @@ class Population {
     } else {
       usize subset_idx = 0;
       std::uniform_real_distribution<double> U(0.0, 1.0);
-      bool can_do_discrete_step;
+      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
-        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
         bool do_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
@@ -10060,6 +10122,8 @@ class Population {
         if (should_terminate(evaluations).has_value()) {
           return evaluations;
         }
+
+        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 

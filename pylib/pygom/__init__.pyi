@@ -2084,6 +2084,7 @@ class SRProblem(GPInstanceBase):
         gradient_mode: str = "central",
         gradient_epsilon: float = 1e-5,
         archive_epsilon: float = 1e-6,
+        always_inherit_continuous: Optional[bool] = None,
     ) -> None:
         pass
 
@@ -3300,6 +3301,39 @@ class Tracked(InstanceBase):
     def target_reached(self, archive: ArchiveBase) -> bool:
         pass
 
+    def always_inherit_continuous(self) -> bool:
+        pass
+
+    def log_header(self, os: io.IOBase) -> None:
+        pass
+
+    def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
+        pass
+
+    def log(self, os: io.IOBase, solution: SolutionBase) -> None:
+        pass
+
+    def gradients(
+        self,
+        rng: Rng,
+        solutions: SolutionSetBase,
+        parents: SolutionSetBase,
+        subsets: List[Subset],
+        indices: std.span[int],
+        evaluations: int,
+    ) -> Mat[float]:
+        pass
+
+    def gradient_steps(
+        self,
+        rng: Rng,
+        solutions: SolutionSetBase,
+        parents: SolutionSetBase,
+        indices: std.span[int],
+        num_steps: int,
+    ) -> Tuple[List[int], int]:
+        pass
+
     @staticmethod
     def run(
         instance: InstanceBase,
@@ -3605,6 +3639,7 @@ class AMaLGaMSamplingModel(RvSamplingModelBase):
         distribution_multiplier_decrease: float = 0.9,
         distribution_multiplier_increase: float = 1.0 / 0.9,
         min_distribution_multiplier: float = 1e-10,
+        num_cholesky_tries: int = 1,
     ) -> None:
         pass
 
@@ -3649,6 +3684,10 @@ class AMaLGaMSamplingModel(RvSamplingModelBase):
 class RvOptions:
     enabled: bool = True
     intron_aware: bool = False
+    intron_aware_intermediate_updates: bool = False
+    intron_aware_mean_estimation: bool = False
+    intron_aware_cov_estimation: bool = False
+    intron_aware_ams: bool = False
 
     selection_percentile: float = 0.35
     p_accept: float = 0.05
@@ -3687,6 +3726,10 @@ class RvOptions:
         self,
         enabled: bool = True,
         intron_aware: bool = False,
+        intron_aware_intermediate_updates: bool = False,
+        intron_aware_mean_estimation: bool = False,
+        intron_aware_cov_estimation: bool = False,
+        intron_aware_ams: bool = False,
         selection_percentile: float = 0.35,
         p_accept: float = 0.05,
         init_ams_from_population_mean: bool = True,

@@ -136,12 +136,6 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       usize steps = 0;
       do {
         status = lm.minimizeOneStep(x);
-
-        Quality before = solutions[i].quality();
-        std::vector<usize> idxs{i};
-        evaluate(rng, solutions, idxs);
-        std::println("Step {}: {} -> {}\n  ({})", steps, fitness().format(before),
-                     fitness().format(solutions[i].quality()), format_solution(solutions[i]));
       } while (++steps < num_steps && status == Eigen::LevenbergMarquardtSpace::Running);
 
       solutions[i].continuous_values()(active.continuous) = x;
