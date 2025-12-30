@@ -22,14 +22,14 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage_details3"
+RESULT_DIR = pathlib.Path("results") / "linkage_details"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    max_generations=41
+    max_generations=21
     # max_evaluations=int(5e5)
     # max_evaluations=int(1e6)
     # max_evaluations=int(1e7)
@@ -41,9 +41,10 @@ def problems(rng):
 
     for problem in [  #
         "Airfoil",
+        "Bike Sharing",
+        "Concrete Compressive Strength",
         "Dow Chemical",
         "Tower",
-        "Bike Sharing",
     ]:
         for (
             fold,
@@ -112,11 +113,11 @@ def problems(rng):
                                     constant_init_lower_bound=min_y,
                                     constant_init_upper_bound=max_y,
                                     # early termination condition for "perfect" expression recovery
-                                    target_objectives=[
-                                        # R2 >= 0.999 for black-box problems
-                                        # and (N)MSE < 1e-8 for synthetic problems
-                                        0.0001 if not is_synthetic else 1e-8
-                                    ],
+                                    # target_objectives=[
+                                    #     # R2 >= 0.999 for black-box problems
+                                    #     # and (N)MSE < 1e-8 for synthetic problems
+                                    #     0.0001 if not is_synthetic else 1e-8
+                                    # ],
                                 ),
                                 ctx,
                             )
@@ -133,27 +134,23 @@ def methods(info, ctx):
 
     for similarity in [  #
         "$MI$",  # plain MI
-        "$NMI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
         r"$MI_{mask\ inactive}$",  # Mask inactive
-        # r"$NMI_{mask\ inactive}$",
         "Node",  # Normalized pairwise node proximity
-        "Node (static)",
-        # r"Node + $MI_{mask\ inactive}$",
+        # "Node (static)",  # same, but first LT is kept throughout
+        r"Node * $MI_{mask\ inactive}$",
+        # r"Node * $NMI_{mask\ inactive}$",
+        # r"max(Node, $MI_{mask\ inactive}$)",
         "Random",  # Random similiarty
-        r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
-        r"$MI_{wany\ active}$",
-        r"max(Node, $MI_{any\ active}$)",
+        # r"Node * $NMI_{mask\ inactive}$",
     ]:
         discrete_model_kwargs = dict(
             # linkage learning parameters
             metric="random"
             if "Random" in similarity
-            else ("nmi" if "+" in similarity or "nmi" in similarity.lower() else "mi"),
+            else ("nmi" if "NMI" in similarity else "mi"),
             intron_strategy=(
-                ("weighted_any_active" if "wany" in similarity else "any_active")
-                if "any" in similarity
-                else "mark_only"
+                "weighted_any_active" if "any" in similarity else "mark_only"
             )
             if "active" in similarity
             else "none",
@@ -161,19 +158,18 @@ def methods(info, ctx):
             custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
             if "Node" in similarity
             else None,
-            # the full FOS is excluded
-            filter_root=True,
-            freeze="static" in similarity,
-            # treat continuous nodes semantically by binning them into 25 bins
-            # as per https://arxiv.org/pdf/1904.02050
-            merge_continuous=False,
-            num_continuous_bins=25,
             custom_similarity_agg="mul"
             if "*" in similarity
             else (
                 "max" if "max" in similarity else ("add" if "+" in similarity else None)
             ),
-            # eta_custom_similarity=0.5 if "+" in similarity else None,
+            # the full FOS is excluded
+            filter_root=True,
+            # treat continuous nodes semantically by binning them into 25 bins
+            # as per https://arxiv.org/pdf/1904.02050
+            merge_continuous=False,
+            num_continuous_bins=25,
+            freeze="static" in similarity,
         )
 
         yield (

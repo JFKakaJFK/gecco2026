@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -4436,11 +4437,17 @@ class GPContext {
           }
         }
 
+        std::vector<std::tuple<const TemplateNode*, usize>> child_stack;
+        child_stack.reserve(nptr->children.size());
         for (const auto& c : nptr->children) {
           usize c_idx = index++;
           _parent[c_idx] = idx;
           children[idx].push_back(c_idx);
-          node_stack.emplace_back(&c, c_idx);
+          child_stack.emplace_back(&c, c_idx);
+        }
+        while(!child_stack.empty()){
+            node_stack.push_back(child_stack.back());
+            child_stack.pop_back();
         }
 
         // domain <-> value mapping
@@ -5517,7 +5524,8 @@ class SRProblem : public GPInstanceBase {
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   bool always_inherit_continuous() const override final {
-    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges);
+    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
+                                               ctx.const_repr == ConstantRepr::Edges);
   };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
@@ -7361,11 +7369,10 @@ class Tracked final : public InstanceBase {
     u64 evals_before = evaluations;
     auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
 
-
     alg_timer.stop();
     evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
 
-    for (usize i: /* changed_indices */ std::get<0>(res)) {
+    for (usize i : /* changed_indices */ std::get<0>(res)) {
       archive.update(solutions[i], true);
     }
 
@@ -7723,11 +7730,15 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -7849,11 +7860,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8211,6 +8225,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8306,14 +8323,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9618,6 +9639,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11010,6 +11032,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

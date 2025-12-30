@@ -296,10 +296,7 @@ def example_solution():
     )
     template_structure = ctx2graph(ctx)
 
-    # internally, the order does not matter and apparently it isn't fully ordered right now...
-    internal_order = [0, 1, 2, 5, 6, 3, 4]
-
-    for i, s in zip(internal_order, solution):
+    for i, s in enumerate(solution):
         template_structure.nodes[i]["label"] = s
 
     fig, axes = plt.subplot_mosaic(
@@ -325,7 +322,7 @@ def example_solution():
     nx.draw_networkx_labels(
         template_structure,
         {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
-        {n: f"${{}}_{i}$" for n, i in zip(template_structure, internal_order)},
+        {n: f"${{}}_{n}$" for n in template_structure},
         ax=axes["T"],
     )
     axes["T"].set_xlabel("Template Structure")
@@ -396,10 +393,7 @@ def example_constants():
     )
     template_structure = ctx2graph(ctx)
 
-    # internally, the order does not matter and apparently it isn't fully ordered right now...
-    internal_order = [0, 1, 2, 5, 6, 3, 4]
-
-    for i, s in zip(internal_order, solution):
+    for i, s in enumerate(solution):
         template_structure.nodes[i]["label"] = s
 
     fig, axes = plt.subplot_mosaic(
@@ -423,7 +417,7 @@ def example_constants():
     nx.draw_networkx_labels(
         template_structure,
         {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
-        {n: f"${{}}_{i}$" for n, i in zip(template_structure, internal_order)},
+        {n: f"${{}}_{n}$" for n in template_structure},
         ax=axes["T"],
     )
     axes["T"].set_xlabel("Template Structure")
@@ -699,7 +693,9 @@ def linkage_example():
 
 
 if __name__ == "__main__":
-    # example_solution()
-    # example_constants()
+    example_solution()
+    plt.show()
+    example_constants()
+    plt.show()
     linkage_example()
     plt.show()

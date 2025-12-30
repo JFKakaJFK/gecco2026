@@ -185,11 +185,17 @@ class GPContext {
           }
         }
 
+        std::vector<std::tuple<const TemplateNode*, usize>> child_stack;
+        child_stack.reserve(nptr->children.size());
         for (const auto& c : nptr->children) {
           usize c_idx = index++;
           _parent[c_idx] = idx;
           children[idx].push_back(c_idx);
-          node_stack.emplace_back(&c, c_idx);
+          child_stack.emplace_back(&c, c_idx);
+        }
+        while(!child_stack.empty()){
+            node_stack.push_back(child_stack.back());
+            child_stack.pop_back();
         }
 
         // domain <-> value mapping
