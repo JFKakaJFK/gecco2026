@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage1"
+RESULT_DIR = pathlib.Path("results") / "linkage"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,8 +24,9 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_evaluations=int(1e4)
-    max_evaluations=int(2e6)
+    # max_evaluations=int(2e6)
     # max_evaluations=int(1e7)
+    max_time_seconds=30 * 60
 )
 
 
@@ -74,7 +75,22 @@ def problems(rng):
                     (
                         "small",
                         [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
-                    )
+                    ),
+                    # (
+                    #     "large",
+                    #     [
+                    #         c.OpAdd(),
+                    #         c.OpSub(),
+                    #         c.OpMul(),
+                    #         c.OpDiv(),
+                    #         c.OpSin(),
+                    #         c.OpCos(),
+                    #         c.OpExp(),
+                    #         c.OpLog(),
+                    #         c.OpSqrt(),
+                    #         c.OpSquare(),
+                    #     ],
+                    # ),
                 ]:
                     for linear_scaling in [False, True]:
                         ctx = c.GPContext(
@@ -131,18 +147,20 @@ def methods(info, ctx):
     for similarity in [  #
         "$MI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        # r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
         r"$MI_{mask\ inactive}$",  # Mask inactive
         "Node",  # Normalized pairwise node proximity
-        "Node (static)",
+        "Node (static)",  # same, but first LT is kept throughout
         r"Node * $MI_{mask\ inactive}$",
-        r"max(Node, $MI_{mask\ inactive}$)",
+        r"Node * $NMI_{mask\ inactive}$",
+        # r"max(Node, $MI_{mask\ inactive}$)",
         "Random",  # Random similiarty
         # r"Node * $NMI_{mask\ inactive}$",
     ]:
         discrete_model_kwargs = dict(
             # linkage learning parameters
-            metric="random" if "Random" in similarity else "mi",
+            metric="random"
+            if "Random" in similarity
+            else ("nmi" if "NMI" in similarity else "mi"),
             intron_strategy=(
                 "weighted_any_active" if "any" in similarity else "mark_only"
             )
@@ -167,7 +185,7 @@ def methods(info, ctx):
         )
 
         yield (
-            f'"GP-GOMEA ({similarity})"',
+            f'"{similarity}"',
             c.MixedGOMEA(
                 discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                 population_options=c.PopulationOptions(
@@ -235,6 +253,7 @@ def status():
 
 def main():
     # status()
+    # exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
     # run_tasks(
@@ -242,7 +261,7 @@ def main():
     #     all_tasks(),
     #     clean=True,
     #     # limit=1,
-    #     # max_workers=1,
+    #     max_workers=44,  # server has 44 physical cores
     # )
 
     with load_results(
@@ -252,25 +271,31 @@ def main():
         parquet_dir=PARQUET_DIR,
     ) as conn:
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
-        plot_convergence_so(
-            PLOT_DIR / "convergence",
-            conn,
-            y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-            y_agg="MAX",  # higher R^2 is better
-            y_label="$R^2$ Train",
-            ymin="auto",
-            ymax="auto",
-            # merge folds and runs into one seaborn "unit"
-            unit_query="format('{}.{}', fold, run)",
-            # split up the plot into the following rows
-            modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
-            modifier_labels=[
-                "Template Height",
-                "Operators",
-                "Linear Scaling",
-            ],
-            nsamples=100,
-        )
+
+        for split in [  #
+            "train",
+            "test",
+        ]:
+            plot_convergence_so(
+                PLOT_DIR / f"convergence_{split}",
+                conn,
+                # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
+                y_var=f"1.0 - nmse_{split}",
+                y_agg="MAX",  # higher R^2 is better
+                y_label=f"$R^2$ {split.title()}",
+                ymin="auto",
+                ymax="auto",
+                # merge folds and runs into one seaborn "unit"
+                unit_query="format('{}.{}', fold, run)",
+                # split up the plot into the following rows
+                modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
+                modifier_labels=[
+                    "Template Height",
+                    "Operators",
+                    "Linear Scaling",
+                ],
+                nsamples=100,
+            )
 
 
 if __name__ == "__main__":
