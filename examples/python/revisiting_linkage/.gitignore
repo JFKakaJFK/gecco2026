@@ -2,3 +2,4 @@ results/
 .pmlb/
 .venv/
 !datasets/*.csv
+*.pdf
