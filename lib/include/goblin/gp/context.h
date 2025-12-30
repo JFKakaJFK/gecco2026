@@ -185,6 +185,7 @@ class GPContext {
           }
         }
 
+        // since node_stack reverses the order, the children are pushed in reverse to match the breadth-first order
         std::vector<std::tuple<const TemplateNode*, usize>> child_stack;
         child_stack.reserve(nptr->children.size());
         for (const auto& c : nptr->children) {
