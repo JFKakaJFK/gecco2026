@@ -11,12 +11,12 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
 
-REPEATS_PER_DATASET = 15
+REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization_rv"
+RESULT_DIR = pathlib.Path("results") / "constant_optimization"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,9 +24,9 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
-    max_evaluations=int(2e6)
+    # max_evaluations=int(2e6)
     # max_evaluations=int(1e7)
-    # max_time_seconds=30 * 60
+    max_time_seconds=30 * 60
 )
 
 
@@ -34,21 +34,21 @@ def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     for problem in [
-        "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
+        # "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
         # "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
         # "sin(3.141 * x0)/(3.141 * x0)",
         # # "sin(3.141 * x0 + 2.72)",
         # "sin(1.772 * x0) + sin(2.035 * x2)",
         # "sin(1.57 * x0 + 1.04 * x1)",
-        "1028_SWD",
-        # "1089_USCrime",
-        "210_cloud",
-        "522_pm10",
+        # "1028_SWD",
+        # # "1089_USCrime",
+        # "210_cloud",
+        # "522_pm10",
         "Airfoil",
         "Bike Sharing",
-        # # "Breast Cancer",
         "Concrete Compressive Strength",
         "Dow Chemical",
+        "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -75,10 +75,7 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [  #
-                5
-                # , 7
-            ]:
+            for height in [5, 7]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
                 )
@@ -86,13 +83,24 @@ def problems(rng):
                     (
                         "small",
                         [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
-                    )
+                    ),
+                    # (
+                    #     "large",
+                    #     [
+                    #         c.OpAdd(),
+                    #         c.OpSub(),
+                    #         c.OpMul(),
+                    #         c.OpDiv(),
+                    #         c.OpSin(),
+                    #         c.OpCos(),
+                    #         c.OpExp(),
+                    #         c.OpLog(),
+                    #         c.OpSqrt(),
+                    #         c.OpSquare(),
+                    #     ],
+                    # ),
                 ]:
-                    for linear_scaling in [  #
-                        False,
-                        True,
-                        # not is_synthetic
-                    ]:
+                    for linear_scaling in [False, True]:
                         for constant_representation in ["ercs", "pool"]:
                             ctx = c.GPContext(
                                 num_inputs=int(X_fold.shape[1]),
@@ -120,9 +128,7 @@ def problems(rng):
                                         y_train=c.np.load(str(y_path.absolute())),
                                         x_test=c.np.load(str(X_test_path.absolute())),
                                         y_test=c.np.load(str(y_test_path.absolute())),
-                                        objectives="mse"
-                                        if is_synthetic
-                                        else "nmse",  # = MSE / var(y_train)
+                                        objectives="nmse",  # = MSE / var(y_train)
                                         linear_scaling=linear_scaling,
                                         init=c.HalfHalfInit(
                                             p_terminal=0.5, p_constant=0.5
@@ -130,11 +136,11 @@ def problems(rng):
                                         constant_init_lower_bound=min_y,
                                         constant_init_upper_bound=max_y,
                                         # early termination condition for "perfect" expression recovery
-                                        target_objectives=[
-                                            # R2 >= 0.999 for black-box problems
-                                            # and (N)MSE < 1e-8 for synthetic problems
-                                            0.0001 if not is_synthetic else 1e-8
-                                        ],  # if is_synthetic else None,
+                                        # target_objectives=[
+                                        #     # R2 >= 0.999 for black-box problems
+                                        #     # and (N)MSE < 1e-8 for synthetic problems
+                                        #     0.0001 if not is_synthetic else 1e-8
+                                        # ],  # if is_synthetic else None,
                                         gradient_mode="forward",
                                         # gradient_mode="central",
                                         archive_epsilon=0.0,  # if is_synthetic else 1e-6,
@@ -166,29 +172,32 @@ def methods(info, ctx):
             ", ERCs",
             # ", ERCs + Mut",
             ", ERCs + LM",
-            # ", ERCs + LM (mut)",
+            ", ERCs + LM (mut)",
             # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
-            # ", $Pool_{10}$ + LM",
-            ", $Pool_{10}$ + RV",
-            ", $Pool_{10}$ + RVIA",
-            ", $Pool_{10}$ + RV (iu)",
-            ", $Pool_{10}$ + RV (ai)",
-            ", $Pool_{10}$ + RV (me,ce)",
-            ", $Pool_{10}$ + RV (iu,me,ce)",
-            ", $Pool_{10}$ + RV (nfi)",
-            # ", $Pool_{10}$ + LM (mut)",
+            ", $Pool_{10}$ + LM",
+            ", $Pool_{10}$ + RV (1:1)",
+            ", $Pool_{10}$ + RV (1:2)",
+            # ", $Pool_{10}$ + RVIA",
+            # ", $Pool_{10}$ + RV (iu)",
+            # ", $Pool_{10}$ + RV (ai)",
+            # ", $Pool_{10}$ + RV (me,ce)",
+            # ", $Pool_{10}$ + RV (iu,me,ce)",
+            # ", $Pool_{10}$ + RV (nfi)",
+            ", $Pool_{10}$ + LM (mut)",
         ]
 
     for similarity in [  #
         # "$MI$",  # plain MI
         # "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        # r"$MI_{any\ active}$",  # Mask inactive and normalize, keeping only at least partialy active pairs
-        r"$MI_{mask\ inactive}$",  # Mask inactive
-        # "Node",  # Normalized pairwise node proximity
+        # r"$MI_{mask\ inactive}$",  # Mask inactive
+        "Node",  # Normalized pairwise node proximity
+        # "Node (static)",  # same, but first LT is kept throughout
+        # r"Node * $MI_{mask\ inactive}$",
         # "Random",  # Random similiarty
+        # r"Node * $NMI_{mask\ inactive}$",
     ]:
         # for clinkage in [
         #     "none", # do not handle constants specially, i.e. == merge for ERCs, index for pool
@@ -232,7 +241,9 @@ def methods(info, ctx):
 
             discrete_model_kwargs = dict(
                 # linkage learning parameters
-                metric="random" if "Random" in similarity else "mi",
+                metric="random"
+                if "Random" in similarity
+                else ("nmi" if "NMI" in similarity else "mi"),
                 intron_strategy=(
                     "weighted_any_active" if "any" in similarity else "mark_only"
                 )
@@ -242,17 +253,27 @@ def methods(info, ctx):
                 custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
                 if "Node" in similarity
                 else None,
+                custom_similarity_agg="mul"
+                if "*" in similarity
+                else (
+                    "max"
+                    if "max" in similarity
+                    else ("add" if "+" in similarity else None)
+                ),
                 # the full FOS is excluded
                 filter_root=True,
+                freeze="static" in similarity,
                 **copt_model_kwargs,
             )
 
             yield (
-                f'"GP-GOMEA ({similarity}{copt})"',
+                f'"{similarity} {copt}"',
                 c.MixedGOMEA(
                     discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                     population_options=c.PopulationOptions(
-                        target_continuous_to_discrete_balance=0.5,
+                        target_continuous_to_discrete_balance=0.5
+                        if "1:2" in copt
+                        else 1.0,
                         forced_improvements="RV" in copt
                         and "nfi"
                         not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
@@ -320,15 +341,16 @@ def status():
 
 def main():
     status()
+    exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     # clean=True,
-    #     # limit=1,
-    #     # max_workers=1,
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        clean=True,
+        # limit=1,
+        max_workers=44,  # server has 44 physical cores
+    )
 
     with load_results(
         LOG_DIR,
@@ -337,32 +359,31 @@ def main():
         parquet_dir=PARQUET_DIR,
     ) as conn:
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
-        plot_convergence_so(
-            PLOT_DIR / "convergence",
-            conn,
-            y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-            y_agg="MAX",  # higher R^2 is better
-            y_label="$R^2$ Train",
-            ymin="auto",
-            ymax="auto",
-            # y_var="objectives[1]::DOUBLE",  # transform NMSE into R2
-            # y_agg="MIN",  # higher R^2 is better
-            # y_label="$(N)MSE$ Train",
-            # ylog=True,
-            # ymin=1e-9,
-            # # ymax=1e-3,
-            # ymax=1e-6,
-            # merge folds and runs into one seaborn "unit"
-            unit_query="format('{}.{}', fold, run)",
-            # split up the plot into the following rows
-            modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
-            modifier_labels=[
-                "Template Height",
-                "Operators",
-                "Linear Scaling",
-            ],
-            nsamples=100,
-        )
+
+        for split in [  #
+            "train",
+            "test",
+        ]:
+            plot_convergence_so(
+                PLOT_DIR / f"convergence_{split}",
+                conn,
+                # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
+                y_var=f"1.0 - nmse_{split}",
+                y_agg="MAX",  # higher R^2 is better
+                y_label=f"$R^2$ {split.title()}",
+                ymin="auto",
+                ymax="auto",
+                # merge folds and runs into one seaborn "unit"
+                unit_query="format('{}.{}', fold, run)",
+                # split up the plot into the following rows
+                modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
+                modifier_labels=[
+                    "Template Height",
+                    "Operators",
+                    "Linear Scaling",
+                ],
+                nsamples=100,
+            )
 
 
 if __name__ == "__main__":

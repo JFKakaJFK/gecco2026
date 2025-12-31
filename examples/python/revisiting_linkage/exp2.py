@@ -109,7 +109,7 @@ def problems(rng):
                                     y_test=c.np.load(str(y_test_path.absolute())),
                                     objectives="nmse",  # = MSE / var(y_train)
                                     linear_scaling=linear_scaling,
-                                    init=c.HalfHalfInit(),
+                                    init=c.HalfHalfInit(p_terminal=0.5, p_constant=0.5),
                                     constant_init_lower_bound=min_y,
                                     constant_init_upper_bound=max_y,
                                     # early termination condition for "perfect" expression recovery
