@@ -12,26 +12,26 @@
 
 namespace goblin {
 
-constexpr int round_up(int value, int multiple) { return ((value + multiple - 1) / multiple) * multiple; }
-constexpr int ceil_div(int a, int b) { return (a + b - 1) / b; }
+constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
+constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
 
 struct KernelDim {
-    unsigned int x = 1;
-    unsigned int y = 1;
-    unsigned int z = 1;
+    size_t x = 1;
+    size_t y = 1;
+    size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1) 
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) 
         : x(_x), y(_y), z(_z) {}
 
-    static KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
+    static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
-        int min_redundant = max_threads;
+        size_t min_redundant = max_threads;
 
-        for (int threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
             // Round up division to determine number of blocks needed
-            int blocks_needed = ceil_div(count, threads);
-            int redundant = blocks_needed * threads - count;
+            size_t blocks_needed = ceil_div(count, threads);
+            size_t redundant = blocks_needed * threads - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
@@ -62,7 +62,7 @@ struct KernelConfig {
     KernelConfig(KernelDim _grid, KernelDim _block) 
         : grid(_grid), block(_block) {}
 
-    static inline KernelConfig for_eval(int num_solutions, int num_datapoints) {
+    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.block = KernelDim::determine(num_datapoints);
@@ -72,7 +72,7 @@ struct KernelConfig {
         return config;
     };
 
-    static KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
+    static KernelConfig for_mse(size_t num_solutions, size_t num_partial, KernelVersion kernel_version) {
         KernelConfig config;
 
         if (kernel_version == KernelVersion::BlockReduce) {
@@ -89,11 +89,11 @@ struct KernelConfig {
         return config;
     }
 
-    static KernelConfig for_single(int num_solutions, int num_datapoints) {
+    static KernelConfig for_single(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.grid.x = num_solutions;
-        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
 
         return config;
     }
@@ -112,20 +112,20 @@ struct LaunchConfig {
     KernelConfig eval;
     KernelConfig mse;
     KernelVersion kernel_version = KernelVersion::Baseline;
-    int num_solutions;
-    int num_datapoints;
-    int solution_length;
-    int items_per_thread;
+    size_t num_solutions;
+    size_t num_datapoints;
+    size_t solution_length;
+    size_t items_per_thread;
 
     LaunchConfig() = default;
     LaunchConfig(
         KernelConfig eval, 
         KernelConfig mse, 
         KernelVersion version = KernelVersion::Baseline,
-        int num_solutions = 1,
-        int num_datapoints = 1,
-        int solution_length = 1,
-        int items_per_thread = 1
+        size_t num_solutions = 1,
+        size_t num_datapoints = 1,
+        size_t solution_length = 1,
+        size_t items_per_thread = 1
     ) : eval(eval), 
         mse(mse), 
         kernel_version(version),
@@ -136,9 +136,9 @@ struct LaunchConfig {
 
     static LaunchConfig determine(
         KernelVersion kernel_version,
-        int num_solutions, 
-        int num_datapoints, 
-        int solution_length
+        size_t num_solutions, 
+        size_t num_datapoints, 
+        size_t solution_length
     ) {
         LaunchConfig config;
 

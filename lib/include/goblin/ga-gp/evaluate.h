@@ -15,9 +15,9 @@ void evaluate_kernel_baseline(
     float* Y, 
     float* v_type, 
     float* v_value, 
-    float* result,
-    int solution_length, 
-    int num_datapoints   
+    float* partial,
+    size_t solution_length, 
+    size_t num_datapoints   
 );
 
 __global__
@@ -26,9 +26,9 @@ void evaluate_kernel_restrict(
     const float* __restrict__ Y, 
     const float* __restrict__ v_type, 
     const float* __restrict__ v_value, 
-    float* __restrict__ result,
-    int solution_length, 
-    int num_datapoints
+    float* __restrict__ v,
+    size_t solution_length, 
+    size_t num_datapoints
 );
 
 __global__
@@ -37,9 +37,9 @@ void evaluate_kernel_shared_memory(
     const float* __restrict__ Y, 
     const float* __restrict__ v_type, 
     const float* __restrict__ v_value, 
-    float* __restrict__ result,
-    int solution_length, 
-    int num_datapoints
+    float* __restrict__ partial,
+    size_t solution_length, 
+    size_t num_datapoints
 );
 
 __device__
@@ -47,9 +47,9 @@ float compute_tree_output_baseline(
     float* X, 
     float* type,
     float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 __device__
@@ -57,25 +57,25 @@ float compute_tree_output_restrict(
     const float* __restrict__ X, 
     const float* __restrict__ type,
     const float* __restrict__ value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 __global__
 void compute_mse_kernel_baseline(
     const float* __restrict__ partial, 
     float* __restrict__ result, 
-    int num_solutions, 
-    int num_datapoints
+    size_t num_solutions, 
+    size_t num_datapoints
 );
 
 __global__
 void mse_kernel_restrict(
     const float* __restrict__ partial, 
     float* __restrict__ result, 
-    int num_solutions, 
-    int num_datapoints
+    size_t num_solutions, 
+    size_t num_datapoints
 );
 
 __global__
@@ -84,9 +84,9 @@ void compute_tree_output_wrapper(
     float* type,
     float* value,
     float* result,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 #endif
 
@@ -128,8 +128,8 @@ float test_compute_output_kernel(
     std::vector<float> h_X,
     std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_datapoints,
-    int datapoint_index
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 std::vector<float> test_evaluate_kernel(
@@ -137,15 +137,15 @@ std::vector<float> test_evaluate_kernel(
     std::vector<float> h_Y, 
     std::vector<float> h_type, 
     std::vector<float> h_value, 
-    int num_solutions,
-    int num_datapoints,
+    size_t num_solutions,
+    size_t num_datapoints,
     KernelVersion version
 );
 
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se, 
-    int num_solutions, 
-    int num_datapoints,
+    size_t num_solutions, 
+    size_t num_datapoints,
     KernelVersion version
 );
 
@@ -154,8 +154,8 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_Y, 
     std::vector<float> h_type, 
     std::vector<float> h_value, 
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 }

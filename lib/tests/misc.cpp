@@ -12,7 +12,7 @@ using namespace goblin;
 
 TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
     struct TestCase {
-        int count;
+        size_t count;
         KernelDim expected;
     };
 
@@ -45,8 +45,8 @@ TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
 
 TEST_CASE("goblin::ga-gp::misc::kernel_config_for_eval") {
     struct TestCase {
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         KernelConfig expected;
     };
 
@@ -58,6 +58,7 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_eval") {
         { 1, 1025, KernelConfig(KernelDim(1, 3), KernelDim(352)) },
         { 32, 1025, KernelConfig(KernelDim(32, 3), KernelDim(352)) },
         { 2048, 100000, KernelConfig(KernelDim(2048, 125), KernelDim(800)) },
+        { 4096, 1000000, KernelConfig(KernelDim(4096, 1250), KernelDim(800)) }
     };
 
 
@@ -80,8 +81,8 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_eval") {
 
 TEST_CASE("goblin::ga-gp::misc::kernel_config_for_mse") {
     struct TestCase {
-        int num_solutions;
-        int num_partial;
+        size_t num_solutions;
+        size_t num_partial;
         KernelVersion kernel_version;
         KernelConfig expected;
     };
@@ -123,8 +124,8 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_mse") {
 
 TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
     struct TestCase {
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         KernelConfig expected;
     };
 
@@ -158,8 +159,8 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
 
 TEST_CASE("goblin::ga-gp::misc::launch_config_determine") {
     struct TestCase {
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         KernelVersion kernel_version;
         LaunchConfig expected;
     };

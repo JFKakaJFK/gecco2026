@@ -275,7 +275,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
-            const int num_solutions = node_type.size();
+            const size_t num_solutions = node_type.size();
             
             // Allocate memory if not allocated or size has increased
             if (_num_solutions_allocated < num_solutions) {
@@ -293,17 +293,19 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _allocate_results_on_gpu(const LaunchConfig config) {
-            const int num_partials = 
-                (config.kernel_version == KernelVersion::BlockReduce)
-                    ? config.num_solutions * config.eval.grid.y
-                    : config.num_solutions * config.num_datapoints;
+            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF) {
+                const size_t num_partials = 
+                    (config.kernel_version == KernelVersion::BlockReduce)
+                        ? config.num_solutions * config.eval.grid.y
+                        : config.num_solutions * config.num_datapoints;
 
-            // Check if we need more memory than we currently have allocated
-            if (_num_partials_allocated < num_partials) {
-                free_on_gpu(d_partial);
+                // Check if we need more memory than we currently have allocated
+                if (_num_partials_allocated < num_partials) {
+                    free_on_gpu(d_partial);
 
-                d_partial = allocate_on_gpu<float>(num_partials);
-                _num_partials_allocated = num_partials;
+                    d_partial = allocate_on_gpu<float>(num_partials);
+                    _num_partials_allocated = num_partials;
+                }
             }
 
             // Check if we need more memory than we currently have allocated
@@ -343,11 +345,11 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        int _num_datapoints;
-        int _solution_length;
-        int _num_solutions_allocated;
-        int _num_partials_allocated;
-        int _num_results_allocated;
+        size_t _num_datapoints;
+        size_t _solution_length;
+        size_t _num_solutions_allocated;
+        size_t _num_partials_allocated;
+        size_t _num_results_allocated;
 
         // GPU pointers
         float* d_X = nullptr;

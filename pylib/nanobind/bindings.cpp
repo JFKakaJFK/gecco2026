@@ -1854,7 +1854,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("y", &goblin::KernelDim::y, "")
       .def_rw("z", &goblin::KernelDim::z, "")
       .def(nb::init<>())
-      .def(nb::init<unsigned int, unsigned int, unsigned int>(),
+      .def(nb::init<size_t, size_t, size_t>(),
           nb::arg("_x"), nb::arg("_y") = 1, nb::arg("_z") = 1)
       .def_static("determine",
           &goblin::KernelDim::determine, nb::arg("count"), nb::arg("max_threads") = MAX_THREADS_PER_BLOCK)
@@ -1897,7 +1897,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("solution_length", &goblin::LaunchConfig::solution_length, "")
       .def_rw("items_per_thread", &goblin::LaunchConfig::items_per_thread, "")
       .def(nb::init<>())
-      .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion, int, int, int, int>(),
+      .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion, size_t, size_t, size_t, size_t>(),
           nb::arg("eval"), nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::Baseline, nb::arg("num_solutions") = 1, nb::arg("num_datapoints") = 1, nb::arg("solution_length") = 1, nb::arg("items_per_thread") = 1)
       .def_static("determine",
           &goblin::LaunchConfig::determine, nb::arg("kernel_version"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("solution_length"))

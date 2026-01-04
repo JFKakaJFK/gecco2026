@@ -187,7 +187,7 @@ def problems(rng):
                         )
                     ]:
                         for constant_representation in ["none", "ercs"]:
-                            for linear_scaling in [False]: # True
+                            for linear_scaling in [False]:  # True
                                 for init_name, init in [("HalfHalf", c.HalfHalfInit())]:
                                     ctx = c.GPContext(
                                         num_inputs=int(X_fold.shape[1]),
@@ -198,9 +198,9 @@ def problems(rng):
 
                                     for device in ["CPU", "GPU"]:
 
-                                    # for multiple different functions, branch here
-                                    # for device in ["CPU"]:
-                                    # and then in the plotting code use the method query to append e.g. device to the method name -> comparison plots are in the same plt.Axes object
+                                        # for multiple different functions, branch here
+                                        # for device in ["CPU"]:
+                                        # and then in the plotting code use the method query to append e.g. device to the method name -> comparison plots are in the same plt.Axes object
 
                                         yield (
                                             dict(
@@ -217,42 +217,50 @@ def problems(rng):
                                                 var_y=float(np.var(y_fold[:, 0])),
                                                 var_y_test=float(np.var(y_test)),
                                             ),
-                                            c.SRProblem(
-                                                ctx,
-                                                x_train=c.np.load(str(X_path.absolute())),
-                                                y_train=c.np.load(str(y_path.absolute())),
-                                                x_test=c.np.load(
-                                                    str(X_test_path.absolute())
-                                                ),
-                                                y_test=c.np.load(
-                                                    str(y_test_path.absolute())
-                                                ),
-                                                objectives="mse",
-                                                linear_scaling=linear_scaling,
-                                                init=init,
-                                                constant_init_lower_bound=-10.0,
-                                                constant_init_upper_bound=10.0,
-                                                target_objectives=[
-                                                    1e-6
-                                                ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
-                                            ) if device == "CPU" else c.GASRProblem(
-                                                ctx,
-                                                c.np.load(str(X_path.absolute())),
-                                                c.np.load(str(y_path.absolute())),
-                                                # x_test=c.np.load(
-                                                #     str(X_test_path.absolute())
-                                                # ),
-                                                # y_test=c.np.load(
-                                                #     str(y_test_path.absolute())
-                                                # ),
-                                                # objectives="mse",
-                                                linear_scaling=linear_scaling,
-                                                init=init,
-                                                constant_init_lower_bound=-10.0,
-                                                constant_init_upper_bound=10.0,
-                                                target_objectives=[
-                                                    1e-6
-                                                ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
+                                            (
+                                                c.SRProblem(
+                                                    ctx,
+                                                    x_train=c.np.load(
+                                                        str(X_path.absolute())
+                                                    ),
+                                                    y_train=c.np.load(
+                                                        str(y_path.absolute())
+                                                    ),
+                                                    x_test=c.np.load(
+                                                        str(X_test_path.absolute())
+                                                    ),
+                                                    y_test=c.np.load(
+                                                        str(y_test_path.absolute())
+                                                    ),
+                                                    objectives="mse",
+                                                    linear_scaling=linear_scaling,
+                                                    init=init,
+                                                    constant_init_lower_bound=-10.0,
+                                                    constant_init_upper_bound=10.0,
+                                                    target_objectives=[
+                                                        1e-6
+                                                    ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
+                                                )
+                                                if device == "CPU"
+                                                else c.GASRProblem(
+                                                    ctx,
+                                                    c.np.load(str(X_path.absolute())),
+                                                    c.np.load(str(y_path.absolute())),
+                                                    # x_test=c.np.load(
+                                                    #     str(X_test_path.absolute())
+                                                    # ),
+                                                    # y_test=c.np.load(
+                                                    #     str(y_test_path.absolute())
+                                                    # ),
+                                                    # objectives="mse",
+                                                    linear_scaling=linear_scaling,
+                                                    init=init,
+                                                    constant_init_lower_bound=-10.0,
+                                                    constant_init_upper_bound=10.0,
+                                                    target_objectives=[
+                                                        1e-6
+                                                    ],  # for the synthetic problems we can get very good errors - no point in continuing if the error is effectively 0
+                                                )
                                             ),
                                         )
 

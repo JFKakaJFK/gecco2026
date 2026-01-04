@@ -197,9 +197,6 @@ cmake-build-*/
 .idea/
 .DS_Store
 
-# Dataset cache
-plmb_cache/
-
 # Experiment results and plots
 examples/python/playground/plots/symbolic_regression_convergence/
 
@@ -208,3 +205,7 @@ examples/python/playground/plots/symbolic_regression_convergence/
 *.nsys-rep
 *.html
 *.sqlite
+
+# GPU experiment results and dataset cache
+gpu_experiments/pmlb_cache
+gpu_experiments/results

@@ -3576,26 +3576,26 @@ constexpr float Div = Op(Operator::Div);
 
 namespace goblin {
 
-constexpr int round_up(int value, int multiple) { return ((value + multiple - 1) / multiple) * multiple; }
-constexpr int ceil_div(int a, int b) { return (a + b - 1) / b; }
+constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
+constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
 
 struct KernelDim {
-    unsigned int x = 1;
-    unsigned int y = 1;
-    unsigned int z = 1;
+    size_t x = 1;
+    size_t y = 1;
+    size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(unsigned int _x, unsigned int _y = 1, unsigned int _z = 1)
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1)
         : x(_x), y(_y), z(_z) {}
 
-    static KernelDim determine(int count, int max_threads = MAX_THREADS_PER_BLOCK) {
+    static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
-        int min_redundant = max_threads;
+        size_t min_redundant = max_threads;
 
-        for (int threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
             // Round up division to determine number of blocks needed
-            int blocks_needed = ceil_div(count, threads);
-            int redundant = blocks_needed * threads - count;
+            size_t blocks_needed = ceil_div(count, threads);
+            size_t redundant = blocks_needed * threads - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
@@ -3626,7 +3626,7 @@ struct KernelConfig {
     KernelConfig(KernelDim _grid, KernelDim _block)
         : grid(_grid), block(_block) {}
 
-    static inline KernelConfig for_eval(int num_solutions, int num_datapoints) {
+    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.block = KernelDim::determine(num_datapoints);
@@ -3636,7 +3636,7 @@ struct KernelConfig {
         return config;
     };
 
-    static KernelConfig for_mse(int num_solutions, int num_partial, KernelVersion kernel_version) {
+    static KernelConfig for_mse(size_t num_solutions, size_t num_partial, KernelVersion kernel_version) {
         KernelConfig config;
 
         if (kernel_version == KernelVersion::BlockReduce) {
@@ -3653,11 +3653,11 @@ struct KernelConfig {
         return config;
     }
 
-    static KernelConfig for_single(int num_solutions, int num_datapoints) {
+    static KernelConfig for_single(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.grid.x = num_solutions;
-        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
 
         return config;
     }
@@ -3676,20 +3676,20 @@ struct LaunchConfig {
     KernelConfig eval;
     KernelConfig mse;
     KernelVersion kernel_version = KernelVersion::Baseline;
-    int num_solutions;
-    int num_datapoints;
-    int solution_length;
-    int items_per_thread;
+    size_t num_solutions;
+    size_t num_datapoints;
+    size_t solution_length;
+    size_t items_per_thread;
 
     LaunchConfig() = default;
     LaunchConfig(
         KernelConfig eval,
         KernelConfig mse,
         KernelVersion version = KernelVersion::Baseline,
-        int num_solutions = 1,
-        int num_datapoints = 1,
-        int solution_length = 1,
-        int items_per_thread = 1
+        size_t num_solutions = 1,
+        size_t num_datapoints = 1,
+        size_t solution_length = 1,
+        size_t items_per_thread = 1
     ) : eval(eval),
         mse(mse),
         kernel_version(version),
@@ -3700,9 +3700,9 @@ struct LaunchConfig {
 
     static LaunchConfig determine(
         KernelVersion kernel_version,
-        int num_solutions,
-        int num_datapoints,
-        int solution_length
+        size_t num_solutions,
+        size_t num_datapoints,
+        size_t solution_length
     ) {
         LaunchConfig config;
 
@@ -3760,9 +3760,9 @@ void evaluate_kernel_baseline(
     float* Y,
     float* v_type,
     float* v_value,
-    float* result,
-    int solution_length,
-    int num_datapoints
+    float* partial,
+    size_t solution_length,
+    size_t num_datapoints
 );
 
 __global__
@@ -3771,9 +3771,9 @@ void evaluate_kernel_restrict(
     const float* __restrict__ Y,
     const float* __restrict__ v_type,
     const float* __restrict__ v_value,
-    float* __restrict__ result,
-    int solution_length,
-    int num_datapoints
+    float* __restrict__ v,
+    size_t solution_length,
+    size_t num_datapoints
 );
 
 __global__
@@ -3782,9 +3782,9 @@ void evaluate_kernel_shared_memory(
     const float* __restrict__ Y,
     const float* __restrict__ v_type,
     const float* __restrict__ v_value,
-    float* __restrict__ result,
-    int solution_length,
-    int num_datapoints
+    float* __restrict__ partial,
+    size_t solution_length,
+    size_t num_datapoints
 );
 
 __device__
@@ -3792,9 +3792,9 @@ float compute_tree_output_baseline(
     float* X,
     float* type,
     float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 __device__
@@ -3802,25 +3802,25 @@ float compute_tree_output_restrict(
     const float* __restrict__ X,
     const float* __restrict__ type,
     const float* __restrict__ value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 __global__
 void compute_mse_kernel_baseline(
     const float* __restrict__ partial,
     float* __restrict__ result,
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 __global__
 void mse_kernel_restrict(
     const float* __restrict__ partial,
     float* __restrict__ result,
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 __global__
@@ -3829,9 +3829,9 @@ void compute_tree_output_wrapper(
     float* type,
     float* value,
     float* result,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 #endif
 
@@ -3873,8 +3873,8 @@ float test_compute_output_kernel(
     std::vector<float> h_X,
     std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_datapoints,
-    int datapoint_index
+    size_t num_datapoints,
+    size_t datapoint_index
 );
 
 std::vector<float> test_evaluate_kernel(
@@ -3882,15 +3882,15 @@ std::vector<float> test_evaluate_kernel(
     std::vector<float> h_Y,
     std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_solutions,
-    int num_datapoints,
+    size_t num_solutions,
+    size_t num_datapoints,
     KernelVersion version
 );
 
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se,
-    int num_solutions,
-    int num_datapoints,
+    size_t num_solutions,
+    size_t num_datapoints,
     KernelVersion version
 );
 
@@ -3899,8 +3899,8 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_Y,
     std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 }
@@ -5905,7 +5905,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
-            const int num_solutions = node_type.size();
+            const size_t num_solutions = node_type.size();
 
             // Allocate memory if not allocated or size has increased
             if (_num_solutions_allocated < num_solutions) {
@@ -5923,17 +5923,19 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _allocate_results_on_gpu(const LaunchConfig config) {
-            const int num_partials =
-                (config.kernel_version == KernelVersion::BlockReduce)
-                    ? config.num_solutions * config.eval.grid.y
-                    : config.num_solutions * config.num_datapoints;
+            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF) {
+                const size_t num_partials =
+                    (config.kernel_version == KernelVersion::BlockReduce)
+                        ? config.num_solutions * config.eval.grid.y
+                        : config.num_solutions * config.num_datapoints;
 
-            // Check if we need more memory than we currently have allocated
-            if (_num_partials_allocated < num_partials) {
-                free_on_gpu(d_partial);
+                // Check if we need more memory than we currently have allocated
+                if (_num_partials_allocated < num_partials) {
+                    free_on_gpu(d_partial);
 
-                d_partial = allocate_on_gpu<float>(num_partials);
-                _num_partials_allocated = num_partials;
+                    d_partial = allocate_on_gpu<float>(num_partials);
+                    _num_partials_allocated = num_partials;
+                }
             }
 
             // Check if we need more memory than we currently have allocated
@@ -5973,11 +5975,11 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        int _num_datapoints;
-        int _solution_length;
-        int _num_solutions_allocated;
-        int _num_partials_allocated;
-        int _num_results_allocated;
+        size_t _num_datapoints;
+        size_t _solution_length;
+        size_t _num_solutions_allocated;
+        size_t _num_partials_allocated;
+        size_t _num_results_allocated;
 
         // GPU pointers
         float* d_X = nullptr;

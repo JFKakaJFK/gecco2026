@@ -13,8 +13,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
         std::vector<float> X;
         std::vector<float> type;
         std::vector<float> value;
-        int num_datapoints;
-        int datapoint_index;
+        size_t num_datapoints;
+        size_t datapoint_index;
         float expected;
     };
 
@@ -99,8 +99,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
         std::vector<float> Y;
         std::vector<float> type;
         std::vector<float> value;
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         std::vector<float> expected;
     };
 
@@ -202,8 +202,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
         std::vector<float> Y;
         std::vector<float> type;
         std::vector<float> value;
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         std::vector<float> expected;
     };
 
@@ -308,8 +308,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
 
     struct TestCase {
         std::vector<float> partial;
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         std::vector<float> expected;
     };
 
@@ -363,8 +363,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
 TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
     struct TestCase {
         std::vector<float> partial;
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         std::vector<float> expected;
     };
 
@@ -433,8 +433,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
         std::vector<float> Y;
         std::vector<float> type;
         std::vector<float> value;
-        int num_solutions;
-        int num_datapoints;
+        size_t num_solutions;
+        size_t num_datapoints;
         std::vector<float> expected;
     };
 
