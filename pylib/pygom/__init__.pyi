@@ -1273,6 +1273,10 @@ class KernelVersion(enum.IntEnum):
     block_reduce = enum.auto()  # (= 3)
     single_kernel = enum.auto()  # (= 4)
     single_kernel_fmaf = enum.auto()  # (= 5)
+    single_kernel_inplace = enum.auto()  # (= 6)
+
+def to_string(v: KernelVersion) -> str:
+    pass
 
 class NodeType(enum.IntEnum):
     input = enum.auto()  # (= 0)
@@ -1284,6 +1288,18 @@ class Operator(enum.IntEnum):
     sub = enum.auto()  # (= 1)
     mul = enum.auto()  # (= 2)
     div = enum.auto()  # (= 3)
+    sin = enum.auto()  # (= 4)
+    cos = enum.auto()  # (= 5)
+    exp = enum.auto()  # (= 6)
+    log = enum.auto()  # (= 7)
+    square = enum.auto()  # (= 8)
+    sqrt = enum.auto()  # (= 9)
+    pow = enum.auto()  # (= 10)
+    abs = enum.auto()  # (= 11)
+    min = enum.auto()  # (= 12)
+    max = enum.auto()  # (= 13)
+
+# The following declarations are used to create more readable test cases
 
 @overload
 def val(x: float) -> float:
@@ -1291,6 +1307,10 @@ def val(x: float) -> float:
 
 @overload
 def val(x: int) -> float:
+    pass
+
+@overload
+def val(x: float) -> float:
     pass
 
 def idx(idx: int) -> float:
@@ -1443,6 +1463,7 @@ def test_compute_output_kernel(
     h_value: List[float],
     num_datapoints: int,
     datapoint_index: int,
+    version: KernelVersion,
 ) -> float:
     pass
 

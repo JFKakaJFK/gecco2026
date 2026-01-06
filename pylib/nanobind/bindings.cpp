@@ -1808,7 +1808,12 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("shared_memory", goblin::KernelVersion::SharedMemory, "")
           .value("block_reduce", goblin::KernelVersion::BlockReduce, "")
           .value("single_kernel", goblin::KernelVersion::SingleKernel, "")
-          .value("single_kernel_fmaf", goblin::KernelVersion::SingleKernelFMAF, "");
+          .value("single_kernel_fmaf", goblin::KernelVersion::SingleKernelFMAF, "")
+          .value("single_kernel_inplace", goblin::KernelVersion::SingleKernelInplace, "");
+
+
+  m.def("to_string",
+      goblin::to_string, nb::arg("v"));
 
 
   auto pyEnumNodeType =
@@ -1823,7 +1828,17 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("add", goblin::Operator::Add, "")
           .value("sub", goblin::Operator::Sub, "")
           .value("mul", goblin::Operator::Mul, "")
-          .value("div", goblin::Operator::Div, "");
+          .value("div", goblin::Operator::Div, "")
+          .value("sin", goblin::Operator::Sin, "")
+          .value("cos", goblin::Operator::Cos, "")
+          .value("exp", goblin::Operator::Exp, "")
+          .value("log", goblin::Operator::Log, "")
+          .value("square", goblin::Operator::Square, "")
+          .value("sqrt", goblin::Operator::Sqrt, "")
+          .value("pow", goblin::Operator::Pow, "")
+          .value("abs", goblin::Operator::Abs, "")
+          .value("min", goblin::Operator::Min, "")
+          .value("max", goblin::Operator::Max, "");
 
 
   m.def("val",
@@ -1831,6 +1846,9 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   m.def("val",
       nb::overload_cast<int>(goblin::Val), nb::arg("x"));
+
+  m.def("val",
+      nb::overload_cast<double>(goblin::Val), nb::arg("x"));
 
   m.def("idx",
       goblin::Idx, nb::arg("idx"));
@@ -1922,7 +1940,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       goblin::kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("result"), nb::arg("config"));
 
   m.def("test_compute_output_kernel",
-      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"));
+      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"), nb::arg("version"));
 
   m.def("test_evaluate_kernel",
       goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));

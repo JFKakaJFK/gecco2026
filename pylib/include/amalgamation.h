@@ -3533,8 +3533,23 @@ enum class KernelVersion : uint8_t {
     SharedMemory,
     BlockReduce,
     SingleKernel,
-    SingleKernelFMAF
+    SingleKernelFMAF,
+    SingleKernelInplace
 };
+
+constexpr std::string_view to_string(KernelVersion v) {
+    switch (v) {
+        case KernelVersion::Baseline:            return "Baseline";
+        case KernelVersion::Restrict:            return "Restrict";
+        case KernelVersion::SharedMemory:        return "SharedMemory";
+        case KernelVersion::BlockReduce:         return "BlockReduce";
+        case KernelVersion::SingleKernel:        return "SingleKernel";
+        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
+        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
+    }
+
+    return "Unknown KernelVersion";
+}
 
 enum class NodeType : uint8_t {
     Input,
@@ -3546,15 +3561,27 @@ enum class Operator : uint8_t {
     Add,
     Sub,
     Mul,
-    Div
+    Div,
+    Sin,
+    Cos,
+    Exp,
+    Log,
+    Square,
+    Sqrt,
+    Pow,
+    Abs,
+    Min,
+    Max
 };
 
+// The following declarations are used to create more readable test cases
 constexpr float C = static_cast<float>(NodeType::Constant);
 constexpr float I = static_cast<float>(NodeType::Input);
 constexpr float O = static_cast<float>(NodeType::Operator);
 
 constexpr float Val(float x) { return x; }
 constexpr float Val(int x) { return static_cast<float>(x); }
+constexpr float Val(double x) { return static_cast<float>(x); }
 constexpr float Idx(int idx) { return static_cast<float>(idx); }
 constexpr float Op(Operator op) { return static_cast<float>(op); }
 
@@ -3562,6 +3589,16 @@ constexpr float Add = Op(Operator::Add);
 constexpr float Sub = Op(Operator::Sub);
 constexpr float Mul = Op(Operator::Mul);
 constexpr float Div = Op(Operator::Div);
+constexpr float Sin = Op(Operator::Sin);
+constexpr float Cos = Op(Operator::Cos);
+constexpr float Exp = Op(Operator::Exp);
+constexpr float Log = Op(Operator::Log);
+constexpr float Square = Op(Operator::Square);
+constexpr float Sqrt = Op(Operator::Sqrt);
+constexpr float Pow = Op(Operator::Pow);
+constexpr float Abs = Op(Operator::Abs);
+constexpr float Min = Op(Operator::Min);
+constexpr float Max = Op(Operator::Max);
 
 }
 
@@ -3717,6 +3754,7 @@ struct LaunchConfig {
                 break;
             case (KernelVersion::SingleKernel):
             case (KernelVersion::SingleKernelFMAF):
+            case (KernelVersion::SingleKernelInplace):
                 config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
                 config.mse = KernelConfig();
                 config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
@@ -3807,6 +3845,16 @@ float compute_tree_output_restrict(
     size_t datapoint_index
 );
 
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
 __global__
 void compute_mse_kernel_baseline(
     const float* __restrict__ partial,
@@ -3831,7 +3879,8 @@ void compute_tree_output_wrapper(
     float* result,
     size_t solution_length,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 );
 #endif
 
@@ -3874,7 +3923,8 @@ float test_compute_output_kernel(
     std::vector<float> h_type,
     std::vector<float> h_value,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 );
 
 std::vector<float> test_evaluate_kernel(
@@ -5923,7 +5973,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _allocate_results_on_gpu(const LaunchConfig config) {
-            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF) {
+            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF && config.kernel_version != KernelVersion::SingleKernelInplace) {
                 const size_t num_partials =
                     (config.kernel_version == KernelVersion::BlockReduce)
                         ? config.num_solutions * config.eval.grid.y

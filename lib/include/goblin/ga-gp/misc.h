@@ -153,6 +153,7 @@ struct LaunchConfig {
                 break;
             case (KernelVersion::SingleKernel):
             case (KernelVersion::SingleKernelFMAF):
+            case (KernelVersion::SingleKernelInplace):
                 config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
                 config.mse = KernelConfig();
                 config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x; 

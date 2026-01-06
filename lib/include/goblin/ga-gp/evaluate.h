@@ -62,6 +62,16 @@ float compute_tree_output_restrict(
     size_t datapoint_index
 );
 
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X, 
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
 __global__
 void compute_mse_kernel_baseline(
     const float* __restrict__ partial, 
@@ -86,7 +96,8 @@ void compute_tree_output_wrapper(
     float* result,
     size_t solution_length,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 );
 #endif
 
@@ -129,7 +140,8 @@ float test_compute_output_kernel(
     std::vector<float> h_type,
     std::vector<float> h_value,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 );
 
 std::vector<float> test_evaluate_kernel(

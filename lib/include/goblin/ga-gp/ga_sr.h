@@ -293,7 +293,7 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _allocate_results_on_gpu(const LaunchConfig config) {
-            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF) {
+            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF && config.kernel_version != KernelVersion::SingleKernelInplace) {
                 const size_t num_partials = 
                     (config.kernel_version == KernelVersion::BlockReduce)
                         ? config.num_solutions * config.eval.grid.y

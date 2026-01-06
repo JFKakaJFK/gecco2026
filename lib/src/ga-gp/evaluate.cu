@@ -17,6 +17,7 @@
 
 #define MAX_STACK_DEPTH 64
 #define MAX_NUM_NODES 64
+#define MAX_ARITY 2
 
 namespace goblin {
 
@@ -347,6 +348,69 @@ void evaluate_mse_kernel_fmaf(
     }
 }
 
+template <int BLOCK_THREADS>
+__global__
+void evaluate_mse_kernel_inplace(
+    const float* __restrict__ X, 
+    const float* __restrict__ Y, 
+    const float* __restrict__ v_type, 
+    const float* __restrict__ v_value, 
+    float* __restrict__ result,
+    const size_t solution_length, 
+    const size_t num_datapoints,
+    const size_t datapoints_per_thread
+) {
+    using BlockReduce = cub::BlockReduce<float, BLOCK_THREADS, cub::BlockReduceAlgorithm::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>;
+    __shared__ typename BlockReduce::TempStorage temp_storage;
+
+    size_t solution_index = static_cast<size_t>(blockIdx.x);
+
+    // Calculate offset for solution
+    size_t solution_offset = solution_index * solution_length;
+
+    // Layout shared memory
+    __shared__ float shmem[MAX_NUM_NODES * 2];
+    float* sh_type = (float*)shmem;
+    float* sh_value = (float*)(sh_type + solution_length);
+
+    // Cooperative load of solution data into shared memory
+    for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
+        sh_type[i] = v_type[solution_offset + i];
+        sh_value[i] = v_value[solution_offset + i];
+    }
+
+    __syncthreads();
+
+    float se = 0.0f;
+
+    for (size_t i = 0; i < datapoints_per_thread; i++) {
+        // Calculate datapoint index
+        size_t datapoint_index = i * blockDim.x + threadIdx.x;
+
+        // Check if datapoint_index corresponds to actual datapoint
+        if (datapoint_index < num_datapoints) {
+            // Compute output of solution
+            float output = compute_tree_output_inplace(
+                X, sh_type, sh_value, 
+                solution_length, 
+                num_datapoints, 
+                datapoint_index
+            );
+
+            // Determine squared error
+            float error = output - Y[datapoint_index];
+            // se += error * error;
+            se = __fmaf_rn(error, error, se); // TODO check SASS code
+        }
+    }
+
+    float sum = BlockReduce(temp_storage).Sum(se);
+
+    if (threadIdx.x == 0) {
+        result[solution_index] = sum / num_datapoints;
+    }
+}
+
 __device__
 float compute_tree_output_baseline(
     float* X, 
@@ -376,9 +440,25 @@ float compute_tree_output_baseline(
             // TODO improve
             Operator op_value = static_cast<Operator>(value[index]);
             
-            // Get operands from stack depending on arity of operator
-            int arity = 2; // Currently only arity of 2 is supported
-            float args[2];
+            // Determine arity of operator
+            int arity;
+            switch (op_value) {
+                case Operator::Sin:
+                case Operator::Cos:
+                case Operator::Exp:
+                case Operator::Log:
+                case Operator::Square:
+                case Operator::Sqrt:
+                case Operator::Abs:
+                    arity = 1;
+                    break;
+                default:
+                    arity = 2;
+                    break;
+            }
+            
+            // Get operands from stack
+            float args[MAX_ARITY];
             for (int j = 0; j < arity; j++) {
                 args[j] = stack[--sp];
             }
@@ -390,6 +470,16 @@ float compute_tree_output_baseline(
                 case Operator::Sub: res = args[0] - args[1]; break;
                 case Operator::Mul: res = args[0] * args[1]; break;
                 case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Sin: res = sinf(args[0]); break;
+                case Operator::Cos: res = cosf(args[0]); break;
+                case Operator::Exp: res = expf(args[0]); break;
+                case Operator::Log: res = logf(args[0]); break;
+                case Operator::Square: res = args[0] * args[0]; break;
+                case Operator::Sqrt: res = sqrtf(args[0]); break;
+                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Abs: res = fabsf(args[0]); break;
+                case Operator::Min: res = fminf(args[0], args[1]); break;
+                case Operator::Max: res = fmaxf(args[0], args[1]); break;
             }
 
             stack[sp++] = res;   
@@ -433,9 +523,25 @@ float compute_tree_output_restrict(
             // TODO improve
             Operator op_value = static_cast<Operator>(value[index]);
             
-            // Get operands from stack depending on arity of operator
-            int arity = 2; // Currently only arity of 2 is supported
-            float args[2];
+            // Determine arity of operator
+            int arity;
+            switch (op_value) {
+                case Operator::Sin:
+                case Operator::Cos:
+                case Operator::Exp:
+                case Operator::Log:
+                case Operator::Square:
+                case Operator::Sqrt:
+                case Operator::Abs:
+                    arity = 1;
+                    break;
+                default:
+                    arity = 2;
+                    break;
+            }
+
+            // Get operands from stack
+            float args[MAX_ARITY];
             for (int j = 0; j < arity; j++) {
                 args[j] = stack[--sp];
             }
@@ -447,9 +553,75 @@ float compute_tree_output_restrict(
                 case Operator::Sub: res = args[0] - args[1]; break;
                 case Operator::Mul: res = args[0] * args[1]; break;
                 case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Sin: res = sinf(args[0]); break;
+                case Operator::Cos: res = cosf(args[0]); break;
+                case Operator::Exp: res = expf(args[0]); break;
+                case Operator::Log: res = logf(args[0]); break;
+                case Operator::Square: res = args[0] * args[0]; break;
+                case Operator::Sqrt: res = sqrtf(args[0]); break;
+                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Abs: res = fabsf(args[0]); break;
+                case Operator::Min: res = fminf(args[0], args[1]); break;
+                case Operator::Max: res = fmaxf(args[0], args[1]); break;
             }
 
             stack[sp++] = res;   
+        } else {
+            break;
+        }
+    }
+
+    // Final result for solution is on the top of the stack
+    float result = stack[--sp];
+
+    return result;
+}
+
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X, 
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+) {
+    // Evaluation stack (per thread)
+    float stack[MAX_STACK_DEPTH];
+    int sp = 0;
+
+    // Traverse through solution from left to right
+    for (size_t index = 0; index < solution_length; index++) {
+        // Get type of current element
+        NodeType t = static_cast<NodeType>(type[index]);
+
+        if (t == NodeType::Input) {
+            size_t input_index = static_cast<size_t>(value[index]);
+            // Push input variable onto stack and increase stack pointer
+            stack[sp++] = X[datapoint_index + input_index * num_datapoints];
+        } else if (t == NodeType::Constant) {
+            // Push constant value onto stack and increase stack pointer
+            stack[sp++] = value[index];
+        } else if (t == NodeType::Operator) { // ValueKind::Operator
+            Operator op_value = static_cast<Operator>(value[index]);
+
+            // Apply the operator on the operands depending on op_value.
+            switch (op_value) {
+                case Operator::Add: stack[sp - 1]   += stack[--sp];                       break;
+                case Operator::Sub: stack[sp - 1]    = stack[--sp] - stack[sp - 1];       break;
+                case Operator::Mul: stack[sp - 1]   *= stack[--sp];                       break;
+                case Operator::Div: stack[sp - 1]    = stack[--sp] / stack[sp - 1];       break; 
+                case Operator::Sin: stack[sp - 1]    = sinf(stack[sp - 1]);               break;
+                case Operator::Cos: stack[sp - 1]    = cosf(stack[sp - 1]);               break;
+                case Operator::Exp: stack[sp - 1]    = expf(stack[sp - 1]);               break;
+                case Operator::Log: stack[sp - 1]    = logf(stack[sp - 1]);               break;
+                case Operator::Square: stack[sp - 1] = stack[sp - 1] * stack[sp - 1];     break;
+                case Operator::Sqrt: stack[sp - 1]   = sqrtf(stack[sp - 1]);              break;
+                case Operator::Pow: stack[sp - 1]    = powf(stack[--sp], stack[sp - 1]);  break;
+                case Operator::Abs: stack[sp - 1]    = fabsf(stack[sp - 1]);              break;
+                case Operator::Min: stack[sp - 1]    = fminf(stack[--sp], stack[sp - 1]); break;
+                case Operator::Max: stack[sp - 1]    = fmaxf(stack[--sp], stack[sp - 1]); break;
+            }
         } else {
             break;
         }
@@ -672,6 +844,20 @@ void evaluate_mse_kernel_wrapper(
                     assert(false && "Unsupported block size");
             }
             break;
+        case (KernelVersion::SingleKernelInplace):
+            switch (block.x) {
+                #define X(BS) \
+                case BS: \
+                    evaluate_mse_kernel_inplace<BS><<<grid, block>>>( \
+                        X, Y, type, value, result, config.solution_length, config.num_datapoints, config.items_per_thread); \
+                    break;
+                BLOCK_SIZE_LIST
+                #undef X
+
+                default: 
+                    assert(false && "Unsupported block size");
+            }
+            break;
         default:
             break;
     }
@@ -691,7 +877,7 @@ void kernel_wrapper(
     float* result,
     const LaunchConfig config
 ) {
-    if (config.kernel_version == KernelVersion::SingleKernel || config.kernel_version == KernelVersion::SingleKernelFMAF) {
+    if (config.kernel_version == KernelVersion::SingleKernel || config.kernel_version == KernelVersion::SingleKernelFMAF || config.kernel_version == KernelVersion::SingleKernelInplace) {
         evaluate_mse_kernel_wrapper(X, Y, type, value, result, config);
     } else {
         // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
@@ -716,16 +902,39 @@ void compute_tree_output_wrapper(
     float* result,
     size_t solution_length,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 ) {
-    result[0] = compute_tree_output_restrict(
-        X, 
-        type, 
-        value, 
-        solution_length, 
-        num_datapoints, 
-        datapoint_index
-    );
+    if (version == KernelVersion::Baseline) {
+        result[0] = compute_tree_output_baseline(
+            X, 
+            type, 
+            value, 
+            solution_length, 
+            num_datapoints, 
+            datapoint_index
+        );
+    } else if (version == KernelVersion::Restrict) {
+        result[0] = compute_tree_output_restrict(
+            X, 
+            type, 
+            value, 
+            solution_length, 
+            num_datapoints, 
+            datapoint_index
+        );
+    } else if (version == KernelVersion::SingleKernelInplace) {
+        result[0] = compute_tree_output_inplace(
+            X, 
+            type, 
+            value, 
+            solution_length, 
+            num_datapoints, 
+            datapoint_index
+        );
+    }
+
+    
 }
 
 float test_compute_output_kernel(
@@ -733,7 +942,8 @@ float test_compute_output_kernel(
     std::vector<float> h_type,
     std::vector<float> h_value,
     size_t num_datapoints,
-    size_t datapoint_index
+    size_t datapoint_index,
+    KernelVersion version
 ) {
     // Length of a single solution vector
     size_t solution_length = h_type.size();
@@ -749,7 +959,10 @@ float test_compute_output_kernel(
     dim3 block(1);
     dim3 grid(1, 1);
 
-    compute_tree_output_wrapper<<<grid, block>>>(d_X, d_type, d_value, d_result, solution_length, num_datapoints, datapoint_index);
+    compute_tree_output_wrapper<<<grid, block>>>(
+        d_X, d_type, d_value, d_result, 
+        solution_length, num_datapoints, datapoint_index, version
+    );
 
     __CHECK_CUDA_ERR__(cudaGetLastError());
     __CHECK_CUDA_ERR__(cudaDeviceSynchronize());

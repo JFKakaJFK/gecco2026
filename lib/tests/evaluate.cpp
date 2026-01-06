@@ -1,5 +1,7 @@
 #include "doctest/doctest.h"
 
+#include <cmath>
+#include <numbers>
 #include <ranges>
 #include <vector>
 
@@ -9,6 +11,14 @@
 using namespace goblin;
 
 TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
+    using namespace std::numbers;
+
+    float e2 = std::pow(e_v<float>, 2.0f);
+
+    std::vector<KernelVersion> kernel_versions = {
+        KernelVersion::Baseline, KernelVersion::Restrict, KernelVersion::SingleKernelInplace
+    };
+
     struct TestCase {
         std::vector<float> X;
         std::vector<float> type;
@@ -38,10 +48,27 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
         { {9}, {C, I, O}, {Val(2), Idx(0), Sub}, 1, 0, 7 }, // x0 - 2
         { {2}, {C, I, O}, {Val(4), Idx(0), Mul}, 1, 0, 8 }, // x0 * 4
         { {8}, {C, I, O}, {Val(4), Idx(0), Div}, 1, 0, 2 }, // x0 / 4
+        { {pi}, {I, O}, {Idx(0), Sin}, 1, 0, 0 }, // x0 = pi, sin(x0) = 0
+        { {pi}, {I, O}, {Idx(0), Cos}, 1, 0, -1 }, // x0 = pi, cos(x0) = -1
+        { {2}, {I, O}, {Idx(0), Exp}, 1, 0, e2 }, // x0 = 2, exp(x0) = e ^ 2
+        { {e2}, {I, O}, {Idx(0), Log}, 1, 0, 2 }, // x0 = e ^ 2, log(x0) = 2
+        { {3}, {I, O}, {Idx(0), Square}, 1, 0, 9 }, // x0 = 3, x0 ^ 2 = 9
+        { {9}, {I, O}, {Idx(0), Sqrt}, 1, 0, 3 }, // x0 = 9, sqrt(x0) = 3
+        { {2}, {C, I, O}, {Val(3), Idx(0), Pow}, 1, 0, 8 }, // x0 = 2, x0 ^ 3 = 8
+        { {-2}, {I, O}, {Idx(0), Abs}, 1, 0, 2}, // x0 = - 2, |x0| = 2
+        { {5}, {C, I, O}, {Val(2), Idx(0), Min}, 1, 0, 2 }, // x0 = 5, min(x0, 2) = 2
+        { {5}, {C, I, O}, {Val(2), Idx(0), Max}, 1, 0, 5 }, // x0 = 5, max(x0, 2) = 5
 
         // nested operators
         { {1}, {I, C, O, C, O}, {Idx(0), Val(5), Sub, Val(3), Add}, 1, 0, 7 }, // 3 + (5 - x0)
         { {2, 3}, {I, I, O, I, C, O, O}, {Idx(0), Idx(1), Sub, Idx(0), Val(10), Div, Mul}, 1, 0, 5 }, // (10 / x0) * (x1 - x0)
+        // x0 = 3, x1 = 4, x2 = 2, sin(exp(log(max(x0 - 5, sqrt(x1) * pi)))) = sin(pi / 2) = 1
+        { 
+            {3, 4, 4}, 
+            {I, C, I, O, O, C, I, O, O, O, O, O, O}, 
+            {Idx(2), Val(pi), Idx(1), Sqrt, Mul, Val(5), Idx(0), Sub, Max, Log, Exp, Div, Sin},
+            1, 0, 1
+        },
         
         ////////////////////////////////////////////
         /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
@@ -62,6 +89,12 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
         { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Mul}, 2, 1, {3} }, // x0 * x1
         { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Div}, 2, 0, {0} }, // x0 / x1
         { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Div}, 2, 1, {1.0/3.0} }, // x0 / x1
+        { {0, 1, 2, 3}, {C, I, O}, {Idx(1), Idx(0), Pow}, 2, 0, 0 }, // x0 ^ x1
+        { {0, 1, 2, 3}, {C, I, O}, {Idx(1), Idx(0), Pow}, 2, 1, 1 }, // x0 ^ x1
+        { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Min}, 2, 0, 0 }, // min(x0, x1)
+        { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Min}, 2, 1, 1 }, // min(x0, x1)
+        { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Max}, 2, 0, 2 }, // max(x0, x1)
+        { {0, 1, 2, 3}, {I, I, O}, {Idx(1), Idx(0), Max}, 2, 1, 3 }, // max(x0, x1)
         
         // nested operators
         { {1, 2, 3, 6, 12, 18}, {C, I, O, I, O}, {Val(4), Idx(0), Mul, Idx(1), Sub}, 3, 0, {2} }, // x1 - (x0 * 4)
@@ -79,13 +112,15 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
     };
 
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
-        INFO("Test case index: ", i);
+        for (auto version : kernel_versions) {
+            INFO("Version: ", to_string(version), "\tTest Case: ", i);
 
-        REQUIRE_EQ(tc.type.size(), tc.value.size());
+            REQUIRE_EQ(tc.type.size(), tc.value.size());
 
-        float result = test_compute_output_kernel(tc.X, tc.type, tc.value, tc.num_datapoints, tc.datapoint_index);
-        
-        CHECK_EQ(result, doctest::Approx(tc.expected));
+            float result = test_compute_output_kernel(tc.X, tc.type, tc.value, tc.num_datapoints, tc.datapoint_index, version);
+            
+            CHECK_EQ(result, doctest::Approx(tc.expected));
+        }
     }
 }
 
@@ -425,7 +460,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
 
 TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
     std::vector<KernelVersion> kernel_versions = {
-        KernelVersion::SingleKernel, KernelVersion::SingleKernelFMAF
+        KernelVersion::SingleKernel, KernelVersion::SingleKernelFMAF, KernelVersion::SingleKernelInplace
     };
 
     struct TestCase {

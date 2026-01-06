@@ -27,7 +27,9 @@ def lambdify_expression(e: str | sym.Expr):
 
     symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
     expr = sym.sympify(e, locals=symbols)
-    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
+    f = sym.lambdify(
+        symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"]
+    )
 
     def fn(X: np.ndarray):
         try:
@@ -76,10 +78,18 @@ def problems(rng, output_directory):
         },
         # PMLB datasets
         "nikuradse_2": {"type": "pmlb", "observations": 362, "features": 1},
-        "feynman_I_6_2a": {"type": "pmlb", "observations": 100_000, "features": 1},
+        "feynman_I_6_2a": {
+            "type": "pmlb",
+            "observations": 100_000,
+            "features": 1,
+        },
         "542_pollution": {"type": "pmlb", "observations": 60, "features": 15},
         "503_wind": {"type": "pmlb", "observations": 6574, "features": 14},
-        "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
+        "1191_BNG_pbc": {
+            "type": "pmlb",
+            "observations": 1_000_000,
+            "features": 18,
+        },
         "505_tecator": {"type": "pmlb", "observations": 240, "features": 124},
     }
 
@@ -99,7 +109,9 @@ def problems(rng, output_directory):
                     )
                 case "pmlb":
                     X, y = pmlb.fetch_data(
-                        problem, return_X_y=True, local_cache_dir=PMLB_CACHE_DIR
+                        problem,
+                        return_X_y=True,
+                        local_cache_dir=PMLB_CACHE_DIR,
                     )
                     X = X[:obs]
                     y = y[:obs]
@@ -117,7 +129,9 @@ def problems(rng, output_directory):
             np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
 
             kf = KFold(
-                n_splits=NUM_FOLDS, shuffle=True, random_state=rng.integers(2**32 - 1)
+                n_splits=NUM_FOLDS,
+                shuffle=True,
+                random_state=rng.integers(2**32 - 1),
             )
             for fold, (train_indices, _) in enumerate(kf.split(X_train)):
                 X_fold, y_fold = (
@@ -161,6 +175,7 @@ def gpu_jobs(problems, include_kernels):
         KernelVersion.block_reduce,
         KernelVersion.single_kernel,
         KernelVersion.single_kernel_fmaf,
+        KernelVersion.single_kernel_inplace,
     ]
 
     kernels_to_use = (
@@ -177,7 +192,9 @@ def all_jobs(output_directory, include_cpu=True, include_kernels=False):
     if include_cpu:
         run_cpu_tasks(
             output_directory,
-            cpu_jobs(problems(np.random.default_rng(seed=42), output_directory)),
+            cpu_jobs(
+                problems(np.random.default_rng(seed=42), output_directory)
+            ),
             num_repeats=REPEATS_PER_FOLD,
         )
 
@@ -185,7 +202,8 @@ def all_jobs(output_directory, include_cpu=True, include_kernels=False):
     run_gpu_tasks(
         output_directory,
         gpu_jobs(
-            problems(np.random.default_rng(seed=42), output_directory), include_kernels
+            problems(np.random.default_rng(seed=42), output_directory),
+            include_kernels,
         ),
         num_repeats=REPEATS_PER_FOLD,
     )
