@@ -1,14 +1,10 @@
 import os
 import pathlib
-import shutil
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import numpy as np
-
 import pygom.gp as gp
-
 from tqdm import tqdm
-
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 
 def run_one_cpu_task(sr_instance, X, y):
@@ -31,28 +27,25 @@ def run_cpu_tasks(
         y_train = np.load(str(info["y_path"].absolute()))
 
         for run in range(num_repeats):
-
             test_name = f"""{info["problem"]}-cpu-pop{info["population_size"]}-obs{info["num_observations"]}-fold{info["fold"]}-iter{run}"""
             logpath = f"{output_directory}/{test_name}.csv"
 
             est = gp.SymbolicRegressor(
                 gpu_accelerated=False,
                 linear_scaling=False,
-                ims_kwargs=dict(
-                    initial_population_size=info["population_size"],
-                    max_num_populations=1,
-                ),
-                rv_kwargs=dict(enabled=False),  # disable rv optimization
-                discrete_model_kwargs=dict(
-                    merge_continuous=False,
-                    num_continuous_bins=25,
-                    normalize_initial_linkage_bias=True,
-                ),
+                ims_kwargs={
+                    "initial_population_size": info["population_size"],
+                    "max_num_populations": 1,
+                },
+                rv_kwargs={"enabled": False},
+                discrete_model_kwargs={
+                    "merge_continuous": False,
+                    "num_continuous_bins": 25,
+                    "normalize_initial_linkage_bias": True,
+                },
                 seed=info["seed"],
                 random_state=info["seed"],
-                tracking_kwargs=dict(
-                    logpath=logpath,
-                ),
+                tracking_kwargs={"logpath": logpath},
             )
 
             jobs.append(
@@ -96,21 +89,19 @@ def run_gpu_tasks(
                 gpu_accelerated=True,
                 kernel_version=kernel,
                 linear_scaling=False,
-                ims_kwargs=dict(
-                    initial_population_size=info["population_size"],
-                    max_num_populations=1,
-                ),
-                rv_kwargs=dict(enabled=False),  # disable rv optimization
-                discrete_model_kwargs=dict(
-                    merge_continuous=False,
-                    num_continuous_bins=25,
-                    normalize_initial_linkage_bias=True,
-                ),
+                ims_kwargs={
+                    "initial_population_size": info["population_size"],
+                    "max_num_populations": 1,
+                },
+                rv_kwargs={"enabled": False},
+                discrete_model_kwargs={
+                    "merge_continuous": False,
+                    "num_continuous_bins": 25,
+                    "normalize_initial_linkage_bias": True,
+                },
                 seed=info["seed"],
                 random_state=info["seed"],
-                tracking_kwargs=dict(
-                    logpath=logpath,
-                ),
+                tracking_kwargs={"logpath": logpath},
             )
 
             est.fit(X_train, y_train)

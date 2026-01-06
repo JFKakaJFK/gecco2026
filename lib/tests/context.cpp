@@ -6,6 +6,8 @@
 using namespace goblin;
 
 TEST_CASE("goblin::gp::context") {
+    using namespace test;
+
     auto tree = TemplateNode::full_nary(2, 3);
     Template tmplate;
     tmplate.add_output(tree);

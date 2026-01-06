@@ -22,18 +22,19 @@ PMLB_CACHE_DIR = "pmlb_cache"
 
 
 def lambdify_expression(e: str | sym.Expr):
-    """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
+    """
+    Converts a `sympy` compatible expression string into a function
+    accepting a dataset `X`.
+    """
     e = str(e)
 
     symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
     expr = sym.sympify(e, locals=symbols)
-    f = sym.lambdify(
-        symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"]
-    )
+    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
 
     def fn(X: np.ndarray):
         try:
-            return f(*[X[:, int(s[1:])] for s in symbols.keys()])
+            return f(*[X[:, int(s[1:])] for s in symbols])
         except Exception as e:
             print(e)
             return np.repeat(float("nan"), X.shape[0])
@@ -49,7 +50,10 @@ def synthetic_problem(
     noise: float = 0.01,
     seed: int | None = None,
 ):
-    """Creates a synthetic problem by sampling a random dataset, applying the function and possibly adding noise."""
+    """
+    Creates a synthetic problem by sampling a random dataset,
+    applying the function and possibly adding noise.
+    """
     assert ub > lb, "Invalid initialisation bounds"
 
     rng = np.random.Generator(np.random.Philox(seed=seed))
@@ -78,18 +82,10 @@ def problems(rng, output_directory):
         },
         # PMLB datasets
         "nikuradse_2": {"type": "pmlb", "observations": 362, "features": 1},
-        "feynman_I_6_2a": {
-            "type": "pmlb",
-            "observations": 100_000,
-            "features": 1,
-        },
+        "feynman_I_6_2a": {"type": "pmlb", "observations": 100_000, "features": 1},
         "542_pollution": {"type": "pmlb", "observations": 60, "features": 15},
         "503_wind": {"type": "pmlb", "observations": 6574, "features": 14},
-        "1191_BNG_pbc": {
-            "type": "pmlb",
-            "observations": 1_000_000,
-            "features": 18,
-        },
+        "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
         "505_tecator": {"type": "pmlb", "observations": 240, "features": 124},
     }
 
@@ -120,7 +116,8 @@ def problems(rng, output_directory):
                 X, y, test_size=0.25, random_state=rng.integers(2**32 - 1)
             )
 
-            # the "task" needs to be transferrable across processess -> save the data as .csv and load it there again
+            # the "task" needs to be transferrable across processess
+            # -> save the data as .csv and load it there again
             X_test_path, y_test_path = (
                 eq_dir / "X_test.npy",
                 eq_dir / "y_test.npy",
@@ -163,8 +160,7 @@ def problems(rng, output_directory):
 
 
 def cpu_jobs(problems):
-    for info in problems:
-        yield info
+    yield from problems
 
 
 def gpu_jobs(problems, include_kernels):
@@ -192,9 +188,7 @@ def all_jobs(output_directory, include_cpu=True, include_kernels=False):
     if include_cpu:
         run_cpu_tasks(
             output_directory,
-            cpu_jobs(
-                problems(np.random.default_rng(seed=42), output_directory)
-            ),
+            cpu_jobs(problems(np.random.default_rng(seed=42), output_directory)),
             num_repeats=REPEATS_PER_FOLD,
         )
 
@@ -213,7 +207,7 @@ def main():
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     output_directory = Path("results") / run_date
 
-    all_jobs(output_directory, include_cpu=True, include_kernels=False)
+    all_jobs(output_directory, include_cpu=True, include_kernels=True)
 
     create_db(output_directory)
 

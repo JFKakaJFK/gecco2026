@@ -1,10 +1,8 @@
-import os
+from pathlib import Path
+
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import seaborn as sns
-
-from pathlib import Path
 
 
 def plot_cpu_gpu(datetime: str, dataset_sizes: dict[str, dict[str, int]]):
@@ -66,9 +64,9 @@ def plot_cpu_gpu(datetime: str, dataset_sizes: dict[str, dict[str, int]]):
     plt.savefig(f"{path}/evals_per_second_barplot.png", dpi=300)
 
     # Speedup plot (GPU / CPU)
-    df_mean = df_all.groupby(
-        ["dataset", "device", "population"], as_index=False
-    ).agg(evals_per_sec=("evals_per_sec", "mean"))
+    df_mean = df_all.groupby(["dataset", "device", "population"], as_index=False).agg(
+        evals_per_sec=("evals_per_sec", "mean")
+    )
 
     cpu = df_mean[df_mean["device"] == "cpu"]
     gpu = df_mean[df_mean["device"] == "gpu"]
@@ -104,8 +102,8 @@ def plot_kernel_versions(datetime: str):
         df = pd.read_csv(file)
 
         # Extract metadata
-        dataset, kernel_version, population, observations, iterations = (
-            file.stem.split("-")
+        dataset, kernel_version, population, observations, iterations = file.stem.split(
+            "-"
         )
 
         population = int(population.replace("pop", ""))
@@ -117,9 +115,9 @@ def plot_kernel_versions(datetime: str):
             continue
 
         row = converged.iloc[0]
-        threads_per_sec = (
-            row["evaluations"] * observations * population
-        ) / row["eval_time_seconds"]
+        threads_per_sec = (row["evaluations"] * observations * population) / row[
+            "eval_time_seconds"
+        ]
 
         records.append(
             {

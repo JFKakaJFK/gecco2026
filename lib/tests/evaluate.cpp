@@ -12,6 +12,7 @@ using namespace goblin;
 
 TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
     using namespace std::numbers;
+    using namespace test;
 
     float e2 = std::pow(e_v<float>, 2.0f);
 
@@ -125,6 +126,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
 }
 
 TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
+    using namespace test;
+
     std::vector<KernelVersion> kernel_versions = {
         KernelVersion::Baseline, KernelVersion::Restrict, KernelVersion::SharedMemory
     };
@@ -232,6 +235,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
 }
 
 TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
+    using namespace test;
+
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
@@ -459,6 +464,8 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
 }
 
 TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
+    using namespace test;
+
     std::vector<KernelVersion> kernel_versions = {
         KernelVersion::SingleKernel, KernelVersion::SingleKernelFMAF, KernelVersion::SingleKernelInplace
     };

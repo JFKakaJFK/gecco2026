@@ -1299,26 +1299,6 @@ class Operator(enum.IntEnum):
     min = enum.auto()  # (= 12)
     max = enum.auto()  # (= 13)
 
-# The following declarations are used to create more readable test cases
-
-@overload
-def val(x: float) -> float:
-    pass
-
-@overload
-def val(x: int) -> float:
-    pass
-
-@overload
-def val(x: float) -> float:
-    pass
-
-def idx(idx: int) -> float:
-    pass
-
-def op(op: Operator) -> float:
-    pass
-
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4259,6 +4239,36 @@ class MixedGOMEA(MethodBase):
 # clang-format on
 
 # #endif
+
+# <submodule test>
+class test:  # Proxy class that introduces typings for the *submodule* test
+    pass  # (This corresponds to a C++ namespace. All methods are static!)
+    """ The following declarations are used to create more readable test cases"""
+
+    @staticmethod
+    @overload
+    def val(x: float) -> float:
+        pass
+
+    @staticmethod
+    @overload
+    def val(x: int) -> float:
+        pass
+
+    @staticmethod
+    @overload
+    def val(x: float) -> float:
+        pass
+
+    @staticmethod
+    def idx(idx: int) -> float:
+        pass
+
+    @staticmethod
+    def op(op: Operator) -> float:
+        pass
+
+# </submodule test>
 ####################    </generated_from:amalgamation.h>    ####################
 
 # </litgen_stub>

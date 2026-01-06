@@ -3575,30 +3575,32 @@ enum class Operator : uint8_t {
 };
 
 // The following declarations are used to create more readable test cases
-constexpr float C = static_cast<float>(NodeType::Constant);
-constexpr float I = static_cast<float>(NodeType::Input);
-constexpr float O = static_cast<float>(NodeType::Operator);
+namespace test {
+    constexpr float C = static_cast<float>(NodeType::Constant);
+    constexpr float I = static_cast<float>(NodeType::Input);
+    constexpr float O = static_cast<float>(NodeType::Operator);
 
-constexpr float Val(float x) { return x; }
-constexpr float Val(int x) { return static_cast<float>(x); }
-constexpr float Val(double x) { return static_cast<float>(x); }
-constexpr float Idx(int idx) { return static_cast<float>(idx); }
-constexpr float Op(Operator op) { return static_cast<float>(op); }
+    constexpr float Val(float x) { return x; }
+    constexpr float Val(int x) { return static_cast<float>(x); }
+    constexpr float Val(double x) { return static_cast<float>(x); }
+    constexpr float Idx(int idx) { return static_cast<float>(idx); }
+    constexpr float Op(Operator op) { return static_cast<float>(op); }
 
-constexpr float Add = Op(Operator::Add);
-constexpr float Sub = Op(Operator::Sub);
-constexpr float Mul = Op(Operator::Mul);
-constexpr float Div = Op(Operator::Div);
-constexpr float Sin = Op(Operator::Sin);
-constexpr float Cos = Op(Operator::Cos);
-constexpr float Exp = Op(Operator::Exp);
-constexpr float Log = Op(Operator::Log);
-constexpr float Square = Op(Operator::Square);
-constexpr float Sqrt = Op(Operator::Sqrt);
-constexpr float Pow = Op(Operator::Pow);
-constexpr float Abs = Op(Operator::Abs);
-constexpr float Min = Op(Operator::Min);
-constexpr float Max = Op(Operator::Max);
+    constexpr float Add = Op(Operator::Add);
+    constexpr float Sub = Op(Operator::Sub);
+    constexpr float Mul = Op(Operator::Mul);
+    constexpr float Div = Op(Operator::Div);
+    constexpr float Sin = Op(Operator::Sin);
+    constexpr float Cos = Op(Operator::Cos);
+    constexpr float Exp = Op(Operator::Exp);
+    constexpr float Log = Op(Operator::Log);
+    constexpr float Square = Op(Operator::Square);
+    constexpr float Sqrt = Op(Operator::Sqrt);
+    constexpr float Pow = Op(Operator::Pow);
+    constexpr float Abs = Op(Operator::Abs);
+    constexpr float Min = Op(Operator::Min);
+    constexpr float Max = Op(Operator::Max);
+}
 
 }
 
