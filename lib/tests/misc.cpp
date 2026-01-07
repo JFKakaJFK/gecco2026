@@ -2,6 +2,7 @@
 
 #include <ranges>
 #include <vector>
+#include <utility>
 
 #include "goblin/ga-gp/misc.h"
 #include "goblin/ga-gp/types.h"

@@ -4,6 +4,7 @@
 #include <numbers>
 #include <ranges>
 #include <vector>
+#include <utility>
 
 #include "goblin/ga-gp/evaluate.h"
 #include "goblin/ga-gp/types.h"
