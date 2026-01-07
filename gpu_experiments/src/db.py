@@ -1,6 +1,7 @@
-import duckdb
 import pathlib
 import re
+
+import duckdb
 
 
 def create_db(dir: pathlib.Path):
@@ -32,11 +33,14 @@ def create_db(dir: pathlib.Path):
 
     filename_re = re.compile(
         r"""
-        (?P<dataset>.+)
+        (?P<dataset>[^-]+)
         -
         (?P<device>[^-]+)
         -pop(?P<pop>\d+)
         -obs(?P<obs>\d+)
+        -feat(?P<feat>\d+)
+        -height(?P<height>\d+)
+        -op_(?P<op_set>[^-]+)
         -fold(?P<fold>\d+)
         -iter(?P<iter>\d+)
         \.csv
@@ -71,7 +75,6 @@ def create_db(dir: pathlib.Path):
             expressions,
             mse_train,
         FROM read_csv_auto('{csv_path.as_posix()}')
-        WHERE status = 'Converged'
         """
         )
 

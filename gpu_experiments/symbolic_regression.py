@@ -11,6 +11,7 @@ from pygom import KernelVersion
 from sklearn.model_selection import KFold, train_test_split
 
 from src.db import create_db
+from src.plots import plot
 from src.run import run_cpu_tasks, run_gpu_tasks
 
 REPEATS_TOTAL = 15
@@ -75,88 +76,122 @@ def problems(rng, output_directory):
 
     problems: dict[str, dict[str, int | str]] = {
         # Synthetic problems
-        "sin(3.1 * x0 + 2.7)": {
-            "type": "synthetic",
-            "observations": np.nan,
-            "features": 1,
-        },
+        # "sin(3.1 * x0 + 2.7)": {
+        #     "type": "synthetic",
+        #     "observations": 1_000_000,
+        #     "features": 1,
+        # },
         # PMLB datasets
-        "nikuradse_2": {"type": "pmlb", "observations": 362, "features": 1},
-        "feynman_I_6_2a": {"type": "pmlb", "observations": 100_000, "features": 1},
-        "542_pollution": {"type": "pmlb", "observations": 60, "features": 15},
-        "503_wind": {"type": "pmlb", "observations": 6574, "features": 14},
+        # "nikuradse_2": {"type": "pmlb", "observations": 362, "features": 1},
+        # "feynman_I_6_2a": {"type": "pmlb", "observations": 100_000, "features": 1},
+        # "542_pollution": {"type": "pmlb", "observations": 60, "features": 15},
+        # "503_wind": {"type": "pmlb", "observations": 6574, "features": 14},
+        # "210_cloud": {"type": "pmlb", "observations": 108, "features": 5},
+        # "505_tecator": {"type": "pmlb", "observations": 240, "features": 124},
+        # "201_pol": {"type": "pmlb", "observations": 15_000, "features": 48},
         "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
-        "505_tecator": {"type": "pmlb", "observations": 240, "features": 124},
     }
 
-    population_sizes: list[int] = [256, 512, 1024, 2048, 4096, 8192]
-
-    num_observations: list[int] = [10, 100, 1_000, 10_000, 100_000, 1_000_000]
+    population_sizes: list[int] = [2**i for i in range(8, 16)]  # 256 - 32768
+    num_observations: list[int] = [10**i for i in range(1, 7)]  # 10 - 1_000_000
+    num_features: list[int] = [2**i for i in range(0, 8)]  # 1 - 128
 
     for problem, stats in problems.items():
         eq_dir = data_dir / quote(problem, safe=" ")
         eq_dir.mkdir(parents=True, exist_ok=True)
 
-        for obs in num_observations:
-            match stats["type"]:
-                case "synthetic":
-                    X, y = synthetic_problem(
-                        problem, obs, noise=0.0, seed=rng.integers(2**32 - 1)
-                    )
-                case "pmlb":
-                    X, y = pmlb.fetch_data(
-                        problem,
-                        return_X_y=True,
-                        local_cache_dir=PMLB_CACHE_DIR,
-                    )
-                    X = X[:obs]
-                    y = y[:obs]
-
-            X_train, X_test, y_train, y_test = train_test_split(
-                X, y, test_size=0.25, random_state=rng.integers(2**32 - 1)
-            )
-
-            # the "task" needs to be transferrable across processess
-            # -> save the data as .csv and load it there again
-            X_test_path, y_test_path = (
-                eq_dir / "X_test.npy",
-                eq_dir / "y_test.npy",
-            )
-            np.save(X_test_path, X_test, allow_pickle=False)
-            np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
-
-            kf = KFold(
-                n_splits=NUM_FOLDS,
-                shuffle=True,
-                random_state=rng.integers(2**32 - 1),
-            )
-            for fold, (train_indices, _) in enumerate(kf.split(X_train)):
-                X_fold, y_fold = (
-                    X_train[train_indices, :],
-                    y_train[train_indices].reshape(-1, 1),
+        match stats["type"]:
+            case "synthetic":
+                X, y = synthetic_problem(
+                    problem,
+                    stats["observations"],
+                    noise=0.0,
+                    seed=rng.integers(2**32 - 1),
+                )
+            case "pmlb":
+                X, y = pmlb.fetch_data(
+                    problem,
+                    return_X_y=True,
+                    local_cache_dir=PMLB_CACHE_DIR,
                 )
 
-                X_path, y_path = (
-                    eq_dir / f"X{fold:03d}.npy",
-                    eq_dir / f"y{fold:03d}.npy",
-                )
-                np.save(X_path, X_fold, allow_pickle=False)
-                np.save(y_path, y_fold, allow_pickle=False)
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.25, random_state=rng.integers(2**32 - 1)
+        )
 
-                for pop in population_sizes:
-                    seed = int(rng.integers(2**32 - 1))
+        # the "task" needs to be transferrable across processess
+        # -> save the data as .csv and load it there again
+        X_test_path, y_test_path = (
+            eq_dir / "X_test.npy",
+            eq_dir / "y_test.npy",
+        )
+        np.save(X_test_path, X_test, allow_pickle=False)
+        np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
 
-                    yield {
-                        "problem": problem,
-                        "fold": fold,
-                        "num_observations": obs,
-                        "population_size": pop,
-                        "X_path": X_path,
-                        "y_path": y_path,
-                        "X_test_path": X_test_path,
-                        "y_test_path": y_test_path,
-                        "seed": seed,
-                    }
+        kf = KFold(
+            n_splits=NUM_FOLDS,
+            shuffle=True,
+            random_state=rng.integers(2**32 - 1),
+        )
+        for fold, (train_indices, _) in enumerate(kf.split(X_train)):
+            X_fold, y_fold = (
+                X_train[train_indices, :],
+                y_train[train_indices].reshape(-1, 1),
+            )
+
+            X_path, y_path = (
+                eq_dir / f"X{fold:03d}.npy",
+                eq_dir / f"y{fold:03d}.npy",
+            )
+            np.save(X_path, X_fold, allow_pickle=False)
+            np.save(y_path, y_fold, allow_pickle=False)
+
+            for obs in num_observations:
+                # Skip datasets that do not have enough observations
+                # 0.75 = due to train_test_split
+                # (1 - 1 / NUM_FOLDS) = due to KFOLD
+                if obs > stats["observations"] * 0.75 * (1 - 1 / NUM_FOLDS):
+                    continue
+
+                for feat in num_features:
+                    # Skip datasets that do not have enough features
+                    if feat > stats["features"]:
+                        continue
+
+                    for pop in population_sizes:
+                        # For larger population sizes, skip large datasets
+                        if pop >= 4096 and obs >= 1e5:
+                            continue
+
+                        # (branching_factor, depth)
+                        for template in [[(2, 3)], [(2, 4)], [(2, 5)]]:
+                            for operator_set, operators in [
+                                ("small", "+,-,*,/"),
+                                ("trig", "+,-,*,/,sin,cos"),
+                                ("exp", "+,-,*,/,sin,cos,exp,log"),
+                                ("pow", "+,-,*,/,sin,cos,exp,log,square,sqrt,pow"),
+                                (
+                                    "all",
+                                    "+,-,*,/,sin,cos,exp,log,square,sqrt,pow,abs,min,max",
+                                ),
+                            ]:
+                                seed = int(rng.integers(2**32 - 1))
+
+                                yield {
+                                    "problem": problem,
+                                    "fold": fold,
+                                    "num_observations": obs,
+                                    "num_features": feat,
+                                    "population_size": pop,
+                                    "template": template,
+                                    "operators": operators,
+                                    "operator_set": operator_set,
+                                    "X_path": X_path,
+                                    "y_path": y_path,
+                                    "X_test_path": X_test_path,
+                                    "y_test_path": y_test_path,
+                                    "seed": seed,
+                                }
 
 
 def cpu_jobs(problems):
@@ -183,16 +218,19 @@ def gpu_jobs(problems, include_kernels):
             yield (info, kernel)
 
 
-def all_jobs(output_directory, include_cpu=True, include_kernels=False):
+def all_jobs(output_directory, include_cpu=True, include_kernels=False, dry_run=False):
     # Run CPU jobs
     if include_cpu:
+        print("Starting CPU tasks...")
         run_cpu_tasks(
             output_directory,
             cpu_jobs(problems(np.random.default_rng(seed=42), output_directory)),
             num_repeats=REPEATS_PER_FOLD,
+            dry_run=dry_run,
         )
 
     # Run GPU jobs
+    print("Starting GPU tasks...")
     run_gpu_tasks(
         output_directory,
         gpu_jobs(
@@ -200,6 +238,7 @@ def all_jobs(output_directory, include_cpu=True, include_kernels=False):
             include_kernels,
         ),
         num_repeats=REPEATS_PER_FOLD,
+        dry_run=dry_run,
     )
 
 
@@ -207,9 +246,10 @@ def main():
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     output_directory = Path("results") / run_date
 
-    all_jobs(output_directory, include_cpu=True, include_kernels=True)
-
+    all_jobs(output_directory, include_cpu=True, include_kernels=True, dry_run=False)
     create_db(output_directory)
+
+    # plot(output_directory)
 
 
 if __name__ == "__main__":

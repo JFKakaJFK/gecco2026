@@ -38,9 +38,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
 
         symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
         expr = sym.sympify(e, locals=symbols)
-        f = sym.lambdify(
-            symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"]
-        )
+        f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
 
         def fn(X: np.ndarray):
             try:
@@ -77,9 +75,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                 population_options=pygom.PopulationOptions(
                     **self.kwargs.get("population_kwargs", {})
                 ),
-                ims_options=pygom.IMSOptions(
-                    **self.kwargs.get("ims_kwargs", {})
-                ),
+                ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
                 rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
                 discrete_model=vars(pygom)[
                     self.kwargs.get("discrete_model", "LinkageTreeFOS")
@@ -98,35 +94,32 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         budget = pygom.Budget(**budget_kwargs)
         template = pygom.Template()
         for branching_factor, depth in self.kwargs.get("outputs", [(2, 4)]):
-            template.add_output(
-                pygom.TemplateNode.full_nary(branching_factor, depth)
-            )
+            template.add_output(pygom.TemplateNode.full_nary(branching_factor, depth))
         for branching_factor, depth in self.kwargs.get("subtrees", []):
-            template.add_subtree(
-                pygom.TemplateNode.full_nary(branching_factor, depth)
-            )
+            template.add_subtree(pygom.TemplateNode.full_nary(branching_factor, depth))
         str2op = {
             "+": pygom.OpAdd(),
             "-": pygom.OpSubGPU(),
             "*": pygom.OpMul(),
             "/": pygom.OpDiv(),
-            # "sin": pygom.OpSin(),
-            # TODO
+            "sin": pygom.OpSin(),
+            "cos": pygom.OpCos(),
+            "exp": pygom.OpExp(),
+            "log": pygom.OpLog(),
+            "square": pygom.OpSquare(),
+            "sqrt": pygom.OpSqrt(),
+            "pow": pygom.OpPow(),
+            "abs": pygom.OpAbs(),
+            "min": pygom.OpMin(),
+            "max": pygom.OpMax(),
         }
         ctx = pygom.GPContext(
             num_inputs=int(X.shape[1]),
             expression_template=template,
             operators=[
-                str2op[op]
-                for op in self.kwargs.get(
-                    "operators",
-                    "+,-,*,/".split(","),
-                    # "operators", "+,-,*,/,sin".split(",")
-                )
+                str2op[op] for op in self.kwargs.get("operators", "+,-,*,/").split(",")
             ],
-            constant_representation=self.kwargs.get(
-                "constant_representation", "ercs"
-            ),
+            constant_representation=self.kwargs.get("constant_representation", "ercs"),
         )
 
         Y = y.reshape(-1, 1) if len(y.shape) == 1 else y
@@ -184,8 +177,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         self.model = str2expr(problem.format_solution(archive.so_solution(0)))
 
         self.front = [
-            str2expr(problem.format_solution(archive[i]))
-            for i in range(archive.size())
+            str2expr(problem.format_solution(archive[i])) for i in range(archive.size())
         ]
 
     def predict(self, X: np.ndarray):
