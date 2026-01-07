@@ -3,8 +3,9 @@ name = "revisiting-linkage"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 dependencies = [
+    "baycomp>=1.0.3",
     "click>=8.1.8",
     "duckdb>=1.3.2",
     "matplotlib>=3.5.3",
@@ -13,6 +14,7 @@ dependencies = [
     "pandas>=1.1.5",
     "pmlb>=1.0.1.post3",
     "pygom",
+    "pystan>=3.4.0",
     "pyyaml>=6.0.1",
     "rliable>=1.2.0",
     "scikit-learn>=1.0.2",

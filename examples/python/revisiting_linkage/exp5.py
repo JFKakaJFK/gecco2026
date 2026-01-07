@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization"
+RESULT_DIR = pathlib.Path("results") / "inherit_continuous_synthetic"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,9 +24,9 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
-    # max_evaluations=int(2e6)
-    # max_evaluations=int(1e7)
-    max_time_seconds=30 * 60
+    # max_evaluations=int(1e6)
+    max_evaluations=int(1e7)
+    # max_time_seconds=30 * 60
 )
 
 
@@ -34,21 +34,21 @@ def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     for problem in [
-        # "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
-        # "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
-        # "sin(3.141 * x0)/(3.141 * x0)",
-        # # "sin(3.141 * x0 + 2.72)",
-        # "sin(1.772 * x0) + sin(2.035 * x2)",
-        # "sin(1.57 * x0 + 1.04 * x1)",
+        "-4.2 * x0 + 1.141 * x1 + 2.72 * x2",
+        "0.1 * x0 + 0.2 * x1 + 2.4 * x2",
+        "sin(3.141 * x0)/(3.141 * x0)",
+        "sin(3.141 * x0 + 2.72)",
+        "sin(1.772 * x0) + sin(2.035 * x2)",
+        "sin(1.57 * x0 + 1.04 * x1)",
         # "1028_SWD",
         # # "1089_USCrime",
         # "210_cloud",
         # "522_pm10",
-        "Airfoil",
-        "Bike Sharing",
-        "Concrete Compressive Strength",
-        "Dow Chemical",
-        "Tower",
+        # "Airfoil",
+        # "Bike Sharing",
+        # "Concrete Compressive Strength",
+        # "Dow Chemical",
+        # "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -109,6 +109,7 @@ def problems(rng):
                                 constant_representation=constant_representation,
                             )
 
+                            # for always_inherit_continuous in [False, True]:
                             for run in range(REPEATS_PER_FOLD):
                                 seed = int(rng.integers(2**32))
                                 yield (
@@ -120,6 +121,7 @@ def problems(rng):
                                         operator_set=operator_set,
                                         linear_scaling=linear_scaling,
                                         constant_representation=constant_representation,
+                                        inherit_continuous=None,
                                     ),
                                     seed,
                                     c.SRProblem(
@@ -136,14 +138,18 @@ def problems(rng):
                                         constant_init_lower_bound=min_y,
                                         constant_init_upper_bound=max_y,
                                         # early termination condition for "perfect" expression recovery
-                                        # target_objectives=[
-                                        #     # R2 >= 0.999 for black-box problems
-                                        #     # and (N)MSE < 1e-8 for synthetic problems
-                                        #     0.0001 if not is_synthetic else 1e-8
-                                        # ],  # if is_synthetic else None,
+                                        target_objectives=[
+                                            #     # R2 >= 0.999 for black-box problems
+                                            #     # and (N)MSE < 1e-8 for synthetic problems
+                                            #     0.0001 if not is_synthetic else 1e-8
+                                            1e-8
+                                        ]
+                                        if is_synthetic
+                                        else None,
                                         gradient_mode="forward",
                                         # gradient_mode="central",
                                         archive_epsilon=0.0,  # if is_synthetic else 1e-6,
+                                        # always_inherit_continuous=always_inherit_continuous,
                                     ),
                                     ctx,
                                 )
@@ -160,10 +166,10 @@ def methods(info, ctx):
     max_num_populations = 25  # int(np.log2(2048 / initial_population_size)) + 1
     restart_stale_populations = True  # restart the last population if it has converged
 
-    # initial_population_size = 1024
-    # max_num_populations = 1
-    # restart_stale_populations = False
-    # restart_stale_populations = True
+    initial_population_size = 1024
+    max_num_populations = 1
+    restart_stale_populations = False
+    restart_stale_populations = True
 
     constant_representation = info["constant_representation"]
     variants = []
@@ -171,22 +177,23 @@ def methods(info, ctx):
         variants += [
             ", ERCs",
             # ", ERCs + Mut",
-            ", ERCs + LM",
-            ", ERCs + LM (mut)",
+            # ", ERCs + LM",
+            # ", ERCs + LM (mut)",
             # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
-            ", $Pool_{10}$ + LM",
-            ", $Pool_{10}$ + RV (1:1)",
-            ", $Pool_{10}$ + RV (1:2)",
+            # ", $Pool_{10}$",
+            # ", $Pool_{10}$ + LM",
+            # ", $Pool_{10}$ + RV (1:1)",
+            # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
             # ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
             # ", $Pool_{10}$ + RV (me,ce)",
             # ", $Pool_{10}$ + RV (iu,me,ce)",
             # ", $Pool_{10}$ + RV (nfi)",
-            ", $Pool_{10}$ + LM (mut)",
+            # ", $Pool_{10}$ + LM (mut)",
         ]
 
     for similarity in [  #
@@ -208,8 +215,10 @@ def methods(info, ctx):
         copt_model_kwargs = dict(
             # treat continuous nodes semantically by binning them into 25 bins
             # as per https://arxiv.org/pdf/1904.02050
-            merge_continuous=True,
-            num_continuous_bins=None,
+            # merge_continuous=True,
+            # num_continuous_bins=None,
+            merge_continuous=False,
+            num_continuous_bins=25,
         )
 
         for copt in variants:
@@ -267,16 +276,15 @@ def methods(info, ctx):
             )
 
             yield (
-                f'"{similarity} {copt}"',
+                f'"{similarity} {copt} FI"',
                 c.MixedGOMEA(
                     discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                     population_options=c.PopulationOptions(
                         target_continuous_to_discrete_balance=0.5
                         if "1:2" in copt
                         else 1.0,
-                        forced_improvements="RV" in copt
-                        and "nfi"
-                        not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        forced_improvements=True,  # "RV" in copt and "nfi" not in copt,
+                        # not used per default as per https://arxiv.org/pdf/1904.02050
                         enable_mixed_forced_improvements=True,
                         **copt_population_kwargs,
                     ),
@@ -342,14 +350,15 @@ def status():
 def main():
     # status()
 
-    # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        max_workers=44,  # server has 44 physical cores
-    )
+    # # TODO add dry run option that only checks how many jobs would be run (per cpu)
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,
+    #     # max_workers=44,  # server has 44 physical cores
+    # )
 
     with load_results(
         LOG_DIR,
@@ -361,17 +370,24 @@ def main():
 
         for split in [  #
             "train",
-            # "test",
+            "test",
         ]:
             plot_convergence_so(
                 PLOT_DIR / f"convergence_{split}",
                 conn,
+                method_query="format('{}{}', method_name, IF(IF(inherit_continuous = 'None', false, inherit_continuous::BOOLEAN), ', IC', '')::STRING)",
                 # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-                y_var=f"1.0 - nmse_{split}",
-                y_agg="MAX",  # higher R^2 is better
-                y_label=f"$R^2$ {split.title()}",
-                ymin="auto",
-                ymax="auto",
+                # y_var=f"1.0 - nmse_{split}",
+                # y_agg="MAX",  # higher R^2 is better
+                # y_label=f"$R^2$ {split.title()}",
+                # ymin="auto",
+                # ymax="auto",
+                y_var=f"nmse_{split}",
+                y_agg="MIN",  # higher R^2 is better
+                y_label=f"$NMSE$ {split.title()}",
+                ymin=1e-9,
+                ymax=1e-6,
+                ylog=True,
                 # merge folds and runs into one seaborn "unit"
                 unit_query="format('{}.{}', fold, run)",
                 # split up the plot into the following rows
@@ -380,6 +396,7 @@ def main():
                     "Template Height",
                     "Operators",
                     "Linear Scaling",
+                    # "Inherit Constants",
                 ],
                 nsamples=100,
             )

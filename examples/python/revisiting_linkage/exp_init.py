@@ -11,22 +11,22 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
 
-REPEATS_PER_DATASET = 30
+REPEATS_PER_DATASET = 5  # 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage"
+RESULT_DIR = pathlib.Path("results") / "init"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
-    # max_evaluations=int(1e4)
+    max_evaluations=int(5e5),
     # max_evaluations=int(2e6)
     # max_evaluations=int(1e7)
-    max_time_seconds=30 * 60
+    # max_time_seconds=30 * 60
 )
 
 
@@ -67,72 +67,102 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [5, 7]:
-                template = c.Template(
-                    [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
-                )
-                for operator_set, operators in [
-                    (
-                        "small",
-                        [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
-                    ),
-                    # (
-                    #     "large",
-                    #     [
-                    #         c.OpAdd(),
-                    #         c.OpSub(),
-                    #         c.OpMul(),
-                    #         c.OpDiv(),
-                    #         c.OpSin(),
-                    #         c.OpCos(),
-                    #         c.OpExp(),
-                    #         c.OpLog(),
-                    #         c.OpSqrt(),
-                    #         c.OpSquare(),
-                    #     ],
-                    # ),
-                ]:
-                    for linear_scaling in [False, True]:
-                        ctx = c.GPContext(
-                            num_inputs=int(X_fold.shape[1]),
-                            expression_template=template,
-                            operators=operators,
-                            constant_representation="ercs",
-                        )
+            for run in range(REPEATS_PER_FOLD):
+                seed = int(rng.integers(2**32))
 
-                        for run in range(REPEATS_PER_FOLD):
-                            seed = int(rng.integers(2**32))
-                            yield (
-                                dict(
-                                    problem_name=problem,
-                                    fold=fold,
-                                    run=run,
-                                    template_height=height,
-                                    operator_set=operator_set,
-                                    linear_scaling=linear_scaling,
-                                ),
-                                seed,
-                                c.SRProblem(
-                                    ctx,
-                                    x_train=c.np.load(str(X_path.absolute())),
-                                    y_train=c.np.load(str(y_path.absolute())),
-                                    x_test=c.np.load(str(X_test_path.absolute())),
-                                    y_test=c.np.load(str(y_test_path.absolute())),
-                                    objectives="nmse",  # = MSE / var(y_train)
-                                    linear_scaling=linear_scaling,
-                                    init=c.HalfHalfInit(p_terminal=0.5, p_constant=0.5),
-                                    constant_init_lower_bound=min_y,
-                                    constant_init_upper_bound=max_y,
-                                    # early termination condition for "perfect" expression recovery
-                                    # target_objectives=[
-                                    #     # R2 >= 0.999 for black-box problems
-                                    #     # and (N)MSE < 1e-8 for synthetic problems
-                                    #     0.0001 if not is_synthetic else 1e-8
-                                    # ],
-                                    archive_epsilon=0.0,
-                                ),
-                                ctx,
+                for height in [  #
+                    5,
+                    7,
+                ]:
+                    template = c.Template(
+                        [
+                            c.TemplateNode.full_nary(
+                                branching_factor=2, depth=height - 1
                             )
+                        ],
+                        [],
+                    )
+                    for init, c_init in [
+                        ("Random", c.RandomDInit()),
+                        ("Grow", c.GrowInit()),
+                        ("Complete", c.CompleteInit()),
+                        ("RC", c.RecursiveCompleteInit()),
+                        ("RC2", c.RecursiveCompleteInit2()),
+                        # ("Full", c.FullInit()),
+                        # (r"$Full_{id}$", c.FullInit()),
+                        # ("HH", c.HalfHalfInit()),
+                        # (
+                        #     r"$HH_{C}$",
+                        #     c.HalfHalfInit(p_terminal=0.5, p_constant=0.5),
+                        # ),
+                        # ("PTC2", c.PTC2Init()),
+                        # (r"$PTC2_{C}$", c.PTC2Init(p_constant=0.5)),
+                    ]:
+                        for operator_set, operators in [
+                            (
+                                "small",
+                                [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()]
+                                + ([c.OpIdentity()] if "id" in init else []),
+                            ),
+                            # (
+                            #     "large",
+                            #     [
+                            #         c.OpAdd(),
+                            #         c.OpSub(),
+                            #         c.OpMul(),
+                            #         c.OpDiv(),
+                            #         c.OpSin(),
+                            #         c.OpCos(),
+                            #         c.OpExp(),
+                            #         c.OpLog(),
+                            #         c.OpSqrt(),
+                            #         c.OpSquare(),
+                            #     ],
+                            # ),
+                        ]:
+                            for linear_scaling in [  #
+                                False,
+                                True,
+                            ]:
+                                ctx = c.GPContext(
+                                    num_inputs=int(X_fold.shape[1]),
+                                    expression_template=template,
+                                    operators=operators,
+                                    constant_representation="ercs",
+                                )
+
+                                yield (
+                                    dict(
+                                        problem_name=problem,
+                                        fold=fold,
+                                        run=run,
+                                        template_height=height,
+                                        operator_set=operator_set,
+                                        linear_scaling=linear_scaling,
+                                        init=init,
+                                    ),
+                                    seed,
+                                    c.SRProblem(
+                                        ctx,
+                                        x_train=c.np.load(str(X_path.absolute())),
+                                        y_train=c.np.load(str(y_path.absolute())),
+                                        x_test=c.np.load(str(X_test_path.absolute())),
+                                        y_test=c.np.load(str(y_test_path.absolute())),
+                                        objectives="nmse",  # = MSE / var(y_train)
+                                        linear_scaling=linear_scaling,
+                                        init=c_init,
+                                        constant_init_lower_bound=min_y,
+                                        constant_init_upper_bound=max_y,
+                                        # early termination condition for "perfect" expression recovery
+                                        # target_objectives=[
+                                        #     # R2 >= 0.999 for black-box problems
+                                        #     # and (N)MSE < 1e-8 for synthetic problems
+                                        #     0.0001 if not is_synthetic else 1e-8
+                                        # ],
+                                        archive_epsilon=0.0,
+                                    ),
+                                    ctx,
+                                )
 
 
 def methods(info, ctx):
@@ -146,15 +176,15 @@ def methods(info, ctx):
     restart_stale_populations = True  # restart the last population if it has converged
 
     for similarity in [  #
-        "$MI$",  # plain MI
-        "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        r"$MI_{mask\ inactive}$",  # Mask inactive
+        # "$MI$",  # plain MI
+        # "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
+        # r"$MI_{mask\ inactive}$",  # Mask inactive
         "Node",  # Normalized pairwise node proximity
-        "Node (static)",  # same, but first LT is kept throughout
-        r"Node * $MI_{mask\ inactive}$",
-        r"Node * $NMI_{mask\ inactive}$",
+        # "Node (static)",  # same, but first LT is kept throughout
+        # r"Node * $MI_{mask\ inactive}$",
+        # r"Node * $NMI_{mask\ inactive}$",
         # r"max(Node, $MI_{mask\ inactive}$)",
-        "Random",  # Random similiarty
+        # "Random",  # Random similiarty
         # r"Node * $NMI_{mask\ inactive}$",
     ]:
         discrete_model_kwargs = dict(
@@ -257,13 +287,13 @@ def main():
     # exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     clean=True,
-    #     # limit=1,
-    #     max_workers=44,  # server has 44 physical cores
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        # clean=True,
+        # limit=1,
+        # max_workers=1,  # 44,  # server has 44 physical cores
+    )
 
     with load_results(
         LOG_DIR,
@@ -280,8 +310,9 @@ def main():
             plot_convergence_so(
                 PLOT_DIR / f"convergence_{split}",
                 conn,
+                method_query="format('{} {}', method_name, init)",
                 # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-                y_var=f"1.0 - nmse_{split}",
+                y_var=f"1.0::DOUBLE - nmse_{split}::DOUBLE",
                 y_agg="MAX",  # higher R^2 is better
                 y_label=f"$R^2$ {split.title()}",
                 ymin="auto",

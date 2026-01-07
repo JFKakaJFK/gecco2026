@@ -112,21 +112,25 @@ def load_results(
 
 
 def rliable_score_dict(
-    conn: duckdb.DuckDBPyConnection, run_expr: str, normalized_value_expr: str
+    conn: duckdb.DuckDBPyConnection,
+    run_expr: str,
+    normalized_value_expr: str,
+    problem_query: str = "problem_name",
+    method_query: str = "method_name",
 ) -> tuple[dict, list[str]]:
     """Score matrices for each method, each of which is of size `(num_runs (runs + folds) x num_problems)` and the corresponding problem names"""
     normalized_score_dict = dict()
     problems = None
 
     for method, *_ in conn.sql(
-        "SELECT DISTINCT(method_name) AS method FROM results"
+        f"SELECT DISTINCT({method_query}) AS method FROM results"
     ).fetchall():
         # get final results for each run and problem
         df = (
             conn.execute(
                 f"""
-            SELECT {run_expr} AS run, problem_name AS problem, {normalized_value_expr} AS value FROM results
-            WHERE status != 'Running' AND method_name = $1
+            SELECT {run_expr} AS run, {problem_query} AS problem, {normalized_value_expr} AS value FROM results
+            WHERE status != 'Running' AND status != 'Aborted' AND {method_query} = $1
         """,
                 [method],
             )

@@ -489,6 +489,7 @@ struct RvOptions {
   // Otherwise the first `floor(selection_percentile * 0.5)` active solutions are used.
   bool randomize_ams_indices = false;
   bool enable_partial_ams = true;
+  bool enable_full_ams = true;
   CType delta_ams = 2.0;
   CType eta_ams = 1.0;
 
@@ -656,7 +657,9 @@ class RvState {
                               subset_orders, subset_idx++, ams_indices);
     }
 
-    evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, ams_indices);
+    if (options.enable_full_ams) {
+      evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, ams_indices);
+    }
 
     // solution NIS update
     std::vector<bool> any_improved(num_clusters, false);
@@ -1055,7 +1058,7 @@ class RvState {
                  SolutionSetBase& parents,
                  const std::vector<usize>& solution_clusters,
                  const std::vector<std::set<usize>>& ams_indices) {
-    if ((generation == 0 && !options.init_ams_from_population_mean)) {
+    if (!options.enable_full_ams || (generation == 0 && !options.init_ams_from_population_mean)) {
       return 0;
     }
 

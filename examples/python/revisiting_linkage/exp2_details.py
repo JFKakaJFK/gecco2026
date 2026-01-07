@@ -28,16 +28,15 @@ LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
 
-BUDGET = c.Budget(
-    max_generations=21
-    # max_evaluations=int(5e5)
-    # max_evaluations=int(1e6)
-    # max_evaluations=int(1e7)
-)
+SEED = 42
+
+BUDGET = c.Budget(max_generations=21)
 
 
 def problems(rng):
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    seeds = [int(rng.integers(2**32)) for _ in range(REPEATS_PER_FOLD)]
 
     for problem in [  #
         "Airfoil",
@@ -89,8 +88,7 @@ def problems(rng):
                             constant_representation="ercs",
                         )
 
-                        for run in range(REPEATS_PER_FOLD):
-                            seed = int(rng.integers(2**32))
+                        for run, seed in enumerate(seeds):
                             yield (
                                 dict(
                                     problem_name=problem,
@@ -109,15 +107,9 @@ def problems(rng):
                                     y_test=c.np.load(str(y_test_path.absolute())),
                                     objectives="nmse",  # = MSE / var(y_train)
                                     linear_scaling=linear_scaling,
-                                    init=c.HalfHalfInit(p_terminal=0.5, p_constant=0.5),
+                                    init=c.HalfHalfInit(),
                                     constant_init_lower_bound=min_y,
                                     constant_init_upper_bound=max_y,
-                                    # early termination condition for "perfect" expression recovery
-                                    # target_objectives=[
-                                    #     # R2 >= 0.999 for black-box problems
-                                    #     # and (N)MSE < 1e-8 for synthetic problems
-                                    #     0.0001 if not is_synthetic else 1e-8
-                                    # ],
                                 ),
                                 ctx,
                             )
@@ -197,7 +189,7 @@ def methods(info, ctx):
 
 
 def all_tasks():
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(seed=SEED)
     for info, seed, instance, ctx in problems(rng):
         # for the same run, all methods get the same seed...
         for method_name, method in methods(info, ctx):
@@ -262,10 +254,10 @@ def analyze_subset_stats(conn, odir):
 
         cmap = "Blues"  # "plasma"  # sns.diverging_palette(230, 20, as_cmap=True)
 
-        vmax = 2  # 2  # 0  # 1
+        vmax = 1.5  # 2  # 2  # 0  # 1
         cmap = plt.get_cmap(cmap)
         norm = Normalize(0, vmax)
-        norm = AsinhNorm(vmin=0, vmax=vmax, linear_width=1)
+        # norm = AsinhNorm(vmin=0, vmax=vmax, linear_width=1)
         cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
 
         cbar_ax = axes.ravel().tolist()
@@ -383,19 +375,19 @@ def analyze_subset_stats(conn, odir):
 
 def main():
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        # clean=True,
-        # limit=1,
-        # max_workers=1,
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,
+    # )
 
     with load_results(
         LOG_DIR,
         file_pattern="stats",
         # enable pre-processing the .csv logs into .parquet files
-        preprocess=True,
+        # preprocess=True,
         parquet_dir=PARQUET_DIR / "stats",
     ) as conn:
         load_results(

@@ -60,9 +60,9 @@ class SRProblem : public GPInstanceBase {
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
             std::optional<std::vector<CType>> target_objectives = std::nullopt,
-            std::string gradient_mode = "central",
+            std::string gradient_mode = "forward",
             CType gradient_epsilon = 1e-5,
-            CType archive_epsilon = 1e-6,
+            CType archive_epsilon = 0.0,
             std::optional<bool> always_inherit_continuous = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),

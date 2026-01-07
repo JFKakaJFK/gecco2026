@@ -1390,6 +1390,13 @@ class MixedGOMEA : public MethodBase {
     return std::visit([](const auto& r) { return r.current_generation(); }, ims_runner.value());
   };
 
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    if (!ims_runner.has_value()) {
+      return std::nullopt;
+    }
+    return std::visit([](const auto& r) { return r.current_population(); }, ims_runner.value());
+  };
+
  private:
   template <typename SolutionSet>
   Population<SolutionSet> create_population(InstanceBase& problem,

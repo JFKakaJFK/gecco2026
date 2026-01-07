@@ -11,12 +11,12 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
 
-REPEATS_PER_DATASET = 30
+REPEATS_PER_DATASET = 15  # 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization"
+RESULT_DIR = pathlib.Path("results") / "constant_optimization_long"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -26,7 +26,8 @@ BUDGET = c.Budget(
     # max_generations=300,
     # max_evaluations=int(2e6)
     # max_evaluations=int(1e7)
-    max_time_seconds=30 * 60
+    max_time_seconds=60 * 60
+    # max_time_seconds=2 * 60 * 60
 )
 
 
@@ -45,10 +46,10 @@ def problems(rng):
         # "210_cloud",
         # "522_pm10",
         "Airfoil",
-        "Bike Sharing",
-        "Concrete Compressive Strength",
-        "Dow Chemical",
-        "Tower",
+        # "Bike Sharing",
+        # "Concrete Compressive Strength",
+        # "Dow Chemical",
+        # "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -75,7 +76,10 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [5, 7]:
+            for height in [
+                # 5,
+                7
+            ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
                 )
@@ -100,7 +104,9 @@ def problems(rng):
                     #     ],
                     # ),
                 ]:
-                    for linear_scaling in [False, True]:
+                    for linear_scaling in [
+                        False,  # True
+                    ]:
                         for constant_representation in ["ercs", "pool"]:
                             ctx = c.GPContext(
                                 num_inputs=int(X_fold.shape[1]),
@@ -169,24 +175,24 @@ def methods(info, ctx):
     variants = []
     if constant_representation == "ercs":
         variants += [
-            ", ERCs",
+            # ", ERCs",
             # ", ERCs + Mut",
             ", ERCs + LM",
-            ", ERCs + LM (mut)",
+            # ", ERCs + LM (mut)",
             # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
-            ", $Pool_{10}$ + LM",
-            ", $Pool_{10}$ + RV (1:1)",
-            ", $Pool_{10}$ + RV (1:2)",
+            # ", $Pool_{10}$ + LM",
+            # ", $Pool_{10}$ + RV (1:1)",
+            # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
             # ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
             # ", $Pool_{10}$ + RV (me,ce)",
             # ", $Pool_{10}$ + RV (iu,me,ce)",
             # ", $Pool_{10}$ + RV (nfi)",
-            ", $Pool_{10}$ + LM (mut)",
+            # ", $Pool_{10}$ + LM (mut)",
         ]
 
     for similarity in [  #
@@ -228,13 +234,14 @@ def methods(info, ctx):
             # evolutionary constant optimization as per https://ir.cwi.nl/pub/34425/paper_115.pdf
             rv_options = dict(
                 enabled="RV" in copt,
-                max_nis=25,  # + nc
+                max_nis=20,
                 intron_aware="RVIA" in copt,  # TODO!!!
                 intron_aware_intermediate_updates="RV" in copt and "iu" in copt,
                 intron_aware_mean_estimation="RV" in copt and "me" in copt,
                 intron_aware_cov_estimation="RV" in copt and "ce" in copt,
                 intron_aware_ams="RV" in copt and "ai" in copt,
                 enable_partial_ams=False,  # full FOS does not need partial AMS...
+                # enable_full_ams=False,
                 init_ams_from_population_mean=False,
                 generations_until_full_evaluation=None,
             )
@@ -282,7 +289,11 @@ def methods(info, ctx):
                     ),
                     rv_options=c.RvOptions(**rv_options),
                     continuous_model=c.FullFOS(),
-                    sampling_model=c.AMaLGaMSamplingModel(),
+                    sampling_model=c.AMaLGaMSamplingModel(
+                        # setting these multipliers to 1 disables the AVS/SDR mechanisms
+                        # distribution_multiplier_decrease=1.0,
+                        # distribution_multiplier_increase=1.0,
+                    ),
                     # IMS options
                     ims_options=c.IMSOptions(
                         initial_population_size=initial_population_size,
@@ -341,15 +352,16 @@ def status():
 
 def main():
     # status()
+    # exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        max_workers=44,  # server has 44 physical cores
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=44,  # server has 44 physical cores
+    # )
 
     with load_results(
         LOG_DIR,

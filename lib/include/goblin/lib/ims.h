@@ -77,7 +77,9 @@ class IMS final : public MethodBase {
 
     std::vector<P> populations;
     populations.reserve(opts.max_num_populations);
-    std::vector<usize> generations;
+    sizes.clear();
+    sizes.reserve(opts.max_num_populations);
+    generations.clear();
     generations.reserve(opts.max_num_populations);
     std::vector<bool> running;
     running.reserve(opts.max_num_populations);
@@ -120,43 +122,45 @@ class IMS final : public MethodBase {
     };
 
     Vec<CType> avg_dist_to_so_elite(opts.max_num_populations);
-    usize i = 0;
+    p_idx = 0;
     while (!should_terminate(/* additional_evaluations = */ 0, /* check_external_criterion = */ true) &&
            (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
       // init/restart population if necessary
-      if (i >= populations.size()) {
-        populations.push_back(create_population(problem, *archive, opts.initial_population_size * std::pow(2, i),
-                                                opts.initial_num_clusters + i * opts.additional_clusters_per_start));
+      if (p_idx >= populations.size()) {
+        usize size = opts.initial_population_size * std::pow(2, p_idx);
+        sizes.push_back(size);
+        populations.push_back(create_population(
+            problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
         generations.push_back(0);
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
-      } else if (!running[i] && opts.restart_stale_populations &&
-                 (i == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
-        populations[i].restart();
-        generations[i] = 0;
-        generations_since_last_improvement[i] = 0;
-        running[i] = true;
+      } else if (!running[p_idx] && opts.restart_stale_populations &&
+                 (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
+        populations[p_idx].restart();
+        generations[p_idx] = 0;
+        generations_since_last_improvement[p_idx] = 0;
+        running[p_idx] = true;
       }
 
       // do a step, optionally terminate this or smaller ones
-      generations[i]++;  // this needs to always be increased, no matter if we do
-                         // a step or not
-      if (running[i]) {
+      generations[p_idx]++;  // this needs to always be increased, no matter if we do
+                             // a step or not
+      if (running[p_idx]) {
         archive->reset_change_count();
-        evaluations += populations[i].perform_generation(rng, should_terminate);
+        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
 
         if (archive->change_count() > 0) {
-          generations_since_last_improvement[i] = 0;
+          generations_since_last_improvement[p_idx] = 0;
         } else {
-          generations_since_last_improvement[i]++;
+          generations_since_last_improvement[p_idx]++;
         }
 
         archive->adapt();
 
         if (!is_multi_objective || opts.stop_covered_populations) {
-          for (usize j = 0; j < i; j++) {
-            if (populations[i].archive().covers(populations[j].archive())) {
+          for (usize j = 0; j < p_idx; j++) {
+            if (populations[p_idx].archive().covers(populations[j].archive())) {
               running[j] = false;
             }
           }
@@ -164,23 +168,23 @@ class IMS final : public MethodBase {
         if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
           // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
           // population is better condition
-          avg_dist_to_so_elite(i) = populations[i].avg_dist_to_global_so_elite();
-          for (usize j = 0; j < i; j++) {
-            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(i)) {
+          avg_dist_to_so_elite(p_idx) = populations[p_idx].avg_dist_to_global_so_elite();
+          for (usize j = 0; j < p_idx; j++) {
+            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(p_idx)) {
               running[j] = false;
             }
           }
         }
-        if (populations[i].converged() ||
+        if (populations[p_idx].converged() ||
             (opts.restart_stale_populations &&
-             generations_since_last_improvement[i] >
+             generations_since_last_improvement[p_idx] >
                  opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-          running[i] = false;
+          running[p_idx] = false;
         }
       }
 
       // go to the next population to do a step with
-      i = generations[i] % opts.subgeneration_factor == 0 ? (i + 1) % opts.max_num_populations : 0;
+      p_idx = generations[p_idx] % opts.subgeneration_factor == 0 ? (p_idx + 1) % opts.max_num_populations : 0;
     }
 
     // std::println(
@@ -189,8 +193,8 @@ class IMS final : public MethodBase {
     //     opts.restart_stale_populations, any_running(), total_generations,
     //     populations.size(), opts.max_num_populations);
 
-    // for (usize i = 0; i < archive->size(); i++) {
-    //   std::println("{}", problem.format_solution((*archive)[i]));
+    // for (usize p_idx = 0; p_idx < archive->size(); p_idx++) {
+    //   std::println("{}", problem.format_solution((*archive)[p_idx]));
     // }
 
     return std::make_tuple(archive, should_terminate().value_or(TerminationStatus::Converged));
@@ -198,12 +202,20 @@ class IMS final : public MethodBase {
 
   std::optional<u64> current_generation() const override final { return total_generations; };
 
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    return std::make_tuple(sizes[p_idx], generations[p_idx]);
+  };
+
  private:
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -
   // generation reporting needs to be accessible (via an IMS instance)
   u64 total_generations;
+
+  usize p_idx;
+  std::vector<usize> sizes;
+  std::vector<u64> generations;
 };
 
 };  // namespace goblin

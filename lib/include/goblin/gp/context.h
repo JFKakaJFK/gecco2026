@@ -53,7 +53,7 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            usize max_expression_size = 50)
+            std::optional<usize> max_expression_size = std::nullopt)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -65,7 +65,7 @@ class GPContext {
         num_discrete(expression_template.size()),
         num_continuous(const_repr == ConstantRepr::Pool ? constant_pool_size
                                                         : (const_repr == ConstantRepr::None ? 0 : num_discrete)),
-        max_expression_size(max_expression_size),
+        max_expression_size(max_expression_size.value_or(num_discrete)),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         enable_subfunctions(enable_subfunctions),
@@ -194,9 +194,9 @@ class GPContext {
           children[idx].push_back(c_idx);
           child_stack.emplace_back(&c, c_idx);
         }
-        while(!child_stack.empty()){
-            node_stack.push_back(child_stack.back());
-            child_stack.pop_back();
+        while (!child_stack.empty()) {
+          node_stack.push_back(child_stack.back());
+          child_stack.pop_back();
         }
 
         // domain <-> value mapping

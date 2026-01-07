@@ -31,7 +31,7 @@ def run_one(
     #         if completed:
     #             return
 
-    # print(task_path)
+    # print("STARTING", task_path)
 
     try:
         Tracked.run(

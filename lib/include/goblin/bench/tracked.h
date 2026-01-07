@@ -525,6 +525,8 @@ class Tracked final : public InstanceBase {
             "total_time_seconds,"
             "alg_time_seconds,"
             "eval_time_seconds,"
+            "current_population_size,"
+            "current_population_generation,"
             << config.log_info_headers
             << debug_headers <<
             "seed,"
@@ -539,13 +541,20 @@ class Tracked final : public InstanceBase {
       }
     }
 
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "";
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    auto pop_info = method.current_population();
+    if (pop_info.has_value()) {
+      auto [p_size, p_gen] = pop_info.value();
+      pop_size = std::to_string(p_size);
+      pop_gen = std::to_string(p_gen);
+    }
     Seconds alg_time = alg_timer.elapsed();
     Seconds eval_time = eval_timer.elapsed();
     Seconds total_time = alg_time + eval_time;
 
-    auto common = std::format("{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                              alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
+    auto common =
+        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
+                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
       SolutionBase* s;

@@ -187,11 +187,13 @@ class SolutionBase {
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
 
-    assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-           "All discrete indices must be valid continuous indices if the continuous "
-           "values should be inherited with the discrete ones.");
+    // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+    //        "All discrete indices must be valid continuous indices if the continuous "
+    //        "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
+      bool inherit_continuous = !is_continuous && always_inherit_continuous;
+      bool inherit_by_index = num_continuous() >= num_discrete();
       for (usize di, i = 0; i < subset.discrete.size(); i++) {
         di = subset.discrete[i];
         if (discrete_values()(di) != donor.discrete_values()(di)) {
@@ -201,11 +203,23 @@ class SolutionBase {
         }
 
         // yes, the indices here should be from the discrete subset!
-        if (!is_continuous && always_inherit_continuous) {
+        if (inherit_continuous && inherit_by_index) {
           if (continuous_values()(di) != donor.continuous_values()(di)) {
             any_active_changed |= continuous_active()(di);
             anything_changed = true;
             continuous_values()(di) = donor.continuous_values()(di);
+          }
+        }
+      }
+
+      if (inherit_continuous && !inherit_by_index) {
+        for (usize i = 0; i < num_continuous(); i++) {
+          // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+          // useful...
+          if (continuous_values()(i) != donor.continuous_values()(i)) {
+            any_active_changed |= continuous_active()(i);
+            anything_changed = true;
+            continuous_values()(i) = donor.continuous_values()(i);
           }
         }
       }
@@ -222,41 +236,36 @@ class SolutionBase {
         }
       }
     }
-    // else if (always_inherit_continuous) {
-    //   // yes, the indices here should be from the discrete subset!
-    //   // TODO do I need to mark anything as active here? - i.e. if the constant is active and this leads to a change,
-    //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
-    // }
 
     return std::make_tuple(any_active_changed, anything_changed);
   };
 
-  virtual void reject(const SolutionBase& backup,
-                      bool always_inherit_continuous,
-                      std::optional<std::reference_wrapper<const Subset>> subset = std::nullopt) {
-    quality() = backup.quality();
+  // virtual void reject(const SolutionBase& backup,
+  //                     bool always_inherit_continuous,
+  //                     std::optional<std::reference_wrapper<const Subset>> subset = std::nullopt) {
+  //   quality() = backup.quality();
 
-    if (subset.has_value()) {
-      auto& s = subset.value().get();
-      if (!s.discrete.empty()) {
-        discrete_values()(s.discrete) = backup.discrete_values()(s.discrete);
-        if (always_inherit_continuous) {
-          continuous_values()(s.discrete) = backup.continuous_values()(s.discrete);
-        }
-      }
-      if (!s.continuous.empty()) {
-        continuous_values()(s.continuous) = backup.continuous_values()(s.continuous);
-      }
-    } else {
-      discrete_values() = backup.discrete_values();
-      continuous_values() = backup.continuous_values();
-    }
+  //   if (subset.has_value()) {
+  //     auto& s = subset.value().get();
+  //     if (!s.discrete.empty()) {
+  //       discrete_values()(s.discrete) = backup.discrete_values()(s.discrete);
+  //       if (always_inherit_continuous) {
+  //         continuous_values()(s.discrete) = backup.continuous_values()(s.discrete);
+  //       }
+  //     }
+  //     if (!s.continuous.empty()) {
+  //       continuous_values()(s.continuous) = backup.continuous_values()(s.continuous);
+  //     }
+  //   } else {
+  //     discrete_values() = backup.discrete_values();
+  //     continuous_values() = backup.continuous_values();
+  //   }
 
-    // The active variables always have to be restored in full,
-    // since variables outside the subset can become active...
-    discrete_active() = backup.discrete_active();
-    continuous_active() = backup.continuous_active();
-  };
+  //   // The active variables always have to be restored in full,
+  //   // since variables outside the subset can become active...
+  //   discrete_active() = backup.discrete_active();
+  //   continuous_active() = backup.continuous_active();
+  // };
 
   virtual ~SolutionBase() {};
 };

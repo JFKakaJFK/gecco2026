@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -556,11 +555,13 @@ class SolutionBase {
     bool is_continuous = subset.continuous.size() > 0;
     bool is_discrete = subset.discrete.size() > 0;
 
-    assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-           "All discrete indices must be valid continuous indices if the continuous "
-           "values should be inherited with the discrete ones.");
+    // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+    //        "All discrete indices must be valid continuous indices if the continuous "
+    //        "values should be inherited with the discrete ones.");
 
     if (is_discrete) {
+      bool inherit_continuous = !is_continuous && always_inherit_continuous;
+      bool inherit_by_index = num_continuous() >= num_discrete();
       for (usize di, i = 0; i < subset.discrete.size(); i++) {
         di = subset.discrete[i];
         if (discrete_values()(di) != donor.discrete_values()(di)) {
@@ -570,11 +571,23 @@ class SolutionBase {
         }
 
         // yes, the indices here should be from the discrete subset!
-        if (!is_continuous && always_inherit_continuous) {
+        if (inherit_continuous && inherit_by_index) {
           if (continuous_values()(di) != donor.continuous_values()(di)) {
             any_active_changed |= continuous_active()(di);
             anything_changed = true;
             continuous_values()(di) = donor.continuous_values()(di);
+          }
+        }
+      }
+
+      if (inherit_continuous && !inherit_by_index) {
+        for (usize i = 0; i < num_continuous(); i++) {
+          // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+          // useful...
+          if (continuous_values()(i) != donor.continuous_values()(i)) {
+            any_active_changed |= continuous_active()(i);
+            anything_changed = true;
+            continuous_values()(i) = donor.continuous_values()(i);
           }
         }
       }
@@ -591,41 +604,36 @@ class SolutionBase {
         }
       }
     }
-    // else if (always_inherit_continuous) {
-    //   // yes, the indices here should be from the discrete subset!
-    //   // TODO do I need to mark anything as active here? - i.e. if the constant is active and this leads to a change,
-    //   then an eval is needed... continuous_values()(subset.discrete) = donor.continuous_values()(subset.discrete);
-    // }
 
     return std::make_tuple(any_active_changed, anything_changed);
   };
 
-  virtual void reject(const SolutionBase& backup,
-                      bool always_inherit_continuous,
-                      std::optional<std::reference_wrapper<const Subset>> subset = std::nullopt) {
-    quality() = backup.quality();
+  // virtual void reject(const SolutionBase& backup,
+  //                     bool always_inherit_continuous,
+  //                     std::optional<std::reference_wrapper<const Subset>> subset = std::nullopt) {
+  //   quality() = backup.quality();
 
-    if (subset.has_value()) {
-      auto& s = subset.value().get();
-      if (!s.discrete.empty()) {
-        discrete_values()(s.discrete) = backup.discrete_values()(s.discrete);
-        if (always_inherit_continuous) {
-          continuous_values()(s.discrete) = backup.continuous_values()(s.discrete);
-        }
-      }
-      if (!s.continuous.empty()) {
-        continuous_values()(s.continuous) = backup.continuous_values()(s.continuous);
-      }
-    } else {
-      discrete_values() = backup.discrete_values();
-      continuous_values() = backup.continuous_values();
-    }
+  //   if (subset.has_value()) {
+  //     auto& s = subset.value().get();
+  //     if (!s.discrete.empty()) {
+  //       discrete_values()(s.discrete) = backup.discrete_values()(s.discrete);
+  //       if (always_inherit_continuous) {
+  //         continuous_values()(s.discrete) = backup.continuous_values()(s.discrete);
+  //       }
+  //     }
+  //     if (!s.continuous.empty()) {
+  //       continuous_values()(s.continuous) = backup.continuous_values()(s.continuous);
+  //     }
+  //   } else {
+  //     discrete_values() = backup.discrete_values();
+  //     continuous_values() = backup.continuous_values();
+  //   }
 
-    // The active variables always have to be restored in full,
-    // since variables outside the subset can become active...
-    discrete_active() = backup.discrete_active();
-    continuous_active() = backup.continuous_active();
-  };
+  //   // The active variables always have to be restored in full,
+  //   // since variables outside the subset can become active...
+  //   discrete_active() = backup.discrete_active();
+  //   continuous_active() = backup.continuous_active();
+  // };
 
   virtual ~SolutionBase() {};
 };
@@ -3224,6 +3232,9 @@ class MethodBase {
   /// hook for tracking the progress over generations
   virtual std::optional<u64> current_generation() const { return std::nullopt; };
 
+  /// Size and generations of the currently active population if available for multi-start schemes
+  virtual std::optional<std::tuple<usize, u64>> current_population() const { return std::nullopt; };
+
   virtual ~MethodBase() {};
 };
 };  // namespace goblin
@@ -3298,7 +3309,9 @@ class IMS final : public MethodBase {
 
     std::vector<P> populations;
     populations.reserve(opts.max_num_populations);
-    std::vector<usize> generations;
+    sizes.clear();
+    sizes.reserve(opts.max_num_populations);
+    generations.clear();
     generations.reserve(opts.max_num_populations);
     std::vector<bool> running;
     running.reserve(opts.max_num_populations);
@@ -3341,43 +3354,46 @@ class IMS final : public MethodBase {
     };
 
     Vec<CType> avg_dist_to_so_elite(opts.max_num_populations);
-    usize i = 0;
+    p_idx = 0;
     while (!should_terminate(/* additional_evaluations = */ 0, /* check_external_criterion = */ true) &&
            (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
       // init/restart population if necessary
-      if (i >= populations.size()) {
-        populations.push_back(create_population(problem, *archive, opts.initial_population_size * std::pow(2, i),
-                                                opts.initial_num_clusters + i * opts.additional_clusters_per_start));
+      if (p_idx >= populations.size()) {
+          usize size = opts.initial_population_size * std::pow(2, p_idx);
+          sizes.push_back(size);
+        populations.push_back(
+            create_population(problem, *archive, size,
+                              opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
         generations.push_back(0);
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
-      } else if (!running[i] && opts.restart_stale_populations &&
-                 (i == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
-        populations[i].restart();
-        generations[i] = 0;
-        generations_since_last_improvement[i] = 0;
-        running[i] = true;
+      } else if (!running[p_idx] && opts.restart_stale_populations &&
+                 (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
+        populations[p_idx].restart();
+        generations[p_idx] = 0;
+        generations_since_last_improvement[p_idx] = 0;
+        running[p_idx] = true;
       }
 
       // do a step, optionally terminate this or smaller ones
-      generations[i]++;  // this needs to always be increased, no matter if we do
-                         // a step or not
-      if (running[i]) {
+      generations[p_idx]++;  // this needs to always be increased, no matter if we do
+                             // a step or not
+      if (running[p_idx]) {
         archive->reset_change_count();
-        evaluations += populations[i].perform_generation(rng, should_terminate);
+        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
 
         if (archive->change_count() > 0) {
-          generations_since_last_improvement[i] = 0;
+          generations_since_last_improvement[p_idx] = 0;
         } else {
-          generations_since_last_improvement[i]++;
+          generations_since_last_improvement[p_idx]++;
         }
 
         archive->adapt();
 
         if (!is_multi_objective || opts.stop_covered_populations) {
-          for (usize j = 0; j < i; j++) {
-            if (populations[i].archive().covers(populations[j].archive())) {
+          for (usize j = 0; j < p_idx; j++) {
+            if (populations[p_idx].archive().covers(populations[j].archive())) {
               running[j] = false;
             }
           }
@@ -3385,23 +3401,23 @@ class IMS final : public MethodBase {
         if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
           // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
           // population is better condition
-          avg_dist_to_so_elite(i) = populations[i].avg_dist_to_global_so_elite();
-          for (usize j = 0; j < i; j++) {
-            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(i)) {
+          avg_dist_to_so_elite(p_idx) = populations[p_idx].avg_dist_to_global_so_elite();
+          for (usize j = 0; j < p_idx; j++) {
+            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(p_idx)) {
               running[j] = false;
             }
           }
         }
-        if (populations[i].converged() ||
+        if (populations[p_idx].converged() ||
             (opts.restart_stale_populations &&
-             generations_since_last_improvement[i] >
+             generations_since_last_improvement[p_idx] >
                  opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-          running[i] = false;
+          running[p_idx] = false;
         }
       }
 
       // go to the next population to do a step with
-      i = generations[i] % opts.subgeneration_factor == 0 ? (i + 1) % opts.max_num_populations : 0;
+      p_idx = generations[p_idx] % opts.subgeneration_factor == 0 ? (p_idx + 1) % opts.max_num_populations : 0;
     }
 
     // std::println(
@@ -3410,8 +3426,8 @@ class IMS final : public MethodBase {
     //     opts.restart_stale_populations, any_running(), total_generations,
     //     populations.size(), opts.max_num_populations);
 
-    // for (usize i = 0; i < archive->size(); i++) {
-    //   std::println("{}", problem.format_solution((*archive)[i]));
+    // for (usize p_idx = 0; p_idx < archive->size(); p_idx++) {
+    //   std::println("{}", problem.format_solution((*archive)[p_idx]));
     // }
 
     return std::make_tuple(archive, should_terminate().value_or(TerminationStatus::Converged));
@@ -3419,12 +3435,20 @@ class IMS final : public MethodBase {
 
   std::optional<u64> current_generation() const override final { return total_generations; };
 
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    return std::make_tuple(sizes[p_idx], generations[p_idx]);
+  };
+
  private:
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -
   // generation reporting needs to be accessible (via an IMS instance)
   u64 total_generations;
+
+  usize p_idx;
+  std::vector<usize> sizes;
+  std::vector<u64> generations;
 };
 
 };  // namespace goblin
@@ -3827,6 +3851,30 @@ class OperatorBase {
   virtual std::string format(const std::span<const std::string>& args) const = 0;
 
   virtual ~OperatorBase() = default;
+};
+
+class OpIdentity : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 1; };
+  usize max_arity() const override final { return 1; };
+
+  bool is_commutative() const override final { return false; };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0); };
+
+  bool has_gradient() const override final { return true; };
+  void apply_grad(Ref<Array<CType>> out,
+                  Ref<Array<CType>> d_out,
+                  CRef<Arr2D<CType>> args,
+                  CRef<Arr2D<CType>> d_args) const override final {
+    apply(out, args);
+
+    d_out = d_args.col(0);
+  };
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    return args[0];
+  };
 };
 
 class OpAdd : public OperatorBase {
@@ -4305,7 +4353,7 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            usize max_expression_size = 50)
+            std::optional<usize> max_expression_size = std::nullopt)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -4317,7 +4365,7 @@ class GPContext {
         num_discrete(expression_template.size()),
         num_continuous(const_repr == ConstantRepr::Pool ? constant_pool_size
                                                         : (const_repr == ConstantRepr::None ? 0 : num_discrete)),
-        max_expression_size(max_expression_size),
+        max_expression_size(max_expression_size.value_or(num_discrete)),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         enable_subfunctions(enable_subfunctions),
@@ -4437,6 +4485,7 @@ class GPContext {
           }
         }
 
+        // since node_stack reverses the order, the children are pushed in reverse to match the breadth-first order
         std::vector<std::tuple<const TemplateNode*, usize>> child_stack;
         child_stack.reserve(nptr->children.size());
         for (const auto& c : nptr->children) {
@@ -4445,9 +4494,9 @@ class GPContext {
           children[idx].push_back(c_idx);
           child_stack.emplace_back(&c, c_idx);
         }
-        while(!child_stack.empty()){
-            node_stack.push_back(child_stack.back());
-            child_stack.pop_back();
+        while (!child_stack.empty()) {
+          node_stack.push_back(child_stack.back());
+          child_stack.pop_back();
         }
 
         // domain <-> value mapping
@@ -5079,7 +5128,6 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/init.h included by goblin.h                                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "context.h"
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
 
@@ -5263,6 +5311,140 @@ class HalfHalfInit final : public DiscreteInitBase {
   FullInit full{};
 };
 
+
+/// PTC2 as per https://cs.gmu.edu/~sean/papers/treecreation.pdf
+class PTC2Init final : public DiscreteInitBase {
+ public:
+  PTC2Init(std::optional<double> p_constant = std::nullopt)
+      : p_constant(p_constant) {};
+
+  Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
+    try {
+      const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
+
+      Mat<DType> dvals(count, problem.num_discrete());
+
+      std::vector<std::vector<usize>> non_terminals(dvals.cols());  // functions/subfunctions
+      std::vector<std::vector<usize>> const_terminals(dvals.cols());      // numeric constant symbols
+      std::vector<std::vector<usize>> non_const_terminals(dvals.cols());  // features/args/params
+
+      for(usize i = 0; i < problem.num_discrete(); i++){
+          usize domain_size = problem.discrete_domain_sizes()(i);
+          for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
+            DType value = ctx.domain2value(i, domain_value);
+            if (ctx.value_min_arity[value] > 0) {
+                non_terminals[i].push_back(domain_value);
+            } else if (ctx.value_kind[value] == ValueKind::Constant) {
+              const_terminals[i].push_back(domain_value);
+            } else {
+              non_const_terminals[i].push_back(domain_value);
+            }
+          }
+          if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
+            throw std::runtime_error("Variable domain must include terminal symbols.");
+          }
+      }
+
+      usize num_roots = ctx.output_roots.size() + ctx.subtree_roots.size();
+      for(isize i = 0; i < dvals.rows(); i++){
+          for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
+            usize root = root_idx < ctx.output_roots.size() ? ctx.output_roots[root_idx]
+                                                            : ctx.subtree_roots[root_idx - ctx.output_roots.size()];
+            sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, dvals.row(i), root);
+          }
+      }
+      return dvals;
+
+    } catch (const std::bad_cast& e) {
+      __goblin_runtime_assert(false);
+    }
+  };
+
+ private:
+
+  void sample_terminal(Rng& rng, const InstanceBase& problem, const GPContext& ctx,
+      const std::vector<std::vector<usize>>& non_terminals,
+      const std::vector<std::vector<usize>>& const_terminals,
+      const std::vector<std::vector<usize>>& non_const_terminals,
+      RefS<Vec<DType>> values, usize idx) const {
+      // 1. determine if it is a constant or other terminal
+      double actual_p_constant = p_constant.value_or(
+          static_cast<double>(const_terminals[idx].size()) /
+          (static_cast<double>(const_terminals[idx].size()) + static_cast<double>(non_const_terminals[idx].size())));
+      if (const_terminals[idx].empty()) {
+        actual_p_constant = 0.0;
+      }
+
+      // 2. sample and place the terminal
+      std::uniform_real_distribution<double> U(0.0, 1.0);
+      if(U(rng) < actual_p_constant){
+          std::uniform_int_distribution<usize> ct_dist(0, const_terminals[idx].size() - 1);
+          values(idx) = const_terminals[idx][ct_dist(rng)];
+      } else {
+          std::uniform_int_distribution<usize> nct_dist(0, non_const_terminals[idx].size() - 1);
+          values(idx) = non_const_terminals[idx][nct_dist(rng)];
+      }
+
+      // 3. enqueue any children to ensure all nodes get initialized
+      for(auto c: ctx.children[idx]){
+          sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, c);
+      }
+  }
+
+  void sample_tree(Rng& rng, const InstanceBase& problem, const GPContext& ctx,
+      const std::vector<std::vector<usize>>& non_terminals,
+      const std::vector<std::vector<usize>>& const_terminals,
+      const std::vector<std::vector<usize>>& non_const_terminals,
+      RefS<Vec<DType>> values, usize idx) const {
+      std::uniform_int_distribution<usize> size_dist(1, ctx.nodes[idx].size());
+      usize target_size = size_dist(rng);
+
+      if(target_size < 2){
+          sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, idx);
+      } else {
+          std::vector<usize> holes{idx};
+          usize current_size = 0;
+
+          // more functions are needed to reach the target size
+          while(!holes.empty() && holes.size() + current_size < target_size){
+              // 1. get a random hole
+              std::swap(holes[std::uniform_int_distribution<usize>(0, holes.size() - 1)(rng)], holes.back());
+              usize i = holes.back(); holes.pop_back();
+
+              // 2. fill the hole
+              if(ctx.children[i].empty()){
+                sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
+              } else {
+                if (non_terminals[i].empty()) {
+                    throw std::runtime_error("Variable domain must include non-terminal symbols.");
+                }
+                std::uniform_int_distribution<usize> nt_dist(0, non_terminals[i].size() - 1);
+                values(i) = non_terminals[i][nt_dist(rng)];
+              }
+              current_size++;
+
+              // 3. update the list of holes and fill intron subtrees recursively
+              usize value = ctx.domain2value(i, values(i));
+              usize arity = ctx.value_max_arity[value];
+              for(usize j = 0; j < ctx.children[i].size(); j++){
+                  if(j < arity){
+                      holes.push_back(ctx.children[i][j]);
+                  } else {
+                      sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, ctx.children[i][j]);
+                  }
+              }
+          }
+
+          // once the size has been reached, fill the remaining nodes with terminals
+          for(usize i: holes){
+              sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
+          }
+      }
+  };
+
+  std::optional<double> p_constant{};
+};
+
 /// Complete init does not really work as intended for GP, since a lot of the diversity is distributed to inactive
 /// individuals. This version aims to have the active and inactive values per variable be "probabilistically complete"
 /// in isolation.
@@ -5338,27 +5520,27 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
         }
       }
 
-      for (isize c = 0; c < dvals.cols(); c++) {
-        std::vector<usize> idx2domain;
+      // for (isize c = 0; c < dvals.cols(); c++) {
+      //   std::vector<usize> idx2domain;
 
-        bool is_leaf = ctx.children[c].empty();
+      //   bool is_leaf = ctx.children[c].empty();
 
-        for (usize domain_value = 0; domain_value < problem.discrete_domain_sizes()(c); domain_value++) {
-          DType value = ctx.domain2value(c, domain_value);
-          if (is_leaf ? ctx.value_min_arity[value] == 0  // terminals only
-                      : ctx.value_min_arity[value] > 0   // non-terminals only
-          ) {
-            idx2domain.push_back(domain_value);
-          }
-        }
+      //   for (usize domain_value = 0; domain_value < problem.discrete_domain_sizes()(c); domain_value++) {
+      //     DType value = ctx.domain2value(c, domain_value);
+      //     if (is_leaf ? ctx.value_min_arity[value] == 0  // terminals only
+      //                 : ctx.value_min_arity[value] > 0   // non-terminals only
+      //     ) {
+      //       idx2domain.push_back(domain_value);
+      //     }
+      //   }
 
-        __goblin_runtime_assert(idx2domain.size() >= 1);
+      //   __goblin_runtime_assert(idx2domain.size() >= 1);
 
-        std::uniform_int_distribution<DType> d(0, idx2domain.size() - 1);
-        for (usize i = 0; i < count; i++) {
-          dvals(i, c) = idx2domain[d(rng)];
-        }
-      }
+      //   std::uniform_int_distribution<DType> d(0, idx2domain.size() - 1);
+      //   for (usize i = 0; i < count; i++) {
+      //     dvals(i, c) = idx2domain[d(rng)];
+      //   }
+      // }
       return dvals;
 
     } catch (const std::bad_cast& e) {
@@ -5367,7 +5549,146 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
   };
 };
 
-// TODO ptc2
+/// Complete init does not really work as intended for GP, since a lot of the diversity is distributed to inactive
+/// individuals. This version aims to have the active and inactive values per variable be "probabilistically complete"
+/// in isolation.
+class RecursiveCompleteInit2 final : public DiscreteInitBase {
+ public:
+
+ RecursiveCompleteInit2(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt)
+     : p_terminal(p_terminal), p_constant(p_constant) {};
+
+  Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
+    try {
+      const auto& ctx = dynamic_cast<const GPInstanceBase&>(problem).context();
+
+      Mat<DType> dvals(count, problem.num_discrete());
+      Arr2D<BType> dactive(count, problem.num_discrete());
+
+      std::vector<std::vector<DType>> non_terminals(dvals.cols());  // functions/subfunctions
+      std::vector<std::vector<DType>> const_terminals(dvals.cols());      // numeric constant symbols
+      std::vector<std::vector<DType>> non_const_terminals(dvals.cols());  // features/args/params
+
+      for(usize i = 0; i < problem.num_discrete(); i++){
+          usize domain_size = problem.discrete_domain_sizes()(i);
+          for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
+            DType value = ctx.domain2value(i, domain_value);
+            if (ctx.value_min_arity[value] > 0) {
+                non_terminals[i].push_back(domain_value);
+            } else if (ctx.value_kind[value] == ValueKind::Constant) {
+              const_terminals[i].push_back(domain_value);
+            } else {
+              non_const_terminals[i].push_back(domain_value);
+            }
+          }
+          if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
+            throw std::runtime_error("Variable domain must include terminal symbols.");
+          }
+      }
+
+      std::vector<usize> active_indices;
+      active_indices.reserve(count);
+      std::vector<usize> inactive_indices;
+      inactive_indices.reserve(count);
+
+      usize num_roots = ctx.output_roots.size() + ctx.subtree_roots.size();
+      for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
+        usize root = root_idx < ctx.output_roots.size() ? ctx.output_roots[root_idx]
+                                                        : ctx.subtree_roots[root_idx - ctx.output_roots.size()];
+        std::vector<usize> queue{root};
+        dactive.col(root) = true;
+
+        while (!queue.empty()) {
+          usize current = queue.back();
+          queue.pop_back();
+
+          active_indices.clear();
+          inactive_indices.clear();
+          for (usize i = 0; i < count; i++) {
+            if (dactive(i, current)) {
+              active_indices.push_back(i);
+            } else {
+              inactive_indices.push_back(i);
+            }
+          }
+
+          dvals(active_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals, non_const_terminals, active_indices.size(), current);
+          dvals(inactive_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals, non_const_terminals, inactive_indices.size(), current);
+
+          for (usize ci = 0; ci < ctx.children[current].size(); ci++) {
+            usize c = ctx.children[current][ci];
+
+            queue.push_back(c);
+            for (usize i = 0; i < count; i++) {
+              DType value = ctx.domain2value(current, dvals(i, current));
+              // child is active if the parent (=current) is active
+              // and the parent arity contains the child...
+              dactive(i, c) = dactive(i, current) && ctx.value_max_arity[value] > ci;
+            }
+          }
+        }
+      }
+
+      return dvals;
+    } catch (const std::bad_cast& e) {
+      return CompleteInit().sample(rng, problem, count);
+    }
+  };
+
+  private:
+
+Vec<DType> sample_nodes(Rng& rng, const InstanceBase& problem,
+    const std::vector<std::vector<DType>>& non_terminals,
+    const std::vector<std::vector<DType>>& const_terminals,
+    const std::vector<std::vector<DType>>& non_const_terminals,
+    usize total, usize idx) const {
+
+    usize domain_size = problem.discrete_domain_sizes()(idx);
+
+    double actual_p_terminal =
+        p_terminal.value_or(1.0 - static_cast<double>(non_terminals[idx].size()) / static_cast<double>(domain_size));
+    double actual_p_constant = p_constant.value_or(
+        static_cast<double>(const_terminals[idx].size()) /
+        (static_cast<double>(const_terminals[idx].size()) + static_cast<double>(non_const_terminals[idx].size())));
+    if (const_terminals[idx].empty()) {
+        actual_p_constant = 0.0;
+    }
+
+    usize num_non_terminals = non_terminals[idx].empty() ? 0 : static_cast<usize>((1.0 - actual_p_terminal) * static_cast<double>(total));
+    usize num_const_terminals = actual_p_constant * static_cast<double>(total - num_non_terminals);
+    usize num_non_const_terminals = total - num_non_terminals - num_const_terminals;
+
+    Vec<DType> values(total);
+
+    sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)));
+    sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)));
+    sample_complete(rng, non_const_terminals[idx], values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)));
+
+    std::shuffle(values.begin(), values.end(), rng);
+
+    return values;
+};
+
+void sample_complete(Rng& rng, const std::vector<DType>& pool,
+    Ref<Vec<DType>> values) const {
+    std::vector<DType> perm(pool.size());
+    std::iota(perm.begin(), perm.end(), 0);
+
+    usize i = perm.size();
+    for (isize vi = 0; vi < values.size(); vi++) {
+      if (i >= perm.size()) {
+        i = 0;
+        std::shuffle(perm.begin(), perm.end(), rng);
+      }
+
+      values(vi) = pool[perm[i++]];
+    }
+};
+
+   std::optional<double> p_terminal{};
+   std::optional<double> p_constant{};
+};
+
 
 };  // namespace goblin
 
@@ -5418,9 +5739,9 @@ class SRProblem : public GPInstanceBase {
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
             std::optional<std::vector<CType>> target_objectives = std::nullopt,
-            std::string gradient_mode = "central",
+            std::string gradient_mode = "forward",
             CType gradient_epsilon = 1e-5,
-            CType archive_epsilon = 1e-6,
+            CType archive_epsilon = 0.0,
             std::optional<bool> always_inherit_continuous = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
@@ -7621,6 +7942,8 @@ class Tracked final : public InstanceBase {
             "total_time_seconds,"
             "alg_time_seconds,"
             "eval_time_seconds,"
+            "current_population_size,"
+            "current_population_generation,"
             << config.log_info_headers
             << debug_headers <<
             "seed,"
@@ -7635,13 +7958,20 @@ class Tracked final : public InstanceBase {
       }
     }
 
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "";
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    auto pop_info = method.current_population();
+    if (pop_info.has_value()) {
+      auto [p_size, p_gen] = pop_info.value();
+      pop_size = std::to_string(p_size);
+      pop_gen = std::to_string(p_gen);
+    }
     Seconds alg_time = alg_timer.elapsed();
     Seconds eval_time = eval_timer.elapsed();
     Seconds total_time = alg_time + eval_time;
 
-    auto common = std::format("{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                              alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
+    auto common =
+        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
+                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
       SolutionBase* s;
@@ -7730,15 +8060,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -7860,14 +8186,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8225,9 +8548,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8323,18 +8643,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -8796,6 +9112,7 @@ struct RvOptions {
   // Otherwise the first `floor(selection_percentile * 0.5)` active solutions are used.
   bool randomize_ams_indices = false;
   bool enable_partial_ams = true;
+  bool enable_full_ams = true;
   CType delta_ams = 2.0;
   CType eta_ams = 1.0;
 
@@ -8963,7 +9280,9 @@ class RvState {
                               subset_orders, subset_idx++, ams_indices);
     }
 
-    evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, ams_indices);
+    if (options.enable_full_ams) {
+      evaluations += full_ams(rng, archive, problem, solutions, parents, solution_clusters, ams_indices);
+    }
 
     // solution NIS update
     std::vector<bool> any_improved(num_clusters, false);
@@ -9362,7 +9681,7 @@ class RvState {
                  SolutionSetBase& parents,
                  const std::vector<usize>& solution_clusters,
                  const std::vector<std::set<usize>>& ams_indices) {
-    if ((generation == 0 && !options.init_ams_from_population_mean)) {
+    if (!options.enable_full_ams || (generation == 0 && !options.init_ams_from_population_mean)) {
       return 0;
     }
 
@@ -9639,7 +9958,6 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11007,6 +11325,13 @@ class MixedGOMEA : public MethodBase {
     return std::visit([](const auto& r) { return r.current_generation(); }, ims_runner.value());
   };
 
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    if (!ims_runner.has_value()) {
+      return std::nullopt;
+    }
+    return std::visit([](const auto& r) { return r.current_population(); }, ims_runner.value());
+  };
+
  private:
   template <typename SolutionSet>
   Population<SolutionSet> create_population(InstanceBase& problem,
@@ -11032,7 +11357,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
