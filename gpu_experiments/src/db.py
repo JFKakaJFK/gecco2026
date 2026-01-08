@@ -2,6 +2,7 @@ import pathlib
 import re
 
 import duckdb
+from tqdm import tqdm
 
 
 def create_db(dir: pathlib.Path):
@@ -13,20 +14,32 @@ def create_db(dir: pathlib.Path):
     conn.execute(
         """
     CREATE TABLE IF NOT EXISTS results (
-        dataset TEXT,
-        device TEXT,
-        population_size INTEGER,
-        num_observations INTEGER,
-        fold INTEGER,
-        iter INTEGER,
-        evaluations INTEGER,
-        generation INTEGER,
+        status TEXT,
+        evaluations UBIGINT,
+        generation UBIGINT,
         total_time_seconds DOUBLE,
         alg_time_seconds DOUBLE,
         eval_time_seconds DOUBLE,
-        seed BIGINT,
         expressions TEXT,
         mse_train DOUBLE,
+        problem TEXT,
+        fold INTEGER,
+        num_observations INTEGER,
+        num_features INTEGER,
+        population_size INTEGER,
+        operator_set TEXT,
+        template_height INTEGER,
+        run INTEGER,
+        gpu_accelerated BOOL,
+        kernel TEXT,
+        seed UBIGINT,
+        discrete USMALLINT[],
+        discrete_active BOOL[],
+        continuous DOUBLE[],
+        continuous_active BOOL[],
+        objectives DOUBLE[],
+        constraint_value DOUBLE,
+        var_y DOUBLE,
     );
     """
     )
@@ -48,32 +61,42 @@ def create_db(dir: pathlib.Path):
         re.VERBOSE,
     )
 
-    for csv_path in dir.glob("*.csv"):
+    for csv_path in tqdm(dir.rglob("*.csv"), leave=False, ascii=True):
         match = filename_re.match(csv_path.name)
         if not match:
             print(f"Skipping unrecognized file: {csv_path.name}")
             continue
 
-        meta = match.groupdict()
-
         conn.execute(
             f"""
         INSERT INTO results
         SELECT
-            '{meta["dataset"]}' AS dataset,
-            '{meta["device"]}' AS device,
-            {meta["pop"]} AS population_size,
-            {meta["obs"]} AS num_observations,
-            {meta["fold"]} AS fold,
-            {meta["iter"]} AS iter,
+            status,
             evaluations,
             generation,
             total_time_seconds,
             alg_time_seconds,
             eval_time_seconds,
-            seed,
             expressions,
             mse_train,
+            problem,
+            fold,
+            num_observations,
+            num_features,
+            population_size,
+            operator_set,
+            template_height,
+            run,
+            gpu_accelerated,
+            kernel,
+            seed,
+            discrete,
+            discrete_active,
+            continuous,
+            continuous_active,
+            objectives,
+            constraint_value,
+            var_y 
         FROM read_csv_auto('{csv_path.as_posix()}')
         """
         )

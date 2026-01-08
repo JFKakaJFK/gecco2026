@@ -26,6 +26,26 @@ def run_one_task(options):
     X = X_train[:obs, :feat]
     y = y_train[:obs]
 
+    # Determine info that needs to be logged
+    loginfo = [
+        (str(k), str(v))
+        for k, v in options.items()
+        if k
+        not in [
+            "kernel",
+            "operators",
+            "template",
+            "X_path",
+            "y_path",
+            "X_test_path",
+            "y_test_path",
+            "logpath",
+        ]
+    ] + [
+        ("var_y", str(float(np.var(y[:, 0])))),
+        ("kernel", str(options["kernel"]).replace("KernelVersion.", "")),
+    ]
+
     est = gp.SymbolicRegressor(
         gpu_accelerated=options["gpu_accelerated"],
         kernel_version=options["kernel"],
@@ -50,6 +70,7 @@ def run_one_task(options):
         },
         tracking_kwargs={
             "logpath": options["logpath"],
+            "log_info": loginfo,
             "max_generations_until_next_report": 1,
             "generation_factor": 1,
             "initial_evaluations_until_next_report": 100,
@@ -69,8 +90,9 @@ def run_cpu_tasks(
     max_workers: int | None = None,
     dry_run: bool = False,
 ):
-    odir = pathlib.Path(output_directory)
-    os.makedirs(odir, exist_ok=True)
+    if not dry_run:
+        odir = pathlib.Path(output_directory)
+        os.makedirs(odir, exist_ok=True)
 
     jobs = []
 
@@ -91,12 +113,14 @@ def run_cpu_tasks(
 
         for run in range(num_repeats):
             test_name = task_name + f"-iter{run}"
-            logpath = f"{output_directory}/{test_name}.csv"
+            logpath = f"{output_directory}/{prob}/cpu/{test_name}.csv"
 
             options = dict(task)
             options["gpu_accelerated"] = False
-            options["kernel"] = None
+            options["kernel"] = "cpu"
+            options["run"] = run
             options["logpath"] = logpath
+            options["template_height"] = h
 
             jobs.append((run_one_task, [], {"options": options}))
 
@@ -108,7 +132,7 @@ def run_cpu_tasks(
         with ProcessPoolExecutor(max_workers=max_workers) as pool:
             futures = [pool.submit(fn, *args, **kwargs) for fn, args, kwargs in jobs]
 
-            progress = tqdm(total=len(futures))
+            progress = tqdm(total=len(futures), leave=False, ascii=True)
             for f in as_completed(futures):
                 try:
                     f.result()
@@ -125,8 +149,9 @@ def run_gpu_tasks(
     num_repeats: int = 1,
     dry_run: bool = False,
 ):
-    odir = pathlib.Path(output_directory)
-    os.makedirs(odir, exist_ok=True)
+    if not dry_run:
+        odir = pathlib.Path(output_directory)
+        os.makedirs(odir, exist_ok=True)
 
     jobs = []
 
@@ -154,12 +179,14 @@ def run_gpu_tasks(
 
         for run in range(num_repeats):
             test_name = task_name + f"-iter{run}"
-            logpath = f"{output_directory}/{test_name}.csv"
+            logpath = f"{output_directory}/{prob}/{kv}/{test_name}.csv"
 
             options = dict(task)
             options["gpu_accelerated"] = True
             options["kernel"] = kernel
+            options["run"] = run
             options["logpath"] = logpath
+            options["template_height"] = h
 
             jobs.append((run_one_task, [], {"options": options}))
 
@@ -167,5 +194,5 @@ def run_gpu_tasks(
         print(f"Total GPU tasks: {len(jobs)}")
         return
 
-    for fn, args, kwargs in tqdm(jobs, total=len(jobs)):
+    for fn, args, kwargs in tqdm(jobs, total=len(jobs), leave=False, ascii=True):
         fn(*args, **kwargs)

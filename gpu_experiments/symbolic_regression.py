@@ -1,5 +1,6 @@
 import os
 import re
+from collections.abc import Generator
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -10,6 +11,7 @@ import sympy as sym
 from pygom import KernelVersion
 from sklearn.model_selection import KFold, train_test_split
 
+from src.config import CPU_GPU_CONFIG, KERNELS_CONFIG, TEST_CONFIG, ExperimentConfig
 from src.db import create_db
 from src.plots import plot
 from src.run import run_cpu_tasks, run_gpu_tasks
@@ -70,47 +72,56 @@ def synthetic_problem(
     return X, y
 
 
-def problems(rng, output_directory):
+def problems(
+    rng: Generator,
+    output_directory: Path,
+    config: ExperimentConfig,
+    dry_run: bool = False,
+):
     data_dir = output_directory / "data"
-    os.makedirs(data_dir, exist_ok=True)
 
-    problems: dict[str, dict[str, int | str]] = {
-        # Synthetic problems
-        # "sin(3.1 * x0 + 2.7)": {
-        #     "type": "synthetic",
-        #     "observations": 1_000_000,
-        #     "features": 1,
-        # },
-        # PMLB datasets
-        # "nikuradse_2": {"type": "pmlb", "observations": 362, "features": 1},
-        # "feynman_I_6_2a": {"type": "pmlb", "observations": 100_000, "features": 1},
-        # "542_pollution": {"type": "pmlb", "observations": 60, "features": 15},
-        # "503_wind": {"type": "pmlb", "observations": 6574, "features": 14},
-        # "210_cloud": {"type": "pmlb", "observations": 108, "features": 5},
-        # "505_tecator": {"type": "pmlb", "observations": 240, "features": 124},
-        # "201_pol": {"type": "pmlb", "observations": 15_000, "features": 48},
-        "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
-    }
+    if not dry_run:
+        os.makedirs(data_dir, exist_ok=True)
 
-    population_sizes: list[int] = [2**i for i in range(8, 16)]  # 256 - 32768
-    num_observations: list[int] = [10**i for i in range(1, 7)]  # 10 - 1_000_000
-    num_features: list[int] = [2**i for i in range(0, 8)]  # 1 - 128
+    # problems: dict[str, dict[str, int | str]] = {
+    #     # Synthetic problems
+    #     "sin(3.1 * x0 + 2.7)": {
+    #         "type": "synthetic",
+    #         "observations": 1_000_000,
+    #         "features": 1,
+    #     },
+    #     # PMLB datasets
+    #     "4544_GeographicalOriginalofMusic": {
+    #         "type": "pmlb",
+    #         "observations": 1059,
+    #         "features": 117,
+    #     },
+    #     "201_pol": {"type": "pmlb", "observations": 15_000, "features": 48},
+    #     "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
+    # }
 
-    for problem, stats in problems.items():
-        eq_dir = data_dir / quote(problem, safe=" ")
-        eq_dir.mkdir(parents=True, exist_ok=True)
+    # population_sizes: list[int] = [2**i for i in range(8, 16)]  # 256 - 32768
+    # num_observations: list[int] = [10**i for i in range(2, 7)]  # 100 - 1_000_000
+    # num_features: list[int] = [2**i for i in range(0, 8)]  # 1 - 128
 
-        match stats["type"]:
+    # for problem, stats in problems.items():
+    for problem in config.problems:
+        eq_dir = data_dir / quote(problem.name, safe=" ")
+
+        if not dry_run:
+            eq_dir.mkdir(parents=True, exist_ok=True)
+
+        match problem.type:
             case "synthetic":
                 X, y = synthetic_problem(
-                    problem,
-                    stats["observations"],
+                    problem.name,
+                    problem.observations,
                     noise=0.0,
                     seed=rng.integers(2**32 - 1),
                 )
             case "pmlb":
                 X, y = pmlb.fetch_data(
-                    problem,
+                    problem.name,
                     return_X_y=True,
                     local_cache_dir=PMLB_CACHE_DIR,
                 )
@@ -119,14 +130,16 @@ def problems(rng, output_directory):
             X, y, test_size=0.25, random_state=rng.integers(2**32 - 1)
         )
 
-        # the "task" needs to be transferrable across processess
+        # the "task" needs to be transferrable across processes
         # -> save the data as .csv and load it there again
         X_test_path, y_test_path = (
             eq_dir / "X_test.npy",
             eq_dir / "y_test.npy",
         )
-        np.save(X_test_path, X_test, allow_pickle=False)
-        np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
+
+        if not dry_run:
+            np.save(X_test_path, X_test, allow_pickle=False)
+            np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
 
         kf = KFold(
             n_splits=NUM_FOLDS,
@@ -143,49 +156,42 @@ def problems(rng, output_directory):
                 eq_dir / f"X{fold:03d}.npy",
                 eq_dir / f"y{fold:03d}.npy",
             )
-            np.save(X_path, X_fold, allow_pickle=False)
-            np.save(y_path, y_fold, allow_pickle=False)
 
-            for obs in num_observations:
+            if not dry_run:
+                np.save(X_path, X_fold, allow_pickle=False)
+                np.save(y_path, y_fold, allow_pickle=False)
+
+            for obs in config.num_observations:
                 # Skip datasets that do not have enough observations
                 # 0.75 = due to train_test_split
                 # (1 - 1 / NUM_FOLDS) = due to KFOLD
-                if obs > stats["observations"] * 0.75 * (1 - 1 / NUM_FOLDS):
+                if obs > problem.observations * 0.75 * (1 - 1 / NUM_FOLDS):
                     continue
 
-                for feat in num_features:
+                for feat in config.num_features:
                     # Skip datasets that do not have enough features
-                    if feat > stats["features"]:
+                    if feat > problem.features:
                         continue
 
-                    for pop in population_sizes:
+                    for pop in config.population_sizes:
                         # For larger population sizes, skip large datasets
                         if pop >= 4096 and obs >= 1e5:
                             continue
 
                         # (branching_factor, depth)
-                        for template in [[(2, 3)], [(2, 4)], [(2, 5)]]:
-                            for operator_set, operators in [
-                                ("small", "+,-,*,/"),
-                                ("trig", "+,-,*,/,sin,cos"),
-                                ("exp", "+,-,*,/,sin,cos,exp,log"),
-                                ("pow", "+,-,*,/,sin,cos,exp,log,square,sqrt,pow"),
-                                (
-                                    "all",
-                                    "+,-,*,/,sin,cos,exp,log,square,sqrt,pow,abs,min,max",
-                                ),
-                            ]:
+                        for template in config.templates:
+                            for operator in config.operator_sets:
                                 seed = int(rng.integers(2**32 - 1))
 
                                 yield {
-                                    "problem": problem,
+                                    "problem": problem.name,
                                     "fold": fold,
                                     "num_observations": obs,
                                     "num_features": feat,
                                     "population_size": pop,
                                     "template": template,
-                                    "operators": operators,
-                                    "operator_set": operator_set,
+                                    "operators": operator.operators,
+                                    "operator_set": operator.name,
                                     "X_path": X_path,
                                     "y_path": y_path,
                                     "X_test_path": X_test_path,
@@ -198,58 +204,64 @@ def cpu_jobs(problems):
     yield from problems
 
 
-def gpu_jobs(problems, include_kernels):
-    kernel_versions: list[KernelVersion] = [
-        KernelVersion.baseline,
-        KernelVersion.restrict,
-        KernelVersion.shared_memory,
-        KernelVersion.block_reduce,
-        KernelVersion.single_kernel,
-        KernelVersion.single_kernel_fmaf,
-        KernelVersion.single_kernel_inplace,
-    ]
-
-    kernels_to_use = (
-        kernel_versions if include_kernels else [KernelVersion.single_kernel]
-    )
-
+def gpu_jobs(problems, kernels: tuple[KernelVersion, ...]):
     for info in problems:
-        for kernel in kernels_to_use:
+        for kernel in kernels:
             yield (info, kernel)
 
 
-def all_jobs(output_directory, include_cpu=True, include_kernels=False, dry_run=False):
+def all_jobs(output_directory: Path, config: ExperimentConfig, dry_run: bool = False):
     # Run CPU jobs
-    if include_cpu:
+    if config.cpu.enabled:
         print("Starting CPU tasks...")
         run_cpu_tasks(
             output_directory,
-            cpu_jobs(problems(np.random.default_rng(seed=42), output_directory)),
+            cpu_jobs(
+                problems(
+                    np.random.default_rng(seed=42), output_directory, config, dry_run
+                )
+            ),
             num_repeats=REPEATS_PER_FOLD,
             dry_run=dry_run,
         )
+        print("Finished CPU tasks...")
 
     # Run GPU jobs
     print("Starting GPU tasks...")
     run_gpu_tasks(
         output_directory,
         gpu_jobs(
-            problems(np.random.default_rng(seed=42), output_directory),
-            include_kernels,
+            problems(np.random.default_rng(seed=42), output_directory, config, dry_run),
+            config.gpu.kernels,
         ),
         num_repeats=REPEATS_PER_FOLD,
         dry_run=dry_run,
     )
+    print("Finished GPU tasks")
+
+
+def run_experiment(dir: Path, config: ExperimentConfig, dry_run=False):
+    print(f"\n\nStarting {config.name} experiment...")
+
+    output_directory = dir / config.name
+
+    all_jobs(output_directory, config, dry_run)
+
+    if not dry_run:
+        create_db(output_directory)
+        plot(output_directory)
+
+    print(f"Finished {config.name} experiment!\n\n")
 
 
 def main():
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    # run_date = "2026-01-08_12:39:02"
     output_directory = Path("results") / run_date
 
-    all_jobs(output_directory, include_cpu=True, include_kernels=True, dry_run=False)
-    create_db(output_directory)
-
-    # plot(output_directory)
+    # run_experiment(output_directory, TEST_CONFIG, dry_run=False)
+    run_experiment(output_directory, CPU_GPU_CONFIG, dry_run=False)
+    run_experiment(output_directory, KERNELS_CONFIG, dry_run=False)
 
 
 if __name__ == "__main__":
