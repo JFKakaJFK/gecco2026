@@ -83,28 +83,6 @@ def problems(
     if not dry_run:
         os.makedirs(data_dir, exist_ok=True)
 
-    # problems: dict[str, dict[str, int | str]] = {
-    #     # Synthetic problems
-    #     "sin(3.1 * x0 + 2.7)": {
-    #         "type": "synthetic",
-    #         "observations": 1_000_000,
-    #         "features": 1,
-    #     },
-    #     # PMLB datasets
-    #     "4544_GeographicalOriginalofMusic": {
-    #         "type": "pmlb",
-    #         "observations": 1059,
-    #         "features": 117,
-    #     },
-    #     "201_pol": {"type": "pmlb", "observations": 15_000, "features": 48},
-    #     "1191_BNG_pbc": {"type": "pmlb", "observations": 1_000_000, "features": 18},
-    # }
-
-    # population_sizes: list[int] = [2**i for i in range(8, 16)]  # 256 - 32768
-    # num_observations: list[int] = [10**i for i in range(2, 7)]  # 100 - 1_000_000
-    # num_features: list[int] = [2**i for i in range(0, 8)]  # 1 - 128
-
-    # for problem, stats in problems.items():
     for problem in config.problems:
         eq_dir = data_dir / quote(problem.name, safe=" ")
 

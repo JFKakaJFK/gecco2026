@@ -63,7 +63,7 @@ DATASETS: dict[str, ProblemConfig] = {
         name="sin(3.1 * x0 + 2.7)",
         type="synthetic",
         observations=1_000_000,
-        features=10,
+        features=1,
     ),
     "4544": ProblemConfig(
         name="4544_GeographicalOriginalofMusic",
