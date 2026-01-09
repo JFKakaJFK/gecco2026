@@ -113,6 +113,7 @@ struct LaunchConfig {
     KernelConfig mse;
     KernelVersion kernel_version = KernelVersion::Baseline;
     size_t num_solutions;
+    size_t num_outputs;
     size_t num_datapoints;
     size_t solution_length;
     size_t items_per_thread;
@@ -123,6 +124,7 @@ struct LaunchConfig {
         KernelConfig mse, 
         KernelVersion version = KernelVersion::Baseline,
         size_t num_solutions = 1,
+        size_t num_outputs = 1,
         size_t num_datapoints = 1,
         size_t solution_length = 1,
         size_t items_per_thread = 1
@@ -130,6 +132,7 @@ struct LaunchConfig {
         mse(mse), 
         kernel_version(version),
         num_solutions(num_solutions),
+        num_outputs(num_outputs),
         num_datapoints(num_datapoints),
         solution_length(solution_length),
         items_per_thread(items_per_thread) {}
@@ -137,6 +140,7 @@ struct LaunchConfig {
     static LaunchConfig determine(
         KernelVersion kernel_version,
         size_t num_solutions, 
+        size_t num_outputs,
         size_t num_datapoints, 
         size_t solution_length
     ) {
@@ -164,6 +168,7 @@ struct LaunchConfig {
 
         config.kernel_version = kernel_version;
         config.num_solutions = num_solutions;
+        config.num_outputs = num_outputs;
         config.num_datapoints = num_datapoints;
         config.solution_length = solution_length;
         

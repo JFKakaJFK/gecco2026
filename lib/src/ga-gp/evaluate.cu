@@ -29,6 +29,7 @@ void evaluate_kernel_baseline(
     float* v_value, 
     float* partial,
     size_t solution_length, 
+    size_t num_outputs,
     size_t num_datapoints
 ) {
     // Calculate datapoint index
@@ -39,26 +40,31 @@ void evaluate_kernel_baseline(
         // Calculate offset for first element of solution
         size_t solution_offset = solution_index * solution_length;
 
-        // Pointers to first element of solution
-        float* type = v_type + solution_offset;
-        float* value = v_value + solution_offset;
+        // Loop over outputs
+        for (size_t output_index = 0; output_index < num_outputs; output_index++) {
+            size_t output_offset = solution_offset + output_index * solution_length;
 
-        // Compute output of solution
-        float output = compute_tree_output_baseline(
-            X, type, value, 
-            solution_length, 
-            num_datapoints, 
-            datapoint_index
-        );
+            // Pointers to first element of solution
+            float* type = v_type + output_offset;
+            float* value = v_value + output_offset;
 
-        // Determine squared error
-        float error = output - Y[datapoint_index];
-        float se = error * error;
+            // Compute output of solution
+            float output = compute_tree_output_baseline(
+                X, type, value, 
+                solution_length, 
+                num_datapoints, 
+                datapoint_index
+            );
 
-        size_t partial_index = solution_index * num_datapoints + datapoint_index;
+            // Determine squared error
+            float error = output - Y[datapoint_index + output_index * num_datapoints];
+            float se = error * error;
 
-        // Store squared error in global memory
-        partial[partial_index] = se;
+            size_t partial_index = solution_index * num_outputs * num_datapoints + output_index + datapoint_index;
+
+            // Store squared error in global memory
+            partial[partial_index] = se;
+        }        
     }
 };
 
@@ -70,6 +76,7 @@ void evaluate_kernel_restrict(
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
     size_t solution_length, 
+    size_t num_outputs,
     size_t num_datapoints
 ) {
     // Calculate datapoint index
@@ -80,26 +87,31 @@ void evaluate_kernel_restrict(
         // Calculate offset for first element of solution
         size_t solution_offset = solution_index * solution_length;
 
-        // Pointers to first element of solution
-        const float* type = v_type + solution_offset;
-        const float* value = v_value + solution_offset;
+        // Loop over outputs
+        for (size_t output_index = 0; output_index < num_outputs; output_index++) {
+            size_t output_offset = solution_offset + output_index * solution_length;
 
-        // Compute output of solution
-        float output = compute_tree_output_restrict(
-            X, type, value, 
-            solution_length, 
-            num_datapoints, 
-            datapoint_index
-        );
+            // Pointers to first element of solution
+            const float* type = v_type + output_offset;
+            const float* value = v_value + output_offset;
 
-        // Determine squared error
-        float error = output - Y[datapoint_index];
-        float se = error * error;
+            // Compute output of solution
+            float output = compute_tree_output_restrict(
+                X, type, value, 
+                solution_length, 
+                num_datapoints, 
+                datapoint_index
+            );
 
-        size_t partial_index = solution_index * num_datapoints + datapoint_index;
+            // Determine squared error
+            float error = output - Y[datapoint_index + output_index * num_datapoints];
+            float se = error * error;
 
-        // Store squared error in global memory
-        partial[partial_index] = se;
+            size_t partial_index = solution_index * num_outputs * num_datapoints + output_index + datapoint_index;
+
+            // Store squared error in global memory
+            partial[partial_index] = se;
+        }
     }
 };
 
@@ -111,7 +123,7 @@ void evaluate_kernel_shared_memory(
     const float* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
-    size_t solution_length, 
+    size_t solution_length,
     size_t num_datapoints
 ) {
     // Calculate datapoint index
@@ -466,20 +478,20 @@ float compute_tree_output_baseline(
             float res = 0.0f;
 
             switch (op_value) {
-                case Operator::Add: res = args[0] + args[1]; break;
-                case Operator::Sub: res = args[0] - args[1]; break;
-                case Operator::Mul: res = args[0] * args[1]; break;
-                case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Add: res = args[1] + args[0]; break;
+                case Operator::Sub: res = args[1] - args[0]; break;
+                case Operator::Mul: res = args[1] * args[0]; break;
+                case Operator::Div: res = args[1] / args[0]; break;
                 case Operator::Sin: res = sinf(args[0]); break;
                 case Operator::Cos: res = cosf(args[0]); break;
                 case Operator::Exp: res = expf(args[0]); break;
                 case Operator::Log: res = logf(args[0]); break;
                 case Operator::Square: res = args[0] * args[0]; break;
                 case Operator::Sqrt: res = sqrtf(args[0]); break;
-                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Pow: res = powf(args[1], args[0]); break;
                 case Operator::Abs: res = fabsf(args[0]); break;
-                case Operator::Min: res = fminf(args[0], args[1]); break;
-                case Operator::Max: res = fmaxf(args[0], args[1]); break;
+                case Operator::Min: res = fminf(args[1], args[0]); break;
+                case Operator::Max: res = fmaxf(args[1], args[0]); break;
             }
 
             stack[sp++] = res;   
@@ -549,20 +561,20 @@ float compute_tree_output_restrict(
             float res = 0.0f;
 
             switch (op_value) {
-                case Operator::Add: res = args[0] + args[1]; break;
-                case Operator::Sub: res = args[0] - args[1]; break;
-                case Operator::Mul: res = args[0] * args[1]; break;
-                case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Add: res = args[1] + args[0]; break;
+                case Operator::Sub: res = args[1] - args[0]; break;
+                case Operator::Mul: res = args[1] * args[0]; break;
+                case Operator::Div: res = args[1] / args[0]; break;
                 case Operator::Sin: res = sinf(args[0]); break;
                 case Operator::Cos: res = cosf(args[0]); break;
                 case Operator::Exp: res = expf(args[0]); break;
                 case Operator::Log: res = logf(args[0]); break;
                 case Operator::Square: res = args[0] * args[0]; break;
                 case Operator::Sqrt: res = sqrtf(args[0]); break;
-                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Pow: res = powf(args[1], args[0]); break;
                 case Operator::Abs: res = fabsf(args[0]); break;
-                case Operator::Min: res = fminf(args[0], args[1]); break;
-                case Operator::Max: res = fmaxf(args[0], args[1]); break;
+                case Operator::Min: res = fminf(args[1], args[0]); break;
+                case Operator::Max: res = fmaxf(args[1], args[0]); break;
             }
 
             stack[sp++] = res;   
@@ -607,20 +619,32 @@ float compute_tree_output_inplace(
 
             // Apply the operator on the operands depending on op_value.
             switch (op_value) {
-                case Operator::Add: stack[sp - 1]   += stack[--sp];                       break;
-                case Operator::Sub: stack[sp - 1]    = stack[--sp] - stack[sp - 1];       break;
-                case Operator::Mul: stack[sp - 1]   *= stack[--sp];                       break;
-                case Operator::Div: stack[sp - 1]    = stack[--sp] / stack[sp - 1];       break; 
-                case Operator::Sin: stack[sp - 1]    = sinf(stack[sp - 1]);               break;
-                case Operator::Cos: stack[sp - 1]    = cosf(stack[sp - 1]);               break;
-                case Operator::Exp: stack[sp - 1]    = expf(stack[sp - 1]);               break;
-                case Operator::Log: stack[sp - 1]    = logf(stack[sp - 1]);               break;
-                case Operator::Square: stack[sp - 1] = stack[sp - 1] * stack[sp - 1];     break;
-                case Operator::Sqrt: stack[sp - 1]   = sqrtf(stack[sp - 1]);              break;
-                case Operator::Pow: stack[sp - 1]    = powf(stack[--sp], stack[sp - 1]);  break;
-                case Operator::Abs: stack[sp - 1]    = fabsf(stack[sp - 1]);              break;
-                case Operator::Min: stack[sp - 1]    = fminf(stack[--sp], stack[sp - 1]); break;
-                case Operator::Max: stack[sp - 1]    = fmaxf(stack[--sp], stack[sp - 1]); break;
+                case Operator::Add: stack[sp - 1]    += stack[--sp];                        break;
+                case Operator::Sub: stack[sp - 1]    -= stack[--sp];                        break;
+                case Operator::Mul: stack[sp - 1]    *= stack[--sp];                        break;
+                case Operator::Div: stack[sp - 1]    /= stack[--sp];                        break; 
+                case Operator::Sin: stack[sp - 1]     = sinf(stack[sp - 1]);                break;
+                case Operator::Cos: stack[sp - 1]     = cosf(stack[sp - 1]);                break;
+                case Operator::Exp: stack[sp - 1]     = expf(stack[sp - 1]);                break;
+                case Operator::Log: stack[sp - 1]     = logf(stack[sp - 1]);                break;
+                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;  
+                case Operator::Sqrt: stack[sp - 1]    = sqrtf(stack[sp - 1]);               break;
+                case Operator::Pow: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = powf(stack[sp - 1], rhs);   
+                    break;
+                }
+                case Operator::Abs: stack[sp - 1]     = fabsf(stack[sp - 1]);               break;
+                case Operator::Min: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = fminf(stack[sp - 1], rhs);  
+                    break;
+                }
+                case Operator::Max: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = fmaxf(stack[sp - 1], rhs);
+                    break;
+                }
             }
         } else {
             break;
@@ -730,10 +754,10 @@ void evaluate_kernel_wrapper(
     // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
     switch (config.kernel_version) {
         case (KernelVersion::Baseline):
-            evaluate_kernel_baseline<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
+            evaluate_kernel_baseline<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_outputs, config.num_datapoints);
             break;
         case (KernelVersion::Restrict):
-            evaluate_kernel_restrict<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
+            evaluate_kernel_restrict<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_outputs, config.num_datapoints);
             break;
         case (KernelVersion::SharedMemory):
             evaluate_kernel_shared_memory<<<grid, block>>>(X, Y, type, value, partial, config.solution_length, config.num_datapoints);
@@ -983,10 +1007,11 @@ std::vector<float> test_evaluate_kernel(
     std::vector<float> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
+    size_t num_outputs,
     size_t num_datapoints,
     KernelVersion version
 ) {
-    size_t solution_length = h_type.size() / num_solutions;
+    size_t solution_length = h_type.size() / (num_solutions * num_outputs);
 
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
@@ -999,12 +1024,12 @@ std::vector<float> test_evaluate_kernel(
     if (version == KernelVersion::BlockReduce) {
         partial_size = num_solutions;
     } else {
-        partial_size = num_solutions * num_datapoints;
+        partial_size = num_solutions * num_outputs * num_datapoints;
     }
 
     float* d_partial = allocate_on_gpu<float>(partial_size);    
 
-    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_datapoints, solution_length);
+    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_outputs, num_datapoints, solution_length);
 
     evaluate_kernel_wrapper(d_X, d_Y, d_type, d_value, d_partial, config);
 
@@ -1021,6 +1046,7 @@ std::vector<float> test_evaluate_kernel(
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> partial, 
     size_t num_solutions, 
+    size_t num_outputs,
     size_t num_datapoints, 
     KernelVersion version
 ) {
@@ -1030,7 +1056,7 @@ std::vector<float> test_compute_mse_kernel(
     // Allocate memory
     float* d_result = allocate_on_gpu<float>(num_solutions);
 
-    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_datapoints, 0);
+    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_outputs, num_datapoints, 0);
 
     mse_kernel_wrapper(d_partial, d_result, config);
 
@@ -1049,6 +1075,7 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
+    size_t num_outputs,
     size_t num_datapoints
 ) {
     size_t solution_length = h_type.size() / num_solutions;
@@ -1061,7 +1088,7 @@ std::vector<float> test_evaluate_mse_kernel(
 
     float* d_result = allocate_on_gpu<float>(num_solutions);    
 
-    LaunchConfig config = LaunchConfig::determine(KernelVersion::SingleKernel, num_solutions, num_datapoints, solution_length);
+    LaunchConfig config = LaunchConfig::determine(KernelVersion::SingleKernel, num_solutions, num_outputs, num_datapoints, solution_length);
 
     evaluate_mse_kernel_wrapper(d_X, d_Y, d_type, d_value, d_result, config);
 

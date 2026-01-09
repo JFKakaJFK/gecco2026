@@ -51,6 +51,7 @@ class GASRProblem : public GPInstanceBase {
             _fitness(MOFitness(1)),
             _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
             _target(_archive_fitness),
+            _num_outputs(ctx.num_outputs),
             _num_datapoints(X_train.rows()),
             _solution_length(ctx.max_expression_size) {
             
@@ -116,7 +117,7 @@ class GASRProblem : public GPInstanceBase {
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
             // Determine launch config
-            const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+            const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_outputs, _num_datapoints, _solution_length);
             // Sanity check
             config.check();
 
@@ -147,7 +148,7 @@ class GASRProblem : public GPInstanceBase {
 
 #ifndef NDEBUG
             if (config.kernel_version != KernelVersion::Baseline) {
-                const LaunchConfig config = LaunchConfig::determine(KernelVersion::Baseline, num_solutions, _num_datapoints, _solution_length);
+                const LaunchConfig config = LaunchConfig::determine(KernelVersion::Baseline, num_solutions, _num_outputs, _num_datapoints, _solution_length);
                 // Sanity check
                 config.check();
 
@@ -345,6 +346,7 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
+        size_t _num_outputs;
         size_t _num_datapoints;
         size_t _solution_length;
         size_t _num_solutions_allocated;
