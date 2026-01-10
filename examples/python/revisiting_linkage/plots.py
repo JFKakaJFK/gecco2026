@@ -15,7 +15,7 @@ from src.plots import plot_convergence_so
 from src.postprocessing import load_results, rliable_score_dict
 from src.run import compute_run_path, run_tasks
 
-RESULT_DIR = pathlib.Path("results") / "init"  #  "linkage_wrong_init"
+RESULT_DIR = pathlib.Path("results") / "linkage"  #  "linkage_wrong_init"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
@@ -38,7 +38,7 @@ def main():
             conn,
             run_expr="format('{}.{}', fold, run)",
             problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
-            method_query="format('{} {}', method_name, init)",
+            # method_query="format('{} {}', method_name, init)",
             normalized_value_expr="1.0 - nmse_train",
         )
 

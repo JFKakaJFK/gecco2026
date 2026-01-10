@@ -117,10 +117,15 @@ def rliable_score_dict(
     normalized_value_expr: str,
     problem_query: str = "problem_name",
     method_query: str = "method_name",
+    where_query: str | None = None
 ) -> tuple[dict, list[str]]:
     """Score matrices for each method, each of which is of size `(num_runs (runs + folds) x num_problems)` and the corresponding problem names"""
     normalized_score_dict = dict()
     problems = None
+
+    where = ""
+    if where_query is not None and where_query != "":
+        where = "AND " + where_query
 
     for method, *_ in conn.sql(
         f"SELECT DISTINCT({method_query}) AS method FROM results"
@@ -130,7 +135,7 @@ def rliable_score_dict(
             conn.execute(
                 f"""
             SELECT {run_expr} AS run, {problem_query} AS problem, {normalized_value_expr} AS value FROM results
-            WHERE status != 'Running' AND status != 'Aborted' AND {method_query} = $1
+            WHERE status != 'Running' AND status != 'Aborted' AND {method_query} = $1 {where}
         """,
                 [method],
             )
@@ -149,7 +154,9 @@ def rliable_score_dict(
 
 
 def rliable_convergence_score_dict(
-    conn: duckdb.DuckDBPyConnection, run_expr: str, normalized_value_expr: str
+    conn: duckdb.DuckDBPyConnection, run_expr: str, normalized_value_expr: str, problem_query: str = "problem_name",
+    method_query: str = "method_name",
+    where_query: str | None = None
 ) -> tuple[dict, list[str], list[int]]:
     """
     Score matrices for each method, each of which is of size `(num_runs (runs + folds) x num_problems x max(generations))`, the corresponding problem names and the generations.
@@ -159,6 +166,27 @@ def rliable_convergence_score_dict(
     normalized_score_dict = dict()
     problems = None
 
+    where = ""
+    if where_query is not None and where_query != "":
+        where = "AND " + where_query
+
+    methods = [m for m, *_ in conn.sql(
+        f"SELECT DISTINCT({method_query}) AS method FROM results ORDER by method"
+    ).fetchall()]
+
+    max_generation = conn.execute(f"""
+    SELECT MIN(generation) AS generation FROM results
+    WHERE status != 'Running' {where}
+""").fetchone()[0]
+    generations = [
+        g
+        for g, *_ in conn.execute(f"""
+        SELECT DISTINCT(generation) AS generation FROM results
+        WHERE generation <= $1
+            {where}
+        ORDER BY generation
+    """, [max_generation]).fetchall()
+    ]
     generations = [
         g
         for g, *_ in conn.execute("""
@@ -166,17 +194,24 @@ def rliable_convergence_score_dict(
         ORDER BY generation
     """).fetchall()
     ]
-    for method, *_ in conn.sql(
-        "SELECT DISTINCT(method_name) AS method FROM results"
-    ).fetchall():
+    for method in methods:
         data = None
         for i, g in enumerate(generations):
             df = (
                 conn.execute(
                     f"""
-                SELECT {run_expr} AS run, problem_name AS problem, {normalized_value_expr} AS value FROM results
-                WHERE generation = $2 AND method_name = $1
-            """,
+                    SELECT
+                        {run_expr} AS run,
+                        {problem_query} AS problem,
+                        MAX({normalized_value_expr}) AS value
+                    FROM results
+                    WHERE generation = $2
+                        AND {method_query} = $1
+                        AND status = 'Running'
+                        {where}
+                    GROUP BY all
+                    ORDER BY run, problem
+                    """,
                     [method, g],
                 )
                 .df()

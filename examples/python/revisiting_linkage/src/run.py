@@ -21,17 +21,24 @@ def run_one(
     loginfo: list[tuple[str, str]],
     seed: int | None = None,
 ):
-    task = instantiate(load_config(task_path), ctx=dict(**vars(pygom), np=vars(np)))
+    task: dict = instantiate(
+        load_config(task_path), ctx=dict(**vars(pygom), np=vars(np))
+    )
 
-    # if pathlib.Path(logfile).is_file():
-    #     with open(logfile, "r") as f:
-    #         *_, last = f.readlines()
-    #         status = last.split(",")[0]
-    #         completed = len(_) > 0 and status != "Running" and status != "Aborted"
-    #         if completed:
-    #             return
+    default_tracking_options = dict(
+        # report_intermediate_results=False,
+        max_generations_until_next_report=10,
+        generation_factor=2,
+        initial_evaluations_until_next_report=1,
+        max_evaluations_until_next_report=100000,
+        eval_factor=100000,
+        initial_time_until_next_report=datetime.timedelta(hours=1),
+    )
 
-    # print("STARTING", task_path)
+    tracking_options = task.get("tracking_options", {})
+    for k, v in default_tracking_options.items():
+        if k not in tracking_options:
+            tracking_options[k] = v
 
     try:
         Tracked.run(
@@ -41,13 +48,7 @@ def run_one(
             config=TrackingOptions(  #
                 logfile,  #
                 loginfo,
-                # report_intermediate_results=False,
-                max_generations_until_next_report=10,
-                generation_factor=2,
-                initial_evaluations_until_next_report=1,
-                max_evaluations_until_next_report=100000,
-                eval_factor=100000,
-                initial_time_until_next_report=datetime.timedelta(hours=1),
+                **tracking_options,
             ),
             seed=task.get("seed", seed),
             population_size=task.get("population_size", None),

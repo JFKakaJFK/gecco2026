@@ -540,3 +540,32 @@ def plot_scalability(
     fig.add_artist(l1)
 
     return fig
+
+
+def factorized_results(
+    plot_dir: pathlib.Path,
+    conn: duckdb.DuckDBPyConnection,
+    problems: list[str] | None = None,
+    methods: list[str] | None = None,
+    method_query: str = "method_name",
+    problem_query: str = "problem_name",
+    modifier_query: str | None = None,
+    modifier_labels: list[str] | None = None,
+    unit_query: str = "run",
+    y_var: str = "objectives[1]",
+    y_agg: Literal["MIN", "MAX"] = "MIN",
+    y_label: str = "Objective Value",
+    metrics=("evaluations", "total_time_seconds", "generation"),
+    metric_labels=("Evaluations", "Time [s]", "Generations"),
+    ylog: bool = False,
+    show_generation_boundaries: bool = False,
+    nsamples: int = 25,
+    ymin: float | str | None = None,
+    ymax: float | str | None = None,
+    y_truncation_quantile: float = 0.975,
+    **kwargs,
+):
+    """
+    Plots final results for "methods" on "problems" factorized in to "modifiers"
+    """
+    pass

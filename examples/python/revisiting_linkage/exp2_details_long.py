@@ -22,7 +22,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage_details"
+RESULT_DIR = pathlib.Path("results") / "linkage_details_long"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -30,7 +30,7 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 SEED = 42
 
-BUDGET = c.Budget(max_generations=21)
+BUDGET = c.Budget(max_generations=51)
 
 
 def problems(rng):
@@ -127,12 +127,12 @@ def methods(info, ctx):
     for similarity in [  #
         "$MI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        r"$MI_{mask\ inactive}$",  # Mask inactive
-        r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
-        r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
-        "Node",  # Normalized pairwise node proximity
-        "Node (static)",  # same, but first LT is kept throughout
-        r"Node * $MI_{mask\ inactive}$",
+        # r"$MI_{mask\ inactive}$",  # Mask inactive
+        # r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
+        # r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
+        # "Node",  # Normalized pairwise node proximity
+        # "Node (static)",  # same, but first LT is kept throughout
+        # r"Node * $MI_{mask\ inactive}$",
         "Random",  # Random similiarty
     ]:
         discrete_model_kwargs = dict(
@@ -385,13 +385,13 @@ def analyze_subset_stats(conn, odir, problem_query="format('{}{}', problem_name,
 
 def main():
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     # clean=True,
-    #     # limit=1,
-    #     # max_workers=44,
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        # clean=True,
+        # limit=1,
+        # max_workers=44,
+    )
 
     with load_results(
         LOG_DIR,
