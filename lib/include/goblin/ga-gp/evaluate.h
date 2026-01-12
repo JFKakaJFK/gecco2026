@@ -4,91 +4,170 @@
 
 #include <vector>
 
-#include "goblin/ga-gp/types.h"
+#include "goblin/ga-gp/misc.h"
 
 namespace goblin {
 
 #ifdef __CUDACC__
 __global__
-void evaluate_kernel(
+void evaluate_kernel_baseline(
     float* X, 
     float* Y, 
-    NodeType* v_type, 
+    float* v_type, 
     float* v_value, 
-    int solution_length, 
-    int num_datapoints,
-    float* result
-);
-
-__device__
-float compute_tree_output(
-    float* X, 
-    NodeType* type,
-    float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    float* partial,
+    size_t solution_length, 
+    size_t num_datapoints   
 );
 
 __global__
-void compute_mse_kernel(
-    float* se, 
-    float* mse, 
-    int num_solutions, 
-    int num_datapoints
+void evaluate_kernel_restrict(
+    const float* __restrict__ X, 
+    const float* __restrict__ Y, 
+    const float* __restrict__ v_type, 
+    const float* __restrict__ v_value, 
+    float* __restrict__ v,
+    size_t solution_length, 
+    size_t num_datapoints
+);
+
+__global__
+void evaluate_kernel_shared_memory(
+    const float* __restrict__ X, 
+    const float* __restrict__ Y, 
+    const float* __restrict__ v_type, 
+    const float* __restrict__ v_value, 
+    float* __restrict__ partial,
+    size_t solution_length, 
+    size_t num_datapoints
+);
+
+__device__
+float compute_tree_output_baseline(
+    float* X, 
+    float* type,
+    float* value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_restrict(
+    const float* __restrict__ X, 
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X, 
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__global__
+void compute_mse_kernel_baseline(
+    const float* __restrict__ partial, 
+    float* __restrict__ result, 
+    size_t num_solutions, 
+    size_t num_datapoints
+);
+
+__global__
+void mse_kernel_restrict(
+    const float* __restrict__ partial, 
+    float* __restrict__ result, 
+    size_t num_solutions, 
+    size_t num_datapoints
 );
 
 __global__
 void compute_tree_output_wrapper(
     float* X, 
-    NodeType* type,
+    float* type,
     float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index,
-    float* result
+    float* result,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
 );
 #endif
 
 void evaluate_kernel_wrapper(
     float* X, 
     float* Y, 
-    NodeType* type, 
+    float* type, 
     float* value, 
-    int solution_length, 
-    int num_solutions,
-    int num_datapoints,
-    float* se
+    float* partial,
+    const LaunchConfig config
 );
 
-void compute_mse_kernel_wrapper(
-    float* se, 
-    float* mse, 
-    int num_solutions, 
-    int num_datapoints
+void mse_kernel_wrapper(
+    float* partial, 
+    float* result, 
+    const LaunchConfig config
+);
+
+void evaluate_mse_kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* result,
+    const LaunchConfig config
+);
+
+void kernel_wrapper(
+    float* X, 
+    float* Y, 
+    float* type, 
+    float* value, 
+    float* partial,
+    float* result,
+    const LaunchConfig config
 );
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_datapoints,
-    int datapoint_index
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
 );
 
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X, 
     std::vector<float> h_Y, 
-    std::vector<NodeType> h_type, 
+    std::vector<float> h_type, 
     std::vector<float> h_value, 
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints,
+    KernelVersion version
 );
 
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se, 
-    int num_solutions, 
-    int num_datapoints
+    size_t num_solutions, 
+    size_t num_datapoints,
+    KernelVersion version
+);
+
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X, 
+    std::vector<float> h_Y, 
+    std::vector<float> h_type, 
+    std::vector<float> h_value, 
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 }

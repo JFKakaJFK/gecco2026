@@ -6,6 +6,7 @@
 
 #include "goblin/bench/tracked.h"
 #include "goblin/gp/sr.h"
+#include "goblin/lib/misc.h"
 #include "goblin/methods/mixed.h"
 
 using namespace std::chrono_literals;

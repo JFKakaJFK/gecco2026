@@ -12,6 +12,7 @@
 #include "goblin/gp/template.h"   // for Template, Templa...
 #include "goblin/lib/archive.h"   // for UnboundedArchive
 #include "goblin/lib/fitness.h"   // for Quality
+#include "goblin/lib/misc.h"
 #include "goblin/lib/rng.h"       // for Rng
 #include "goblin/lib/solution.h"  // for Solution, AoSSet
 #include "goblin/lib/types.h"     // for CType, Arr2D, Vec

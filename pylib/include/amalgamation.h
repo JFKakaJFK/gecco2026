@@ -3511,13 +3511,45 @@ class CompleteInit final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/types.h included by goblin/ga-gp/evaluate.h                               //
+//                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_MISC_H
+#define _GOBLIN_GA_GP_MISC_H
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/types.h included by goblin/ga-gp/misc.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_TYPES_H
 #define _GOBLIN_GA_GP_TYPES_H
 
 
 namespace goblin {
+
+enum class KernelVersion : uint8_t {
+    Baseline,
+    Restrict,
+    SharedMemory,
+    BlockReduce,
+    SingleKernel,
+    SingleKernelFMAF,
+    SingleKernelInplace
+};
+
+constexpr std::string_view to_string(KernelVersion v) {
+    switch (v) {
+        case KernelVersion::Baseline:            return "Baseline";
+        case KernelVersion::Restrict:            return "Restrict";
+        case KernelVersion::SharedMemory:        return "SharedMemory";
+        case KernelVersion::BlockReduce:         return "BlockReduce";
+        case KernelVersion::SingleKernel:        return "SingleKernel";
+        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
+        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
+    }
+
+    return "Unknown KernelVersion";
+}
 
 enum class NodeType : uint8_t {
     Input,
@@ -3529,26 +3561,231 @@ enum class Operator : uint8_t {
     Add,
     Sub,
     Mul,
-    Div
+    Div,
+    Sin,
+    Cos,
+    Exp,
+    Log,
+    Square,
+    Sqrt,
+    Pow,
+    Abs,
+    Min,
+    Max
 };
 
-constexpr NodeType C = NodeType::Constant;
-constexpr NodeType I = NodeType::Input;
-constexpr NodeType O = NodeType::Operator;
+// The following declarations are used to create more readable test cases
+namespace test {
+    constexpr float C = static_cast<float>(NodeType::Constant);
+    constexpr float I = static_cast<float>(NodeType::Input);
+    constexpr float O = static_cast<float>(NodeType::Operator);
 
-constexpr float Val(float x) { return x; }
-constexpr float Val(int x) { return static_cast<float>(x); }
-constexpr float Idx(int idx) { return static_cast<float>(idx); }
-constexpr float Op(Operator op) { return static_cast<float>(op); }
+    constexpr float Val(float x) { return x; }
+    constexpr float Val(int x) { return static_cast<float>(x); }
+    constexpr float Val(double x) { return static_cast<float>(x); }
+    constexpr float Idx(int idx) { return static_cast<float>(idx); }
+    constexpr float Op(Operator op) { return static_cast<float>(op); }
 
-constexpr float Add = Op(Operator::Add);
-constexpr float Sub = Op(Operator::Sub);
-constexpr float Mul = Op(Operator::Mul);
-constexpr float Div = Op(Operator::Div);
+    constexpr float Add = Op(Operator::Add);
+    constexpr float Sub = Op(Operator::Sub);
+    constexpr float Mul = Op(Operator::Mul);
+    constexpr float Div = Op(Operator::Div);
+    constexpr float Sin = Op(Operator::Sin);
+    constexpr float Cos = Op(Operator::Cos);
+    constexpr float Exp = Op(Operator::Exp);
+    constexpr float Log = Op(Operator::Log);
+    constexpr float Square = Op(Operator::Square);
+    constexpr float Sqrt = Op(Operator::Sqrt);
+    constexpr float Pow = Op(Operator::Pow);
+    constexpr float Abs = Op(Operator::Abs);
+    constexpr float Min = Op(Operator::Min);
+    constexpr float Max = Op(Operator::Max);
+}
 
 }
 
 #endif /* _GOBLIN_GA_GP_TYPES_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/misc.h continued                                                          //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define MAX_THREADS_PER_BLOCK 1024
+#define WARP_SIZE 32
+
+namespace goblin {
+
+constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
+constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
+
+struct KernelDim {
+    size_t x = 1;
+    size_t y = 1;
+    size_t z = 1;
+
+    KernelDim() = default;
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1)
+        : x(_x), y(_y), z(_z) {}
+
+    static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
+        KernelDim dim{WARP_SIZE};
+        size_t min_redundant = max_threads;
+
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+            // Round up division to determine number of blocks needed
+            size_t blocks_needed = ceil_div(count, threads);
+            size_t redundant = blocks_needed * threads - count;
+
+            if (redundant < min_redundant) {
+                min_redundant = redundant;
+                dim.x = threads;
+            }
+
+            // Early exit if perfect fit is found
+            if (redundant == 0) break;
+        }
+
+        return dim;
+    }
+
+    void check() const {
+        assert(x * y * z <= MAX_THREADS_PER_BLOCK);
+    }
+
+    constexpr bool operator==(const KernelDim& other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+};
+
+struct KernelConfig {
+    KernelDim grid;
+    KernelDim block;
+
+    KernelConfig() = default;
+    KernelConfig(KernelDim _grid, KernelDim _block)
+        : grid(_grid), block(_block) {}
+
+    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
+        KernelConfig config;
+
+        config.block = KernelDim::determine(num_datapoints);
+        config.grid.x = num_solutions;
+        config.grid.y = ceil_div(num_datapoints, config.block.x);
+
+        return config;
+    };
+
+    static KernelConfig for_mse(size_t num_solutions, size_t num_partial, KernelVersion kernel_version) {
+        KernelConfig config;
+
+        if (kernel_version == KernelVersion::BlockReduce) {
+            // Each block determine the mse for a single solution
+            config.grid.x = num_solutions;
+            // Number of partial results determines the number of threads in a block
+            // Rounded to a multiple of 32
+            config.block.x = round_up(num_partial, WARP_SIZE);
+        } else {
+            config.block = KernelDim::determine(num_solutions);
+            config.grid.x = ceil_div(num_solutions, config.block.x);
+        }
+
+        return config;
+    }
+
+    static KernelConfig for_single(size_t num_solutions, size_t num_datapoints) {
+        KernelConfig config;
+
+        config.grid.x = num_solutions;
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
+
+        return config;
+    }
+
+    void check() const {
+        block.check();
+        // grid.check(); TODO
+    }
+
+    constexpr bool operator==(const KernelConfig& other) const {
+        return grid == other.grid && block == other.block;
+    }
+};
+
+struct LaunchConfig {
+    KernelConfig eval;
+    KernelConfig mse;
+    KernelVersion kernel_version = KernelVersion::Baseline;
+    size_t num_solutions;
+    size_t num_datapoints;
+    size_t solution_length;
+    size_t items_per_thread;
+
+    LaunchConfig() = default;
+    LaunchConfig(
+        KernelConfig eval,
+        KernelConfig mse,
+        KernelVersion version = KernelVersion::Baseline,
+        size_t num_solutions = 1,
+        size_t num_datapoints = 1,
+        size_t solution_length = 1,
+        size_t items_per_thread = 1
+    ) : eval(eval),
+        mse(mse),
+        kernel_version(version),
+        num_solutions(num_solutions),
+        num_datapoints(num_datapoints),
+        solution_length(solution_length),
+        items_per_thread(items_per_thread) {}
+
+    static LaunchConfig determine(
+        KernelVersion kernel_version,
+        size_t num_solutions,
+        size_t num_datapoints,
+        size_t solution_length
+    ) {
+        LaunchConfig config;
+
+        // Determine grid and block dimensions for kernels
+        switch (kernel_version) {
+            case (KernelVersion::Baseline):
+            case (KernelVersion::Restrict):
+            case (KernelVersion::SharedMemory):
+            case (KernelVersion::BlockReduce):
+                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
+                config.mse = KernelConfig::for_mse(num_solutions, config.eval.grid.y, kernel_version);
+                break;
+            case (KernelVersion::SingleKernel):
+            case (KernelVersion::SingleKernelFMAF):
+            case (KernelVersion::SingleKernelInplace):
+                config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
+                config.mse = KernelConfig();
+                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
+                break;
+            default:
+                break;
+        }
+
+        config.kernel_version = kernel_version;
+        config.num_solutions = num_solutions;
+        config.num_datapoints = num_datapoints;
+        config.solution_length = solution_length;
+
+        return config;
+    }
+
+    void check() const {
+        eval.check();
+        mse.check();
+    }
+
+    constexpr bool operator==(const LaunchConfig& other) const {
+        return eval == other.eval && mse == other.mse && kernel_version == other.kernel_version;
+    }
+};
+
+}
+
+#endif /* _GOBLIN_GA_GP_MISC_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/evaluate.h continued                                                      //
@@ -3558,85 +3795,164 @@ namespace goblin {
 
 #ifdef __CUDACC__
 __global__
-void evaluate_kernel(
+void evaluate_kernel_baseline(
     float* X,
     float* Y,
-    NodeType* v_type,
+    float* v_type,
     float* v_value,
-    int solution_length,
-    int num_datapoints,
-    float* result
-);
-
-__device__
-float compute_tree_output(
-    float* X,
-    NodeType* type,
-    float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index
+    float* partial,
+    size_t solution_length,
+    size_t num_datapoints
 );
 
 __global__
-void compute_mse_kernel(
-    float* se,
-    float* mse,
-    int num_solutions,
-    int num_datapoints
+void evaluate_kernel_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ v,
+    size_t solution_length,
+    size_t num_datapoints
+);
+
+__global__
+void evaluate_kernel_shared_memory(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ partial,
+    size_t solution_length,
+    size_t num_datapoints
+);
+
+__device__
+float compute_tree_output_baseline(
+    float* X,
+    float* type,
+    float* value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__global__
+void compute_mse_kernel_baseline(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    size_t num_solutions,
+    size_t num_datapoints
+);
+
+__global__
+void mse_kernel_restrict(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 __global__
 void compute_tree_output_wrapper(
     float* X,
-    NodeType* type,
+    float* type,
     float* value,
-    int solution_length,
-    int num_datapoints,
-    int datapoint_index,
-    float* result
+    float* result,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
 );
 #endif
 
 void evaluate_kernel_wrapper(
     float* X,
     float* Y,
-    NodeType* type,
+    float* type,
     float* value,
-    int solution_length,
-    int num_solutions,
-    int num_datapoints,
-    float* se
+    float* partial,
+    const LaunchConfig config
 );
 
-void compute_mse_kernel_wrapper(
-    float* se,
-    float* mse,
-    int num_solutions,
-    int num_datapoints
+void mse_kernel_wrapper(
+    float* partial,
+    float* result,
+    const LaunchConfig config
+);
+
+void evaluate_mse_kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* result,
+    const LaunchConfig config
+);
+
+void kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* partial,
+    float* result,
+    const LaunchConfig config
 );
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_datapoints,
-    int datapoint_index
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
 );
 
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<NodeType> h_type,
+    std::vector<float> h_type,
     std::vector<float> h_value,
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints,
+    KernelVersion version
 );
 
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se,
-    int num_solutions,
-    int num_datapoints
+    size_t num_solutions,
+    size_t num_datapoints,
+    KernelVersion version
+);
+
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_solutions,
+    size_t num_datapoints
 );
 
 }
@@ -3658,7 +3974,7 @@ std::vector<float> test_compute_mse_kernel(
 
 // Maximum number of threads per CUDA block, currently defined as 1024,
 // which is the maximum for modern NVIDIA GPUs.
-#define MAX_THREADS_PER_BLOCK 1024
+
 
 namespace goblin {
 
@@ -3676,11 +3992,9 @@ template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count
 
 template <typename T> void free_on_gpu(T* d_ptr);
 
-int compute_block_size(int count);
+template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
 
 };
-
-
 
 #endif /* _GOBLIN_GA_GP_HELPER_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5051,7 +5365,7 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<NodeType>& node_type, std::vector<float>& node_value) const {
+  void to_gpu_repr(SolutionBase& solution, std::vector<float>& node_type, std::vector<float>& node_value) const {
     // TODO implement multi-output (multiple trees per solution) parsing
 
     // initially we haven't visited anything, so we set everything to be inactive
@@ -5061,7 +5375,7 @@ class GPContext {
     std::vector<usize> stack;
 
     // Vectors to hold temporary type and value data
-    std::vector<NodeType> temp_type;
+    std::vector<float> temp_type;
     std::vector<float> temp_value;
 
     // Push root node on stack
@@ -5080,7 +5394,7 @@ class GPContext {
       // Mark current node as active
       solution.discrete_active()(node) = true;
 
-      temp_type.push_back(static_cast<NodeType>(type));
+      temp_type.push_back(static_cast<float>(type));
 
      if (type == ValueKind::Input) {
         // Push the index of the input feature, will be used to access the input matrix on GPU
@@ -5118,7 +5432,7 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO investigate coalesced memory access
-    temp_type.resize(max_expression_size, static_cast<NodeType>(std::numeric_limits<std::underlying_type_t<NodeType>>::max()));
+    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
@@ -5381,18 +5695,37 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 //                       goblin/ga-gp/ga_sr.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef NDEBUG
+constexpr int MAX_ULP_ERROR = 8;
+inline int ulp_diff(float a, float b) {
+    uint32_t ua = std::bit_cast<uint32_t>(a);
+    uint32_t ub = std::bit_cast<uint32_t>(b);
+
+    // Make lexicographically ordered as signed magnitude
+    if (ua & 0x80000000u) ua = 0x80000000u - ua;
+    if (ub & 0x80000000u) ub = 0x80000000u - ub;
+
+    return std::abs((int)ua - (int)ub);
+}
+#endif
+
 namespace goblin {
 
 class GASRProblem : public GPInstanceBase {
     public:
         GASRProblem(
             GPContext ctx,
-            Arr2D<CType> X,
-            Arr2D<CType> Y,
+            Arr2D<CType> X_train,
+            Arr2D<CType> Y_train,
+            std::optional<Arr2D<CType>> X_test = std::nullopt,
+            std::optional<Arr2D<CType>> Y_test = std::nullopt,
+            std::variant<std::string, std::vector<std::string>> objectives = "mse",
+            std::optional<usize> objectives_to_optimize = std::nullopt,
             bool linear_scaling = false,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
-            CType constant_init_upper_bound = 1.0
+            CType constant_init_upper_bound = 1.0,
+            std::optional<std::vector<CType>> target_objectives = std::nullopt
         ) : ctx(ctx),
             linear_scaling(linear_scaling),
             objective("mse"),
@@ -5400,7 +5733,7 @@ class GASRProblem : public GPInstanceBase {
             _fitness(MOFitness(1)),
             _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
             _target(_archive_fitness),
-            _num_datapoints(X.rows()),
+            _num_datapoints(X_train.rows()),
             _solution_length(ctx.max_expression_size) {
 
             _num_continuous = this->ctx.num_continuous;
@@ -5411,14 +5744,23 @@ class GASRProblem : public GPInstanceBase {
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
+            if (target_objectives.has_value()) {
+                register_target(target_objectives.value());
+            }
+
             // Copy data to GPU
-            _copy_data_to_gpu(X, Y);
+            _copy_data_to_gpu(X_train, Y_train);
             _num_solutions_allocated = 0;
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
 
         ~GASRProblem() {
             free_gpu();
+        }
+
+        void set_kernel_version(KernelVersion kernel_version) {
+            _kernel_version = kernel_version;
         }
 
         void free_gpu() {
@@ -5439,14 +5781,14 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-            int num_solutions = indices.size();
+            size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
                 return;
             }
 
             // Transform solutions to GPU compatible representation
-            std::vector<NodeType> node_type;
+            std::vector<float> node_type;
             std::vector<float> node_value;
 
             for (auto i : indices) {
@@ -5455,41 +5797,81 @@ class GASRProblem : public GPInstanceBase {
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
+            // Determine launch config
+            const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+            // Sanity check
+            config.check();
+
             // Copy solution data to GPU
             _copy_solutions_to_gpu(node_type, node_value);
 
-            // Allocate memory for se and mse on device
-            _allocate_results_on_gpu(num_solutions);
+            // Allocate memory for results on device
+            _allocate_results_on_gpu(config);
 
-            // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
-            evaluate_kernel_wrapper(
-                d_X,
-                d_Y,
-                d_type,
-                d_value,
-                _solution_length,
-                num_solutions,
-                _num_datapoints,
-                d_se
-            );
+            // Copy solution data to GPU
+            _copy_solutions_to_gpu(node_type, node_value);
 
-            // Launch mse kernel that calculates the mse over all datapoints for each solution
-            compute_mse_kernel_wrapper(
-                d_se,
-                d_mse,
-                num_solutions,
-                _num_datapoints
+            kernel_wrapper(
+                d_X, d_Y, d_type, d_value,
+                d_partial, d_result,
+                config
             );
 
             // Retrieve the results from the GPU
             std::vector<float> result(num_solutions);
-            copy_from_device(result.data(), d_mse, num_solutions);
+            copy_from_device(result.data(), d_result, num_solutions);
 
             size_t k = 0;
             for (auto i : indices) {
                 solutions[i].quality().constraint_value = 0.0;
                 solutions[i].quality().objectives(0) = result[k++];
             }
+
+#ifndef NDEBUG
+            if (config.kernel_version != KernelVersion::Baseline) {
+                const LaunchConfig config = LaunchConfig::determine(KernelVersion::Baseline, num_solutions, _num_datapoints, _solution_length);
+                // Sanity check
+                config.check();
+
+                // Allocate memory for results on device
+                _allocate_results_on_gpu(config);
+
+                // Launch evaluate kernel that calculates the squared error for every solution and datapoint combination
+                evaluate_kernel_wrapper(
+                    d_X,
+                    d_Y,
+                    d_type,
+                    d_value,
+                    d_partial,
+                    config
+                );
+
+                // Launch mse kernel that calculates the mse over all datapoints for each solution
+                mse_kernel_wrapper(
+                    d_partial,
+                    d_result,
+                    config
+                );
+
+                // Retrieve the results from the GPU
+                std::vector<float> result(num_solutions);
+                copy_from_device(result.data(), d_result, num_solutions);
+
+                size_t k = 0;
+                for (auto i : indices) {
+                    float expected = solutions[i].quality().objectives(0);
+                    float actual = result[k++];
+
+                    int ulps = ulp_diff(expected, actual);
+                    if (ulps > MAX_ULP_ERROR) {
+                        printf("Kernel similarity violated at index %ld\n", i);
+                        printf("Expected: %.9g, Actual: %.9g\n", expected, actual);
+                        printf("ULP diff: %d\n", ulps);
+                        std::abort();
+                    }
+                }
+            }
+#endif
         }
 
         void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
@@ -5574,8 +5956,8 @@ class GASRProblem : public GPInstanceBase {
             d_Y = allocate_and_copy(Y32.data(), Y32.size());
         }
 
-        void _copy_solutions_to_gpu(std::vector<NodeType> node_type, std::vector<float> node_value) {
-            size_t num_solutions = node_type.size();
+        void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
+            const size_t num_solutions = node_type.size();
 
             // Allocate memory if not allocated or size has increased
             if (_num_solutions_allocated < num_solutions) {
@@ -5592,11 +5974,28 @@ class GASRProblem : public GPInstanceBase {
             }
         }
 
-        void _allocate_results_on_gpu(size_t num_solutions) {
-            if (_num_results_allocated < num_solutions) {
-                d_se = allocate_on_gpu<float>(num_solutions * _num_datapoints);
-                d_mse = allocate_on_gpu<float>(num_solutions);
-                _num_results_allocated = num_solutions;
+        void _allocate_results_on_gpu(const LaunchConfig config) {
+            if (config.kernel_version != KernelVersion::SingleKernel && config.kernel_version != KernelVersion::SingleKernelFMAF && config.kernel_version != KernelVersion::SingleKernelInplace) {
+                const size_t num_partials =
+                    (config.kernel_version == KernelVersion::BlockReduce)
+                        ? config.num_solutions * config.eval.grid.y
+                        : config.num_solutions * config.num_datapoints;
+
+                // Check if we need more memory than we currently have allocated
+                if (_num_partials_allocated < num_partials) {
+                    free_on_gpu(d_partial);
+
+                    d_partial = allocate_on_gpu<float>(num_partials);
+                    _num_partials_allocated = num_partials;
+                }
+            }
+
+            // Check if we need more memory than we currently have allocated
+            if (_num_results_allocated < config.num_solutions) {
+                free_on_gpu(d_result);
+
+                d_result = allocate_on_gpu<float>(config.num_solutions);
+                _num_results_allocated = config.num_solutions;
             }
         }
 
@@ -5612,22 +6011,11 @@ class GASRProblem : public GPInstanceBase {
         }
 
         void _free_results_on_gpu() {
-            free_on_gpu(d_se);
-            free_on_gpu(d_mse);
+            free_on_gpu(d_partial);
+            free_on_gpu(d_result);
+            _num_partials_allocated = 0;
             _num_results_allocated = 0;
         }
-
-        // bool _solution_allocated;
-        size_t _num_solutions_allocated;
-        size_t _num_results_allocated;
-
-        // GPU pointers
-        float* d_X = nullptr;
-        float* d_Y = nullptr;
-        NodeType* d_type = nullptr;
-        float* d_value = nullptr;
-        float* d_se = nullptr;
-        float* d_mse = nullptr;
 
         MOFitness _archive_fitness;
         MOFitness _fitness;
@@ -5639,8 +6027,21 @@ class GASRProblem : public GPInstanceBase {
         Vec<CType> _continuous_init_lower_bounds;
         Vec<CType> _continuous_init_upper_bounds;
 
-        int _num_datapoints;
-        int _solution_length;
+        size_t _num_datapoints;
+        size_t _solution_length;
+        size_t _num_solutions_allocated;
+        size_t _num_partials_allocated;
+        size_t _num_results_allocated;
+
+        // GPU pointers
+        float* d_X = nullptr;
+        float* d_Y = nullptr;
+        float* d_type = nullptr;
+        float* d_value = nullptr;
+        float* d_partial = nullptr;
+        float* d_result = nullptr;
+
+        KernelVersion _kernel_version = KernelVersion::BlockReduce;
 };
 
 }

@@ -6,7 +6,7 @@
 
 // Maximum number of threads per CUDA block, currently defined as 1024,
 // which is the maximum for modern NVIDIA GPUs.
-#define MAX_THREADS_PER_BLOCK 1024
+
 
 namespace goblin {
 
@@ -24,10 +24,8 @@ template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count
 
 template <typename T> void free_on_gpu(T* d_ptr);
 
-int compute_block_size(int count);
+template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
 
 };
-
-
 
 #endif /* _GOBLIN_GA_GP_HELPER_H */

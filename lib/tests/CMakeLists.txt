@@ -40,8 +40,9 @@ set(
     ctx_subfunction
     ctx_introns
     context
-    helper
+    misc
     ga_sr
+    kernel
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
@@ -54,6 +55,7 @@ endforeach()
 target_compile_options(lib_test_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_sr PRIVATE -O2 -g)
 target_compile_options(lib_test_ga_sr PRIVATE -O2 -g)
+target_compile_options(lib_test_kernel PRIVATE -O2 -g)
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)

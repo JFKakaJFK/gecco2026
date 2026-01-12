@@ -8,6 +8,7 @@
 #include "goblin/bench/functions/discrete.h"
 #include "goblin/bench/problem.h"
 #include "goblin/lib/ims.h"
+#include "goblin/lib/misc.h"
 
 using namespace std::chrono_literals;
 using namespace goblin;

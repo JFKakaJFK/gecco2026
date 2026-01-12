@@ -17,14 +17,13 @@ void check(cudaError_t err, char const* func, char const* file, int line) {
 template <typename T>
 T* allocate_on_gpu(size_t count) {
     T* d_ptr = nullptr;
-    check(cudaMalloc(&d_ptr, count * sizeof(T)), "cudaMalloc", __FILE__, __LINE__);
+    __CHECK_CUDA_ERR__(cudaMalloc(&d_ptr, count * sizeof(T)));
     return d_ptr;
 }
 
 template <typename T>
 void copy_to_gpu(T* d_ptr, const T* host_data, size_t count) {
-    check(cudaMemcpy(d_ptr, host_data, count * sizeof(T), cudaMemcpyHostToDevice),
-          "cudaMemcpy H2D", __FILE__, __LINE__);
+    __CHECK_CUDA_ERR__(cudaMemcpy(d_ptr, host_data, count * sizeof(T), cudaMemcpyHostToDevice));
 }
 
 template <typename T>
@@ -36,56 +35,24 @@ T* allocate_and_copy(const T* host_data, size_t count) {
 
 template <typename T>
 void copy_from_device(T* host_data, T* d_ptr, size_t count) {
-    check(cudaMemcpy(host_data, d_ptr, count * sizeof(T), cudaMemcpyDeviceToHost),
-          "cudaMemcpy D2H", __FILE__, __LINE__);
+    __CHECK_CUDA_ERR__(cudaMemcpy(host_data, d_ptr, count * sizeof(T), cudaMemcpyDeviceToHost));
 }
 
 template <typename T>
 void free_on_gpu(T* d_ptr) {
-    check(cudaFree(d_ptr), "cudaFree", __FILE__, __LINE__);
+    __CHECK_CUDA_ERR__(cudaFree(d_ptr));
 }
 
-int compute_block_size(int count) {
-    int best_block_size = 32;
-    int min_redundant_threads = MAX_THREADS_PER_BLOCK;
+template <typename T>
+void zero_mem_on_gpu(T* d_ptr, size_t count) {
+    __CHECK_CUDA_ERR__(cudaMemset(d_ptr, 0, count * sizeof(T)));
+}
 
-    int blocks_needed;
-    int redundant_threads;
-
-    // If there are multiple optimal solutions, the largest block size is preferred
-    // TODO test if this is beneficial in practice
-
-    // Iterate over possible block sizes (multiples of 32)
-    for (int b = MAX_THREADS_PER_BLOCK; b > 0; b -= 32) {
-        // Round up division to determine number of blocks needed
-        blocks_needed = (count + b - 1) / b;
-        redundant_threads = blocks_needed * b - count;
-
-        if (redundant_threads < min_redundant_threads) {
-            min_redundant_threads = redundant_threads;
-            best_block_size = b;
-        }
-
-        // Early exit if perfect fit is found
-        if (redundant_threads == 0) {
-            break;
-        }
-    }
-
-    return best_block_size;
-};
-
-// Explicit template instantiation for all types you use
 template float* allocate_on_gpu<float>(size_t);
 template void copy_to_gpu<float>(float*, const float*, size_t);
 template float* allocate_and_copy<float>(const float*, size_t);
 template void copy_from_device<float>(float*, float*, size_t);
 template void free_on_gpu<float>(float*);
-
-template NodeType* allocate_on_gpu<NodeType>(size_t);
-template void copy_to_gpu<NodeType>(NodeType*, const NodeType*, size_t);
-template NodeType* allocate_and_copy<NodeType>(const NodeType*, size_t);
-template void copy_from_device<NodeType>(NodeType*, NodeType*, size_t);
-template void free_on_gpu<NodeType>(NodeType*);
+template void zero_mem_on_gpu<float>(float* d_ptr, size_t count);
 
 }

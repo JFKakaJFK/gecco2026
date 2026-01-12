@@ -1,7 +1,6 @@
 # Using https://github.com/github/gitignore/blob/master/Python.gitignore + C++.gitignore
 
 profile.json.gz
-*.csv
 *.yaml
 .zed/
 .vscode/
@@ -197,3 +196,16 @@ _skbuild/
 cmake-build-*/
 .idea/
 .DS_Store
+
+# Experiment results and plots
+examples/python/playground/plots/symbolic_regression_convergence/
+
+# NSight Compute and Nsight Systems files
+*.ncu-rep
+*.nsys-rep
+*.html
+*.sqlite
+
+# GPU experiment results and dataset cache
+gpu_experiments/pmlb_cache
+gpu_experiments/results
