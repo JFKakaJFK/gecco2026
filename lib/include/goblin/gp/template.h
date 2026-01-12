@@ -13,6 +13,7 @@
 namespace goblin {
 struct TemplateNode {
   std::vector<TemplateNode> children;
+  size_t max_num_nodes;
 
   static TemplateNode full_nary(usize branching_factor, usize depth) {
     TemplateNode root;
@@ -22,6 +23,10 @@ struct TemplateNode {
         root.children.push_back(full_nary(branching_factor, depth - 1));
       }
     }
+
+    // Calculate maximum number of nodes in the template
+    root.max_num_nodes = calc_max_num_nodes(depth, branching_factor);
+
     return root;
   };
 
@@ -86,6 +91,20 @@ struct TemplateNode {
     path.erase(current);
     return true;
   };
+
+  static size_t calc_max_num_nodes(size_t branching_factor, size_t depth) {
+    if (branching_factor == 0) return depth == 0 ? 1 : 0;
+    if (branching_factor == 1) return depth + 1;
+
+    auto ipow = [](size_t base, size_t exp) {
+      size_t result = 1;
+      for (size_t i = 0; i < exp; ++i)
+        result *= base;
+      return result;
+    };
+
+    return (ipow(branching_factor, depth + 1) - 1) / (branching_factor - 1);
+  }
 };
 
 struct Template {

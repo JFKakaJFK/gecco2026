@@ -2,6 +2,7 @@
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
+#include <algorithm>
 #include <format>
 #include <iostream>
 #include <limits>
@@ -12,7 +13,6 @@
 #include <span>
 #include <stdexcept>
 
-#include "goblin/ga-gp/types.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
 #include "goblin/lib/assert.h"
@@ -62,6 +62,7 @@ class GPContext {
         num_continuous(const_repr == ConstantRepr::Pool ? constant_pool_size
                                                         : (const_repr == ConstantRepr::None ? 0 : num_discrete)),
         max_expression_size(max_expression_size),
+        max_tree_size(determine_max_tree_size(expression_template)),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         operators(std::move(operators)) {
@@ -688,8 +689,8 @@ class GPContext {
       // Vectors to hold temporary type and value data
       std::vector<float> temp_type;
       std::vector<float> temp_value;
-      temp_type.reserve(max_expression_size - size);
-      temp_value.reserve(max_expression_size - size);
+      temp_type.reserve(max_tree_size);
+      temp_value.reserve(max_tree_size);
 
       node_stack.emplace_back(n, 0, false);
       
@@ -814,8 +815,8 @@ class GPContext {
 
       // Pad vectors with placeholder values such that the solutions and subtrees
       // are at constant intervals in memory
-      temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
-      temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
+      temp_type.resize(max_tree_size, std::numeric_limits<float>::max());
+      temp_value.resize(max_tree_size, std::numeric_limits<float>::max());
 
       // Append temporary vectors to final vectors
       node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
@@ -894,8 +895,8 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO max_expression_size is not correct
-    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
-    temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
+    temp_type.resize(max_tree_size, std::numeric_limits<float>::max());
+    temp_value.resize(max_tree_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
     node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
@@ -921,6 +922,7 @@ class GPContext {
   usize num_discrete;
   usize num_continuous;
   usize max_expression_size;
+  usize max_tree_size;
   usize num_parameters;
   usize max_num_children;
 
@@ -949,6 +951,20 @@ class GPContext {
                                           // node (without subtrees)
 
  private:
+  size_t determine_max_tree_size(const Template& expression_template) {
+    size_t maximum = 0;
+
+    // Determine the size of the largest output and/or subexpression tree
+    for (const auto& o : expression_template.outputs) {
+      maximum = std::max(maximum, o.max_num_nodes);
+    }
+    for (const auto& s : expression_template.subexpressions) {
+      maximum = std::max(maximum, s.max_num_nodes);
+    }
+
+    return maximum;
+  }
+
   Arr2D<DType> _value2domain;
   std::vector<usize> _parent;  // node -> parent or invalid index for root nodes
 };

@@ -1,11 +1,12 @@
 #include "doctest/doctest.h"
 
+#include "goblin/ga-gp/types.h"
 #include "goblin/gp/context.h"
 #include "goblin/gp/sr.h"
 
 using namespace goblin;
 
-TEST_CASE("goblin::gp::context_single_output") {
+TEST_CASE("goblin::gp::ctx_gpu_repr::single_output") {
     using namespace test;
 
     auto tree = TemplateNode::full_nary(2, 3);
@@ -41,8 +42,8 @@ TEST_CASE("goblin::gp::context_single_output") {
     std::vector<float> expected_node_value;
 
     auto expect = [&](std::vector<float> types, std::vector<float> values) {
-        types.resize(ctx.num_discrete, std::numeric_limits<float>::max());
-        values.resize(ctx.num_discrete, std::numeric_limits<float>::max());
+        types.resize(ctx.max_tree_size, std::numeric_limits<float>::max());
+        values.resize(ctx.max_tree_size, std::numeric_limits<float>::max());
         expected_node_type = std::move(types);
         expected_node_value = std::move(values);
     };
@@ -110,7 +111,7 @@ TEST_CASE("goblin::gp::context_single_output") {
     }
 }
 
-TEST_CASE("goblin::gp::context_multiple_output") {
+TEST_CASE("goblin::gp::ctx_gpu_repr::multiple_output") {
     using namespace test;
 
     auto tree = TemplateNode::full_nary(2, 3);
@@ -157,8 +158,7 @@ TEST_CASE("goblin::gp::context_multiple_output") {
             expected_node_value.end(), values.begin(), values.end()
         );
 
-        // Pad this output to stride = ctx.num_discrete
-        const usize pad = ctx.max_expression_size - types.size();
+        const usize pad = ctx.max_tree_size - types.size();
         expected_node_type.insert(
             expected_node_type.end(), pad, std::numeric_limits<float>::max()
         );
