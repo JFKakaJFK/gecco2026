@@ -32,7 +32,7 @@ void evaluate_kernel_baseline(
     size_t num_datapoints
 ) {
     // Calculate datapoint index
-    size_t datapoint_index = static_cast<size_t>(blockIdx.y) * blockDim.x + threadIdx.x;
+    size_t datapoint_index = (static_cast<size_t>(blockIdx.y) * blockDim.x) + threadIdx.x;
     size_t solution_index = static_cast<size_t>(blockIdx.x);
 
     if (datapoint_index < num_datapoints) {
@@ -55,7 +55,7 @@ void evaluate_kernel_baseline(
         float error = output - Y[datapoint_index];
         float se = error * error;
 
-        size_t partial_index = solution_index * num_datapoints + datapoint_index;
+        size_t partial_index = (solution_index * num_datapoints) + datapoint_index;
 
         // Store squared error in global memory
         partial[partial_index] = se;
@@ -73,7 +73,7 @@ void evaluate_kernel_restrict(
     size_t num_datapoints
 ) {
     // Calculate datapoint index
-    size_t datapoint_index = static_cast<size_t>(blockIdx.y) * blockDim.x + threadIdx.x;
+    size_t datapoint_index = (static_cast<size_t>(blockIdx.y) * blockDim.x) + threadIdx.x;
     size_t solution_index = static_cast<size_t>(blockIdx.x);
 
     if (datapoint_index < num_datapoints) {
@@ -96,7 +96,7 @@ void evaluate_kernel_restrict(
         float error = output - Y[datapoint_index];
         float se = error * error;
 
-        size_t partial_index = solution_index * num_datapoints + datapoint_index;
+        size_t partial_index = (solution_index * num_datapoints) + datapoint_index;
 
         // Store squared error in global memory
         partial[partial_index] = se;
@@ -115,7 +115,7 @@ void evaluate_kernel_shared_memory(
     size_t num_datapoints
 ) {
     // Calculate datapoint index
-    size_t datapoint_index = static_cast<size_t>(blockIdx.y) * blockDim.x + threadIdx.x;
+    size_t datapoint_index = (static_cast<size_t>(blockIdx.y) * blockDim.x) + threadIdx.x;
     size_t solution_index = static_cast<size_t>(blockIdx.x);
 
     // Calculate offset for solution
@@ -148,7 +148,7 @@ void evaluate_kernel_shared_memory(
         float error = output - Y[datapoint_index];
         float se = error * error;
 
-        size_t partial_index = solution_index * num_datapoints + datapoint_index;
+        size_t partial_index = (solution_index * num_datapoints) + datapoint_index;
 
         // Store squared error in global memory
         partial[partial_index] = se;
@@ -169,7 +169,7 @@ void evaluate_kernel_block_reduce(
     // Calculate datapoint index
     // blockIdx.y = block index of solution
     // blockDim.x = number of threads in a block
-    const size_t datapoint_index = static_cast<size_t>(blockIdx.y) * blockDim.x + threadIdx.x;
+    const size_t datapoint_index = (static_cast<size_t>(blockIdx.y) * blockDim.x) + threadIdx.x;
     const size_t solution_index = static_cast<size_t>(blockIdx.x);
 
     // Calculate offset for solution
@@ -188,7 +188,7 @@ void evaluate_kernel_block_reduce(
 
     __syncthreads();
 
-    float se = 0.0f;
+    float se = 0.0F;
 
     // Early exit if thread does not correspond to datapoint
     if (datapoint_index < num_datapoints) {
@@ -217,7 +217,7 @@ void evaluate_kernel_block_reduce(
     if (threadIdx.x == 0) {
         // gridDim.y = Number of partial results per solution
         // blockIdx.y = Partial result index of current solution
-        size_t partial_index = gridDim.y * solution_index + blockIdx.y;
+        size_t partial_index = (gridDim.y * solution_index) + blockIdx.y;
         partial[partial_index] = block_sum;
     }
 }
@@ -256,11 +256,11 @@ void evaluate_mse_kernel(
 
     __syncthreads();
 
-    float se = 0.0f;
+    float se = 0.0F;
 
     for (size_t i = 0; i < datapoints_per_thread; i++) {
         // Calculate datapoint index
-        size_t datapoint_index = i * blockDim.x + threadIdx.x;
+        size_t datapoint_index = (i * blockDim.x) + threadIdx.x;
 
         // Check if datapoint_index corresponds to actual datapoint
         if (datapoint_index < num_datapoints) {
@@ -318,11 +318,11 @@ void evaluate_mse_kernel_fmaf(
 
     __syncthreads();
 
-    float se = 0.0f;
+    float se = 0.0F;
 
     for (size_t i = 0; i < datapoints_per_thread; i++) {
         // Calculate datapoint index
-        size_t datapoint_index = i * blockDim.x + threadIdx.x;
+        size_t datapoint_index = (i * blockDim.x) + threadIdx.x;
 
         // Check if datapoint_index corresponds to actual datapoint
         if (datapoint_index < num_datapoints) {
@@ -381,11 +381,11 @@ void evaluate_mse_kernel_inplace(
 
     __syncthreads();
 
-    float se = 0.0f;
+    float se = 0.0F;
 
     for (size_t i = 0; i < datapoints_per_thread; i++) {
         // Calculate datapoint index
-        size_t datapoint_index = i * blockDim.x + threadIdx.x;
+        size_t datapoint_index = (i * blockDim.x) + threadIdx.x;
 
         // Check if datapoint_index corresponds to actual datapoint
         if (datapoint_index < num_datapoints) {
@@ -414,8 +414,8 @@ void evaluate_mse_kernel_inplace(
 __device__
 float compute_tree_output_baseline(
     float* X, 
-    float* type,
-    float* value,
+    const float* type,
+    const float* value,
     size_t solution_length,
     size_t num_datapoints,
     size_t datapoint_index
@@ -427,17 +427,16 @@ float compute_tree_output_baseline(
     // Traverse through solution from left to right
     for (size_t index = 0; index < solution_length; index++) {
         // Get type of current element
-        NodeType t = static_cast<NodeType>(type[index]);
+        NodeType node_type = static_cast<NodeType>(type[index]);
 
-        if (t == NodeType::Input) {
+        if (node_type == NodeType::Input) {
             size_t input_index = size_t(value[index]);
             // Push input variable onto stack and increase stack pointer
-            stack[sp++] = X[datapoint_index + input_index * num_datapoints];
-        } else if (t == NodeType::Constant) {
+            stack[sp++] = X[datapoint_index + (input_index * num_datapoints)];
+        } else if (node_type == NodeType::Constant) {
             // Push constant value onto stack and increase stack pointer
             stack[sp++] = value[index];
-        } else if (t == NodeType::Operator) { // ValueKind::Operator
-            // TODO improve
+        } else if (node_type == NodeType::Operator) {
             Operator op_value = static_cast<Operator>(value[index]);
             
             // Determine arity of operator
@@ -463,7 +462,7 @@ float compute_tree_output_baseline(
                 args[j] = stack[--sp];
             }
 
-            float res = 0.0f;
+            float res = 0.0F;
 
             switch (op_value) {
                 case Operator::Add: res = args[0] + args[1]; break;
@@ -510,16 +509,16 @@ float compute_tree_output_restrict(
     // Traverse through solution from left to right
     for (size_t index = 0; index < solution_length; index++) {
         // Get type of current element
-        NodeType t = static_cast<NodeType>(type[index]);
+        NodeType node_type = static_cast<NodeType>(type[index]);
 
-        if (t == NodeType::Input) {
+        if (node_type == NodeType::Input) {
             size_t input_index = static_cast<size_t>(value[index]);
             // Push input variable onto stack and increase stack pointer
-            stack[sp++] = X[datapoint_index + input_index * num_datapoints];
-        } else if (t == NodeType::Constant) {
+            stack[sp++] = X[datapoint_index + (input_index * num_datapoints)];
+        } else if (node_type == NodeType::Constant) {
             // Push constant value onto stack and increase stack pointer
             stack[sp++] = value[index];
-        } else if (t == NodeType::Operator) { // ValueKind::Operator
+        } else if (node_type == NodeType::Operator) { // ValueKind::Operator
             // TODO improve
             Operator op_value = static_cast<Operator>(value[index]);
             
@@ -546,7 +545,7 @@ float compute_tree_output_restrict(
                 args[j] = stack[--sp];
             }
 
-            float res = 0.0f;
+            float res = 0.0F;
 
             switch (op_value) {
                 case Operator::Add: res = args[0] + args[1]; break;
@@ -593,16 +592,16 @@ float compute_tree_output_inplace(
     // Traverse through solution from left to right
     for (size_t index = 0; index < solution_length; index++) {
         // Get type of current element
-        NodeType t = static_cast<NodeType>(type[index]);
+        NodeType node_type = static_cast<NodeType>(type[index]);
 
-        if (t == NodeType::Input) {
+        if (node_type == NodeType::Input) {
             size_t input_index = static_cast<size_t>(value[index]);
             // Push input variable onto stack and increase stack pointer
-            stack[sp++] = X[datapoint_index + input_index * num_datapoints];
-        } else if (t == NodeType::Constant) {
+            stack[sp++] = X[datapoint_index + (input_index * num_datapoints)];
+        } else if (node_type == NodeType::Constant) {
             // Push constant value onto stack and increase stack pointer
             stack[sp++] = value[index];
-        } else if (t == NodeType::Operator) { // ValueKind::Operator
+        } else if (node_type == NodeType::Operator) { // ValueKind::Operator
             Operator op_value = static_cast<Operator>(value[index]);
 
             // Apply the operator on the operands depending on op_value.
@@ -634,14 +633,14 @@ float compute_tree_output_inplace(
 }
 
 __global__
-void mse_kernel_baseline(float* partial, float* result, size_t num_solutions, size_t num_datapoints) {
-    size_t solution_index = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+void mse_kernel_baseline(const float* partial, float* result, size_t num_solutions, size_t num_datapoints) {
+    size_t solution_index = (static_cast<size_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
 
     if (solution_index < num_solutions) {
         size_t start = solution_index * num_datapoints; 
         size_t end = start + num_datapoints - 1;
 
-        float sum = 0.0f;
+        float sum = 0.0F;
 
         // Loop through datapoints and sum squared errors
         for (size_t i = start; i <= end; i++) {
@@ -660,13 +659,13 @@ void mse_kernel_restrict(
     size_t num_solutions, 
     size_t num_datapoints
 ) {
-    size_t solution_index = static_cast<size_t>(blockIdx.x) * blockDim.x + threadIdx.x;
+    size_t solution_index = (static_cast<size_t>(blockIdx.x) * blockDim.x) + threadIdx.x;
 
     if (solution_index < num_solutions) {
         size_t start = solution_index * num_datapoints; 
         size_t end = start + num_datapoints - 1;
 
-        float sum = 0.0f;
+        float sum = 0.0F;
 
         // Loop through datapoints and sum squared errors
         for (size_t i = start; i <= end; i++) {

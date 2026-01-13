@@ -1,5 +1,6 @@
 #include "doctest/doctest.h"
 
+#include "goblin/ga-gp/types.h"
 #include "goblin/gp/context.h"
 #include "goblin/gp/sr.h"
 

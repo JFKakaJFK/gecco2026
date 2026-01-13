@@ -45,8 +45,8 @@ void evaluate_kernel_shared_memory(
 __device__
 float compute_tree_output_baseline(
     float* X, 
-    float* type,
-    float* value,
+    const float* type,
+    const float* value,
     size_t solution_length,
     size_t num_datapoints,
     size_t datapoint_index
@@ -107,13 +107,13 @@ void evaluate_kernel_wrapper(
     float* type, 
     float* value, 
     float* partial,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void mse_kernel_wrapper(
     float* partial, 
     float* result, 
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void evaluate_mse_kernel_wrapper(
@@ -122,7 +122,7 @@ void evaluate_mse_kernel_wrapper(
     float* type, 
     float* value, 
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void kernel_wrapper(
@@ -132,7 +132,7 @@ void kernel_wrapper(
     float* value, 
     float* partial,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 float test_compute_output_kernel(
@@ -155,7 +155,7 @@ std::vector<float> test_evaluate_kernel(
 );
 
 std::vector<float> test_compute_mse_kernel(
-    std::vector<float> se, 
+    std::vector<float> partial, 
     size_t num_solutions, 
     size_t num_datapoints,
     KernelVersion version
@@ -170,6 +170,6 @@ std::vector<float> test_evaluate_mse_kernel(
     size_t num_datapoints
 );
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */

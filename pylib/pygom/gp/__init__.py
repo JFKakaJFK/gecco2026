@@ -148,6 +148,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             constant_init_upper_bound=self.kwargs.get(
                 "constant_init_upper_bound", float(np.nanmax(Y))
             ),
+            target_objectives=self.kwargs.get("target_objectives", None),
             **specific_args,
         )
 

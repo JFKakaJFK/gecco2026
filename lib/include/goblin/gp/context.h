@@ -14,8 +14,6 @@
 #include <type_traits>
 #include <span>
 #include <stdexcept>
-#include <iterator>
-#include <ranges>
 
 #include "goblin/ga-gp/types.h"
 #include "goblin/gp/operator.h"
@@ -686,9 +684,9 @@ class GPContext {
       // Mark current node as active
       solution.discrete_active()(node) = true;
 
-      temp_type.push_back(static_cast<float>(type));  
+      temp_type.push_back(static_cast<float>(type));
 
-     if (type == ValueKind::Input) {
+      if (type == ValueKind::Input) {
         // Push the index of the input feature, will be used to access the input matrix on GPU
         temp_value.push_back(v_idx);
       } else if (type == ValueKind::Parameter) {
@@ -716,7 +714,7 @@ class GPContext {
           stack.push_back(children[node][j - 1]);
         }
       }
-    } 
+    }
 
     // Reverse the vectors to allow forward iteration on the GPU
     std::reverse(temp_type.begin(), temp_type.end());

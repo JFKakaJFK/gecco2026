@@ -12,8 +12,12 @@
 
 namespace goblin {
 
-constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
-constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
+constexpr size_t round_up(size_t value, size_t multiple) {
+    return ((value + multiple - 1) / multiple) * multiple;
+}
+constexpr size_t ceil_div(size_t a, size_t b) {
+    return (a + b - 1) / b;
+}
 
 struct KernelDim {
     size_t x = 1;
@@ -21,17 +25,16 @@ struct KernelDim {
     size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) 
-        : x(_x), y(_y), z(_z) {}
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) : x(_x), y(_y), z(_z) {}
 
     static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
         size_t min_redundant = max_threads;
 
-        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= WARP_SIZE) {
             // Round up division to determine number of blocks needed
             size_t blocks_needed = ceil_div(count, threads);
-            size_t redundant = blocks_needed * threads - count;
+            size_t redundant = (blocks_needed * threads) - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
@@ -39,15 +42,15 @@ struct KernelDim {
             }
 
             // Early exit if perfect fit is found
-            if (redundant == 0) break;
+            if (redundant == 0) {
+                break;
+            }
         }
 
         return dim;
     }
 
-    void check() const {
-        assert(x * y * z <= MAX_THREADS_PER_BLOCK);
-    }
+    void check() const { assert(x * y * z <= MAX_THREADS_PER_BLOCK); }
 
     constexpr bool operator==(const KernelDim& other) const {
         return x == other.x && y == other.y && z == other.z;
@@ -57,12 +60,11 @@ struct KernelDim {
 struct KernelConfig {
     KernelDim grid;
     KernelDim block;
-    
-    KernelConfig() = default;
-    KernelConfig(KernelDim _grid, KernelDim _block) 
-        : grid(_grid), block(_block) {}
 
-    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
+    KernelConfig() = default;
+    KernelConfig(KernelDim _grid, KernelDim _block) : grid(_grid), block(_block) {}
+
+    static KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.block = KernelDim::determine(num_datapoints);
@@ -80,7 +82,7 @@ struct KernelConfig {
             config.grid.x = num_solutions;
             // Number of partial results determines the number of threads in a block
             // Rounded to a multiple of 32
-            config.block.x = round_up(num_partial, WARP_SIZE); 
+            config.block.x = round_up(num_partial, WARP_SIZE);
         } else {
             config.block = KernelDim::determine(num_solutions);
             config.grid.x = ceil_div(num_solutions, config.block.x);
@@ -119,15 +121,15 @@ struct LaunchConfig {
 
     LaunchConfig() = default;
     LaunchConfig(
-        KernelConfig eval, 
-        KernelConfig mse, 
+        KernelConfig eval,
+        KernelConfig mse,
         KernelVersion version = KernelVersion::Baseline,
         size_t num_solutions = 1,
         size_t num_datapoints = 1,
         size_t solution_length = 1,
         size_t items_per_thread = 1
-    ) : eval(eval), 
-        mse(mse), 
+    ) : eval(eval),
+        mse(mse),
         kernel_version(version),
         num_solutions(num_solutions),
         num_datapoints(num_datapoints),
@@ -136,8 +138,8 @@ struct LaunchConfig {
 
     static LaunchConfig determine(
         KernelVersion kernel_version,
-        size_t num_solutions, 
-        size_t num_datapoints, 
+        size_t num_solutions,
+        size_t num_datapoints,
         size_t solution_length
     ) {
         LaunchConfig config;
@@ -156,7 +158,7 @@ struct LaunchConfig {
             case (KernelVersion::SingleKernelInplace):
                 config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
                 config.mse = KernelConfig();
-                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x; 
+                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
                 break;
             default:
                 break;
@@ -166,7 +168,7 @@ struct LaunchConfig {
         config.num_solutions = num_solutions;
         config.num_datapoints = num_datapoints;
         config.solution_length = solution_length;
-        
+
         return config;
     }
 
@@ -180,6 +182,6 @@ struct LaunchConfig {
     }
 };
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_MISC_H */
