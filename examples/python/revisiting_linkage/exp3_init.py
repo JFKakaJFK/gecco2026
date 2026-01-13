@@ -265,13 +265,13 @@ def main():
     # exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        clean=True,
-        # limit=1,
-        max_workers=44,  # server has 44 physical cores
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     clean=True,
+    #     # limit=1,
+    #     max_workers=44,  # server has 44 physical cores
+    # )
 
     with load_results(
         LOG_DIR,

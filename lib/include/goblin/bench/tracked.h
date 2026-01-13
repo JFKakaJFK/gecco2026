@@ -608,8 +608,8 @@ class Tracked final : public InstanceBase {
 /// other purposes controlled by the algorithm, not the tracking
 inline void debug_log(InstanceBase& problem,
                       std::string_view path,
-                      std::string_view headers,
-                      std::string_view values,
+                      std::string_view headers = "",
+                      std::string_view values = "",
                       std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
   if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
     if (population.has_value()) {

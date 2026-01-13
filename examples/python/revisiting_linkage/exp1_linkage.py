@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage"
+RESULT_DIR = pathlib.Path("results") / "linkage_extended"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -70,21 +70,21 @@ def problems(rng):
                         "small",
                         [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
                     ),
-                    # (
-                    #     "large",
-                    #     [
-                    #         c.OpAdd(),
-                    #         c.OpSub(),
-                    #         c.OpMul(),
-                    #         c.OpDiv(),
-                    #         c.OpSin(),
-                    #         c.OpCos(),
-                    #         c.OpExp(),
-                    #         c.OpLog(),
-                    #         c.OpSqrt(),
-                    #         c.OpSquare(),
-                    #     ],
-                    # ),
+                    (
+                        "large",
+                        [
+                            c.OpAdd(),
+                            c.OpSub(),
+                            c.OpMul(),
+                            c.OpDiv(),
+                            c.OpSin(),
+                            c.OpCos(),
+                            c.OpExp(),
+                            c.OpLog(),
+                            c.OpSqrt(),
+                            c.OpSquare(),
+                        ],
+                    ),
                 ]:
                     for linear_scaling in [False, True]:
                         ctx = c.GPContext(
@@ -139,7 +139,7 @@ def methods(info, ctx):
         r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
         "Node",  # Normalized pairwise node proximity
         "Node (static)",  # same, but first LT is kept throughout
-        r"Node * $MI_{mask\ inactive}$",
+        # r"Node * $MI_{mask\ inactive}$",
         "Random",  # Random similiarty
     ]:
         discrete_model_kwargs = dict(
@@ -173,7 +173,7 @@ def methods(info, ctx):
 
         yield (
             f'"{similarity}"',
-            c.MixedGOMEA(
+            lambda run_path: c.MixedGOMEA(
                 discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                 population_options=c.PopulationOptions(
                     forced_improvements=False,  # not used per default as per https://arxiv.org/pdf/1904.02050
@@ -188,6 +188,7 @@ def methods(info, ctx):
                     max_num_populations=max_num_populations,
                     subgeneration_factor=subgeneration_factor,
                     restart_stale_populations=restart_stale_populations,
+                    population_logfile=str(run_path / "population_stats.csv")
                 ),
             ),
         )
@@ -198,9 +199,16 @@ def all_tasks():
     for info, seed, instance, ctx in problems(rng):
         # for the same run, all methods get the same seed...
         for method_name, method in methods(info, ctx):
+            run_info = dict(method_name=method_name, **info)
+            run_path = compute_run_path(LOG_DIR, run_info)
             yield (
-                dict(method_name=method_name, **info),
-                dict(instance=instance, method=method, budget=BUDGET, seed=seed),
+                run_info,
+                dict(
+                    instance=instance,
+                    method=method(run_path),
+                    budget=BUDGET,
+                    seed=seed,
+                ),
             )
 
 

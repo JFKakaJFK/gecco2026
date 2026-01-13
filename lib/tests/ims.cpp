@@ -15,6 +15,7 @@ using namespace goblin;
 struct DummyPopulation {
   InstanceBase& problem;
   ArchiveBase& global_archive;
+  AoSSet solutions;
   usize population_size;
   usize num_clusters;
   std::vector<usize>& generation_population_sizes;
@@ -57,6 +58,8 @@ struct DummyPopulation {
       return global_archive;
     }
   };
+
+  const SolutionSetBase& get_solutions() const { return solutions; };
 
   bool converged() { return is_converged; }
 };

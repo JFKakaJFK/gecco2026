@@ -17,6 +17,8 @@
 #include "goblin/lib/instance.h"
 #include "goblin/lib/method.h"
 #include "goblin/lib/rng.h"
+// TODO fix this, lib should not depend on bench!!!
+#include "goblin/bench/tracked.h"
 
 namespace goblin {
 
@@ -31,6 +33,9 @@ struct IMSOptions {
   bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
   usize additional_clusters_per_start = 1;
   std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
+
+  std::optional<std::string> population_logfile = std::nullopt;
+  std::string population_log_resolution = "archive";
 };
 
 template <typename P>
@@ -149,6 +154,25 @@ class IMS final : public MethodBase {
         archive->reset_change_count();
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
+
+        if(opts.population_logfile.has_value()){
+            AoSSet p; // copy is needed because p needs to be non-const, and that is the case because logging for the sr problem at this point in time might do a test set evaluation...
+            if(opts.population_log_resolution == "archive"){
+                const auto& a = populations[p_idx].archive();
+                for(usize i = 0; i < a.size(); i++){
+                    p.add(a[i]);
+                }
+            } else if(opts.population_log_resolution == "population"){
+                const auto& s = populations[p_idx].get_solutions();
+                for(usize i = 0; i < s.size(); i++){
+                    p.add(s[i]);
+                }
+            } else {
+                throw std::runtime_error("Unknown population log resolution.");
+            }
+
+            debug_log(problem, opts.population_logfile.value(), "", "", p);
+        }
 
         if (archive->change_count() > 0) {
           generations_since_last_improvement[p_idx] = 0;

@@ -634,6 +634,8 @@ class Population {
   /// to return the elite to check if an IMS population should stop
   const ArchiveBase& archive() const { return *local_archive; };
 
+  const SolutionSetBase& get_solutions() const { return solutions; };
+
  private:
   void log_subset_statistics() {
     generations_until_next_fos_log =
