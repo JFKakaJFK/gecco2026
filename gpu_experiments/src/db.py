@@ -6,6 +6,8 @@ from tqdm import tqdm
 
 
 def create_db(dir: pathlib.Path):
+    print("Starting db creation...")
+
     db_path = dir / "experiments.duckdb"
 
     conn = duckdb.connect(db_path)
@@ -28,9 +30,8 @@ def create_db(dir: pathlib.Path):
         num_features INTEGER,
         population_size INTEGER,
         operator_set TEXT,
-        template_height INTEGER,
+        template_depth INTEGER,
         run INTEGER,
-        gpu_accelerated BOOL,
         kernel TEXT,
         seed UBIGINT,
         discrete USMALLINT[],
@@ -52,7 +53,7 @@ def create_db(dir: pathlib.Path):
         -pop(?P<pop>\d+)
         -obs(?P<obs>\d+)
         -feat(?P<feat>\d+)
-        -height(?P<height>\d+)
+        -depth(?P<depth>\d+)
         -op_(?P<op_set>[^-]+)
         -fold(?P<fold>\d+)
         -iter(?P<iter>\d+)
@@ -85,9 +86,8 @@ def create_db(dir: pathlib.Path):
             num_features,
             population_size,
             operator_set,
-            template_height,
+            depth,
             run,
-            gpu_accelerated,
             kernel,
             seed,
             discrete,

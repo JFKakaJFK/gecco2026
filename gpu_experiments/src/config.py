@@ -1,11 +1,14 @@
-from dataclasses import dataclass, field, replace
-from typing import Literal
+from collections.abc import Iterable
+from dataclasses import dataclass, field
+from typing import Literal, TypeVar
 
 from pygom import KernelVersion as KV
 
+T = TypeVar("T")
+
 ProblemType = Literal["synthetic", "pmlb"]
 
-KERNEL_VERSIONS: tuple[KV] = (
+KERNEL_VERSIONS: tuple[KV, ...] = (
     KV.baseline,
     KV.restrict,
     KV.shared_memory,
@@ -22,6 +25,19 @@ class ProblemConfig:
     type: ProblemType
     observations: int
     features: int
+    target: float | list[float] | None = None
+
+    def target_objectives(self) -> list[float] | None:
+        if isinstance(self.target, float):
+            return [self.target]
+
+        return self.target
+
+
+@dataclass(frozen=True)
+class TemplateConfig:
+    branching_factor: int = 2
+    depth: int = 4
 
 
 @dataclass(frozen=True)
@@ -41,35 +57,12 @@ class CPUConfig:
     enabled: bool = True
 
 
-@dataclass
-class ExperimentConfig:
-    name: str
-
-    # Problem space
-    problems: list[ProblemConfig]
-    population_sizes: list[int]
-    num_observations: list[int]
-    num_features: list[int]
-    templates: list[list[tuple[int, int]]]
-    operator_sets: list[OperatorSet]
-
-    # Execution
-    cpu: CPUConfig = field(default_factory=CPUConfig)
-    gpu: GPUConfig = field(default_factory=GPUConfig)
-
-
 DATASETS: dict[str, ProblemConfig] = {
     "sin": ProblemConfig(
         name="sin(3.1 * x0 + 2.7)",
         type="synthetic",
         observations=1_000_000,
         features=1,
-    ),
-    "4544": ProblemConfig(
-        name="4544_GeographicalOriginalofMusic",
-        type="pmlb",
-        observations=1059,
-        features=117,
     ),
     "201": ProblemConfig(
         name="201_pol",
@@ -83,49 +76,137 @@ DATASETS: dict[str, ProblemConfig] = {
         observations=1_000_000,
         features=18,
     ),
-}
-
-OPERATOR_SETS: dict[str, OperatorSet] = {
-    "small": OperatorSet("small", "+,-,*,/"),
-    "exp": OperatorSet("exp", "+,-,*,/,sin,cos,exp,log"),
-    "all": OperatorSet(
-        "all",
-        "+,-,*,/,sin,cos,exp,log,square,sqrt,pow,abs,min,max",
+    "feynman_9": ProblemConfig(
+        name="feynman_test_9",
+        type="pmlb",
+        observations=100_000,
+        features=5,
+        target=1.1e6,
     ),
 }
 
-KERNELS_CONFIG = ExperimentConfig(
+OPERATOR_SETS: dict[str, str] = {
+    "small": "+,-,*,/",
+    "exp": "+,-,*,/,sin,cos,exp,log",
+    "all": "+,-,*,/,sin,cos,exp,log,square,sqrt,pow,abs,min,max",
+}
+
+
+def ensure_iter(x: T | list[T]) -> list[T]:
+    if isinstance(x, list):
+        return x
+    else:
+        return [x]
+
+
+@dataclass
+class ExperimentConfig:
+    name: str
+
+    # Problem space
+    problems: list[ProblemConfig] | ProblemConfig
+    population_sizes: list[int] | int
+    num_observations: list[int] | int
+    num_features: list[int] | int
+    templates: list[TemplateConfig] | TemplateConfig = field(
+        default_factory=TemplateConfig
+    )
+    operator_sets: list[str] | str = "all"
+
+    use_target: bool = False
+
+    num_folds: int = 5
+    num_iterations: int = 3
+
+    # Execution
+    cpu: CPUConfig = field(default_factory=CPUConfig)
+    gpu: GPUConfig = field(default_factory=GPUConfig)
+
+    def iter_problems(self) -> Iterable[ProblemConfig]:
+        return ensure_iter(self.problems)
+
+    def iter_population(self) -> Iterable[int]:
+        return ensure_iter(self.population_sizes)
+
+    def iter_observations(self) -> Iterable[int]:
+        return ensure_iter(self.num_observations)
+
+    def iter_features(self) -> Iterable[int]:
+        return ensure_iter(self.num_features)
+
+    def iter_templates(self) -> Iterable[TemplateConfig]:
+        return ensure_iter(self.templates)
+
+    def iter_operators(self) -> Iterable[str]:
+        return ensure_iter(self.operator_sets)
+
+    def get_target_objectives(self, problem: ProblemConfig) -> list[float] | None:
+        if problem not in self.iter_problems():
+            raise ValueError("Problem not found in config")
+
+        return ensure_iter(problem.target_objectives())
+
+
+TEST_CONFIG = ExperimentConfig(
+    name="test",
+    problems=DATASETS["sin"],
+    population_sizes=[256, 512],
+    num_observations=[10, 100],
+    num_features=1,
+    templates=[TemplateConfig(2, 3), TemplateConfig(2, 4)],
+    operator_sets=["small", "all"],
+    gpu=GPUConfig(enabled=True, kernels=(KV.baseline, KV.single_kernel)),
+)
+
+SCALABILITY_POPULATION_CONFIG = ExperimentConfig(
+    name="scalability_population",
+    problems=DATASETS["feynman_9"],
+    population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
+    num_observations=60_000,
+    num_features=DATASETS["feynman_9"].features,
+)
+
+SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
+    name="scalability_observation",
+    problems=DATASETS["feynman_9"],
+    population_sizes=512,
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_features=DATASETS["feynman_9"].features,
+)
+
+KERNEL_SWEEP_POPULATION_CONFIG = ExperimentConfig(
     name="kernel_sweep",
-    problems=[DATASETS["1191"]],
-    population_sizes=[2**i for i in range(9, 16, 2)],  # 512, 2048, 8192, 32768
-    num_observations=[10**i for i in range(4, 7)],  # 10_000, 100_000, 1_000_000
-    num_features=[DATASETS["1191"].features // 2, DATASETS["1191"].features],  # 9, 18
-    templates=[[(2, 4)]],
-    operator_sets=[OPERATOR_SETS["small"], OPERATOR_SETS["all"]],
+    problems=DATASETS["feynman_9"],
+    population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
+    num_observations=60_000,
+    num_features=DATASETS["feynman_9"].features,
+    use_target=True,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(kernels=KERNEL_VERSIONS),
 )
 
-CPU_GPU_CONFIG = ExperimentConfig(
-    name="cpu_vs_gpu",
-    problems=list(DATASETS.values()),
-    population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
-    num_observations=[10**i for i in range(1, 7)],  # 10 - 1_000_000
-    num_features=[2**i for i in range(0, 8)],  # 1 - 128
-    templates=[[(2, 3)], [(2, 4)], [(2, 5)]],
-    operator_sets=list(v for v in OPERATOR_SETS.values()),
-    cpu=CPUConfig(enabled=True),
-    gpu=GPUConfig(enabled=True),
+KERNEL_SWEEP_OBSERVATION_CONFIG = ExperimentConfig(
+    name="kernel_sweep",
+    problems=DATASETS["feynman_9"],
+    population_sizes=512,
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_features=DATASETS["feynman_9"].features,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(kernels=KERNEL_VERSIONS),
 )
 
-TEST_CONFIG = ExperimentConfig(
-    name="test",
-    problems=[DATASETS["sin"]],
-    population_sizes=[256, 512],
-    num_observations=[10, 100],
-    num_features=[1],
-    templates=[[(2, 3)], [(2, 4)]],
-    operator_sets=[OPERATOR_SETS["small"], OPERATOR_SETS["all"]],
-    cpu=CPUConfig(enabled=True),
-    gpu=GPUConfig(enabled=True, kernels=(KV.baseline, KV.single_kernel)),
-)
+
+class Configs:
+    # Test experiment
+    TEST = TEST_CONFIG
+
+    # Scalability experiments
+    SCALABILITY_POPULATION = SCALABILITY_POPULATION_CONFIG
+    SCALABILITY_OBSERVATION = SCALABILITY_OBSERVATION_CONFIG
+
+    # Kernel sweep experiments
+    KERNEL_SWEEP_POPULATION = KERNEL_SWEEP_POPULATION_CONFIG
+    KERNEL_SWEEP_OBSERVATION = KERNEL_SWEEP_OBSERVATION_CONFIG
+
+
+cfg = Configs()
