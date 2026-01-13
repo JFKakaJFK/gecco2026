@@ -369,6 +369,76 @@ def example_solution():
     fig.savefig("template_example.pdf", dpi=600, transparent=True, bbox_inches="tight")
 
 
+def example_node_proximity():
+    d = 2
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    node_proximity = ctx.normalized_node_proximity()
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        TN
+        """,
+        figsize=(8, 4),
+        gridspec_kw=dict(width_ratios=[1.5, 1]),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = draw_nx(
+        template_structure,
+        axes["T"],
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        # label_offset=(0, 0),
+        node_size=1200,
+        margins=0.1,
+    )
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+    axes["T"].set_xlabel("Template")
+
+    S = node_proximity.copy()
+    S[np.triu_indices_from(S)] = ((S - 1.0) * -(1 + 2 * d))[np.triu_indices_from(S)]
+
+    sns.heatmap(
+        node_proximity,
+        annot=S,
+        mask=np.eye(
+            node_proximity.shape[0], dtype=np.bool_
+        ),  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        # fmt="s",
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        square=True,
+        annot_kws=dict(fontsize="small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    axes["N"].set_title("Node Distance")
+    axes["N"].set_xlabel("Node Proximity")
+
+    fig.align_labels()
+    # fig.align_titles()
+
+    fig.savefig(
+        "node_proximity_example.pdf", dpi=600, transparent=True, bbox_inches="tight"
+    )
+
+
 def example_constants():
     solution = [r"$+$", r"$\times$", r"$2.7$", "$x_0$", "$3.1$", "$x_2$", "$3.1$"]
     active = [True, True, True, True, True, False, False]
@@ -695,7 +765,9 @@ def linkage_example():
 if __name__ == "__main__":
     example_solution()
     plt.show()
-    example_constants()
+    example_node_proximity()
     plt.show()
+    # example_constants()
+    # plt.show()
     linkage_example()
     plt.show()

@@ -128,7 +128,7 @@ def rliable_score_dict(
         where = "AND " + where_query
 
     for method, *_ in conn.sql(
-        f"SELECT DISTINCT({method_query}) AS method FROM results"
+        f"SELECT DISTINCT({method_query}) AS method FROM results {f'WHERE true {where}' if where else ''}"
     ).fetchall():
         # get final results for each run and problem
         df = (
