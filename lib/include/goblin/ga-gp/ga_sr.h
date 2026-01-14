@@ -9,6 +9,7 @@
 #include "goblin/gp/context.h"
 #include "goblin/gp/init.h"
 #include "goblin/gp/instance.h"
+#include "goblin/lib/assert.h"
 #include "goblin/lib/archive.h"
 #include "goblin/lib/init.h"
 #include "goblin/lib/types.h"
@@ -59,6 +60,9 @@ class GASRProblem : public GPInstanceBase {
             _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
             _continuous_lower_bounds = -_continuous_upper_bounds;
 
+            __goblin_runtime_assert(!isna(constant_init_lower_bound));
+            __goblin_runtime_assert(!isna(constant_init_upper_bound));
+            __goblin_runtime_assert(constant_init_lower_bound < constant_init_upper_bound);
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 

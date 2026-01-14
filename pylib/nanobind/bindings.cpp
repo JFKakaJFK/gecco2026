@@ -1795,6 +1795,37 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
   //
+
+
+  m.def("evaluate_kernel_wrapper",
+      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("config"));
+
+  m.def("mse_kernel_wrapper",
+      goblin::mse_kernel_wrapper, nb::arg("partial"), nb::arg("result"), nb::arg("config"));
+
+  m.def("evaluate_mse_kernel_wrapper",
+      goblin::evaluate_mse_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("result"), nb::arg("config"));
+
+  m.def("kernel_wrapper",
+      goblin::kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("result"), nb::arg("config"));
+
+  m.def("test_compute_output_kernel",
+      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"), nb::arg("version"));
+
+  m.def("test_evaluate_kernel",
+      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
+
+  m.def("test_compute_mse_kernel",
+      goblin::test_compute_mse_kernel, nb::arg("partial"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
+
+  m.def("test_evaluate_mse_kernel",
+      goblin::test_evaluate_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+  // #endif
+  // #ifndef _GOBLIN_GA_GP_SR_H
+  //
+  // #ifndef _GOBLIN_GA_GP_HELPER_H
+  //
+  // #endif
   // #ifndef _GOBLIN_GA_GP_MISC_H
   //
   // #ifndef _GOBLIN_GA_GP_TYPES_H
@@ -1908,41 +1939,6 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("__eq__",
           &goblin::LaunchConfig::operator==, nb::arg("other"))
       ;
-  // #endif
-
-
-  m.def("evaluate_kernel_wrapper",
-      goblin::evaluate_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("config"));
-
-  m.def("mse_kernel_wrapper",
-      goblin::mse_kernel_wrapper, nb::arg("partial"), nb::arg("result"), nb::arg("config"));
-
-  m.def("evaluate_mse_kernel_wrapper",
-      goblin::evaluate_mse_kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("result"), nb::arg("config"));
-
-  m.def("kernel_wrapper",
-      goblin::kernel_wrapper, nb::arg("x"), nb::arg("y"), nb::arg("type"), nb::arg("value"), nb::arg("partial"), nb::arg("result"), nb::arg("config"));
-
-  m.def("test_compute_output_kernel",
-      goblin::test_compute_output_kernel, nb::arg("h_x"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_datapoints"), nb::arg("datapoint_index"), nb::arg("version"));
-
-  m.def("test_evaluate_kernel",
-      goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
-
-  m.def("test_compute_mse_kernel",
-      goblin::test_compute_mse_kernel, nb::arg("partial"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
-
-  m.def("test_evaluate_mse_kernel",
-      goblin::test_evaluate_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
-  // #endif
-  // #ifndef _GOBLIN_GA_GP_SR_H
-  //
-  // #ifndef _GOBLIN_GA_GP_HELPER_H
-  //
-
-
-  m.def("set_device_wrapper",
-      goblin::set_device_wrapper, nb::arg("device_id"));
   // #endif
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //

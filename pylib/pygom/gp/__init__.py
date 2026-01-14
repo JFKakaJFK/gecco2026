@@ -127,6 +127,10 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         linear_scaling = self.kwargs.get("linear_scaling", True)
         init = vars(pygom)[self.kwargs.get("init", "HalfHalfInit")]()
 
+        temp = float(np.nanmax(np.abs(Y)))
+        constant_init_lower_bound = -temp
+        constant_init_upper_bound = temp
+
         if self.gpu_accelerated:
             ProblemClass = pygom.GASRProblem
             specific_args = {}
@@ -143,10 +147,10 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             linear_scaling=linear_scaling,
             init=init,
             constant_init_lower_bound=self.kwargs.get(
-                "constant_init_lower_bound", float(-np.nanmax(Y))
+                "constant_init_lower_bound", constant_init_lower_bound
             ),
             constant_init_upper_bound=self.kwargs.get(
-                "constant_init_upper_bound", float(np.nanmax(Y))
+                "constant_init_upper_bound", constant_init_upper_bound
             ),
             target_objectives=self.kwargs.get("target_objectives", None),
             **specific_args,

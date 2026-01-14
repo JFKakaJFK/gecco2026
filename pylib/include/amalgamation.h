@@ -3505,13 +3505,224 @@ class CompleteInit final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
 
+#include "misc.h"
+
+// #include "goblin/ga-gp/misc.h"
+
+namespace goblin {
+
+#ifdef __CUDACC__
+__global__
+void evaluate_kernel_baseline(
+    float* X,
+    float* Y,
+    float* v_type,
+    float* v_value,
+    float* partial,
+    size_t solution_length,
+    size_t num_datapoints
+);
+
+__global__
+void evaluate_kernel_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ v,
+    size_t solution_length,
+    size_t num_datapoints
+);
+
+__global__
+void evaluate_kernel_shared_memory(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ partial,
+    size_t solution_length,
+    size_t num_datapoints
+);
+
+__device__
+float compute_tree_output_baseline(
+    float* X,
+    const float* type,
+    const float* value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_restrict(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__device__
+float compute_tree_output_inplace(
+    const float* __restrict__ X,
+    const float* __restrict__ type,
+    const float* __restrict__ value,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index
+);
+
+__global__
+void compute_mse_kernel_baseline(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    size_t num_solutions,
+    size_t num_datapoints
+);
+
+__global__
+void mse_kernel_restrict(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    size_t num_solutions,
+    size_t num_datapoints
+);
+
+__global__
+void compute_tree_output_wrapper(
+    float* X,
+    float* type,
+    float* value,
+    float* result,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
+);
+#endif
+
+void evaluate_kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* partial,
+    LaunchConfig config
+);
+
+void mse_kernel_wrapper(
+    float* partial,
+    float* result,
+    LaunchConfig config
+);
+
+void evaluate_mse_kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* result,
+    LaunchConfig config
+);
+
+void kernel_wrapper(
+    float* X,
+    float* Y,
+    float* type,
+    float* value,
+    float* partial,
+    float* result,
+    LaunchConfig config
+);
+
+float test_compute_output_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_datapoints,
+    size_t datapoint_index,
+    KernelVersion version
+);
+
+std::vector<float> test_evaluate_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_solutions,
+    size_t num_datapoints,
+    KernelVersion version
+);
+
+std::vector<float> test_compute_mse_kernel(
+    std::vector<float> partial,
+    size_t num_solutions,
+    size_t num_datapoints,
+    KernelVersion version
+);
+
+std::vector<float> test_evaluate_mse_kernel(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_solutions,
+    size_t num_datapoints
+);
+
+}  // namespace goblin
+
+#endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_SR_H
+#define _GOBLIN_GA_GP_SR_H
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
+//                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_HELPER_H
+#define _GOBLIN_GA_GP_HELPER_H
+
+namespace goblin {
+
+#ifdef __CUDACC__
+void check(cudaError_t err, char const* func, char const* file, int line);
+#endif
+
+template <typename T>
+T* allocate_on_gpu(size_t count);
+
+template <typename T>
+void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
+
+template <typename T>
+T* allocate_and_copy(const T* host_data, size_t count);
+
+template <typename T>
+void copy_from_device(T* host_data, T* d_ptr, size_t count);
+
+template <typename T>
+void free_on_gpu(T* d_ptr);
+
+template <typename T>
+void zero_mem_on_gpu(T* d_ptr, size_t count);
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_GA_GP_HELPER_H */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/ga-gp/misc.h included by goblin/ga-gp/ga_sr.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_MISC_H
 #define _GOBLIN_GA_GP_MISC_H
@@ -3788,220 +3999,6 @@ struct LaunchConfig {
 }  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_MISC_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/evaluate.h continued                                                      //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace goblin {
-
-#ifdef __CUDACC__
-__global__
-void evaluate_kernel_baseline(
-    float* X,
-    float* Y,
-    float* v_type,
-    float* v_value,
-    float* partial,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
-__global__
-void evaluate_kernel_restrict(
-    const float* __restrict__ X,
-    const float* __restrict__ Y,
-    const float* __restrict__ v_type,
-    const float* __restrict__ v_value,
-    float* __restrict__ v,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
-__global__
-void evaluate_kernel_shared_memory(
-    const float* __restrict__ X,
-    const float* __restrict__ Y,
-    const float* __restrict__ v_type,
-    const float* __restrict__ v_value,
-    float* __restrict__ partial,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
-__device__
-float compute_tree_output_baseline(
-    float* X,
-    const float* type,
-    const float* value,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index
-);
-
-__device__
-float compute_tree_output_restrict(
-    const float* __restrict__ X,
-    const float* __restrict__ type,
-    const float* __restrict__ value,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index
-);
-
-__device__
-float compute_tree_output_inplace(
-    const float* __restrict__ X,
-    const float* __restrict__ type,
-    const float* __restrict__ value,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index
-);
-
-__global__
-void compute_mse_kernel_baseline(
-    const float* __restrict__ partial,
-    float* __restrict__ result,
-    size_t num_solutions,
-    size_t num_datapoints
-);
-
-__global__
-void mse_kernel_restrict(
-    const float* __restrict__ partial,
-    float* __restrict__ result,
-    size_t num_solutions,
-    size_t num_datapoints
-);
-
-__global__
-void compute_tree_output_wrapper(
-    float* X,
-    float* type,
-    float* value,
-    float* result,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index,
-    KernelVersion version
-);
-#endif
-
-void evaluate_kernel_wrapper(
-    float* X,
-    float* Y,
-    float* type,
-    float* value,
-    float* partial,
-    LaunchConfig config
-);
-
-void mse_kernel_wrapper(
-    float* partial,
-    float* result,
-    LaunchConfig config
-);
-
-void evaluate_mse_kernel_wrapper(
-    float* X,
-    float* Y,
-    float* type,
-    float* value,
-    float* result,
-    LaunchConfig config
-);
-
-void kernel_wrapper(
-    float* X,
-    float* Y,
-    float* type,
-    float* value,
-    float* partial,
-    float* result,
-    LaunchConfig config
-);
-
-float test_compute_output_kernel(
-    std::vector<float> h_X,
-    std::vector<float> h_type,
-    std::vector<float> h_value,
-    size_t num_datapoints,
-    size_t datapoint_index,
-    KernelVersion version
-);
-
-std::vector<float> test_evaluate_kernel(
-    std::vector<float> h_X,
-    std::vector<float> h_Y,
-    std::vector<float> h_type,
-    std::vector<float> h_value,
-    size_t num_solutions,
-    size_t num_datapoints,
-    KernelVersion version
-);
-
-std::vector<float> test_compute_mse_kernel(
-    std::vector<float> partial,
-    size_t num_solutions,
-    size_t num_datapoints,
-    KernelVersion version
-);
-
-std::vector<float> test_evaluate_mse_kernel(
-    std::vector<float> h_X,
-    std::vector<float> h_Y,
-    std::vector<float> h_type,
-    std::vector<float> h_value,
-    size_t num_solutions,
-    size_t num_datapoints
-);
-
-}  // namespace goblin
-
-#endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GA_GP_SR_H
-#define _GOBLIN_GA_GP_SR_H
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GA_GP_HELPER_H
-#define _GOBLIN_GA_GP_HELPER_H
-
-namespace goblin {
-
-#ifdef __CUDACC__
-void check(cudaError_t err, char const* func, char const* file, int line);
-#endif
-
-void set_device_wrapper(int device_id);
-
-template <typename T>
-T* allocate_on_gpu(size_t count);
-
-template <typename T>
-void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
-
-template <typename T>
-T* allocate_and_copy(const T* host_data, size_t count);
-
-template <typename T>
-void copy_from_device(T* host_data, T* d_ptr, size_t count);
-
-template <typename T>
-void free_on_gpu(T* d_ptr);
-
-template <typename T>
-void zero_mem_on_gpu(T* d_ptr, size_t count);
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_GA_GP_HELPER_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/ga-gp/ga_sr.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5744,6 +5741,9 @@ class GASRProblem : public GPInstanceBase {
             _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
             _continuous_lower_bounds = -_continuous_upper_bounds;
 
+            __goblin_runtime_assert(!isna(constant_init_lower_bound));
+            __goblin_runtime_assert(!isna(constant_init_upper_bound));
+            __goblin_runtime_assert(constant_init_lower_bound < constant_init_upper_bound);
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
@@ -5765,10 +5765,6 @@ class GASRProblem : public GPInstanceBase {
         void set_kernel_version(KernelVersion kernel_version) {
             _kernel_version = kernel_version;
         }
-
-        // void set_device_id(int device_id) {
-        //     _device_id = device_id;
-        // }
 
         void free_gpu() {
             _free_data_on_gpu();
@@ -5808,9 +5804,6 @@ class GASRProblem : public GPInstanceBase {
             const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
             // Sanity check
             config.check();
-
-            // Set CUDA device to be used for GPU executions
-            // set_device_wrapper(_device_id);
 
             // Copy solution data to GPU
             _copy_solutions_to_gpu(node_type, node_value);
@@ -6052,7 +6045,6 @@ class GASRProblem : public GPInstanceBase {
         float* d_result = nullptr;
 
         KernelVersion _kernel_version = KernelVersion::BlockReduce;
-        // int _device_id = 0;
 };
 
 }

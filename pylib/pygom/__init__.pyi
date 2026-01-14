@@ -1251,11 +1251,91 @@ class CompleteInit(DiscreteInitBase):
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 # #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #
 
+# #include "goblin/ga-gp/misc.h"
+
+def evaluate_kernel_wrapper(
+    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
+) -> None:
+    pass
+
+def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
+    pass
+
+def evaluate_mse_kernel_wrapper(
+    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
+) -> None:
+    pass
+
+def kernel_wrapper(
+    x: float,
+    y: float,
+    type: float,
+    value: float,
+    partial: float,
+    result: float,
+    config: LaunchConfig,
+) -> None:
+    pass
+
+def test_compute_output_kernel(
+    h_x: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_datapoints: int,
+    datapoint_index: int,
+    version: KernelVersion,
+) -> float:
+    pass
+
+def test_evaluate_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    version: KernelVersion,
+) -> List[float]:
+    pass
+
+def test_compute_mse_kernel(
+    partial: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    version: KernelVersion,
+) -> List[float]:
+    pass
+
+def test_evaluate_mse_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+) -> List[float]:
+    pass
+
+# #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
+#                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_SR_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_HELPER_H
+#
+
+# #endif
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/misc.h included by goblin/ga-gp/ga_sr.h                                   //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_MISC_H
 #
@@ -1406,91 +1486,6 @@ class LaunchConfig:
 
     def __eq__(self, other: LaunchConfig) -> bool:
         pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/evaluate.h continued                                                      //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def evaluate_kernel_wrapper(
-    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
-) -> None:
-    pass
-
-def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
-    pass
-
-def evaluate_mse_kernel_wrapper(
-    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
-) -> None:
-    pass
-
-def kernel_wrapper(
-    x: float,
-    y: float,
-    type: float,
-    value: float,
-    partial: float,
-    result: float,
-    config: LaunchConfig,
-) -> None:
-    pass
-
-def test_compute_output_kernel(
-    h_x: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_datapoints: int,
-    datapoint_index: int,
-    version: KernelVersion,
-) -> float:
-    pass
-
-def test_evaluate_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_compute_mse_kernel(
-    partial: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_evaluate_mse_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-) -> List[float]:
-    pass
-
-# #endif
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_SR_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_HELPER_H
-#
-
-def set_device_wrapper(device_id: int) -> None:
-    pass
 
 # #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2328,9 +2323,6 @@ class GASRProblem(GPInstanceBase):
 
     def set_kernel_version(self, kernel_version: KernelVersion) -> None:
         pass
-    # None set_device_id(int device_id) {
-    #     _device_id = device_id;
-    # }
 
     def free_gpu(self) -> None:
         pass

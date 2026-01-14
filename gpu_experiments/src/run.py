@@ -116,7 +116,7 @@ def run_one_task(task: Task, run: int, log_path: Path) -> None:
         seed=task["seed"],
         random_state=task["seed"],
         budget_kwargs={
-            "max_evaluations": 1_000_000,  # TODO
+            # "max_evaluations": 1_000_000,  # TODO
             "max_duration": datetime.timedelta(minutes=15),
         },
         tracking_kwargs={

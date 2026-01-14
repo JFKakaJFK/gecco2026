@@ -81,7 +81,7 @@ DATASETS: dict[str, ProblemConfig] = {
         type="pmlb",
         observations=100_000,
         features=5,
-        target=1.1e6,
+        target=2e7,
     ),
 }
 
@@ -164,6 +164,7 @@ SCALABILITY_POPULATION_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
     num_observations=60_000,
     num_features=DATASETS["feynman_9"].features,
+    use_target=True,
 )
 
 SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
@@ -172,6 +173,7 @@ SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
     population_sizes=512,
     num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
     num_features=DATASETS["feynman_9"].features,
+    use_target=True,
 )
 
 KERNEL_SWEEP_POPULATION_CONFIG = ExperimentConfig(
@@ -191,6 +193,7 @@ KERNEL_SWEEP_OBSERVATION_CONFIG = ExperimentConfig(
     population_sizes=512,
     num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
     num_features=DATASETS["feynman_9"].features,
+    use_target=True,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(kernels=KERNEL_VERSIONS),
 )

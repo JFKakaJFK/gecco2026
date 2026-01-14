@@ -1,10 +1,13 @@
 #pragma once
+
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
 #include <vector>
 
-#include "goblin/ga-gp/misc.h"
+#include "misc.h"
+
+// #include "goblin/ga-gp/misc.h"
 
 namespace goblin {
 

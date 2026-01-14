@@ -111,9 +111,11 @@ def main():
     # run_date = "2026-01-13_11:38:49"
     output_directory = Path("results") / run_date
 
-    # run_experiment(output_directory, cfg.TEST, dry_run=False)
-    # run_experiment(output_directory, cfg., dry_run=True)
-    run_experiment(output_directory, cfg.KERNEL_SWEEP_POPULATION, dry_run=False)
+    run_experiment(output_directory, cfg.SCALABILITY_POPULATION)
+    run_experiment(output_directory, cfg.SCALABILITY_OBSERVATION)
+
+    run_experiment(output_directory, cfg.KERNEL_SWEEP_POPULATION)
+    run_experiment(output_directory, cfg.KERNEL_SWEEP_OBSERVATION)
 
 
 if __name__ == "__main__":
