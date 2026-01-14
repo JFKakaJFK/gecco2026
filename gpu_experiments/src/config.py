@@ -158,6 +158,7 @@ TEST_CONFIG = ExperimentConfig(
     gpu=GPUConfig(enabled=True, kernels=(KV.baseline, KV.single_kernel)),
 )
 
+# Used for comparing the fastest kernel version to the CPU version
 SCALABILITY_POPULATION_CONFIG = ExperimentConfig(
     name="scalability_population",
     problems=DATASETS["feynman_9"],
@@ -176,8 +177,32 @@ SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
     use_target=True,
 )
 
+
+# Used for comparing all kernel versions to the CPU version
+CPU_KERNEL_POPULATION_CONFIG = ExperimentConfig(
+    name="cpu_kernel_population",
+    problems=DATASETS["feynman_9"],
+    population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
+    num_observations=60_000,
+    num_features=DATASETS["feynman_9"].features,
+    use_target=True,
+    gpu=GPUConfig(kernels=KERNEL_VERSIONS),
+)
+
+CPU_KERNEL_OBSERVATION_CONFIG = ExperimentConfig(
+    name="cpu_kernel_observation",
+    problems=DATASETS["feynman_9"],
+    population_sizes=512,
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_features=DATASETS["feynman_9"].features,
+    use_target=True,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(kernels=KERNEL_VERSIONS),
+)
+
+# Used for comparing different kernel versions
 KERNEL_SWEEP_POPULATION_CONFIG = ExperimentConfig(
-    name="kernel_sweep",
+    name="kernel_sweep_population",
     problems=DATASETS["feynman_9"],
     population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
     num_observations=60_000,
@@ -188,7 +213,7 @@ KERNEL_SWEEP_POPULATION_CONFIG = ExperimentConfig(
 )
 
 KERNEL_SWEEP_OBSERVATION_CONFIG = ExperimentConfig(
-    name="kernel_sweep",
+    name="kernel_sweep_observation",
     problems=DATASETS["feynman_9"],
     population_sizes=512,
     num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
@@ -206,6 +231,10 @@ class Configs:
     # Scalability experiments
     SCALABILITY_POPULATION = SCALABILITY_POPULATION_CONFIG
     SCALABILITY_OBSERVATION = SCALABILITY_OBSERVATION_CONFIG
+
+    # CPU vs kernels
+    CPU_KERNEL_POPULATION = CPU_KERNEL_POPULATION_CONFIG
+    CPU_KERNEL_OBSERVATION = CPU_KERNEL_OBSERVATION_CONFIG
 
     # Kernel sweep experiments
     KERNEL_SWEEP_POPULATION = KERNEL_SWEEP_POPULATION_CONFIG
