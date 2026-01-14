@@ -114,8 +114,11 @@ def main():
     run_experiment(output_directory, cfg.SCALABILITY_POPULATION)
     run_experiment(output_directory, cfg.SCALABILITY_OBSERVATION)
 
-    run_experiment(output_directory, cfg.KERNEL_SWEEP_POPULATION)
-    run_experiment(output_directory, cfg.KERNEL_SWEEP_OBSERVATION)
+    run_experiment(output_directory, cfg.CPU_KERNEL_POPULATION)
+    run_experiment(output_directory, cfg.CPU_KERNEL_OBSERVATION)
+
+    # run_experiment(output_directory, cfg.KERNEL_SWEEP_POPULATION)
+    # run_experiment(output_directory, cfg.KERNEL_SWEEP_OBSERVATION)
 
 
 if __name__ == "__main__":

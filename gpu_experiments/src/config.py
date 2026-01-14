@@ -172,7 +172,7 @@ SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
     name="scalability_observation",
     problems=DATASETS["feynman_9"],
     population_sizes=512,
-    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(2, 6)],  # 60 - 60_000
     num_features=DATASETS["feynman_9"].features,
     use_target=True,
 )
@@ -193,7 +193,7 @@ CPU_KERNEL_OBSERVATION_CONFIG = ExperimentConfig(
     name="cpu_kernel_observation",
     problems=DATASETS["feynman_9"],
     population_sizes=512,
-    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(2, 6)],  # 60 - 60_000
     num_features=DATASETS["feynman_9"].features,
     use_target=True,
     cpu=CPUConfig(enabled=False),
@@ -216,7 +216,7 @@ KERNEL_SWEEP_OBSERVATION_CONFIG = ExperimentConfig(
     name="kernel_sweep_observation",
     problems=DATASETS["feynman_9"],
     population_sizes=512,
-    num_observations=[int(10**i * 0.75 * 0.8) for i in range(1, 6)],  # 6 - 60_000
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(2, 6)],  # 60 - 60_000
     num_features=DATASETS["feynman_9"].features,
     use_target=True,
     cpu=CPUConfig(enabled=False),
