@@ -1,6 +1,7 @@
 import pathlib
 import re
 
+import matplotlib
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +17,19 @@ from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
+
+sns.set_theme(
+    context="paper",
+    style="ticks",
+    font_scale=1.5,
+    rc={
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
+    },
+)
+
+matplotlib.rcParams["pdf.fonttype"] = 42
+matplotlib.rcParams["ps.fonttype"] = 42
 
 REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
@@ -213,7 +227,11 @@ def all_tasks():
             )
 
 
-def analyze_subset_stats(conn, odir, problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))"):
+def analyze_subset_stats(
+    conn,
+    odir,
+    problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))",
+):
     print(conn.sql("DESCRIBE fos_stats;"))
 
     problems = sorted(
@@ -447,6 +465,7 @@ def main():
             ],
             nsamples=100,
         )
+
 
 if __name__ == "__main__":
     main()

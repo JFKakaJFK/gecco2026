@@ -9,6 +9,8 @@ from matplotlib.patches import Rectangle
 from pygom import *
 from rliable import library as rly
 from rliable import metrics, plot_utils
+from seaborn._core.typing import PaletteSpec
+from sklearn import metrics as skm
 from tqdm import tqdm
 
 from src.config import c, extract, instantiate, load_config
@@ -63,8 +65,653 @@ m_order = {
 }
 
 
+def custom_convergence_plot(
+    conn,
+    plot_dir,
+    metric: str = "1.0 - nmse_train",
+    metric_label: str = "$R^2$ Train",
+    run_expr: str = r"format('{}.{}', fold, seed)",
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
+    problem_query: str = r"format('{}.{}.{}', problem_name, template_height, linear_scaling)",
+    rows=[  #
+        (
+            "Evaluations",
+            "evaluations",
+            [
+                # 100_000,
+                500_000,
+                int(1e6),
+                int(5e6),
+                int(1e7),
+            ],
+            lambda v: f"{v:.0e}".replace("e+0", "e"),
+            # lambda v: f"$10^{{{int(np.log10(v))}}}$",
+        ),
+        (
+            "Approximate Runtime",
+            "total_time_seconds",
+            [
+                # 0.5 * 60,
+                60,
+                5 * 60,
+                10 * 60,
+                30 * 60,
+            ],
+            lambda v: f"{int(v / 60)}min" if v >= 60 else f"{int(v)}s",
+        ),
+    ],
+    use_non_linear_scaling: bool = False,  # True,
+    filename_suffix="",
+):
+    progress = tqdm(total=1)
+    pdir = plot_dir / "custom"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    methods = [
+        m
+        for m, *_ in conn.sql(
+            f"SELECT DISTINCT(method_name) AS method FROM results WHERE {where_query} ORDER by method"
+        ).fetchall()
+    ]
+
+    max_evals = conn.sql("SELECT MAX(evaluations) FROM results").fetchone()[0]
+
+    algorithms = []
+    row_data = []
+    for _, column, xticks, _ in rows + [
+        (
+            "",
+            "evaluations",
+            [max_evals],
+            None,
+        )
+    ]:
+        score_dict = {}
+        for method in methods:
+            data = None
+
+            for i, value in enumerate(xticks):
+                df = (
+                    conn.execute(
+                        f"""
+                        SELECT
+                            {run_expr} AS run,
+                            {problem_query} AS problem,
+                            MAX({metric}) AS value
+                        FROM results
+                        WHERE {column} <= $2
+                            AND method_name = $1
+                            AND {where_query}
+                        GROUP BY all
+                        ORDER BY run, problem
+                        """,
+                        [method, value],
+                    )
+                    .df()
+                    .pivot(index="run", values="value", columns="problem")
+                )
+
+                if data is None:
+                    data = np.empty((*df.values.shape, len(xticks)))
+
+                data[:, :, i] = df.values
+
+            if data is not None:
+                alg = method2name(method)
+                score_dict[alg] = data
+                algorithms.append(alg)
+
+        row_data.append(score_dict)
+
+    algorithms = sorted(set(algorithms))
+    keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+    algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    hues = sns.color_palette(  #
+        "colorblind", n_colors=len(algorithms)
+    )
+    palette = {a: h for a, h in zip(algorithms, hues)}
+
+    line_style = dict(marker="o", lw=2)
+
+    nrows = len(rows)
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        # sharey=True,
+        figsize=(10, 3 * nrows),
+    )
+
+    for row, (xlabel, column, xticks, fmt) in enumerate(rows):
+        score_dict = row_data[row]
+        ax = axes[row]
+
+        iqm = lambda scores: np.array(
+            [
+                metrics.aggregate_iqm(scores[..., frame])
+                for frame in range(scores.shape[-1])
+            ]
+        )
+        iqm_scores, iqm_cis = rly.get_interval_estimates(
+            score_dict, iqm, reps=5000
+        )  # 0)
+
+        last_iqm_scores, last_iqm_cis = rly.get_interval_estimates(
+            row_data[-1], iqm, reps=5000
+        )
+
+        actual_xticks = list(range(len(xticks))) if use_non_linear_scaling else xticks
+
+        for alg, metric_values in iqm_scores.items():
+            lower, upper = iqm_cis[alg]
+
+            ax.plot(actual_xticks, metric_values, color=palette[alg], **line_style)
+            ax.fill_between(
+                actual_xticks, y1=lower, y2=upper, color=palette[alg], alpha=0.2, lw=0
+            )
+
+        x_end = (
+            max_evals
+            if column == "evaluations"
+            else ax.transData.inverted().transform(ax.transAxes.transform((1.0, 0.0)))[
+                0
+            ]
+        )
+        for alg, metric_values in iqm_scores.items():
+            lower, upper = iqm_cis[alg]
+
+            last_center = last_iqm_scores[alg]
+            last_lower, last_upper = last_iqm_cis[alg]
+
+            last_style = {**line_style}
+            last_style["marker"] = None
+            last_style["lw"] = 1.0
+            ax.plot(
+                [actual_xticks[-1], x_end],
+                [metric_values[-1], last_center[0]],
+                color=palette[alg],
+                ls="dashed",
+                **last_style,
+            )
+            ax.scatter([x_end], [last_center[0]], color=palette[alg], marker="x")
+            ax.fill_between(
+                [actual_xticks[-1], x_end],
+                y1=[lower[-1], last_lower[0]],
+                y2=[upper[-1], last_upper[0]],
+                color=palette[alg],
+                alpha=0.2,
+                lw=0,
+            )
+
+            if alg in [
+                "Random",
+                "$MI$",
+                "$MI_{adjusted}$",
+            ]:
+                ax.axhline(
+                    last_center[0], color=palette[alg], alpha=0.5, linestyle="dotted"
+                )
+        ax.axvline(x_end, color="black", alpha=0.5, zorder=0)  # , linestyle="dashed")
+
+        # frames = np.array(xticks)
+        # plot_utils.plot_sample_efficiency_curve(
+        #     frames + 1,
+        #     iqm_scores,
+        #     iqm_cis,
+        #     algorithms=algorithms,
+        #     xlabel=xlabel,
+        #     ylabel=metric_label,
+        #     ax=ax,
+        # )
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel("IQM " + metric_label)
+
+        ax.set_xticks(actual_xticks, [fmt(v) for v in xticks])
+
+        sns.despine(ax=ax)
+
+    labels, handles = [], []
+    for alg in algorithms:
+        h, *_ = axes.flat[0].plot([], [], color=palette[alg])
+        labels.append(alg)
+        handles.append(h)
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.03),
+        ncols=min(6, len(algorithms)),
+        borderaxespad=0.0,
+        labelspacing=0,
+        frameon=False,
+    )
+
+    fig.savefig(
+        pdir / f"convergence{filename_suffix}.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    progress.update()
+
+
+def custom_cmp_plot(
+    conn,
+    plot_dir,
+    metric: str = "1.0 - nmse_train",
+    metric_label: str = "$R^2$ Train",
+    method_where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
+    problem_query: str = r"format('{}.{}.{}', problem_name, template_height, linear_scaling)",
+    max_evaluations: int | tuple[int, int] = int(1e7),  # (int(1e7), int(5e5)),
+    filename_suffix="",
+):
+    progress = tqdm(total=1)
+    pdir = plot_dir / "custom"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    if isinstance(max_evaluations, int):
+        max_evaluations = [max_evaluations]
+
+    score_dicts = []
+
+    algorithms = []
+    for evals in max_evaluations:
+        score_dict, _ = rliable_score_dict(
+            conn,
+            run_expr="format('{}.{}', fold, run)",
+            problem_query=problem_query,
+            where_query=method_where_query + f"AND evaluations <= {evals}",
+            normalized_value_expr=metric,
+            finished_runs_only=False,
+        )
+
+        score_dict = {method2name(m): s for m, s in score_dict.items()}
+
+        algorithms += sorted(score_dict.keys())
+
+        score_dicts.append(score_dict)
+
+    algorithms = sorted(set(algorithms))
+    keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+    algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+
+    for is_upper, score_dict in enumerate(score_dicts):
+        comparisons = {
+            (algorithms[i], algorithms[j]): (
+                score_dict[algorithms[i]],
+                score_dict[algorithms[j]],
+            )
+            for i in range(len(algorithms))
+            for j in range(i)
+        }
+        average_probabilities, average_prob_cis = rly.get_interval_estimates(
+            comparisons, metrics.probability_of_improvement, reps=2000
+        )
+
+        P = np.empty((len(algorithms), len(algorithms)))
+        M = np.triu(np.ones_like(P, dtype=np.bool_))
+
+        A = [["" for _ in algorithms] for _ in algorithms]
+
+        for i, a in enumerate(algorithms):
+            for j, b in enumerate(algorithms):
+                if j >= i:
+                    continue
+
+                P[i, j] = P[j, i] = (
+                    1.0 - average_probabilities[(a, b)]
+                    if is_upper
+                    else average_probabilities[(a, b)]
+                )
+
+                lower, upper = average_prob_cis[(a, b)]
+                if is_upper:
+                    lower, upper = 1.0 - lower, 1.0 - upper
+
+                A[j][i] = A[i][j] = (
+                    f"{float(P[i, j]):.2f}\n${{}}_{{[{float(lower):.2f},{float(upper):.2f}]}}$"
+                )
+        A = np.array(A)
+
+        if len(score_dicts) == 1:
+            data, mask, annot, xticklabels, yticklabels = (
+                P[1:, :-1],
+                M[1:, :-1],
+                A[1:, :-1],
+                algorithms[:-1],
+                algorithms[1:],
+            )
+        elif is_upper:
+            data, mask, annot, xticklabels, yticklabels = (
+                P.T,
+                M.T,
+                A.T,
+                algorithms,
+                algorithms,
+            )
+        else:
+            data, mask, annot, xticklabels, yticklabels = (
+                P,
+                M,
+                A,
+                algorithms,
+                algorithms,
+            )
+
+        print(is_upper, max_evaluations[is_upper], data, mask)
+
+        sns.heatmap(
+            data,
+            mask=mask,
+            annot=annot,
+            fmt="s",
+            # annot_kws=dict(fontsize="x-small"),
+            annot_kws=dict(fontsize="small"),
+            # annot=True,
+            # mask=np.eye(len(algorithms), dtype=np.bool_),
+            vmin=0,
+            vmax=1,
+            square=True,
+            xticklabels=xticklabels,
+            yticklabels=yticklabels,
+            cbar_kws=dict(shrink=0.95, label="P(A > B)"),
+            cbar=not is_upper,
+            ax=ax,
+        )
+
+        if len(score_dicts) > 1:
+            ax.text(
+                x=0.8 if is_upper else -0.15,
+                y=1.03 if is_upper else -0.1,
+                s=f"{max_evaluations[is_upper]}{['\n', ' '][is_upper]}Evaluations",
+                ha="center",
+                va="center",
+                size="medium",
+                transform=ax.transAxes,
+            )
+
+    # ax.text(
+    #     x=0.75,
+    #     y=0.75,
+    #     s=r"P(A > B)",
+    #     ha="center",
+    #     va="center",
+    #     size="large",
+    #     transform=ax.transAxes,
+    # )
+
+    # ax.text(
+    #     x=0.75,
+    #     y=0.75,
+    #     s=r"P(B > A) = 1 - P(A > B)",
+    #     ha="center",
+    #     va="center",
+    #     size="medium",
+    #     transform=ax.transAxes,
+    # )
+
+    # ax.set_xticks(
+    #     [i + 0.5 for i in range(len(algorithms) - 1)],
+    #     labels=algorithms[:-1],
+    #     rotation=-15,
+    #     ha="left",
+    #     rotation_mode="anchor",
+    # )
+
+    ax.set_ylabel("A")
+    ax.set_xlabel("B")
+
+    if len(score_dicts) > 1:
+        ax.set_title("B")
+        ax.text(
+            x=1.03,
+            y=0.5,
+            s="A",
+            ha="center",
+            va="center",
+            size="medium",
+            transform=ax.transAxes,
+        )
+
+    fig.align_labels()
+
+    fig.savefig(
+        pdir / f"cmp{filename_suffix}.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    progress.update()
+
+
+def custom_pprof_plot(
+    conn,
+    plot_dir,
+    metric: str = "1.0 - nmse_train",
+    metric_label: str = "$R^2$ Train",
+    method_where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
+    problem_query: str = "problem_name",
+    rows: list[tuple[str, str]] = [
+        ("Height = 5", r"template_height::INTEGER = 5::INTEGER"),
+        ("Height = 7", r"template_height::INTEGER = 7::INTEGER"),
+    ],
+    cols: list[tuple[str, str]] = [
+        ("Without Linear Scaling", r"linear_scaling::BOOLEAN = false"),
+        ("With Linear Scaling", r"linear_scaling::BOOLEAN = true"),
+    ],
+    zooms: dict = {  #
+        (0, 1): ((0.775, 0.1), 0.12, 0.8),
+        (1, 1): ((0.75, 0.15), 0.17, 0.75),
+    },
+    filename_suffix="",
+):
+    progress = tqdm(total=1)
+    pdir = plot_dir / "custom"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    algorithms = []
+    row_data = []
+    for row_label, row_query in rows:
+        col_data = []
+        for col_label, col_query in cols:
+            where_query = " AND ".join(
+                q for q in [row_query, col_query, method_where_query] if q
+            )
+
+            score_dict, problems = rliable_score_dict(
+                conn,
+                run_expr="format('{}.{}', fold, run)",
+                problem_query=problem_query,
+                where_query=where_query,
+                normalized_value_expr=metric,
+            )
+
+            score_dict = {method2name(m): s for m, s in score_dict.items()}
+
+            algorithms += score_dict.keys()
+
+            col_data.append(
+                score_dict,
+            )
+        row_data.append(col_data)
+
+    algorithms = sorted(set(algorithms))
+    keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+    algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    hues = sns.color_palette(  #
+        "colorblind", n_colors=len(algorithms)
+    )
+    palette = {a: h for a, h in zip(algorithms, hues)}
+
+    nrows = len(rows)
+    ncols = len(cols)
+
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        sharex=True,
+        sharey=True,
+        squeeze=False,
+        figsize=(ncols * 6, nrows * 3),
+        gridspec_kw=dict(wspace=0.05, hspace=0.1),
+    )
+
+    aucs = {a: np.empty((nrows, ncols)) for a in algorithms}
+
+    line_style = dict(lw=1.5)
+    ci_style = dict(alpha=0.15, lw=0.0)
+
+    for row, (col_data) in enumerate(row_data):
+        row_label = rows[row][0]
+
+        for col, score_dict in enumerate(col_data):
+            col_label = cols[col][0]
+
+            ax = axes[row, col]
+
+            auc_thresholds = np.linspace(0.0, 1.0, 50)
+            auc_distributions, _ = rly.create_performance_profile(
+                score_dict, auc_thresholds
+            )
+
+            thresholds = np.linspace(0.35, 0.95, 100)
+            score_distributions, score_distributions_cis = (
+                rly.create_performance_profile(score_dict, thresholds)
+            )
+
+            # plot_utils.plot_performance_profiles(
+            #     score_distributions,
+            #     thresholds,
+            #     performance_profile_cis=score_distributions_cis,
+            #     # use_non_linear_scaling=True,
+            #     # xticks=[],
+            #     colors=palette,
+            #     ax=ax,
+            # )
+
+            for method, profile in score_distributions.items():
+                ax.plot(thresholds, profile, color=palette[method], **line_style)
+                lower_ci, upper_ci = score_distributions_cis[method]
+                ax.fill_between(
+                    thresholds, lower_ci, upper_ci, color=palette[method], **ci_style
+                )
+
+                aucs[method][row, col] = skm.auc(
+                    auc_thresholds, auc_distributions[method]
+                )
+
+            if (row, col) in zooms:
+                xy, w, h = zooms[(row, col)]
+
+                zax = ax.inset_axes(
+                    [
+                        0.1,  # x0
+                        0.15,  # y0
+                        0.4,  # width
+                        0.6,  # height
+                    ]
+                )
+
+                zoom_taus = np.linspace(xy[0], xy[0] + w, 100)
+                score_distributions, score_distributions_cis = (
+                    rly.create_performance_profile(score_dict, zoom_taus)
+                )
+
+                zls = {**line_style}
+                zls["lw"] = 1.0
+
+                for method, profile in score_distributions.items():
+                    zax.plot(zoom_taus, profile, color=palette[method], **zls)
+                    lower_ci, upper_ci = score_distributions_cis[method]
+                    zax.fill_between(
+                        zoom_taus, lower_ci, upper_ci, color=palette[method], **ci_style
+                    )
+
+                ax.indicate_inset_zoom(zax, edgecolor="black")
+                zax.tick_params(axis="both", which="major", labelsize="xx-small")
+
+            if col == 0:
+                ax.set_ylabel(row_label)
+            else:
+                ax.set_ylabel("")
+
+            if row == 0:
+                ax.set_title(col_label)
+
+            # if row >= nrows - 1:
+            #     ax.set_xlabel(metric_label + r" ($\tau$)")
+            # else:
+            #     ax.set_xlabel("")
+            ax.set_xlabel("")
+
+            sns.despine(ax=ax, offset=5)  # , left=True, bottom=True)  # , trim=True)
+
+            # ax.tick_params("x", length=0)
+            # ax.tick_params("y", pad=20, length=0)
+            # ax.grid(
+            #     visible=True,
+            #     which="major",
+            #     axis="x",
+            #     lw=0.5,
+            #     color="black",
+            #     alpha=0.2,
+            # )
+
+    fig.supylabel(r"Fraction of runs with score $> \tau$", x=0.03)
+    fig.supxlabel(metric_label + r" ($\tau$)", y=0.0)
+
+    labels, handles = [], []
+    for alg in algorithms:
+        h, *_ = axes.flat[0].plot([], [], color=palette[alg], **line_style)
+        labels.append(alg)  # + "\n" + str(aucs[alg]))
+        handles.append(h)
+
+        # for alg in algorithms:
+        h = axes.flat[0].scatter(
+            [], [], marker=r"$\mathsf{AUC}$", s=500, color="k", lw=0
+        )  # , color=palette[alg])
+        mat_str = "\n".join(
+            " ".join(f"${{}}_{{{aucs[alg][i, j]:0.3f}}}$" for j in range(nrows))
+            for i in range(nrows)
+        )
+        print(mat_str, aucs[alg])
+        labels.append(mat_str)
+        handles.append(h)
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.125),
+        ncols=min(6, len(algorithms)),
+        borderaxespad=0.0,
+        labelspacing=0,
+        frameon=False,
+    )
+
+    fig.savefig(
+        pdir / f"pprof{filename_suffix}.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    progress.update()
+
+
 def custom_problem_plot(conn, plot_dir):
-    pdir = plot_dir / "problems"
+    pdir = plot_dir / "custom"
     pdir.mkdir(parents=True, exist_ok=True)
 
     for group, m_where_query in tqdm(
@@ -223,11 +870,13 @@ def custom_problem_plot(conn, plot_dir):
                         hue="method",
                         order=algorithms,
                         palette=palette,
+                        saturation=1.0,
                         # alpha=0.5,
                         linewidth=0.25,
                         flierprops=dict(marker=".", markeredgewidth=0.25),
                         fliersize=3,
                         medianprops=dict(linewidth=0.75),
+                        # boxprops=dict(alpha=0.75),
                         ax=m_ax,
                         legend=False,
                     )
@@ -288,7 +937,7 @@ def custom_problem_plot(conn, plot_dir):
             handles,
             labels,
             loc="lower center",
-            bbox_to_anchor=(0.5, -0.075),
+            bbox_to_anchor=(0.5, -0.05),  # 75),
             ncols=min(6, len(algorithms)),
             borderaxespad=0.0,
             frameon=False,
@@ -305,7 +954,7 @@ def custom_problem_plot(conn, plot_dir):
 
 
 def custom_interval_plot(conn, plot_dir):
-    pdir = plot_dir / "cmp"
+    pdir = plot_dir / "custom" / "intervals"
     pdir.mkdir(parents=True, exist_ok=True)
 
     for group, m_where_query in tqdm(
@@ -560,8 +1209,15 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
+        # custom_convergence_plot(conn, PLOT_DIR)
+        # custom_pprof_plot(conn, PLOT_DIR)
+
         # custom_problem_plot(conn, PLOT_DIR)
-        custom_interval_plot(conn, PLOT_DIR)
+        # custom_interval_plot(conn, PLOT_DIR)
+
+        custom_cmp_plot(conn, PLOT_DIR)
+
+        exit()
 
         for h_group, h_where_query in [  #
             ("", ""),
