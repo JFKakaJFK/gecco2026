@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pygom
 import seaborn as sns
-from matplotlib.colors import AsinhNorm, Normalize
+from matplotlib.colors import AsinhNorm, Normalize, SymLogNorm
 from pygom import *
 from sklearn.externals._packaging.version import SubLocalType
 
@@ -227,10 +227,30 @@ def all_tasks():
             )
 
 
+def method2name(m):
+    return {"$MI_{mask\\ inactive}$": "$MI_{masked}$"}.get(m, m)
+
+
+m_order = {
+    m: i
+    for i, m in enumerate(
+        [
+            "Random",
+            "$MI$",
+            "$MI_{adjusted}$",
+            "$MI_{masked}$",
+            "Node",
+            "Node (static)",
+        ]
+    )
+}
+
+
 def analyze_subset_stats(
     conn,
     odir,
     problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))",
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|Random).*'",
 ):
     print(conn.sql("DESCRIBE fos_stats;"))
 
@@ -238,167 +258,272 @@ def analyze_subset_stats(
         [
             p
             for p, *_ in conn.sql(
-                f"SELECT DISTINCT({problem_query}) FROM fos_stats"
+                f"SELECT DISTINCT({problem_query}) FROM fos_stats WHERE {where_query}"
             ).fetchall()
         ]
     )
 
-    for problem in problems:
-        pdir = odir / problem
-        pdir.mkdir(parents=True, exist_ok=True)
+    for run in [  #
+        0,
+        # 1,
+        # 2,
+        # 3,
+        None,
+    ]:  # average or single run...
+        for ylog in [False, True, None]:
+            joint_cbar = ylog is not None
 
-        methods = sorted(
-            [
-                m
-                for m, *_ in conn.execute(
-                    f"SELECT DISTINCT(method_name) FROM fos_stats WHERE {problem_query} = $1",
-                    [problem],
-                ).fetchall()
-                if "static" not in m
-            ]
-        )
+            for problem in problems:
+                suffix = {False: "linear", True: "log"}.get(ylog, "separate")
+                if run is not None:
+                    suffix += f"_run{run:03d}"
+                pdir = odir / suffix
+                pdir.mkdir(parents=True, exist_ok=True)
 
-        generations = sorted(
-            [
-                g
-                for g, *_ in conn.execute(
-                    f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1",
-                    [problem],
-                ).fetchall()
-            ]
-        )
-
-        nrows = int(np.ceil(len(methods) / 2))
-        ncols = len(generations)
-        fig, axes = plt.subplots(
-            nrows=nrows,
-            ncols=ncols,
-            sharex=True,
-            sharey=True,
-            figsize=(ncols * 3, nrows * 3),
-            gridspec_kw=dict(wspace=0.1, hspace=0.05),
-        )
-        axes = axes.reshape(nrows, ncols)
-
-        cmap = "Blues"  # "plasma"  # sns.diverging_palette(230, 20, as_cmap=True)
-
-        vmax = 1.5  # 2  # 2  # 0  # 1
-        cmap = plt.get_cmap(cmap)
-        norm = Normalize(0, vmax)
-        # norm = AsinhNorm(vmin=0, vmax=vmax, linear_width=1)
-        cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
-
-        cbar_ax = axes.ravel().tolist()
-
-        actual_vmax = 0
-
-        for col, generation in enumerate(generations):
-            for row in range(nrows):
-                ax = axes[row, col]
-
-                avg_sim, mask = None, None
-
-                ax_methods = methods[2 * row : 2 * row + 2]
-                for is_lower, method in enumerate(ax_methods):
-                    stats = conn.execute(
-                        f"""
-                        SELECT
-                            population_size,
-                            cluster,
-                            similarity,
-                            subsets,
-                            usage_count,
-                            evaluation_rate,
-                            acceptance_rate,
-                            avg_improvement,
-                            solution_activation_rate,
-                            variables_activation_rate
-                        FROM fos_stats
-                        WHERE
-                            {problem_query} = $1
-                            AND method_name = $2
-                            AND generation = $3
-                        """,
-                        [problem, method, generation],
-                    ).df()
-
-                    similarities = [
-                        np.array([r.tolist() for r in s]) for s in stats["similarity"]
+                methods = sorted(
+                    [
+                        m
+                        for m, *_ in conn.execute(
+                            f"SELECT DISTINCT(method_name) FROM fos_stats WHERE {problem_query} = $1 AND {where_query}",
+                            [problem],
+                        ).fetchall()
+                        if "static" not in m
                     ]
-                    if len(similarities) < 1:
-                        continue
-                    avg_similarity = similarities[0]
-                    for s in similarities[1:]:
-                        avg_similarity += s
-                    avg_similarity /= len(similarities)
-
-                    if avg_sim is None:
-                        avg_sim = np.zeros_like(avg_similarity, dtype=np.float64)
-                        avg_sim += np.triu(avg_similarity, k=0)
-                        mask = np.zeros_like(avg_sim, dtype=bool)
-                        mask[np.tril_indices(avg_sim.shape[0], k=0)] = True
-                    else:
-                        avg_sim += np.tril(avg_similarity, k=0)
-                        mask[np.tril_indices(avg_sim.shape[0], k=-1)] = False
-
-                if (avg_sim[~mask] > vmax).any():
-                    print(problem, ax_methods, f"Pairwise similarity > {vmax} found!")
-                    print(np.max(avg_sim[~mask]))
-
-                    actual_vmax = max(actual_vmax, float(np.max(avg_sim[~mask])))
-
-                sns.heatmap(
-                    avg_sim,
-                    mask=mask,
-                    cmap=cmap,
-                    norm=norm,
-                    square=True,
-                    linewidths=0.5,
-                    cbar=False,
-                    ax=ax,
                 )
 
-                def fmt_name(name):
-                    return re.match(r"^GP-GOMEA \((.+)\)$", name).group(1)
+                generations = sorted(
+                    [
+                        g
+                        for g, *_ in conn.execute(
+                            f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1 AND {where_query}",
+                            [problem],
+                        ).fetchall()
+                    ]
+                )
 
-                title = (
-                    f"Generation {generation:>3d}\n" if row == 0 else ""
-                ) + fmt_name(ax_methods[0])
-                ax.set_title(title)
+                nrows = int(np.ceil(len(methods) / 2))
+                ncols = len(generations)
+                fig, axes = plt.subplots(
+                    nrows=nrows,
+                    ncols=ncols,
+                    sharex=True,
+                    sharey=True,
+                    figsize=(ncols * 3, nrows * 3),
+                    gridspec_kw=dict(wspace=0.1, hspace=0.05),
+                )
+                axes = axes.reshape(nrows, ncols)
 
-                if col == 0 and len(ax_methods) > 1:
-                    ax.set_ylabel(fmt_name(ax_methods[1]))
+                cmap = (
+                    "Blues"  # "plasma"  # sns.diverging_palette(230, 20, as_cmap=True)
+                )
 
-                ticks, ticklabels = zip(
-                    *[
-                        (
-                            t + 0.5,  # center the tick
-                            str(t),  # + 1) # 0/1 indexing
+                vmax = (
+                    1.04 if "Airfoil" in problem else 2.1
+                )  # 2  # 1.5  # 2  # 2  # 0  # 1
+                cmap = plt.get_cmap(cmap)
+                norm = Normalize(0, vmax)
+                if ylog:
+                    norm = SymLogNorm(0.05, vmin=0, vmax=vmax)
+                    norm = AsinhNorm(vmin=0, vmax=vmax, linear_width=0.05)
+
+                actual_vmax = 0
+
+                data = []
+                for col, generation in enumerate(generations):
+                    row_data = []
+                    for row in range(nrows):
+                        avg_sim, mask = None, None
+
+                        ax_methods = methods[2 * row : 2 * row + 2]
+                        for is_lower, method in enumerate(ax_methods):
+                            stats = conn.execute(
+                                f"""
+                                SELECT
+                                    population_size,
+                                    cluster,
+                                    similarity,
+                                    subsets,
+                                    usage_count,
+                                    evaluation_rate,
+                                    acceptance_rate,
+                                    avg_improvement,
+                                    solution_activation_rate,
+                                    variables_activation_rate,
+                                    format('{{}}.{{}}', fold, seed) as run
+                                FROM fos_stats
+                                WHERE
+                                    {problem_query} = $1
+                                    AND method_name = $2
+                                    AND generation = $3
+                                    AND {where_query}
+                                ORDER BY run
+                                """,
+                                [problem, method, generation],
+                            ).df()
+
+                            if run is not None:
+                                runs = sorted(stats["run"].unique().tolist())
+                                sim = stats[stats["run"] == runs[run]][
+                                    "similarity"
+                                ].values[0]
+                                avg_similarity = np.array([r.tolist() for r in sim])
+                            else:
+                                similarities = [
+                                    np.array([r.tolist() for r in s])
+                                    for s in (stats["similarity"])
+                                ]
+                                if len(similarities) < 1:
+                                    continue
+                                avg_similarity = similarities[0]
+                                for s in similarities[1:]:
+                                    avg_similarity += s
+                                avg_similarity /= len(similarities)
+
+                            if avg_sim is None:
+                                avg_sim = np.zeros_like(
+                                    avg_similarity, dtype=np.float64
+                                )
+                                avg_sim += np.triu(avg_similarity, k=0)
+                                mask = np.zeros_like(avg_sim, dtype=bool)
+                                mask[np.tril_indices(avg_sim.shape[0], k=0)] = True
+                            else:
+                                avg_sim += np.tril(avg_similarity, k=0)
+                                mask[np.tril_indices(avg_sim.shape[0], k=-1)] = False
+
+                        if (avg_sim[~mask] > vmax).any():
+                            print(
+                                problem,
+                                ax_methods,
+                                f"Pairwise similarity > {vmax} found!",
+                            )
+                            print(np.max(avg_sim[~mask]))
+
+                            actual_vmax = max(
+                                actual_vmax, float(np.max(avg_sim[~mask]))
+                            )
+                        row_data.append((avg_sim, mask))
+                    data.append(row_data)
+
+                row_norm = [None for _ in range(nrows)]
+                for row in range(nrows):
+                    row_vmax = 0
+                    for col, _ in enumerate(generations):
+                        avg_sim, mask = data[col][row]
+                        row_vmax = max(row_vmax, float(np.max(avg_sim[~mask])))
+
+                    row_norm[row] = Normalize(0, row_vmax)
+                    if row == 0 and "Airfoil" in problem:  # hack
+                        row_norm[row] = SymLogNorm(0.1, vmin=0, vmax=vmax)
+                        # row_norm[row] = AsinhNorm(vmin=0, vmax=vmax, linear_width=0.05)
+
+                for col, generation in enumerate(generations):
+                    for row in range(nrows):
+                        ax = axes[row, col]
+
+                        ax_methods = methods[2 * row : 2 * row + 2]
+
+                        avg_sim, mask = data[col][row]
+                        sns.heatmap(
+                            avg_sim,
+                            mask=mask,
+                            cmap=cmap,
+                            norm=norm if joint_cbar else row_norm[row],
+                            square=True,
+                            linewidths=0.5,
+                            cbar=False,  # not joint_cbar and col + 1 == len(generations),
+                            # xticklabels=[],
+                            # yticklabels=[],
+                            ax=ax,
                         )
-                        for t in range(0, avg_sim.shape[0], 2)
-                    ]
+
+                        def fmt_name(name):
+                            n = re.match(r"^GP-GOMEA \((.+)\)$", name).group(1)
+                            n = method2name(n)
+                            return "Node / Node (static)" if n == "Node" else n
+
+                        title = (
+                            f"Generation {generation:>3d}\n" if row == 0 else ""
+                        ) + fmt_name(ax_methods[0])
+                        ax.set_title(title)
+
+                        if col == 0 and len(ax_methods) > 1:
+                            ax.set_ylabel(fmt_name(ax_methods[1]))
+
+                        ticks, ticklabels = zip(
+                            *[
+                                (
+                                    t + 0.5,  # center the tick
+                                    str(t),  # + 1) # 0/1 indexing
+                                )
+                                for t in range(0, avg_sim.shape[0], 2)
+                            ]
+                        )
+                        ax.set_xticks(ticks, labels=ticklabels, fontsize="xx-small")
+                        ax.set_yticks(ticks, labels=ticklabels, fontsize="xx-small")
+                        ax.tick_params(
+                            axis="both",
+                            which="major",
+                            bottom=True,
+                            left=True,
+                            length=0,
+                        )
+                        # sns hides the ticks, this would enable them again...
+                        # ax.spines[["left", "bottom"]].set_visible(True)
+                        # ax.tick_params(
+                        #     axis="both",
+                        #     which="major",
+                        #     bottom=True,
+                        #     left=True,
+                        #     length=3,
+                        #     color="black",
+                        # )
+
+                if joint_cbar:
+                    cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
+
+                    cbar_ax = axes.ravel().tolist()
+
+                    cb = fig.colorbar(
+                        cbar,
+                        # pad=0.025,
+                        # shrink=0.4,
+                        pad=0.01,
+                        shrink=0.6,
+                        aspect=30,
+                        drawedges=False,
+                        extend="max" if actual_vmax > vmax else None,
+                        label="Similarity",
+                        ax=cbar_ax,
+                    )
+                    cb.outline.set_linewidth(0.0)
+                else:
+                    for row in range(nrows):
+                        cbar = cm.ScalarMappable(cmap=cmap, norm=row_norm[row])
+
+                        cbar_ax = axes[row, :].ravel().tolist()
+
+                        cb = fig.colorbar(
+                            cbar,
+                            # pad=0.025,
+                            # shrink=0.4,
+                            pad=0.01,
+                            shrink=0.75,
+                            # aspect=30,
+                            drawedges=False,
+                            extend="max" if actual_vmax > vmax else None,
+                            # label="Similarity",
+                            ax=cbar_ax,
+                        )
+                        cb.outline.set_linewidth(0.0)
+
+                fig.savefig(
+                    pdir / f"similarities_{problem.lower().replace(' ', '-')}.pdf",
+                    dpi=600,
+                    bbox_inches="tight",
+                    transparent=True,
                 )
-                ax.set_xticks(ticks, labels=ticklabels)
-                ax.set_yticks(ticks, labels=ticklabels)
 
-        cb = fig.colorbar(
-            cbar,
-            pad=0.025,
-            shrink=0.4,
-            aspect=30,
-            drawedges=False,
-            extend="max" if actual_vmax > vmax else None,
-            label="Similarity",
-            ax=cbar_ax,
-        )
-        cb.outline.set_linewidth(0.0)
-
-        fig.savefig(
-            pdir / "similarities.pdf",
-            dpi=600,
-            bbox_inches="tight",
-            transparent=True,
-        )
+                plt.close(fig)
 
 
 def main():

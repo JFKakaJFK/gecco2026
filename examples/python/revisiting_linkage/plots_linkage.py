@@ -1,8 +1,10 @@
 import pathlib
+from operator import sub
 
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import pygom
 import seaborn as sns
 from matplotlib.patches import Rectangle
@@ -64,6 +66,261 @@ m_order = {
     )
 }
 
+# colorblind-friendly colors from https://www.nature.com/articles/nmeth.1618.pdf
+PALETTE = {
+    "Random": "#E69F00",  # orange
+    "$MI$": "#009E73",  # bluish green
+    "$MI_{adjusted}$": "#CC79A7",  # reddish purple
+    "$MI_{masked}$": "#D55E00",  # vermillion red
+    "Node": "#0072B2",  # blue
+    "Node (static)": "#56B4E9",  # sky blue
+    # "#F0E442", # yellow
+}
+
+
+def custom_problem_convergence_plot(
+    conn,
+    plot_dir,
+    y: str = "1.0 - nmse_train",
+    y_agg: str = "MAX",
+    ylabel: str = "$R^2$ Train",
+    metrics=["evaluations", "total_time_seconds"],
+    metric_labels=["Evaluations", "Approximate Runtime [s]"],
+    run_expr: str = r"format('{}.{}', fold, seed)",
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
+    problem_query: str = "problem_name",
+    modifier_query: str = r"format('H={}{}', template_height, IF(linear_scaling, ' LS', ''))",
+    num_samples: int = 100,
+):
+    progress = tqdm(total=1)
+    pdir = plot_dir / "custom"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    methods = [
+        m
+        for m, *_ in conn.sql(
+            f"SELECT DISTINCT(method_name) AS method FROM results WHERE {where_query} ORDER by method"
+        ).fetchall()
+    ]
+
+    problems = sorted(
+        [
+            p
+            for p, *_ in conn.sql(
+                f"SELECT DISTINCT({problem_query}) AS problem FROM results WHERE {where_query} ORDER by problem"
+            ).fetchall()
+        ]
+    )
+
+    modifiers = sorted(
+        [
+            m
+            for m, *_ in conn.sql(
+                f"SELECT DISTINCT({modifier_query}) AS modifier FROM results WHERE {where_query} ORDER by modifier"
+            ).fetchall()
+        ]
+    )
+
+    algorithms = sorted(set([method2name(m) for m in methods]))
+    keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+    algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    hues = sns.color_palette(  #
+        "colorblind", n_colors=len(algorithms)
+    )
+    palette = {a: h for a, h in zip(algorithms, hues)}
+
+    palette = PALETTE
+
+    nrows = len(modifiers)
+    ncols = len(problems)
+
+    fig, main_axes = plt.subplots(
+        nrows=len(metrics),
+        ncols=1,
+        figsize=(4 * ncols, 2.75 * nrows * len(metrics)),
+        layout="constrained",
+        gridspec_kw=dict(hspace=0.05),
+    )
+
+    gs = main_axes[0].get_subplotspec().get_gridspec()
+
+    for midx, (metric, metric_label) in enumerate(zip(metrics, metric_labels)):
+        subfig = fig.add_subfigure(gs[midx, :])
+
+        axes = subfig.subplots(nrows=nrows, ncols=ncols, squeeze=False)
+        for row, modifier in enumerate(modifiers):
+            for col, problem in enumerate(problems):
+                ax = axes[row, col]
+
+                all_dfs = []
+                for method in methods:
+                    alg = method2name(method)
+                    hue = palette[alg]
+
+                    xlim = conn.execute(
+                        f"""
+                    SELECT
+                        -- MIN({metric}::DOUBLE),
+                        quantile({metric}::DOUBLE, 0.01),
+                        MAX({metric}::DOUBLE)
+                    FROM results
+                    WHERE {modifier_query} = $1
+                      AND {problem_query} = $2
+                      AND method_name = $3
+                      AND {where_query}
+                    """,
+                        [modifier, problem, method],
+                    ).fetchone()
+
+                    first_done_x, *_ = conn.execute(
+                        f"""
+                    SELECT
+                        MIN({metric}::DOUBLE)
+                    FROM results
+                    WHERE {modifier_query} = $1
+                      AND {problem_query} = $2
+                      AND method_name = $3
+                      AND {where_query}
+                      AND status != 'Running'
+                      AND status != 'Aborted'
+                    """,
+                        [modifier, problem, method],
+                    ).fetchone()
+                    first_done_y = (
+                        conn.execute(
+                            f"""
+                            SELECT
+                                {y_agg}({y}) AS value,
+                                {run_expr} AS run
+                            FROM results
+                            WHERE {modifier_query} = $1
+                            AND {problem_query} = $2
+                            AND method_name = $3
+                            AND {metric}::DOUBLE <= {first_done_x}::DOUBLE
+                            AND {where_query}
+                            GROUP BY all
+                            """,
+                            [modifier, problem, method],
+                        )
+                        .df()["value"]
+                        .median()
+                    )
+
+                    df = pd.concat(
+                        [
+                            conn.execute(
+                                f"""
+                        SELECT
+                            {y_agg}({y}) AS value,
+                            {run_expr} AS run,
+                            {x}::DOUBLE AS metric,
+                        FROM results
+                        WHERE {modifier_query} = $1
+                          AND {problem_query} = $2
+                          AND method_name = $3
+                          AND {metric}::DOUBLE <= {x}::DOUBLE
+                          AND {where_query}
+                        GROUP BY all
+                        """,
+                                [modifier, problem, method],
+                            ).df()
+                            for x in np.linspace(*xlim, num_samples)
+                        ],
+                        ignore_index=True,
+                    )
+
+                    sns.lineplot(
+                        df,
+                        x="metric",
+                        y="value",
+                        color=hue,
+                        # units="unit",
+                        # estimator=None,
+                        lw=1.5,
+                        estimator=np.median,
+                        errorbar=("pi", 50),
+                        err_kws=dict(linewidth=0),
+                        legend=False,
+                        ax=ax,
+                    )
+
+                    if first_done_x < xlim[1]:
+                        ax.scatter(
+                            first_done_x,
+                            first_done_y,
+                            color=hue,
+                            marker="x",
+                            s=100,
+                            # lw=0.5,
+                            zorder=0,
+                        )
+
+                    all_dfs.append(df)
+
+                adf = pd.concat(all_dfs, ignore_index=True)
+                truncation_ratio = 0.05
+                ylim = (
+                    adf["value"].quantile(truncation_ratio / 2),
+                    min(
+                        1.0, adf["value"].max()
+                    ),  # adf["value"].quantile(1.0 - truncation_ratio / 2),
+                )
+                ax.set_ylim(*ylim)
+
+                if row == 0:  # and midx == 0:
+                    ax.set_title(problem)
+
+                ax.set_xlabel(
+                    # metric_label if row + 1 == nrows else
+                    ""
+                )
+                ax.set_ylabel(ylabel + "\n" + modifier if col == 0 else "")
+
+                sns.despine(ax=ax)
+
+                ax.grid(
+                    visible=True,
+                    which="major",
+                    axis="both",
+                    lw=0.5,
+                    color="black",
+                    alpha=0.2,
+                )
+
+        subfig.supxlabel(metric_label, y=-0.0225)
+
+    labels, handles = [], []
+    for alg in algorithms:
+        h, *_ = main_axes.flat[0].plot([], [], color=palette[alg], lw=3)
+        labels.append(alg)
+        handles.append(h)
+
+    for a in main_axes:
+        a.remove()
+
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.03),
+        ncols=min(6, len(algorithms)),
+        borderaxespad=0.0,
+        labelspacing=0,
+        frameon=False,
+    )
+
+    fig.savefig(
+        pdir / "convergence_per_problem.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    progress.update()
+
 
 def custom_convergence_plot(
     conn,
@@ -81,7 +338,9 @@ def custom_convergence_plot(
                 # 100_000,
                 500_000,
                 int(1e6),
+                int(2e6),
                 int(5e6),
+                # int(7.5e6),
                 int(1e7),
             ],
             lambda v: f"{v:.0e}".replace("e+0", "e"),
@@ -95,12 +354,16 @@ def custom_convergence_plot(
                 60,
                 5 * 60,
                 10 * 60,
+                #
+                20 * 60,
+                #
                 30 * 60,
             ],
             lambda v: f"{int(v / 60)}min" if v >= 60 else f"{int(v)}s",
         ),
     ],
     use_non_linear_scaling: bool = False,  # True,
+    minor_ticks: bool = True,
     filename_suffix="",
 ):
     progress = tqdm(total=1)
@@ -126,11 +389,25 @@ def custom_convergence_plot(
             None,
         )
     ]:
+        row_ticks = []
+        if minor_ticks:
+            row_ticks = [xticks[0]]
+            i, t = 1, row_ticks[-1]
+            while i < len(xticks):
+                t += xticks[0]
+                if t < xticks[i]:
+                    row_ticks.append(t)
+                else:
+                    row_ticks.append(xticks[i])
+                    i += 1
+        else:
+            row_ticks = xticks
+
         score_dict = {}
         for method in methods:
             data = None
 
-            for i, value in enumerate(xticks):
+            for i, value in enumerate(row_ticks):
                 df = (
                     conn.execute(
                         f"""
@@ -152,7 +429,7 @@ def custom_convergence_plot(
                 )
 
                 if data is None:
-                    data = np.empty((*df.values.shape, len(xticks)))
+                    data = np.empty((*df.values.shape, len(row_ticks)))
 
                 data[:, :, i] = df.values
 
@@ -161,7 +438,7 @@ def custom_convergence_plot(
                 score_dict[alg] = data
                 algorithms.append(alg)
 
-        row_data.append(score_dict)
+        row_data.append((score_dict, row_ticks))
 
     algorithms = sorted(set(algorithms))
     keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
@@ -172,17 +449,19 @@ def custom_convergence_plot(
     )
     palette = {a: h for a, h in zip(algorithms, hues)}
 
+    palette = PALETTE
+
     line_style = dict(marker="o", lw=2)
 
     nrows = len(rows)
     fig, axes = plt.subplots(
         nrows=nrows,
         # sharey=True,
-        figsize=(10, 3 * nrows),
+        figsize=(11, 3 * nrows),
     )
 
     for row, (xlabel, column, xticks, fmt) in enumerate(rows):
-        score_dict = row_data[row]
+        score_dict, row_ticks = row_data[row]
         ax = axes[row]
 
         iqm = lambda scores: np.array(
@@ -196,10 +475,12 @@ def custom_convergence_plot(
         )  # 0)
 
         last_iqm_scores, last_iqm_cis = rly.get_interval_estimates(
-            row_data[-1], iqm, reps=5000
+            row_data[-1][0], iqm, reps=5000
         )
 
-        actual_xticks = list(range(len(xticks))) if use_non_linear_scaling else xticks
+        actual_xticks = (
+            list(range(len(row_ticks))) if use_non_linear_scaling else row_ticks
+        )
 
         for alg, metric_values in iqm_scores.items():
             lower, upper = iqm_cis[alg]
@@ -224,15 +505,15 @@ def custom_convergence_plot(
 
             last_style = {**line_style}
             last_style["marker"] = None
-            last_style["lw"] = 1.0
+            # last_style["lw"] = 1.0
             ax.plot(
                 [actual_xticks[-1], x_end],
                 [metric_values[-1], last_center[0]],
                 color=palette[alg],
-                ls="dashed",
+                ls="dotted",
                 **last_style,
             )
-            ax.scatter([x_end], [last_center[0]], color=palette[alg], marker="x")
+            ax.scatter([x_end], [last_center[0]], color=palette[alg], marker="x", s=50)
             ax.fill_between(
                 [actual_xticks[-1], x_end],
                 y1=[lower[-1], last_lower[0]],
@@ -248,7 +529,11 @@ def custom_convergence_plot(
                 "$MI_{adjusted}$",
             ]:
                 ax.axhline(
-                    last_center[0], color=palette[alg], alpha=0.5, linestyle="dotted"
+                    last_center[0],
+                    color=palette[alg],
+                    alpha=0.75,
+                    linestyle="dashed",
+                    zorder=0,
                 )
         ax.axvline(x_end, color="black", alpha=0.5, zorder=0)  # , linestyle="dashed")
 
@@ -265,13 +550,23 @@ def custom_convergence_plot(
         ax.set_xlabel(xlabel)
         ax.set_ylabel("IQM " + metric_label)
 
-        ax.set_xticks(actual_xticks, [fmt(v) for v in xticks])
+        major_ticks = list(range(len(xticks))) if use_non_linear_scaling else xticks
+        ax.set_xticks(major_ticks, [fmt(v) for v in xticks])
+
+        ax.grid(
+            visible=True,
+            which="major",
+            axis="both",
+            lw=0.5,
+            color="black",
+            alpha=0.2,
+        )
 
         sns.despine(ax=ax)
 
     labels, handles = [], []
     for alg in algorithms:
-        h, *_ = axes.flat[0].plot([], [], color=palette[alg])
+        h, *_ = axes.flat[0].plot([], [], color=palette[alg], lw=2)
         labels.append(alg)
         handles.append(h)
 
@@ -279,7 +574,7 @@ def custom_convergence_plot(
         handles,
         labels,
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.03),
+        bbox_to_anchor=(0.475, -0.03),
         ncols=min(6, len(algorithms)),
         borderaxespad=0.0,
         labelspacing=0,
@@ -552,6 +847,8 @@ def custom_pprof_plot(
     )
     palette = {a: h for a, h in zip(algorithms, hues)}
 
+    palette = PALETTE
+
     nrows = len(rows)
     ncols = len(cols)
 
@@ -561,7 +858,7 @@ def custom_pprof_plot(
         sharex=True,
         sharey=True,
         squeeze=False,
-        figsize=(ncols * 6, nrows * 3),
+        figsize=(ncols * 7, nrows * 3),
         gridspec_kw=dict(wspace=0.05, hspace=0.1),
     )
 
@@ -777,6 +1074,8 @@ def custom_problem_plot(conn, plot_dir):
         )
         palette = {a: h for a, h in zip(algorithms, hues)}
 
+        palette = PALETTE
+
         nrows = len(rows)
         ncols = len(problems)
 
@@ -786,7 +1085,7 @@ def custom_problem_plot(conn, plot_dir):
             sharex="col",
             sharey=False,
             squeeze=False,
-            figsize=(ncols * 3, nrows * 4),
+            figsize=(ncols * 3, nrows * 4.5),
             gridspec_kw=dict(wspace=0.05, hspace=0.1),
         )
 
@@ -963,14 +1262,14 @@ def custom_interval_plot(conn, plot_dir):
                 "_main",
                 r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
             ),  # random, mi, mi_a, mi_m, node
-            (
-                "_masking",
-                r"method_name NOT SIMILAR TO '.*(adjusted|Random|Node).*'",
-            ),  # mi, any, all, masked
-            (
-                "_hybrid",
-                r"method_name NOT SIMILAR TO '.*(adjusted|Random|any|all).*'",
-            ),  # mi, node, static, hybrid
+            # (
+            #     "_masking",
+            #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|Node).*'",
+            # ),  # mi, any, all, masked
+            # (
+            #     "_hybrid",
+            #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|any|all).*'",
+            # ),  # mi, node, static, hybrid
         ]
     ):
         algorithms = []
@@ -1025,6 +1324,8 @@ def custom_interval_plot(conn, plot_dir):
         )
         palette = {a: h for a, h in zip(algorithms, hues)}
 
+        palette = PALETTE
+
         aggregate_func = lambda x: np.array(
             [
                 # metrics.aggregate_median(x), # is the median of means
@@ -1053,7 +1354,7 @@ def custom_interval_plot(conn, plot_dir):
             sharex=True,  # "col",
             sharey=False,
             squeeze=False,
-            figsize=(ncols * 6, nrows * 3),
+            figsize=(ncols * 7, nrows * 3),
             gridspec_kw=dict(wspace=0.05, hspace=0.1),
         )
 
@@ -1209,13 +1510,15 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
-        # custom_convergence_plot(conn, PLOT_DIR)
+        custom_convergence_plot(conn, PLOT_DIR)
         # custom_pprof_plot(conn, PLOT_DIR)
 
         # custom_problem_plot(conn, PLOT_DIR)
         # custom_interval_plot(conn, PLOT_DIR)
 
-        custom_cmp_plot(conn, PLOT_DIR)
+        # custom_problem_convergence_plot(conn, PLOT_DIR)
+
+        # custom_cmp_plot(conn, PLOT_DIR)
 
         exit()
 
