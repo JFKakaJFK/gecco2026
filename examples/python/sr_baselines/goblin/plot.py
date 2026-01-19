@@ -26,9 +26,12 @@ if __name__ == "__main__":
             """
         )
 
+        exclude = "true"
+        exclude = r"alg_name NOT SIMILAR TO '.*(10C).*'"
+
         # make some plots
         methods = sorted(
-            conn.execute("SELECT DISTINCT alg_name FROM results")
+            conn.execute(f"SELECT DISTINCT alg_name FROM results WHERE {exclude}")
             .df()["alg_name"]
             .tolist()
         )
@@ -40,7 +43,9 @@ if __name__ == "__main__":
         metric_labels = [r"$R^2$ Train", r"$R^2$ Test", "Time [s]"]
 
         for max_evals in tqdm(
-            conn.execute("SELECT DISTINCT max_evals FROM results").df()["max_evals"]
+            conn.execute(
+                f"SELECT DISTINCT max_evals FROM results WHERE {exclude}"
+            ).df()["max_evals"]
         ):
             # for max_evals in df["max_evals"].unique():
             # df_subset = df[df["max_evals"] == max_evals]
@@ -58,7 +63,7 @@ if __name__ == "__main__":
             for row_idx, linear_scaling in enumerate([True, False]):
                 # df_row = df_subset[df_subset["linear_scaling"] == linear_scaling]
                 df_row = conn.execute(
-                    "SELECT * FROM results WHERE max_evals = $1 AND linear_scaling = $2",
+                    f"SELECT * FROM results WHERE max_evals = $1 AND linear_scaling = $2 AND {exclude}",
                     [max_evals, linear_scaling],
                 ).df()
 

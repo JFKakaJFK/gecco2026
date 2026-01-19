@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -3249,6 +3250,680 @@ class MethodBase {
 
 #include <cstddef>
 
+// TODO fix this, lib should not depend on bench!!!
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/tracked.h included by goblin/lib/ims.h                                    //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_TRACKED_H
+#define _GOBLIN_BENCH_TRACKED_H
+
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <ostream>
+#include <string>
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/timer.h included by goblin/bench/tracked.h                                //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_TIMER_H
+#define _GOBLIN_BENCH_TIMER_H
+
+
+
+namespace goblin {
+class Timer {
+ public:
+  void start() { start_time_ = std::make_optional(std::chrono::high_resolution_clock::now()); }
+
+  void stop() {
+    auto now = std::chrono::high_resolution_clock::now();
+    if (start_time_.has_value()) {
+      total_time_ += std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time_.value());
+      start_time_ = std::nullopt;
+    }
+  }
+
+  std::chrono::nanoseconds elapsed() const { return total_time_; }
+
+ private:
+  std::chrono::nanoseconds total_time_{0};
+  std::optional<std::chrono::high_resolution_clock::time_point> start_time_ = std::nullopt;
+};
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_TIMER_H */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/tracked.h continued                                                       //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+namespace goblin {
+
+template <typename T>
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  usize i = 0;
+  for (const auto& e : span) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
+#ifdef __cpp_lib_print
+      std::print(os,
+#else
+      os << std::format(
+#endif
+                 "{:d}", e);
+    } else {
+      os << e;
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename EigenLike>
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  if (m.rows() > 1 && m.cols() > 1) {
+    for (isize r = 0; r < m.rows(); r++) {
+      if (r > 0) {
+        os << ',';
+      }
+      if (indent) {
+        os << "\n  ";
+      }
+      os << '[';
+      for (isize c = 0; c < m.cols(); c++) {
+        if (c > 0) {
+          os << ',';
+        }
+
+        // fmt to alwyas use the decimal instead of the ascii byte value for
+        // (unsigned) chars
+        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", m(r, c));
+        } else {
+          os << m(r, c);
+        }
+      }
+      os << ']';
+    }
+    if (indent) {
+      os << '\n';
+    }
+  } else {
+    for (isize i = 0; i < m.size(); i++) {
+      if (i > 0) {
+        os << ',';
+      }
+      // fmt to alwyas use the decimal instead of the ascii byte value for
+      // (unsigned) chars
+      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+        std::print(os,
+#else
+        os << std::format(
+#endif
+                   "{:d}", m(i));
+      } else {
+        os << m(i);
+      }
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename T>
+inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
+  std::ostringstream os;
+  log_helper(os, t, escape, indent);
+  return os.str();
+};
+
+class TrackingOptions {
+ public:
+  TrackingOptions() = delete;
+  // TODO at some point think about enabling dynamically setting the logging
+  // precision for floating points
+  // TODO at some point allow these params on Tracked::run to reduce the amount
+  // of config object nesting?
+  TrackingOptions(std::filesystem::path logpath,
+                  std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
+                  usize archive_capacity = 100,
+                  u64 max_evaluations_until_archive_adaption = 100000,
+                  bool consider_evaluation_time = true,
+                  bool report_intermediate_results = true,
+                  u64 initial_evaluations_until_next_report = 10,
+                  u64 eval_factor = 2,
+                  u64 max_evaluations_until_next_report = 1000000,
+                  u64 initial_generations_until_next_report = 1,
+                  u64 generation_factor = 2,
+                  u64 max_generations_until_next_report = 100,
+                  std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
+                  u64 time_factor = 2,
+                  std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
+      : archive_capacity(archive_capacity),
+        max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
+        consider_evaluation_time(consider_evaluation_time),
+        report_intermediate_results(report_intermediate_results),
+        initial_evaluations_until_next_report(initial_evaluations_until_next_report),
+        eval_factor(eval_factor),
+        max_evaluations_until_next_report(max_evaluations_until_next_report),
+        initial_generations_until_next_report(initial_generations_until_next_report),
+        generation_factor(generation_factor),
+        max_generations_until_next_report(max_generations_until_next_report),
+        initial_time_until_next_report(initial_time_until_next_report),
+        time_factor(time_factor),
+        max_time_until_next_report(max_time_until_next_report),
+        logpath(logpath) {
+    if (log_info.has_value()) {
+      for (auto& kv : log_info.value()) {
+        // TODO escape any '"' here?
+        log_info_headers += std::get<0>(kv) + ',';
+        log_info_values += std::get<1>(kv) + ',';
+      }
+    }
+  };
+
+  usize archive_capacity;
+  u64 max_evaluations_until_archive_adaption;
+  bool consider_evaluation_time;
+  bool report_intermediate_results;
+
+  u64 initial_evaluations_until_next_report;
+  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_evaluations_until_next_report;
+
+  u64 initial_generations_until_next_report;
+  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_generations_until_next_report;
+
+  std::chrono::nanoseconds initial_time_until_next_report;
+  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
+  std::chrono::nanoseconds max_time_until_next_report;
+
+ private:
+  std::filesystem::path logpath;
+
+  // key-value pairs to log, e.g.
+  // [(method_name,AMaLGaM),(problem_name,Sphere),(dims,10),(run,99)]
+  std::string log_info_headers;
+  std::string log_info_values;
+
+  friend class Tracked;
+};
+
+/// An instance that intercepts evaluations
+class Tracked final : public InstanceBase {
+ public:
+  Tracked() = delete;
+
+  usize num_objectives() const override final { return instance.num_objectives(); };
+
+  usize num_discrete() const override final { return instance.num_discrete(); };
+  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
+
+  usize num_continuous() const override final { return instance.num_continuous(); };
+  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
+  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
+    return instance.continuous_init_lower_bounds();
+  };
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
+    return instance.continuous_init_upper_bounds();
+  };
+
+  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
+              indices);
+  };
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
+    wrap_eval(
+        [&](const std::span<const usize>& _indices) {
+          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+        },
+        solutions, indices);
+  };
+
+  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+    return instance.add_random(rng, solutions, count);
+  };
+
+  const FitnessBase& fitness() const override final { return instance.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
+
+  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
+
+  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
+
+  void log_header(std::ostream& os) const override { instance.log_header(os); }
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    instance.log_solution(os, solution);
+  }
+
+  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    u64 evals_before = this->evaluations, _evals = evaluations;
+    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
+    return res;
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    u64 evals_before = evaluations;
+    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+
+    alg_timer.stop();
+    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
+
+    for (usize i : /* changed_indices */ std::get<0>(res)) {
+      archive.update(solutions[i], true);
+    }
+
+    if (instance.target_reached(archive)) {
+      status = TerminationStatus::TargetReached;
+      throw TrackingException("");
+    }
+
+    alg_timer.start();
+    return res;
+  }
+
+  /// This can be used by the algorithm to log when debugging to log an
+  /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
+  /// values need to be empty, or valid csv columns with a ',' separator at the
+  /// end (possibly escaping other ',' occurrences with '"').
+  template <typename P>
+  void request_debug_report(std::filesystem::path debug_logpath,
+                            P& solutions,
+                            std::string_view debug_headers,
+                            std::string_view debug_values) {
+    // close the actual logfile to open up the debug logpath next
+    if (logfile.is_open()) {
+      logfile.close();
+    }
+
+    // temporarily change the logpath
+    auto tracked_generation = generation;
+    generation = method.current_generation();
+    std::swap(debug_logpath, config.logpath);
+    report(solutions, debug_headers, debug_values);
+    std::swap(debug_logpath, config.logpath);
+    generation = tracked_generation;
+
+    // close the debug logfile to open up the actual logpath again next
+    if (logfile.is_open()) {
+      logfile.close();
+    }
+  };
+
+  void request_debug_report(std::filesystem::path debug_logpath,
+                            std::string_view debug_headers,
+                            std::string_view debug_values) {
+    request_debug_report(debug_logpath, archive, debug_headers, debug_values);
+  };
+
+  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& instance,
+      MethodBase& method,
+      Budget& budget,
+      TrackingOptions config,
+      std::optional<usize> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) {
+    std::random_device rd;
+    usize _seed = seed.has_value() ? seed.value()
+                                   : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
+    Tracked ti(instance, method, budget, config, _seed);
+    try {
+      ti.alg_timer.start();
+      auto [_, alg_status] = method.run(ti, budget, _seed, population_size);
+      ti.alg_timer.stop();
+      ti.status = alg_status;
+
+      // TODO why is this necessary? (alg should not be able to hit the target without the exception being thrown...)
+      if (instance.target_reached(ti.archive)) {
+        ti.status = TerminationStatus::TargetReached;
+      }
+
+      // // effectively guess the reason for stopping - assume convergence
+      // // unless the budget is exhausted or the target was reached
+      // auto elapsed = ti.alg_timer.elapsed() + ti.eval_timer.elapsed();
+      // auto ts =
+      //     budget.exhausted(ti.generation.value_or(0), ti.evaluations,
+      //     elapsed);
+      // if (ts.has_value()) {
+      //   ti.status = ts.value();
+      // } else if (instance.target_reached(ti.archive)) {
+      //   ti.status = TerminationStatus::TargetReached;
+      // } else {
+      //   ti.status = TerminationStatus::Converged;
+      // }
+    } catch (const TrackingException& e) {
+    }
+
+    ti.report(ti.archive);
+
+    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
+  };
+
+ private:
+  struct TrackingException : std::runtime_error {
+    using std::runtime_error::runtime_error;
+  };
+
+  Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
+      : instance(instance),
+        method(method),
+        budget(budget),
+        config(config),
+        seed(seed),
+        status(TerminationStatus::Running),
+        archive(instance.archive_fitness(), config.archive_capacity),
+        generation(std::nullopt),
+        last_generation(0),
+        generations_at_next_report(config.initial_generations_until_next_report),
+        evaluations(0),
+        evaluations_at_next_report(config.initial_evaluations_until_next_report),
+        time_elapsed_at_next_report(config.initial_time_until_next_report) {};
+
+  template <typename E>
+  void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
+    alg_timer.stop();
+
+    // check if the budget was exhausted while the algorithm was running
+    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    generation = method.current_generation();
+    auto ts = budget.exhausted(generation.value_or(0), evaluations, elapsed);
+    if (ts.has_value()) {
+      status = ts.value();
+      throw TrackingException("");
+    }
+
+    // actually evaluate, but ensure we don't go beyond the evaluation limit
+    u64 evaluations_performed;
+    if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
+      auto evals_left = budget.max_evaluations.value() - evaluations;
+      eval_timer.start();
+      eval(indices.first(evals_left));
+      eval_timer.stop();
+      evaluations_performed = evals_left;
+
+      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
+             "Evaluation limit was not reached!");
+    } else {
+      eval_timer.start();
+      eval(indices);
+      eval_timer.stop();
+      evaluations_performed = indices.size();
+    }
+
+    // update the internal archive, and possibly stop if the target was reached
+    for (usize i = 0; i < evaluations_performed; i++) {
+      archive.update(solutions[indices[i]], true);
+      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
+                      // evaluations performed were considered...
+
+      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
+      // evaluating one by one
+      if (instance.target_reached(archive)) {
+        status = TerminationStatus::TargetReached;
+        throw TrackingException("");
+      }
+    }
+
+    evaluations_since_last_archive_adaption += evaluations_performed;
+
+    // check if we need to stop because the evaluation time/evaluations
+    // exhausted the budget
+    elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    ts = budget.exhausted(0, evaluations, elapsed);
+    if (ts.has_value()) {
+      status = ts.value();
+      throw TrackingException("");
+    }
+
+    // if we made it here, possibly report (if not, a final report
+    // will be generated - no need for doing the final report twice)
+    if (should_report()) {
+      report(archive);
+    }
+    if (evaluations_since_last_archive_adaption >= config.max_evaluations_until_archive_adaption) {
+      evaluations_since_last_archive_adaption = 0;
+      archive.adapt();
+    }
+
+    alg_timer.start();
+  };
+
+  bool should_report() {
+    if (!config.report_intermediate_results)
+      return false;
+
+    bool report_needed = false;
+    if (evaluations >= evaluations_at_next_report) {
+      report_needed = true;
+      evaluations_at_next_report =
+          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
+                                          : evaluations + config.initial_evaluations_until_next_report,
+                   evaluations + config.max_evaluations_until_next_report);
+    }
+
+    u64 g = generation.value_or(0);
+    if (g >= generations_at_next_report && g != last_generation) {
+      last_generation = g;
+      report_needed = true;
+      generations_at_next_report =
+          std::min(config.generation_factor > 1 ? g * config.generation_factor
+                                                : g + config.initial_generations_until_next_report,
+                   g + config.max_generations_until_next_report);
+    }
+
+    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    if (elapsed > time_elapsed_at_next_report) {
+      report_needed = true;
+      time_elapsed_at_next_report = std::min(
+          config.time_factor > 1
+              ? std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed * config.time_factor)
+              : std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed + config.initial_time_until_next_report),
+          elapsed + config.max_time_until_next_report);
+    }
+
+    return report_needed;
+  };
+
+  // A can annoyingly not be const since in the SR case an evaluation on the
+  // test set might be necessary - shouldn't change the solution, but is not
+  // const on paper
+  template <typename A>
+  void report(A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
+    namespace fs = std::filesystem;
+    typedef std::chrono::duration<double> Seconds;
+
+    if (config.logpath == "/dev/null") {
+      return;
+    }
+
+    if (!logfile.is_open()) {
+      if (!config.logpath.parent_path().empty()) {
+        fs::create_directories(config.logpath.parent_path());
+      }
+
+      // clear the file if it was not cleared before
+      if (truncated_files.contains(config.logpath)) {
+        logfile.open(config.logpath, std::ios::out | std::ios::app | std::ios::ate);
+      } else {
+        truncated_files.insert(config.logpath);
+        logfile.open(config.logpath, std::ios::out | std::ios::trunc);
+      }
+
+      if (fs::is_empty(config.logpath)) {
+        // clang-format off
+        logfile <<
+            "status,"
+            "evaluations,"
+            "generation,"
+            "total_time_seconds,"
+            "alg_time_seconds,"
+            "eval_time_seconds,"
+            "current_population_size,"
+            "current_population_generation,"
+            << config.log_info_headers
+            << debug_headers <<
+            "seed,"
+            "discrete,"
+            "discrete_active,"
+            "continuous,"
+            "continuous_active,"
+        ;
+        // clang-format on
+        instance.log_header(logfile);
+        logfile << std::endl;  // here we want to flush
+      }
+    }
+
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    auto pop_info = method.current_population();
+    if (pop_info.has_value()) {
+      auto [p_size, p_gen] = pop_info.value();
+      pop_size = std::to_string(p_size);
+      pop_gen = std::to_string(p_gen);
+    }
+    Seconds alg_time = alg_timer.elapsed();
+    Seconds eval_time = eval_timer.elapsed();
+    Seconds total_time = alg_time + eval_time;
+
+    auto common =
+        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
+                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
+
+    for (usize i = 0; i < solutions.size(); i++) {
+      SolutionBase* s;
+      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
+        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
+                                      // evaluations require mutable solutions
+      } else {
+        s = &solutions[i];
+      }
+      // clang-format off
+        logfile << common;
+        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
+        log_helper(logfile, s->continuous_values(), true); logfile << ',';
+        log_helper(logfile, s->continuous_active(), true); logfile << ',';
+      // clang-format on
+      instance.log(logfile, *s);
+      logfile << "\n";
+    }
+    logfile << std::flush;
+  };
+
+  InstanceBase& instance;
+  MethodBase& method;
+  Budget& budget;
+  TrackingOptions config;
+  usize seed;
+
+  TerminationStatus status;
+  AdaptiveGridArchive archive;
+
+  Timer alg_timer;
+  Timer eval_timer;
+
+  std::optional<u64> generation;
+  u64 last_generation;
+  u64 generations_at_next_report;
+
+  u64 evaluations;
+  u64 evaluations_at_next_report;
+  std::chrono::nanoseconds time_elapsed_at_next_report;
+
+  usize evaluations_since_last_archive_adaption;
+
+  std::ofstream logfile;
+  std::set<std::filesystem::path> truncated_files;
+};
+
+/// Tracked running was intended to unify reporting across algorithms
+/// - this method abuses that functionality to re-use that logging for
+/// other purposes controlled by the algorithm, not the tracking
+inline void debug_log(InstanceBase& problem,
+                      std::string_view path,
+                      std::string_view headers = "",
+                      std::string_view values = "",
+                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
+    if (population.has_value()) {
+      ti->request_debug_report(path, population.value().get(), headers, values);
+    } else {
+      ti->request_debug_report(path, headers, values);
+    }
+  } else {
+    throw std::runtime_error(
+        "Debug log called on an incompatible problem instance. Try using "
+        "`Tracked::run` to enable logging.");
+  }
+};
+
+template <typename T>
+inline std::string iterator2str(T&& it) {
+  std::ostringstream os;
+  os << '[';
+  usize i = 0;
+  for (const auto& e : it) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    os << e;
+  }
+  os << ']';
+  return os.str();
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_TRACKED_H */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/lib/ims.h continued                                                             //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace goblin {
 
@@ -3263,6 +3938,9 @@ struct IMSOptions {
   bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
   usize additional_clusters_per_start = 1;
   std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
+
+  std::optional<std::string> population_logfile = std::nullopt;
+  std::string population_log_resolution = "archive";
 };
 
 template <typename P>
@@ -3359,11 +4037,10 @@ class IMS final : public MethodBase {
            (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
       // init/restart population if necessary
       if (p_idx >= populations.size()) {
-          usize size = opts.initial_population_size * std::pow(2, p_idx);
-          sizes.push_back(size);
-        populations.push_back(
-            create_population(problem, *archive, size,
-                              opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
+        usize size = opts.initial_population_size * std::pow(2, p_idx);
+        sizes.push_back(size);
+        populations.push_back(create_population(
+            problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
         generations.push_back(0);
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
@@ -3382,6 +4059,25 @@ class IMS final : public MethodBase {
         archive->reset_change_count();
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
+
+        if(opts.population_logfile.has_value()){
+            AoSSet p; // copy is needed because p needs to be non-const, and that is the case because logging for the sr problem at this point in time might do a test set evaluation...
+            if(opts.population_log_resolution == "archive"){
+                const auto& a = populations[p_idx].archive();
+                for(usize i = 0; i < a.size(); i++){
+                    p.add(a[i]);
+                }
+            } else if(opts.population_log_resolution == "population"){
+                const auto& s = populations[p_idx].get_solutions();
+                for(usize i = 0; i < s.size(); i++){
+                    p.add(s[i]);
+                }
+            } else {
+                throw std::runtime_error("Unknown population log resolution.");
+            }
+
+            debug_log(problem, opts.population_logfile.value(), "", "", p);
+        }
 
         if (archive->change_count() > 0) {
           generations_since_last_improvement[p_idx] = 0;
@@ -3619,7 +4315,6 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
-#include <string>
 #include <iterator>
 #include <ranges>
 
@@ -3872,9 +4567,7 @@ class OpIdentity : public OperatorBase {
     d_out = d_args.col(0);
   };
 
-  std::string format(const std::span<const std::string>& args) const override final {
-    return args[0];
-  };
+  std::string format(const std::span<const std::string>& args) const override final { return args[0]; };
 };
 
 class OpAdd : public OperatorBase {
@@ -5311,12 +6004,10 @@ class HalfHalfInit final : public DiscreteInitBase {
   FullInit full{};
 };
 
-
 /// PTC2 as per https://cs.gmu.edu/~sean/papers/treecreation.pdf
 class PTC2Init final : public DiscreteInitBase {
  public:
-  PTC2Init(std::optional<double> p_constant = std::nullopt)
-      : p_constant(p_constant) {};
+  PTC2Init(std::optional<double> p_constant = std::nullopt) : p_constant(p_constant) {};
 
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     try {
@@ -5324,34 +6015,34 @@ class PTC2Init final : public DiscreteInitBase {
 
       Mat<DType> dvals(count, problem.num_discrete());
 
-      std::vector<std::vector<usize>> non_terminals(dvals.cols());  // functions/subfunctions
+      std::vector<std::vector<usize>> non_terminals(dvals.cols());        // functions/subfunctions
       std::vector<std::vector<usize>> const_terminals(dvals.cols());      // numeric constant symbols
       std::vector<std::vector<usize>> non_const_terminals(dvals.cols());  // features/args/params
 
-      for(usize i = 0; i < problem.num_discrete(); i++){
-          usize domain_size = problem.discrete_domain_sizes()(i);
-          for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
-            DType value = ctx.domain2value(i, domain_value);
-            if (ctx.value_min_arity[value] > 0) {
-                non_terminals[i].push_back(domain_value);
-            } else if (ctx.value_kind[value] == ValueKind::Constant) {
-              const_terminals[i].push_back(domain_value);
-            } else {
-              non_const_terminals[i].push_back(domain_value);
-            }
+      for (usize i = 0; i < problem.num_discrete(); i++) {
+        usize domain_size = problem.discrete_domain_sizes()(i);
+        for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
+          DType value = ctx.domain2value(i, domain_value);
+          if (ctx.value_min_arity[value] > 0) {
+            non_terminals[i].push_back(domain_value);
+          } else if (ctx.value_kind[value] == ValueKind::Constant) {
+            const_terminals[i].push_back(domain_value);
+          } else {
+            non_const_terminals[i].push_back(domain_value);
           }
-          if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
-            throw std::runtime_error("Variable domain must include terminal symbols.");
-          }
+        }
+        if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
+          throw std::runtime_error("Variable domain must include terminal symbols.");
+        }
       }
 
       usize num_roots = ctx.output_roots.size() + ctx.subtree_roots.size();
-      for(isize i = 0; i < dvals.rows(); i++){
-          for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
-            usize root = root_idx < ctx.output_roots.size() ? ctx.output_roots[root_idx]
-                                                            : ctx.subtree_roots[root_idx - ctx.output_roots.size()];
-            sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, dvals.row(i), root);
-          }
+      for (isize i = 0; i < dvals.rows(); i++) {
+        for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
+          usize root = root_idx < ctx.output_roots.size() ? ctx.output_roots[root_idx]
+                                                          : ctx.subtree_roots[root_idx - ctx.output_roots.size()];
+          sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, dvals.row(i), root);
+        }
       }
       return dvals;
 
@@ -5361,85 +6052,92 @@ class PTC2Init final : public DiscreteInitBase {
   };
 
  private:
+  void sample_terminal(Rng& rng,
+                       const InstanceBase& problem,
+                       const GPContext& ctx,
+                       const std::vector<std::vector<usize>>& non_terminals,
+                       const std::vector<std::vector<usize>>& const_terminals,
+                       const std::vector<std::vector<usize>>& non_const_terminals,
+                       RefS<Vec<DType>> values,
+                       usize idx) const {
+    // 1. determine if it is a constant or other terminal
+    double actual_p_constant = p_constant.value_or(
+        static_cast<double>(const_terminals[idx].size()) /
+        (static_cast<double>(const_terminals[idx].size()) + static_cast<double>(non_const_terminals[idx].size())));
+    if (const_terminals[idx].empty()) {
+      actual_p_constant = 0.0;
+    }
 
-  void sample_terminal(Rng& rng, const InstanceBase& problem, const GPContext& ctx,
-      const std::vector<std::vector<usize>>& non_terminals,
-      const std::vector<std::vector<usize>>& const_terminals,
-      const std::vector<std::vector<usize>>& non_const_terminals,
-      RefS<Vec<DType>> values, usize idx) const {
-      // 1. determine if it is a constant or other terminal
-      double actual_p_constant = p_constant.value_or(
-          static_cast<double>(const_terminals[idx].size()) /
-          (static_cast<double>(const_terminals[idx].size()) + static_cast<double>(non_const_terminals[idx].size())));
-      if (const_terminals[idx].empty()) {
-        actual_p_constant = 0.0;
-      }
+    // 2. sample and place the terminal
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    if (U(rng) < actual_p_constant) {
+      std::uniform_int_distribution<usize> ct_dist(0, const_terminals[idx].size() - 1);
+      values(idx) = const_terminals[idx][ct_dist(rng)];
+    } else {
+      std::uniform_int_distribution<usize> nct_dist(0, non_const_terminals[idx].size() - 1);
+      values(idx) = non_const_terminals[idx][nct_dist(rng)];
+    }
 
-      // 2. sample and place the terminal
-      std::uniform_real_distribution<double> U(0.0, 1.0);
-      if(U(rng) < actual_p_constant){
-          std::uniform_int_distribution<usize> ct_dist(0, const_terminals[idx].size() - 1);
-          values(idx) = const_terminals[idx][ct_dist(rng)];
-      } else {
-          std::uniform_int_distribution<usize> nct_dist(0, non_const_terminals[idx].size() - 1);
-          values(idx) = non_const_terminals[idx][nct_dist(rng)];
-      }
-
-      // 3. enqueue any children to ensure all nodes get initialized
-      for(auto c: ctx.children[idx]){
-          sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, c);
-      }
+    // 3. enqueue any children to ensure all nodes get initialized
+    for (auto c : ctx.children[idx]) {
+      sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, c);
+    }
   }
 
-  void sample_tree(Rng& rng, const InstanceBase& problem, const GPContext& ctx,
-      const std::vector<std::vector<usize>>& non_terminals,
-      const std::vector<std::vector<usize>>& const_terminals,
-      const std::vector<std::vector<usize>>& non_const_terminals,
-      RefS<Vec<DType>> values, usize idx) const {
-      std::uniform_int_distribution<usize> size_dist(1, ctx.nodes[idx].size());
-      usize target_size = size_dist(rng);
+  void sample_tree(Rng& rng,
+                   const InstanceBase& problem,
+                   const GPContext& ctx,
+                   const std::vector<std::vector<usize>>& non_terminals,
+                   const std::vector<std::vector<usize>>& const_terminals,
+                   const std::vector<std::vector<usize>>& non_const_terminals,
+                   RefS<Vec<DType>> values,
+                   usize idx) const {
+    std::uniform_int_distribution<usize> size_dist(1, ctx.nodes[idx].size());
+    usize target_size = size_dist(rng);
 
-      if(target_size < 2){
-          sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, idx);
-      } else {
-          std::vector<usize> holes{idx};
-          usize current_size = 0;
+    if (target_size < 2) {
+      sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, idx);
+    } else {
+      std::vector<usize> holes{idx};
+      usize current_size = 0;
 
-          // more functions are needed to reach the target size
-          while(!holes.empty() && holes.size() + current_size < target_size){
-              // 1. get a random hole
-              std::swap(holes[std::uniform_int_distribution<usize>(0, holes.size() - 1)(rng)], holes.back());
-              usize i = holes.back(); holes.pop_back();
+      // more functions are needed to reach the target size
+      while (!holes.empty() && holes.size() + current_size < target_size) {
+        // 1. get a random hole
+        std::swap(holes[std::uniform_int_distribution<usize>(0, holes.size() - 1)(rng)], holes.back());
+        usize i = holes.back();
+        holes.pop_back();
 
-              // 2. fill the hole
-              if(ctx.children[i].empty()){
-                sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
-              } else {
-                if (non_terminals[i].empty()) {
-                    throw std::runtime_error("Variable domain must include non-terminal symbols.");
-                }
-                std::uniform_int_distribution<usize> nt_dist(0, non_terminals[i].size() - 1);
-                values(i) = non_terminals[i][nt_dist(rng)];
-              }
-              current_size++;
-
-              // 3. update the list of holes and fill intron subtrees recursively
-              usize value = ctx.domain2value(i, values(i));
-              usize arity = ctx.value_max_arity[value];
-              for(usize j = 0; j < ctx.children[i].size(); j++){
-                  if(j < arity){
-                      holes.push_back(ctx.children[i][j]);
-                  } else {
-                      sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, ctx.children[i][j]);
-                  }
-              }
+        // 2. fill the hole
+        if (ctx.children[i].empty()) {
+          sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
+        } else {
+          if (non_terminals[i].empty()) {
+            throw std::runtime_error("Variable domain must include non-terminal symbols.");
           }
+          std::uniform_int_distribution<usize> nt_dist(0, non_terminals[i].size() - 1);
+          values(i) = non_terminals[i][nt_dist(rng)];
+        }
+        current_size++;
 
-          // once the size has been reached, fill the remaining nodes with terminals
-          for(usize i: holes){
-              sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
+        // 3. update the list of holes and fill intron subtrees recursively
+        usize value = ctx.domain2value(i, values(i));
+        usize arity = ctx.value_max_arity[value];
+        for (usize j = 0; j < ctx.children[i].size(); j++) {
+          if (j < arity) {
+            holes.push_back(ctx.children[i][j]);
+          } else {
+            sample_tree(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values,
+                        ctx.children[i][j]);
           }
+        }
       }
+
+      // once the size has been reached, fill the remaining nodes with terminals
+      for (usize i : holes) {
+        sample_terminal(rng, problem, ctx, non_terminals, const_terminals, non_const_terminals, values, i);
+      }
+    }
   };
 
   std::optional<double> p_constant{};
@@ -5554,9 +6252,9 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 /// in isolation.
 class RecursiveCompleteInit2 final : public DiscreteInitBase {
  public:
-
- RecursiveCompleteInit2(std::optional<double> p_terminal = std::nullopt, std::optional<double> p_constant = std::nullopt)
-     : p_terminal(p_terminal), p_constant(p_constant) {};
+  RecursiveCompleteInit2(std::optional<double> p_terminal = std::nullopt,
+                         std::optional<double> p_constant = std::nullopt)
+      : p_terminal(p_terminal), p_constant(p_constant) {};
 
   Mat<DType> sample(Rng& rng, const InstanceBase& problem, usize count) const override final {
     try {
@@ -5565,25 +6263,25 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
       Mat<DType> dvals(count, problem.num_discrete());
       Arr2D<BType> dactive(count, problem.num_discrete());
 
-      std::vector<std::vector<DType>> non_terminals(dvals.cols());  // functions/subfunctions
+      std::vector<std::vector<DType>> non_terminals(dvals.cols());        // functions/subfunctions
       std::vector<std::vector<DType>> const_terminals(dvals.cols());      // numeric constant symbols
       std::vector<std::vector<DType>> non_const_terminals(dvals.cols());  // features/args/params
 
-      for(usize i = 0; i < problem.num_discrete(); i++){
-          usize domain_size = problem.discrete_domain_sizes()(i);
-          for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
-            DType value = ctx.domain2value(i, domain_value);
-            if (ctx.value_min_arity[value] > 0) {
-                non_terminals[i].push_back(domain_value);
-            } else if (ctx.value_kind[value] == ValueKind::Constant) {
-              const_terminals[i].push_back(domain_value);
-            } else {
-              non_const_terminals[i].push_back(domain_value);
-            }
+      for (usize i = 0; i < problem.num_discrete(); i++) {
+        usize domain_size = problem.discrete_domain_sizes()(i);
+        for (usize domain_value = 0; domain_value < domain_size; domain_value++) {
+          DType value = ctx.domain2value(i, domain_value);
+          if (ctx.value_min_arity[value] > 0) {
+            non_terminals[i].push_back(domain_value);
+          } else if (ctx.value_kind[value] == ValueKind::Constant) {
+            const_terminals[i].push_back(domain_value);
+          } else {
+            non_const_terminals[i].push_back(domain_value);
           }
-          if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
-            throw std::runtime_error("Variable domain must include terminal symbols.");
-          }
+        }
+        if (const_terminals[i].empty() && non_const_terminals[i].empty()) {
+          throw std::runtime_error("Variable domain must include terminal symbols.");
+        }
       }
 
       std::vector<usize> active_indices;
@@ -5612,8 +6310,10 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
             }
           }
 
-          dvals(active_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals, non_const_terminals, active_indices.size(), current);
-          dvals(inactive_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals, non_const_terminals, inactive_indices.size(), current);
+          dvals(active_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals,
+                                                        non_const_terminals, active_indices.size(), current);
+          dvals(inactive_indices, current) = sample_nodes(rng, problem, non_terminals, const_terminals,
+                                                          non_const_terminals, inactive_indices.size(), current);
 
           for (usize ci = 0; ci < ctx.children[current].size(); ci++) {
             usize c = ctx.children[current][ci];
@@ -5635,14 +6335,14 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
     }
   };
 
-  private:
-
-Vec<DType> sample_nodes(Rng& rng, const InstanceBase& problem,
-    const std::vector<std::vector<DType>>& non_terminals,
-    const std::vector<std::vector<DType>>& const_terminals,
-    const std::vector<std::vector<DType>>& non_const_terminals,
-    usize total, usize idx) const {
-
+ private:
+  Vec<DType> sample_nodes(Rng& rng,
+                          const InstanceBase& problem,
+                          const std::vector<std::vector<DType>>& non_terminals,
+                          const std::vector<std::vector<DType>>& const_terminals,
+                          const std::vector<std::vector<DType>>& non_const_terminals,
+                          usize total,
+                          usize idx) const {
     usize domain_size = problem.discrete_domain_sizes()(idx);
 
     double actual_p_terminal =
@@ -5651,10 +6351,11 @@ Vec<DType> sample_nodes(Rng& rng, const InstanceBase& problem,
         static_cast<double>(const_terminals[idx].size()) /
         (static_cast<double>(const_terminals[idx].size()) + static_cast<double>(non_const_terminals[idx].size())));
     if (const_terminals[idx].empty()) {
-        actual_p_constant = 0.0;
+      actual_p_constant = 0.0;
     }
 
-    usize num_non_terminals = non_terminals[idx].empty() ? 0 : static_cast<usize>((1.0 - actual_p_terminal) * static_cast<double>(total));
+    usize num_non_terminals =
+        non_terminals[idx].empty() ? 0 : static_cast<usize>((1.0 - actual_p_terminal) * static_cast<double>(total));
     usize num_const_terminals = actual_p_constant * static_cast<double>(total - num_non_terminals);
     usize num_non_const_terminals = total - num_non_terminals - num_const_terminals;
 
@@ -5662,15 +6363,15 @@ Vec<DType> sample_nodes(Rng& rng, const InstanceBase& problem,
 
     sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)));
     sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)));
-    sample_complete(rng, non_const_terminals[idx], values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)));
+    sample_complete(rng, non_const_terminals[idx],
+                    values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)));
 
     std::shuffle(values.begin(), values.end(), rng);
 
     return values;
-};
+  };
 
-void sample_complete(Rng& rng, const std::vector<DType>& pool,
-    Ref<Vec<DType>> values) const {
+  void sample_complete(Rng& rng, const std::vector<DType>& pool, Ref<Vec<DType>> values) const {
     std::vector<DType> perm(pool.size());
     std::iota(perm.begin(), perm.end(), 0);
 
@@ -5683,12 +6384,11 @@ void sample_complete(Rng& rng, const std::vector<DType>& pool,
 
       values(vi) = pool[perm[i++]];
     }
-};
+  };
 
-   std::optional<double> p_terminal{};
-   std::optional<double> p_constant{};
+  std::optional<double> p_terminal{};
+  std::optional<double> p_constant{};
 };
-
 
 };  // namespace goblin
 
@@ -7398,673 +8098,15 @@ class BenchmarkInstance final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/timer.h included by goblin.h                                              //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_TIMER_H
-#define _GOBLIN_BENCH_TIMER_H
-
-
-
-namespace goblin {
-class Timer {
- public:
-  void start() { start_time_ = std::make_optional(std::chrono::high_resolution_clock::now()); }
-
-  void stop() {
-    auto now = std::chrono::high_resolution_clock::now();
-    if (start_time_.has_value()) {
-      total_time_ += std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time_.value());
-      start_time_ = std::nullopt;
-    }
-  }
-
-  std::chrono::nanoseconds elapsed() const { return total_time_; }
-
- private:
-  std::chrono::nanoseconds total_time_{0};
-  std::optional<std::chrono::high_resolution_clock::time_point> start_time_ = std::nullopt;
-};
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_TIMER_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/tracked.h included by goblin.h                                            //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_TRACKED_H
-#define _GOBLIN_BENCH_TRACKED_H
-
-#include <exception>
-#include <filesystem>
-#include <fstream>
-#include <ostream>
-
-
-namespace goblin {
-
-template <typename T>
-inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
-  if (escape) {
-    os << '"';
-  }
-  os << '[';
-  usize i = 0;
-  for (const auto& e : span) {
-    if (i++ > 0) {
-      os << ',';
-    }
-    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
-#ifdef __cpp_lib_print
-      std::print(os,
-#else
-      os << std::format(
-#endif
-                 "{:d}", e);
-    } else {
-      os << e;
-    }
-  }
-  os << ']';
-  if (escape) {
-    os << '"';
-  }
-};
-
-template <typename EigenLike>
-inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
-  if (escape) {
-    os << '"';
-  }
-  os << '[';
-  if (m.rows() > 1 && m.cols() > 1) {
-    for (isize r = 0; r < m.rows(); r++) {
-      if (r > 0) {
-        os << ',';
-      }
-      if (indent) {
-        os << "\n  ";
-      }
-      os << '[';
-      for (isize c = 0; c < m.cols(); c++) {
-        if (c > 0) {
-          os << ',';
-        }
-
-        // fmt to alwyas use the decimal instead of the ascii byte value for
-        // (unsigned) chars
-        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-          std::print(os,
-#else
-          os << std::format(
-#endif
-                     "{:d}", m(r, c));
-        } else {
-          os << m(r, c);
-        }
-      }
-      os << ']';
-    }
-    if (indent) {
-      os << '\n';
-    }
-  } else {
-    for (isize i = 0; i < m.size(); i++) {
-      if (i > 0) {
-        os << ',';
-      }
-      // fmt to alwyas use the decimal instead of the ascii byte value for
-      // (unsigned) chars
-      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-        std::print(os,
-#else
-        os << std::format(
-#endif
-                   "{:d}", m(i));
-      } else {
-        os << m(i);
-      }
-    }
-  }
-  os << ']';
-  if (escape) {
-    os << '"';
-  }
-};
-
-template <typename T>
-inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
-  std::ostringstream os;
-  log_helper(os, t, escape, indent);
-  return os.str();
-};
-
-class TrackingOptions {
- public:
-  TrackingOptions() = delete;
-  // TODO at some point think about enabling dynamically setting the logging
-  // precision for floating points
-  // TODO at some point allow these params on Tracked::run to reduce the amount
-  // of config object nesting?
-  TrackingOptions(std::filesystem::path logpath,
-                  std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
-                  usize archive_capacity = 100,
-                  u64 max_evaluations_until_archive_adaption = 100000,
-                  bool consider_evaluation_time = true,
-                  bool report_intermediate_results = true,
-                  u64 initial_evaluations_until_next_report = 10,
-                  u64 eval_factor = 2,
-                  u64 max_evaluations_until_next_report = 1000000,
-                  u64 initial_generations_until_next_report = 1,
-                  u64 generation_factor = 2,
-                  u64 max_generations_until_next_report = 100,
-                  std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
-                  u64 time_factor = 2,
-                  std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
-      : archive_capacity(archive_capacity),
-        max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
-        consider_evaluation_time(consider_evaluation_time),
-        report_intermediate_results(report_intermediate_results),
-        initial_evaluations_until_next_report(initial_evaluations_until_next_report),
-        eval_factor(eval_factor),
-        max_evaluations_until_next_report(max_evaluations_until_next_report),
-        initial_generations_until_next_report(initial_generations_until_next_report),
-        generation_factor(generation_factor),
-        max_generations_until_next_report(max_generations_until_next_report),
-        initial_time_until_next_report(initial_time_until_next_report),
-        time_factor(time_factor),
-        max_time_until_next_report(max_time_until_next_report),
-        logpath(logpath) {
-    if (log_info.has_value()) {
-      for (auto& kv : log_info.value()) {
-        // TODO escape any '"' here?
-        log_info_headers += std::get<0>(kv) + ',';
-        log_info_values += std::get<1>(kv) + ',';
-      }
-    }
-  };
-
-  usize archive_capacity;
-  u64 max_evaluations_until_archive_adaption;
-  bool consider_evaluation_time;
-  bool report_intermediate_results;
-
-  u64 initial_evaluations_until_next_report;
-  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
-  u64 max_evaluations_until_next_report;
-
-  u64 initial_generations_until_next_report;
-  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
-  u64 max_generations_until_next_report;
-
-  std::chrono::nanoseconds initial_time_until_next_report;
-  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
-  std::chrono::nanoseconds max_time_until_next_report;
-
- private:
-  std::filesystem::path logpath;
-
-  // key-value pairs to log, e.g.
-  // [(method_name,AMaLGaM),(problem_name,Sphere),(dims,10),(run,99)]
-  std::string log_info_headers;
-  std::string log_info_values;
-
-  friend class Tracked;
-};
-
-/// An instance that intercepts evaluations
-class Tracked final : public InstanceBase {
- public:
-  Tracked() = delete;
-
-  usize num_objectives() const override final { return instance.num_objectives(); };
-
-  usize num_discrete() const override final { return instance.num_discrete(); };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
-
-  usize num_continuous() const override final { return instance.num_continuous(); };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-    return instance.continuous_init_lower_bounds();
-  };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-    return instance.continuous_init_upper_bounds();
-  };
-
-  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
-              indices);
-  };
-  void evaluate_partial(Rng& rng,
-                        SolutionSetBase& solutions,
-                        SolutionSetBase& parents,
-                        const std::vector<const Subset*>& subsets,
-                        const std::span<const usize>& indices) override final {
-    wrap_eval(
-        [&](const std::span<const usize>& _indices) {
-          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
-        },
-        solutions, indices);
-  };
-
-  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-    return instance.add_random(rng, solutions, count);
-  };
-
-  const FitnessBase& fitness() const override final { return instance.fitness(); };
-  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
-
-  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
-
-  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
-
-  void log_header(std::ostream& os) const override { instance.log_header(os); }
-
-  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
-    instance.log_solution(os, solution);
-  }
-
-  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
-
-  Mat<CType> gradients(Rng& rng,
-                       SolutionSetBase& solutions,
-                       SolutionSetBase& parents,
-                       const std::vector<const Subset*>& subsets,
-                       const std::span<const usize>& indices,
-                       u64& evaluations) override {
-    u64 evals_before = this->evaluations, _evals = evaluations;
-    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
-    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
-    return res;
-  }
-
-  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
-                                                     SolutionSetBase& solutions,
-                                                     SolutionSetBase& parents,
-                                                     const std::span<const usize>& indices,
-                                                     usize num_steps) override {
-    u64 evals_before = evaluations;
-    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
-
-    alg_timer.stop();
-    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
-
-    for (usize i : /* changed_indices */ std::get<0>(res)) {
-      archive.update(solutions[i], true);
-    }
-
-    if (instance.target_reached(archive)) {
-      status = TerminationStatus::TargetReached;
-      throw TrackingException("");
-    }
-
-    alg_timer.start();
-    return res;
-  }
-
-  /// This can be used by the algorithm to log when debugging to log an
-  /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
-  /// values need to be empty, or valid csv columns with a ',' separator at the
-  /// end (possibly escaping other ',' occurrences with '"').
-  template <typename P>
-  void request_debug_report(std::filesystem::path debug_logpath,
-                            P& solutions,
-                            std::string_view debug_headers,
-                            std::string_view debug_values) {
-    // close the actual logfile to open up the debug logpath next
-    if (logfile.is_open()) {
-      logfile.close();
-    }
-
-    // temporarily change the logpath
-    auto tracked_generation = generation;
-    generation = method.current_generation();
-    std::swap(debug_logpath, config.logpath);
-    report(solutions, debug_headers, debug_values);
-    std::swap(debug_logpath, config.logpath);
-    generation = tracked_generation;
-
-    // close the debug logfile to open up the actual logpath again next
-    if (logfile.is_open()) {
-      logfile.close();
-    }
-  };
-
-  void request_debug_report(std::filesystem::path debug_logpath,
-                            std::string_view debug_headers,
-                            std::string_view debug_values) {
-    request_debug_report(debug_logpath, archive, debug_headers, debug_values);
-  };
-
-  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
-      InstanceBase& instance,
-      MethodBase& method,
-      Budget& budget,
-      TrackingOptions config,
-      std::optional<usize> seed = std::nullopt,
-      std::optional<usize> population_size = std::nullopt) {
-    std::random_device rd;
-    usize _seed = seed.has_value() ? seed.value()
-                                   : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
-    Tracked ti(instance, method, budget, config, _seed);
-    try {
-      ti.alg_timer.start();
-      auto [_, alg_status] = method.run(ti, budget, _seed, population_size);
-      ti.alg_timer.stop();
-      ti.status = alg_status;
-
-      // TODO why is this necessary? (alg should not be able to hit the target without the exception being thrown...)
-      if (instance.target_reached(ti.archive)) {
-        ti.status = TerminationStatus::TargetReached;
-      }
-
-      // // effectively guess the reason for stopping - assume convergence
-      // // unless the budget is exhausted or the target was reached
-      // auto elapsed = ti.alg_timer.elapsed() + ti.eval_timer.elapsed();
-      // auto ts =
-      //     budget.exhausted(ti.generation.value_or(0), ti.evaluations,
-      //     elapsed);
-      // if (ts.has_value()) {
-      //   ti.status = ts.value();
-      // } else if (instance.target_reached(ti.archive)) {
-      //   ti.status = TerminationStatus::TargetReached;
-      // } else {
-      //   ti.status = TerminationStatus::Converged;
-      // }
-    } catch (const TrackingException& e) {
-    }
-
-    ti.report(ti.archive);
-
-    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
-  };
-
- private:
-  struct TrackingException : std::runtime_error {
-    using std::runtime_error::runtime_error;
-  };
-
-  Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
-      : instance(instance),
-        method(method),
-        budget(budget),
-        config(config),
-        seed(seed),
-        status(TerminationStatus::Running),
-        archive(instance.archive_fitness(), config.archive_capacity),
-        generation(std::nullopt),
-        last_generation(0),
-        generations_at_next_report(config.initial_generations_until_next_report),
-        evaluations(0),
-        evaluations_at_next_report(config.initial_evaluations_until_next_report),
-        time_elapsed_at_next_report(config.initial_time_until_next_report) {};
-
-  template <typename E>
-  void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
-    alg_timer.stop();
-
-    // check if the budget was exhausted while the algorithm was running
-    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    generation = method.current_generation();
-    auto ts = budget.exhausted(generation.value_or(0), evaluations, elapsed);
-    if (ts.has_value()) {
-      status = ts.value();
-      throw TrackingException("");
-    }
-
-    // actually evaluate, but ensure we don't go beyond the evaluation limit
-    u64 evaluations_performed;
-    if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
-      auto evals_left = budget.max_evaluations.value() - evaluations;
-      eval_timer.start();
-      eval(indices.first(evals_left));
-      eval_timer.stop();
-      evaluations_performed = evals_left;
-
-      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
-             "Evaluation limit was not reached!");
-    } else {
-      eval_timer.start();
-      eval(indices);
-      eval_timer.stop();
-      evaluations_performed = indices.size();
-    }
-
-    // update the internal archive, and possibly stop if the target was reached
-    for (usize i = 0; i < evaluations_performed; i++) {
-      archive.update(solutions[indices[i]], true);
-      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
-                      // evaluations performed were considered...
-
-      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
-      // evaluating one by one
-      if (instance.target_reached(archive)) {
-        status = TerminationStatus::TargetReached;
-        throw TrackingException("");
-      }
-    }
-
-    evaluations_since_last_archive_adaption += evaluations_performed;
-
-    // check if we need to stop because the evaluation time/evaluations
-    // exhausted the budget
-    elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    ts = budget.exhausted(0, evaluations, elapsed);
-    if (ts.has_value()) {
-      status = ts.value();
-      throw TrackingException("");
-    }
-
-    // if we made it here, possibly report (if not, a final report
-    // will be generated - no need for doing the final report twice)
-    if (should_report()) {
-      report(archive);
-    }
-    if (evaluations_since_last_archive_adaption >= config.max_evaluations_until_archive_adaption) {
-      evaluations_since_last_archive_adaption = 0;
-      archive.adapt();
-    }
-
-    alg_timer.start();
-  };
-
-  bool should_report() {
-    if (!config.report_intermediate_results)
-      return false;
-
-    bool report_needed = false;
-    if (evaluations >= evaluations_at_next_report) {
-      report_needed = true;
-      evaluations_at_next_report =
-          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
-                                          : evaluations + config.initial_evaluations_until_next_report,
-                   evaluations + config.max_evaluations_until_next_report);
-    }
-
-    u64 g = generation.value_or(0);
-    if (g >= generations_at_next_report && g != last_generation) {
-      last_generation = g;
-      report_needed = true;
-      generations_at_next_report =
-          std::min(config.generation_factor > 1 ? g * config.generation_factor
-                                                : g + config.initial_generations_until_next_report,
-                   g + config.max_generations_until_next_report);
-    }
-
-    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    if (elapsed > time_elapsed_at_next_report) {
-      report_needed = true;
-      time_elapsed_at_next_report = std::min(
-          config.time_factor > 1
-              ? std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed * config.time_factor)
-              : std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed + config.initial_time_until_next_report),
-          elapsed + config.max_time_until_next_report);
-    }
-
-    return report_needed;
-  };
-
-  // A can annoyingly not be const since in the SR case an evaluation on the
-  // test set might be necessary - shouldn't change the solution, but is not
-  // const on paper
-  template <typename A>
-  void report(A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
-    namespace fs = std::filesystem;
-    typedef std::chrono::duration<double> Seconds;
-
-    if (config.logpath == "/dev/null") {
-      return;
-    }
-
-    if (!logfile.is_open()) {
-      if (!config.logpath.parent_path().empty()) {
-        fs::create_directories(config.logpath.parent_path());
-      }
-
-      // clear the file if it was not cleared before
-      if (truncated_files.contains(config.logpath)) {
-        logfile.open(config.logpath, std::ios::out | std::ios::app | std::ios::ate);
-      } else {
-        truncated_files.insert(config.logpath);
-        logfile.open(config.logpath, std::ios::out | std::ios::trunc);
-      }
-
-      if (fs::is_empty(config.logpath)) {
-        // clang-format off
-        logfile <<
-            "status,"
-            "evaluations,"
-            "generation,"
-            "total_time_seconds,"
-            "alg_time_seconds,"
-            "eval_time_seconds,"
-            "current_population_size,"
-            "current_population_generation,"
-            << config.log_info_headers
-            << debug_headers <<
-            "seed,"
-            "discrete,"
-            "discrete_active,"
-            "continuous,"
-            "continuous_active,"
-        ;
-        // clang-format on
-        instance.log_header(logfile);
-        logfile << std::endl;  // here we want to flush
-      }
-    }
-
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
-    auto pop_info = method.current_population();
-    if (pop_info.has_value()) {
-      auto [p_size, p_gen] = pop_info.value();
-      pop_size = std::to_string(p_size);
-      pop_gen = std::to_string(p_gen);
-    }
-    Seconds alg_time = alg_timer.elapsed();
-    Seconds eval_time = eval_timer.elapsed();
-    Seconds total_time = alg_time + eval_time;
-
-    auto common =
-        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
-
-    for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase* s;
-      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
-        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
-                                      // evaluations require mutable solutions
-      } else {
-        s = &solutions[i];
-      }
-      // clang-format off
-        logfile << common;
-        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-        log_helper(logfile, s->continuous_values(), true); logfile << ',';
-        log_helper(logfile, s->continuous_active(), true); logfile << ',';
-      // clang-format on
-      instance.log(logfile, *s);
-      logfile << "\n";
-    }
-    logfile << std::flush;
-  };
-
-  InstanceBase& instance;
-  MethodBase& method;
-  Budget& budget;
-  TrackingOptions config;
-  usize seed;
-
-  TerminationStatus status;
-  AdaptiveGridArchive archive;
-
-  Timer alg_timer;
-  Timer eval_timer;
-
-  std::optional<u64> generation;
-  u64 last_generation;
-  u64 generations_at_next_report;
-
-  u64 evaluations;
-  u64 evaluations_at_next_report;
-  std::chrono::nanoseconds time_elapsed_at_next_report;
-
-  usize evaluations_since_last_archive_adaption;
-
-  std::ofstream logfile;
-  std::set<std::filesystem::path> truncated_files;
-};
-
-/// Tracked running was intended to unify reporting across algorithms
-/// - this method abuses that functionality to re-use that logging for
-/// other purposes controlled by the algorithm, not the tracking
-inline void debug_log(InstanceBase& problem,
-                      std::string_view path,
-                      std::string_view headers,
-                      std::string_view values,
-                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
-  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
-    if (population.has_value()) {
-      ti->request_debug_report(path, population.value().get(), headers, values);
-    } else {
-      ti->request_debug_report(path, headers, values);
-    }
-  } else {
-    throw std::runtime_error(
-        "Debug log called on an incompatible problem instance. Try using "
-        "`Tracked::run` to enable logging.");
-  }
-};
-
-template <typename T>
-inline std::string iterator2str(T&& it) {
-  std::ostringstream os;
-  os << '[';
-  usize i = 0;
-  for (const auto& e : it) {
-    if (i++ > 0) {
-      os << ',';
-    }
-    os << e;
-  }
-  os << ']';
-  return os.str();
-};
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_TRACKED_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -8186,11 +8228,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8548,6 +8593,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8643,14 +8691,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9959,6 +10011,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10568,6 +10621,8 @@ class Population {
   /// For single objective optimization, this just is a roundabout way
   /// to return the elite to check if an IMS population should stop
   const ArchiveBase& archive() const { return *local_archive; };
+
+  const SolutionSetBase& get_solutions() const { return solutions; };
 
  private:
   void log_subset_statistics() {
@@ -11357,6 +11412,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

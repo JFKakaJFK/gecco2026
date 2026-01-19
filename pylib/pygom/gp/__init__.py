@@ -60,28 +60,6 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         else:
             self.imputer.fit(X)
 
-        if "algorithm" in self.kwargs:
-            alg = vars(pygom)[self.kwargs["algorithm"]](
-                **self.kwargs.get("algorithm_kwargs", {})
-            )
-        else:
-            alg = pygom.MixedGOMEA(
-                population_options=pygom.PopulationOptions(
-                    **self.kwargs.get("population_kwargs", {})
-                ),
-                ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
-                rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
-                discrete_model=vars(pygom)[
-                    self.kwargs.get("discrete_model", "LinkageTreeFOS")
-                ](**self.kwargs.get("discrete_model_kwargs", {})),
-                continuous_model=vars(pygom)[
-                    self.kwargs.get("continuous_model", "FullFOS")
-                ](**self.kwargs.get("continuous_model_kwargs", {})),
-                sampling_model=vars(pygom)[
-                    self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
-                ](**self.kwargs.get("sampling_model_kwargs", {})),
-                repr=self.kwargs.get("repr", "aos"),
-            )
         budget_kwargs = self.kwargs.get("budget_kwargs", {})
         # if "termination_callback" not in budget_kwargs:
         #     budget_kwargs["termination_callback"] = pygom.default_termination_callback
@@ -127,6 +105,38 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                 "constant_init_upper_bound", float(np.nanmax(Y))
             ),
         )
+
+        if "algorithm" in self.kwargs:
+            alg = vars(pygom)[self.kwargs["algorithm"]](
+                **self.kwargs.get("algorithm_kwargs", {})
+            )
+        else:
+            discrete_model_kwargs = {**self.kwargs.get("discrete_model_kwargs", {})}
+            if (
+                discrete_model_kwargs.get("metric", "node_proximity")
+                == "node_proximity"
+            ):
+                discrete_model_kwargs["custom_similarity"] = np.array(
+                    ctx.normalized_node_proximity().tolist()
+                )
+
+            alg = pygom.MixedGOMEA(
+                population_options=pygom.PopulationOptions(
+                    **self.kwargs.get("population_kwargs", {})
+                ),
+                ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
+                rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
+                discrete_model=vars(pygom)[
+                    self.kwargs.get("discrete_model", "LinkageTreeFOS")
+                ](**discrete_model_kwargs),
+                continuous_model=vars(pygom)[
+                    self.kwargs.get("continuous_model", "FullFOS")
+                ](**self.kwargs.get("continuous_model_kwargs", {})),
+                sampling_model=vars(pygom)[
+                    self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
+                ](**self.kwargs.get("sampling_model_kwargs", {})),
+                repr=self.kwargs.get("repr", "aos"),
+            )
 
         seed = self.kwargs.get("random_state", self.kwargs.get("seed"))
 

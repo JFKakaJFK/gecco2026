@@ -6,9 +6,10 @@ import networkx as nx
 import numpy as np
 import scipy
 import seaborn as sns
-from matplotlib.patches import Rectangle
+from matplotlib.patches import Circle, Rectangle
 from networkx.drawing.nx_agraph import graphviz_layout
 from pygom import *
+from seaborn.utils import relative_luminance
 
 sns.set_theme(
     context="paper",
@@ -188,7 +189,7 @@ def draw_nx(
         ax=ax,
         **kwargs,
     )
-    if labels is not None:
+    if labels is not None and labels:
         lpos = {
             n: (x + label_offset[0], y + label_offset[1]) for n, (x, y) in pos.items()
         }
@@ -276,12 +277,21 @@ def ctx2graph(ctx):
 
 
 def example_solution():
-    solution = [r"$+$", r"$\sin$", r"$\sqrt{\ }$", "$x_0$", "$x_2$", "$x_1$", "$x_3$"]
+    solution = [
+        r"$+$",
+        r"$\sin$",  # r"$\text{sin}$",
+        r"$\sqrt{\ }$",
+        "$x_0$",
+        "$x_2$",
+        "$x_1$",
+        "$x_3$",
+    ]
     active = [True, True, True, True, False, True, False]
     expr = r"$\sin(x_0) + \sqrt{x_1}$"
 
     all_symbols = sorted({s for s in solution})
     s2v = {s: i for i, s in enumerate(all_symbols)}
+    v2s = {i: s for i, s in enumerate(all_symbols)}
     values = [s2v[s] for s in solution]
 
     cmap = sns.color_palette("Set2", n_colors=len(all_symbols))
@@ -310,14 +320,54 @@ def example_solution():
 
     axes["E"].set_axis_off()
 
+    node_size = 800
     pos = draw_nx(
         template_structure,
         axes["T"],
-        labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        labels=False,  # {n: template_structure.nodes[n]["label"] for n in template_structure},
+        alpha=[1.0 if active[n] else 0.5 for n in template_structure.nodes],
+        node_color=[
+            palette[template_structure.nodes[n]["label"]]
+            for n in template_structure.nodes
+        ],
         xscale=1,
         yscale=1,
         label_offset=(0, 0),
-        node_size=800,
+        node_size=node_size,
+        font_color={
+            n: ".15"
+            if relative_luminance(palette[template_structure.nodes[n]["label"]]) > 0.408
+            else "w"
+            for n in template_structure
+        },
+    )
+    for n in template_structure:
+        if not active[n]:
+            axes["T"].add_patch(
+                Circle(
+                    pos[n],
+                    radius=27.5,  # np.sqrt(node_size / np.pi),
+                    lw=0,
+                    alpha=0.2,  # 5,
+                    color="black",
+                    fill=False,
+                    hatch_linewidth=4,
+                    hatch="//",
+                    zorder=10,
+                )
+            )
+
+    nx.draw_networkx_labels(
+        template_structure,
+        pos,
+        {n: template_structure.nodes[n]["label"] for n in template_structure},
+        font_color={
+            n: ".15"
+            if relative_luminance(palette[template_structure.nodes[n]["label"]]) > 0.408
+            else "w"
+            for n in template_structure
+        },
+        ax=axes["T"],
     )
     nx.draw_networkx_labels(
         template_structure,
@@ -337,9 +387,21 @@ def example_solution():
 
     sns.heatmap(
         [values],
+        mask=np.array([active], dtype=np.bool_),
         annot=[solution],
         fmt="s",
-        cmap=cmap,
+        cmap=[palette[v2s[v]] for v, a in zip(values, active) if not a],
+        square=True,
+        alpha=0.5,
+        ax=axes["R"],
+        cbar=False,
+    )
+    sns.heatmap(
+        [values],
+        mask=~np.array([active], dtype=np.bool_),
+        annot=[solution],
+        fmt="s",
+        cmap=[palette[v2s[v]] for v, a in zip(values, active) if a],
         square=True,
         ax=axes["R"],
         cbar=False,

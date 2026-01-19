@@ -40,6 +40,7 @@ matplotlib.rcParams["ps.fonttype"] = 42
 
 
 RESULT_DIR = pathlib.Path("results") / "linkage"  #  "linkage_wrong_init"
+RESULT_DIR = pathlib.Path("results") / "linkage_extended"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
@@ -81,7 +82,7 @@ PALETTE = {
 def custom_problem_convergence_plot(
     conn,
     plot_dir,
-    y: str = "1.0 - nmse_train",
+    y: str = "1.0 - nmse_train::DOUBLE",
     y_agg: str = "MAX",
     ylabel: str = "$R^2$ Train",
     metrics=["evaluations", "total_time_seconds"],
@@ -91,6 +92,12 @@ def custom_problem_convergence_plot(
     problem_query: str = "problem_name",
     modifier_query: str = r"format('H={}{}', template_height, IF(linear_scaling, ' LS', ''))",
     num_samples: int = 100,
+    wscale: float = 4,
+    hscale: float = 2.75,
+    gridspec_kw=dict(hspace=0.05),
+    supxlabel_kwargs=dict(y=-0.0225),
+    legend_pos=(0.5, -0.03),
+    filename: str = "convergence_per_problem",
 ):
     progress = tqdm(total=1)
     pdir = plot_dir / "custom"
@@ -138,9 +145,9 @@ def custom_problem_convergence_plot(
     fig, main_axes = plt.subplots(
         nrows=len(metrics),
         ncols=1,
-        figsize=(4 * ncols, 2.75 * nrows * len(metrics)),
+        figsize=(wscale * ncols, hscale * nrows * len(metrics)),
         layout="constrained",
-        gridspec_kw=dict(hspace=0.05),
+        gridspec_kw=gridspec_kw,
     )
 
     gs = main_axes[0].get_subplotspec().get_gridspec()
@@ -288,7 +295,7 @@ def custom_problem_convergence_plot(
                     alpha=0.2,
                 )
 
-        subfig.supxlabel(metric_label, y=-0.0225)
+        subfig.supxlabel(metric_label, **supxlabel_kwargs)
 
     labels, handles = [], []
     for alg in algorithms:
@@ -303,7 +310,7 @@ def custom_problem_convergence_plot(
         handles,
         labels,
         loc="lower center",
-        bbox_to_anchor=(0.5, -0.03),
+        bbox_to_anchor=legend_pos,
         ncols=min(6, len(algorithms)),
         borderaxespad=0.0,
         labelspacing=0,
@@ -311,7 +318,7 @@ def custom_problem_convergence_plot(
     )
 
     fig.savefig(
-        pdir / "convergence_per_problem.pdf",
+        pdir / f"{filename}.pdf",
         dpi=600,
         bbox_inches="tight",
         transparent=True,
@@ -325,7 +332,7 @@ def custom_problem_convergence_plot(
 def custom_convergence_plot(
     conn,
     plot_dir,
-    metric: str = "1.0 - nmse_train",
+    metric: str = "1.0 - nmse_train::DOUBLE",
     metric_label: str = "$R^2$ Train",
     run_expr: str = r"format('{}.{}', fold, seed)",
     where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
@@ -596,7 +603,7 @@ def custom_convergence_plot(
 def custom_cmp_plot(
     conn,
     plot_dir,
-    metric: str = "1.0 - nmse_train",
+    metric: str = "1.0 - nmse_train::DOUBLE",
     metric_label: str = "$R^2$ Train",
     method_where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
     problem_query: str = r"format('{}.{}.{}', problem_name, template_height, linear_scaling)",
@@ -790,7 +797,7 @@ def custom_cmp_plot(
 def custom_pprof_plot(
     conn,
     plot_dir,
-    metric: str = "1.0 - nmse_train",
+    metric: str = "1.0 - nmse_train::DOUBLE",
     metric_label: str = "$R^2$ Train",
     method_where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
     problem_query: str = "problem_name",
@@ -1023,8 +1030,8 @@ def custom_problem_plot(conn, plot_dir):
         algorithms = []
         rows = []
         for metric_label, metric in [  #
-            (r"$R^2$ Train", "1.0 - nmse_train"),
-            # (r"$R^2$ Test", "1.0 - nmse_test"),
+            (r"$R^2$ Train", "1.0 - nmse_train::DOUBLE"),
+            # (r"$R^2$ Test", "1.0 - nmse_test::DOUBLE"),
         ]:
             # modifier -> info + score dict
             modifiers = []
@@ -1252,7 +1259,16 @@ def custom_problem_plot(conn, plot_dir):
         plt.clf()
 
 
-def custom_interval_plot(conn, plot_dir):
+def custom_interval_plot(
+    conn,
+    plot_dir,
+    include_operator_set: bool = False,
+    show_test_acc: bool = True,
+    wscale: float = 7,
+    hscale: float = 3.25,
+    gridspec_kw=dict(wspace=0.05, hspace=0.1),
+    legend_pos=(0.5, -0.0),
+):
     pdir = plot_dir / "custom" / "intervals"
     pdir.mkdir(parents=True, exist_ok=True)
 
@@ -1275,9 +1291,14 @@ def custom_interval_plot(conn, plot_dir):
         algorithms = []
         rows = []
         for metric_label, metric in [  #
-            (r"$R^2$ Train", "1.0 - nmse_train"),
-            (r"$R^2$ Test", "1.0 - nmse_test"),
-        ]:
+            (r"$R^2$ Train", "1.0::DOUBLE - nmse_train::DOUBLE"),
+        ] + (
+            [
+                (r"$R^2$ Test", "1.0::DOUBLE - nmse_test::DOUBLE"),
+            ]
+            if show_test_acc
+            else []
+        ):
             # modifier -> info + score dict
             modifiers = []
 
@@ -1289,30 +1310,71 @@ def custom_interval_plot(conn, plot_dir):
                     ("No", r"linear_scaling::BOOLEAN = false"),
                     ("Yes", r"linear_scaling::BOOLEAN = true"),
                 ]:
-                    where_query = " AND ".join(
-                        q for q in [h_where_query, ls_where_query, m_where_query] if q
-                    )
+                    if include_operator_set:
+                        for op_value, op_where_query in [  #
+                            ("\n#O = 5", r"operator_set = 'small'"),
+                            ("\n#O = 10", r"operator_set = 'large'"),
+                        ]:
+                            where_query = " AND ".join(
+                                q
+                                for q in [
+                                    h_where_query,
+                                    ls_where_query,
+                                    m_where_query,
+                                    op_where_query,
+                                ]
+                                if q
+                            )
 
-                    score_dict, problems = rliable_score_dict(
-                        conn,
-                        run_expr="format('{}.{}', fold, run)",
-                        problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
-                        # method_query="format('{} {}', method_name, init)",
-                        where_query=where_query,
-                        normalized_value_expr=metric,
-                    )
+                            score_dict, problems = rliable_score_dict(
+                                conn,
+                                run_expr="format('{}.{}', fold, run)",
+                                problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
+                                # method_query="format('{} {}', method_name, init)",
+                                where_query=where_query,
+                                normalized_value_expr=metric,
+                            )
 
-                    score_dict = {method2name(m): s for m, s in score_dict.items()}
+                            score_dict = {
+                                method2name(m): s for m, s in score_dict.items()
+                            }
 
-                    algorithms += score_dict.keys()
+                            algorithms += score_dict.keys()
 
-                    modifiers.append(
-                        (
-                            # h_value + " " + ls_value,
-                            f"H = {h_value}{['', '\nLS']['Yes' == ls_value]}",
-                            score_dict,
+                            modifiers.append(
+                                (
+                                    # h_value + " " + ls_value,
+                                    f"H = {h_value}{['', '\nLS']['Yes' == ls_value]}{op_value}",
+                                    score_dict,
+                                )
+                            )
+                    else:
+                        where_query = " AND ".join(
+                            q
+                            for q in [h_where_query, ls_where_query, m_where_query]
+                            if q
                         )
-                    )
+
+                        score_dict, problems = rliable_score_dict(
+                            conn,
+                            run_expr="format('{}.{}', fold, run)",
+                            problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
+                            # method_query="format('{} {}', method_name, init)",
+                            where_query=where_query,
+                            normalized_value_expr=metric,
+                        )
+
+                        score_dict = {method2name(m): s for m, s in score_dict.items()}
+
+                        algorithms += score_dict.keys()
+
+                        modifiers.append(
+                            (
+                                # h_value + " " + ls_value,
+                                f"H = {h_value}{['', '\nLS']['Yes' == ls_value]}",
+                                score_dict,
+                            )
+                        )
             rows.append((metric_label, modifiers))
 
         algorithms = sorted(set(algorithms))
@@ -1354,8 +1416,8 @@ def custom_interval_plot(conn, plot_dir):
             sharex=True,  # "col",
             sharey=False,
             squeeze=False,
-            figsize=(ncols * 7, nrows * 3),
-            gridspec_kw=dict(wspace=0.05, hspace=0.1),
+            figsize=(ncols * wscale, nrows * hscale),
+            gridspec_kw=gridspec_kw,
         )
 
         size = 6
@@ -1484,14 +1546,15 @@ def custom_interval_plot(conn, plot_dir):
             handles,
             labels,
             loc="lower center",
-            bbox_to_anchor=(0.5, -0.0),
+            bbox_to_anchor=legend_pos,
             ncols=min(6, len(algorithms)),
             borderaxespad=0.0,
             frameon=False,
         )
 
         fig.savefig(
-            pdir / f"interval_estimates{group}.pdf",
+            pdir
+            / f"interval_estimates{group}{'_os' if include_operator_set else ''}.pdf",
             dpi=600,
             bbox_inches="tight",
             transparent=True,
@@ -1510,13 +1573,33 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
-        custom_convergence_plot(conn, PLOT_DIR)
+        # custom_convergence_plot(conn, PLOT_DIR)
         # custom_pprof_plot(conn, PLOT_DIR)
 
         # custom_problem_plot(conn, PLOT_DIR)
         # custom_interval_plot(conn, PLOT_DIR)
+        custom_interval_plot(
+            conn,
+            PLOT_DIR,
+            include_operator_set=True,
+            show_test_acc=False,
+            wscale=7,
+            hscale=7,
+            legend_pos=(0.5, 0.03),
+        )
 
         # custom_problem_convergence_plot(conn, PLOT_DIR)
+        # custom_problem_convergence_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     where_query=r"method_name NOT SIMILAR TO '.*(\*|any|all).*' AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
+        #     wscale=3,
+        #     hscale=3,
+        #     gridspec_kw=dict(hspace=0.15),
+        #     supxlabel_kwargs=dict(y=-0.1),
+        #     legend_pos=(0.5, -0.11),
+        #     filename="convergence_per_problem_h7ls",
+        # )
 
         # custom_cmp_plot(conn, PLOT_DIR)
 
@@ -1562,7 +1645,7 @@ def main():
                         problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
                         # method_query="format('{} {}', method_name, init)",
                         where_query=where_query,
-                        normalized_value_expr="1.0 - nmse_train",
+                        normalized_value_expr="1.0 - nmse_train::DOUBLE",
                     )
 
                     algorithms = sorted(score_dict.keys())
@@ -1638,7 +1721,7 @@ def main():
                     #     problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
                     #     # method_query="format('{} {}', method_name, init)",
                     #     where_query=where_query,
-                    #     normalized_value_expr="1.0 - nmse_train",
+                    #     normalized_value_expr="1.0 - nmse_train::DOUBLE",
                     # )
 
                     # iqm = lambda scores: np.array([metrics.aggregate_iqm(scores[..., frame])
