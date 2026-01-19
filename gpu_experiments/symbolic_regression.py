@@ -5,11 +5,11 @@ from pathlib import Path
 import numpy as np
 from pygom import KernelVersion
 
-from src.config import ExperimentConfig, cfg
 from src.db import create_db
-from src.plots import plot
-from src.run import run_cpu_tasks, run_gpu_tasks
-from src.task import Task, problems
+from src.experiment.config import ExperimentConfig, cfg
+from src.experiment.run import run_cpu_tasks, run_gpu_tasks
+from src.experiment.task import Task, problems
+from src.plot.plots import plot
 
 LINE_UP = "\033[1A"
 LINE_CLEAR = "\x1b[2K"
@@ -101,24 +101,26 @@ def run_experiment(dir: Path, config: ExperimentConfig, dry_run: bool = False):
         create_db(output_directory)
         print_status("Finished with database creation", dry_run, n=1)
 
-        print_status("Starting plot creation...", dry_run)
-        plot(output_directory)
-        print_status("Finished with plot creation", dry_run, n=1)
+        # print_status("Starting plot creation...", dry_run)
+        # plot(output_directory)
+        # print_status("Finished with plot creation", dry_run, n=1)
+
+
+def plot_experiment(dir: Path, config_name: str):
+    output_directory = dir / config_name
+
+    plot(output_directory)
 
 
 def main():
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    # run_date = "2026-01-13_11:38:49"
+    # run_date = "2026-01-14_17_26_08"
     output_directory = Path("results") / run_date
 
-    run_experiment(output_directory, cfg.SCALABILITY_POPULATION)
-    run_experiment(output_directory, cfg.SCALABILITY_OBSERVATION)
+    run_experiment(output_directory, cfg.CPU_ALL_KERNEL_POPULATION)
+    run_experiment(output_directory, cfg.CPU_ALL_KERNEL_OBSERVATION)
 
-    run_experiment(output_directory, cfg.CPU_KERNEL_POPULATION)
-    run_experiment(output_directory, cfg.CPU_KERNEL_OBSERVATION)
-
-    # run_experiment(output_directory, cfg.KERNEL_SWEEP_POPULATION)
-    # run_experiment(output_directory, cfg.KERNEL_SWEEP_OBSERVATION)
+    run_experiment(output_directory, cfg.CPU_KERNEL_POP_OBS)
 
 
 if __name__ == "__main__":

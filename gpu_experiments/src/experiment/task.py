@@ -11,7 +11,7 @@ import sympy as sym
 from pygom import KernelVersion
 from sklearn.model_selection import KFold, train_test_split
 
-from src.config import ExperimentConfig
+from src.experiment.config import ExperimentConfig
 
 # REPEATS_TOTAL = 15
 # NUM_FOLDS = 5

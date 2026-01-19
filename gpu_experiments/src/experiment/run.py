@@ -12,8 +12,8 @@ import pygom.gp as gp
 from pygom import KernelVersion as KV
 from tqdm import tqdm
 
-from src.config import OPERATOR_SETS
-from src.task import Task
+from src.experiment.config import OPERATOR_SETS
+from src.experiment.task import Task
 
 JobQueue = list[
     tuple[Callable[[Task, int, Path], None], list[Never], dict[str, Task | str]]

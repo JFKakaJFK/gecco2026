@@ -1,7 +1,8 @@
 import os
 from ast import literal_eval
+from collections.abc import Callable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import duckdb
 import matplotlib.pyplot as plt
@@ -9,6 +10,8 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
+
+from src.plot.config import CONFIGS
 
 KERNEL_ORDER = [
     "cpu",
@@ -24,6 +27,52 @@ KERNEL_ORDER = [
 sns.set_theme(context="notebook", style="whitegrid")
 
 
+def get_modifiers(
+    conn: duckdb.DuckDBPyConnection,
+    modifier_query: str | None = None,
+    modifier_labels: list[str] | None = None,
+    default_query: str | None = None,
+    allow_none: bool = False,
+    sort_key: Callable[[tuple], Any] | None = None,
+):
+    if modifier_query is not None:
+        assert modifier_labels is not None, "modifier_labels must be provided"
+
+        modifiers = sorted(
+            map(
+                literal_eval,
+                set(
+                    str(m)
+                    for m, *_ in conn.sql(
+                        f"SELECT {modifier_query} FROM results"
+                    ).fetchall()
+                    if m is not None
+                ),
+            ),
+            key=sort_key,
+        )
+
+        assert len(modifiers) > 0, "No modifiers found in database"
+        num_modifiers = len(modifiers[0])
+        assert num_modifiers == len(modifier_labels), (
+            f"Expected {num_modifiers} labels got {len(modifier_labels)}"
+        )
+
+        return modifiers, num_modifiers, modifier_query
+
+    if default_query is not None:
+        modifiers = sorted(
+            [m for m, *_ in conn.sql(default_query).fetchall() if m is not None]
+        )
+
+        return modifiers, 0, None
+
+    if allow_none:
+        return None, 0, "['']"
+
+    raise ValueError("Invalid modifier configuration")
+
+
 def plot_convergence(
     plot_dir: Path,
     conn: duckdb.DuckDBPyConnection,
@@ -31,8 +80,10 @@ def plot_convergence(
     kernel_query: str = "kernel",
     row_modifier_query: str | None = None,
     row_modifier_labels: list[str] | None = None,
+    row_sort_key: Callable[[tuple], Any] | None = None,
     col_modifier_query: str | None = None,
     col_modifier_labels: list[str] | None = None,
+    col_sort_key: Callable[[tuple], Any] | None = None,
     unit_query: str = "run",
     y_var: str = "objectives[1]",
     y_agg: Literal["MIN", "MAX"] = "MIN",
@@ -44,62 +95,21 @@ def plot_convergence(
     ymin: float | str | None = None,
     ymax: float | str | None = None,
 ):
-    if row_modifier_query is not None:
-        assert row_modifier_labels is not None
+    row_modifiers, num_row_modifiers, row_modifier_query = get_modifiers(
+        conn,
+        modifier_query=row_modifier_query,
+        modifier_labels=row_modifier_labels,
+        allow_none=True,
+        sort_key=row_sort_key,
+    )
 
-        row_modifiers = sorted(
-            map(
-                literal_eval,
-                set(
-                    str(m)
-                    for m, *_ in conn.sql(
-                        f"SELECT {row_modifier_query} FROM results"
-                    ).fetchall()
-                    if m is not None
-                ),
-            )
-        )
-
-        assert len(row_modifiers) > 0
-        num_row_modifiers = len(row_modifiers[0])
-        assert num_row_modifiers == len(row_modifier_labels)
-    else:
-        row_modifiers = None
-        num_row_modifiers = 0
-        row_modifier_query = "['']"
-
-    if col_modifier_query is not None:
-        assert col_modifier_labels is not None
-
-        col_modifiers = sorted(
-            map(
-                literal_eval,
-                set(
-                    str(m)
-                    for m, *_ in conn.sql(
-                        f"SELECT {col_modifier_query} FROM results"
-                    ).fetchall()
-                    if m is not None
-                ),
-            )
-        )
-
-        assert len(col_modifiers) > 0
-        num_col_modifiers = len(col_modifiers[0])
-        assert num_col_modifiers == len(col_modifier_labels)
-    else:
-        col_modifiers = sorted(
-            [
-                p
-                for p, *_ in conn.sql(
-                    "SELECT DISTINCT(problem) FROM results"
-                ).fetchall()
-                if p is not None
-            ]
-        )
-
-        col_modifier_labels = []
-        num_col_modifiers = 0
+    col_modifiers, num_col_modifiers, col_modifier_query = get_modifiers(
+        conn,
+        modifier_query=col_modifier_query,
+        modifier_labels=col_modifier_labels,
+        default_query="SELECT DISTINCT(problem) FROM results",
+        sort_key=col_sort_key,
+    )
 
     if kernels is None:
         kernels = sorted(
@@ -110,7 +120,7 @@ def plot_convergence(
             ]
         )
 
-    if len(col_modifiers) == 0 or len(col_modifiers) == 0 or len(kernels) == 0:
+    if num_row_modifiers == 0 or num_col_modifiers == 0 or len(kernels) == 0:
         print("Not enough data?")
         return
 
@@ -152,11 +162,13 @@ def plot_convergence(
                         xlim = conn.execute(
                             f"""
                                 SELECT MIN({metric}) as xmin, MAX({metric}) as xmax FROM results
-                                WHERE {col_modifier_query} = $1
-                                AND {row_modifier_query} = $2
+                                WHERE 
+                                    {kernel_query} IN $1 AND
+                                    {col_modifier_query} = $2 AND
+                                    {row_modifier_query} = $3
                                 LIMIT 1
                                 """,
-                            [col_modifier, row_modifier],
+                            [kernels, col_modifier, row_modifier],
                         ).fetchone()
 
                         assert xlim is not None
@@ -172,10 +184,12 @@ def plot_convergence(
                         xlim = conn.execute(
                             f"""
                                 SELECT MIN({metric}) as xmin, MAX({metric}) as xmax FROM results
-                                WHERE {col_modifier_query} = $1
+                                WHERE 
+                                    {kernel_query} IN $1 AND
+                                    {col_modifier_query} = $2
                                 LIMIT 1
                                 """,
-                            [col_modifier],
+                            [kernels, col_modifier],
                         ).fetchone()
 
                     # print(metric, row_modifier, col_modifier, xlim)
@@ -200,17 +214,19 @@ def plot_convergence(
                                 -- aggregate is needed to find the best result up to `x`
                                 {y_agg}({y_var}) as value,
                             FROM results
-                            WHERE {col_modifier_query} = $1
-                                AND {metric}::DOUBLE <= {x}::DOUBLE
-                                {f"AND {row_modifier_query} = $2" if row_modifier else ""}
+                            WHERE 
+                                {kernel_query} in $1 AND
+                                {col_modifier_query} = $2 AND
+                                {metric}::DOUBLE <= {x}::DOUBLE
+                                {f"AND {row_modifier_query} = $3" if row_modifier else ""}
                             GROUP BY ALL
                             """
                         try:
                             part = conn.execute(
                                 q,
-                                [col_modifier, row_modifier]
+                                [kernels, col_modifier, row_modifier]
                                 if row_modifier
-                                else [col_modifier],
+                                else [kernels, col_modifier],
                             ).df()
                         except Exception as e:
                             print(q)
@@ -228,6 +244,9 @@ def plot_convergence(
                         ignore_index=True,
                     )
 
+                    if kernels is not None:
+                        df = df[df[kernel_query].isin(kernels)]
+
                     sns.lineplot(
                         df,
                         x="metric",
@@ -243,9 +262,6 @@ def plot_convergence(
                         ax=ax,
                     )
 
-                    # if row_mi == 0:
-                    #     ax.set_title(col_modifier)
-
                     if row_mi == 0:
                         # Show column modifier as title
                         col_str = ""
@@ -257,7 +273,7 @@ def plot_convergence(
                                 )
                             )
                         ax.set_title(
-                            f"{col_modifier if not col_str else col_str}", fontsize=10
+                            f"{col_str if col_str else col_modifier}", fontsize=10
                         )
 
                     ax.set_xlabel("")
@@ -312,7 +328,6 @@ def plot_convergence(
             fig.legend(
                 handles=handles,
                 loc="center left",
-                # mode="expand",
                 bbox_to_anchor=(1.01, 0.5),
                 borderaxespad=0.0,
                 frameon=False,
@@ -335,58 +350,169 @@ def plot_convergence(
     pbar.close()
 
 
-# def plot_gpu_kernels(output_dir: Path, conn: duckdb.DuckDBPyConnection):
-#     df = conn.execute(
-#         """
-#         SELECT
-#             device,
-#             population_size,
-#             num_observations,
-#             AVG(evaluations / total_time_seconds) AS evals_per_sec
-#         FROM results
-#         WHERE num_observations IN (10000, 100000)
-#         GROUP BY device, population_size, num_observations
-#         ORDER BY population_size, num_observations, device
-#         """
-#     ).fetchdf()
+def plot_fraction_target_reached(
+    plot_dir: Path,
+    conn: duckdb.DuckDBPyConnection,
+    kernels: list[str] | None = None,
+    kernel_query: str = "kernel",
+    row_modifier_query: str | None = None,
+    row_modifier_labels: list[str] | None = None,
+    col_modifier_query: str | None = None,
+    col_modifier_labels: list[str] | None = None,
+    unit_query: str = "run",
+):
+    row_modifiers, num_row_modifiers, row_modifier_query = get_modifiers(
+        conn,
+        modifier_query=row_modifier_query,
+        modifier_labels=row_modifier_labels,
+        allow_none=True,
+    )
 
-#     # Now plot using seaborn
-#     plt.figure(figsize=(6, 12))
-#     sns.set_style("whitegrid")
+    col_modifiers, num_col_modifiers, col_modifier_query = get_modifiers(
+        conn,
+        modifier_query=col_modifier_query,
+        modifier_labels=col_modifier_labels,
+        default_query="SELECT DISTINCT(problem) FROM results",
+    )
 
-#     # Get unique number of observations for subplots
-#     num_observations_list = sorted(df["num_observations"].unique())
-#     num_obs = len(num_observations_list)
+    if kernels is None:
+        kernels = sorted(
+            [
+                d
+                for d, *_ in conn.sql("SELECT DISTINCT(kernel) FROM results").fetchall()
+                if d is not None
+            ]
+        )
 
-#     # Create subplots: 1 row, N columns (one per num_observations)
-#     fig, axes = plt.subplots(1, num_obs, figsize=(6 * num_obs, 5), sharey=True)
+    if num_row_modifiers == 0 or num_col_modifiers == 0 or len(kernels) == 0:
+        print("Not enough data?")
+        return
 
-#     if num_obs == 1:
-#         axes = [axes]
+    nrows = len(row_modifiers) if row_modifiers else 1
+    ncols = len(col_modifiers)
 
-#     y_ticks = [1e4, 1e5, 1e6]
+    # Sort devices by predetermined order
+    kernel_order_index = {k: i for i, k in enumerate(KERNEL_ORDER)}
+    kernels = sorted(kernels, key=lambda k: kernel_order_index.get(k, float("inf")))
 
-#     for ax, obs in zip(axes, num_observations_list):
-#         subset = df[df["num_observations"] == obs]
-#         sns.barplot(
-#             data=subset,
-#             x="population_size",
-#             y="evals_per_sec",
-#             hue="device",
-#             palette="tab10",
-#             ax=ax,
-#         )
-#         ax.set_title(f"Num Observations = {obs}")
-#         ax.set_xlabel("Population Size")
-#         ax.set_ylabel("")  # Only label first subplot
-#         ax.set_yscale("log")  # Set logarithmic y-axis
-#         ax.set_yticks(y_ticks)  # Force ticks at 10^4, 10^5, 10^6
-#         ax.tick_params(axis="y", which="major", labelsize=10)
+    hues = sns.color_palette(n_colors=len(kernels))
+    palette = {d: h for d, h in zip(kernels, hues, strict=True)}
 
-#     axes[0].set_ylabel("Evaluations/sec")  # y-axis label only once
-#     plt.tight_layout()
+    pbar = tqdm(leave=False, total=(nrows * ncols), ascii=True)
 
-#     plt.savefig(output_dir / "kernel.png")
+    fig, axes = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=(4 * ncols, 5 * nrows),
+        sharey=True,
+        constrained_layout=True,
+    )
+
+    axes = np.atleast_2d(axes)
+
+    if axes.shape != (nrows, ncols):
+        axes = axes.reshape(nrows, ncols)
+
+    for row_mi, row_modifier in enumerate(
+        row_modifiers if row_modifiers is not None else [None]
+    ):
+        for col_mi, col_modifier in enumerate(col_modifiers):
+            ax = axes[row_mi, col_mi]
+
+            q = f"""
+                SELECT 
+                    kernel,
+                    SUM(CASE WHEN status = 'TargetReached' THEN 1 ELSE 0 END)
+                        / SUM(CASE WHEN status != 'Running' THEN 1 ELSE 0 END) AS reached
+                FROM results
+                WHERE
+                    {col_modifier_query} = $1
+                    {f"AND {row_modifier_query} = $2" if row_modifier is not None else ""}
+                GROUP BY kernel
+            """
+
+            df = conn.execute(
+                q,
+                [col_modifier, row_modifier]
+                if row_modifier is not None
+                else [col_modifier],
+            ).df()
+
+            # df = df.set_index("kernel").reindex(kernels, fill_value=0.0).reset_index()
+
+            assert df is not None
+
+            sns.barplot(
+                df,
+                x="kernel",
+                y="reached",
+                hue="kernel",
+                order=kernels,
+                palette=palette,
+                legend=None,
+                ax=ax,
+            )
+
+            # Rotate x-tick labels
+            ax.set_xticks(ax.get_xticks())
+            ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha="right")
+
+            if row_mi == 0:
+                # Show column modifier as title
+                col_str = ""
+                if col_modifier is not None and col_modifier_labels:
+                    col_str = "\n".join(
+                        f"{label} = {value}"
+                        for label, value in zip(
+                            col_modifier_labels, col_modifier, strict=True
+                        )
+                    )
+                ax.set_title(f"{col_str if col_str else col_modifier}", fontsize=10)
+
+            ax.set_xlabel("")
+
+            if row_mi == len(row_modifiers) - 1:
+                ax.set_xlabel("Kernel Version")
+
+            if col_mi == 0:
+                modifier_str = ""
+                if row_modifier is not None:
+                    modifier_str = (
+                        "\n".join(
+                            f"{label} = {value}"
+                            for label, value in zip(
+                                row_modifier_labels, row_modifier, strict=True
+                            )
+                        )
+                        + "\n"
+                    )
+                ax.set_ylabel(modifier_str + "Target reached [%]")
+            else:
+                ax.set_ylabel("")
+
+            pbar.update(1)
+
+    handles = [axes.flat[0].plot([], [], label=k, color=palette[k])[0] for k in kernels]
+    fig.legend(
+        handles=handles,
+        loc="center left",
+        bbox_to_anchor=(1.01, 0.5),
+        borderaxespad=0.0,
+        frameon=False,
+    )
+
+    if not plot_dir.is_dir():
+        os.makedirs(plot_dir, exist_ok=True)
+
+    for fmt in ["pdf", "png"]:
+        fig.savefig(
+            plot_dir / f"target_reached.{fmt}",
+            dpi=600,
+            # transparent=True,
+            bbox_inches="tight",
+        )
+
+    pbar.close()
 
 
 def plot(output_dir: Path):
@@ -397,25 +523,27 @@ def plot(output_dir: Path):
 
     conn = duckdb.connect(db_path)
 
-    plot_convergence(
-        plot_dir,
-        conn,
-        y_agg="MAX",
-        ymin="auto",  # cuts of the lower 2.5% of data points
-        ymax=None,
-        # SQL can be used to derive values...
-        y_var="1 - objectives[1]::DOUBLE / var_y::DOUBLE",
-        y_label="$R^2$ Train",
-        unit_query="format('{}.{}', fold, run)",
-        # metrics=["evaluations / dims::DOUBLE", "total_time_seconds / dims::DOUBLE"],
-        # metric_labels=[r"$\frac{Evaluations}{Dimensions}$", "Time/Dimensions [s]"],
-        row_modifier_query="[template_depth::STRING,operator_set::STRING]",
-        row_modifier_labels=["Depth", "Operators"],
-        col_modifier_query="[num_observations::STRING, population_size::STRING]",
-        col_modifier_labels=["#Observations", "#Individiuals"],
-        # show_generation_boundaries=True,
-        nsamples=100,
-    )
+    for cfg in tqdm(CONFIGS.values(), ascii=True):
+        plot_convergence(
+            plot_dir / cfg.name,
+            conn,
+            kernels=cfg.kernels,
+            y_var=cfg.y_var,
+            y_agg=cfg.y_agg,
+            y_label=cfg.y_label,
+            unit_query=cfg.unit_query,
+            row_modifier_query=cfg.row_modifier_query,
+            row_modifier_labels=cfg.row_modifier_labels,
+            row_sort_key=cfg.row_sort_key,
+            col_modifier_query=cfg.col_modifier_query,
+            col_modifier_labels=cfg.col_modifier_labels,
+            col_sort_key=cfg.col_sort_key,
+            metrics=cfg.metrics,
+            metric_labels=cfg.metric_labels,
+            ylog=cfg.ylog,
+            ymin=cfg.ymin,
+            ymax=cfg.ymax,
+            nsamples=cfg.nsamples,
+        )
 
     conn.close()
-

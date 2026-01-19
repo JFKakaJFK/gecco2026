@@ -179,8 +179,8 @@ SCALABILITY_OBSERVATION_CONFIG = ExperimentConfig(
 
 
 # Used for comparing all kernel versions to the CPU version
-CPU_KERNEL_POPULATION_CONFIG = ExperimentConfig(
-    name="cpu_kernel_population",
+CPU_ALL_KERNEL_POPULATION_CONFIG = ExperimentConfig(
+    name="cpu_all_kernel_population",
     problems=DATASETS["feynman_9"],
     population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
     num_observations=60_000,
@@ -189,15 +189,24 @@ CPU_KERNEL_POPULATION_CONFIG = ExperimentConfig(
     gpu=GPUConfig(kernels=KERNEL_VERSIONS),
 )
 
-CPU_KERNEL_OBSERVATION_CONFIG = ExperimentConfig(
-    name="cpu_kernel_observation",
+CPU_ALL_KERNEL_OBSERVATION_CONFIG = ExperimentConfig(
+    name="cpu_all_kernel_observation",
     problems=DATASETS["feynman_9"],
     population_sizes=512,
     num_observations=[int(10**i * 0.75 * 0.8) for i in range(2, 6)],  # 60 - 60_000
     num_features=DATASETS["feynman_9"].features,
     use_target=True,
-    cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(kernels=KERNEL_VERSIONS),
+)
+
+CPU_KERNEL_POP_OBS_CONFIG = ExperimentConfig(
+    name="cpu_kernel_pop_obs",
+    problems=DATASETS["feynman_9"],
+    population_sizes=[2**i for i in range(8, 16)],  # 256 - 32768
+    num_observations=[int(10**i * 0.75 * 0.8) for i in range(2, 6)],  # 60 - 60_000
+    num_features=DATASETS["feynman_9"].features,
+    use_target=True,
+    gpu=GPUConfig(kernels=(KV.baseline, KV.block_reduce, KV.single_kernel)),
 )
 
 # Used for comparing different kernel versions
@@ -233,8 +242,9 @@ class Configs:
     SCALABILITY_OBSERVATION = SCALABILITY_OBSERVATION_CONFIG
 
     # CPU vs kernels
-    CPU_KERNEL_POPULATION = CPU_KERNEL_POPULATION_CONFIG
-    CPU_KERNEL_OBSERVATION = CPU_KERNEL_OBSERVATION_CONFIG
+    CPU_ALL_KERNEL_POPULATION = CPU_ALL_KERNEL_POPULATION_CONFIG
+    CPU_ALL_KERNEL_OBSERVATION = CPU_ALL_KERNEL_OBSERVATION_CONFIG
+    CPU_KERNEL_POP_OBS = CPU_KERNEL_POP_OBS_CONFIG
 
     # Kernel sweep experiments
     KERNEL_SWEEP_POPULATION = KERNEL_SWEEP_POPULATION_CONFIG
