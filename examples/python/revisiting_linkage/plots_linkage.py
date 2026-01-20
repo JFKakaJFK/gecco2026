@@ -1014,7 +1014,15 @@ def custom_pprof_plot(
     progress.update()
 
 
-def custom_problem_plot(conn, plot_dir):
+def custom_problem_plot(
+    conn,
+    plot_dir,
+    include_operator_set=False,
+    wscale=3,
+    hscale=4.5,
+    gridspec_kw=dict(wspace=0.05, hspace=0.1),
+    legend_pos=(0.5, -0.05),
+):
     pdir = plot_dir / "custom"
     pdir.mkdir(parents=True, exist_ok=True)
 
@@ -1044,29 +1052,70 @@ def custom_problem_plot(conn, plot_dir):
                     ("No", r"linear_scaling::BOOLEAN = false"),
                     ("Yes", r"linear_scaling::BOOLEAN = true"),
                 ]:
-                    where_query = " AND ".join(
-                        q for q in [h_where_query, ls_where_query, m_where_query] if q
-                    )
+                    if include_operator_set:
+                        for op_value, op_where_query in [  #
+                            ("\n#O = 5", r"operator_set = 'small'"),
+                            ("\n#O = 10", r"operator_set = 'large'"),
+                        ]:
+                            where_query = " AND ".join(
+                                q
+                                for q in [
+                                    h_where_query,
+                                    ls_where_query,
+                                    m_where_query,
+                                    op_where_query,
+                                ]
+                                if q
+                            )
 
-                    df = conn.execute(f"""
-                        SELECT
-                            problem_name AS problem,
-                            method_name AS method,
-                            format('{{}}.{{}}', fold, seed) AS run,
-                            {metric} AS value,
-                        FROM results
-                        WHERE status != 'Running' AND status != 'Aborted' AND {where_query}
-                    """).df()
+                            df = conn.execute(f"""
+                                SELECT
+                                    problem_name AS problem,
+                                    method_name AS method,
+                                    format('{{}}.{{}}', fold, seed) AS run,
+                                    {metric} AS value,
+                                FROM results
+                                WHERE status != 'Running' AND status != 'Aborted' AND {where_query}
+                            """).df()
 
-                    df["method"] = df["method"].apply(method2name)
+                            df["method"] = df["method"].apply(method2name)
 
-                    algorithms += list(df["method"].unique())
+                            algorithms += list(df["method"].unique())
 
-                    problems += list(df["problem"].unique())
+                            problems += list(df["problem"].unique())
 
-                    modifiers.append(
-                        (f"H = {h_value}{['', '\nLS'][ls_value == 'Yes']}", df)
-                    )
+                            modifiers.append(
+                                (
+                                    f"H = {h_value}{['', '\nLS'][ls_value == 'Yes']}{op_value}",
+                                    df,
+                                )
+                            )
+                    else:
+                        where_query = " AND ".join(
+                            q
+                            for q in [h_where_query, ls_where_query, m_where_query]
+                            if q
+                        )
+
+                        df = conn.execute(f"""
+                            SELECT
+                                problem_name AS problem,
+                                method_name AS method,
+                                format('{{}}.{{}}', fold, seed) AS run,
+                                {metric} AS value,
+                            FROM results
+                            WHERE status != 'Running' AND status != 'Aborted' AND {where_query}
+                        """).df()
+
+                        df["method"] = df["method"].apply(method2name)
+
+                        algorithms += list(df["method"].unique())
+
+                        problems += list(df["problem"].unique())
+
+                        modifiers.append(
+                            (f"H = {h_value}{['', '\nLS'][ls_value == 'Yes']}", df)
+                        )
 
             rows.append((metric_label, modifiers))
 
@@ -1092,8 +1141,8 @@ def custom_problem_plot(conn, plot_dir):
             sharex="col",
             sharey=False,
             squeeze=False,
-            figsize=(ncols * 3, nrows * 4.5),
-            gridspec_kw=dict(wspace=0.05, hspace=0.1),
+            figsize=(ncols * wscale, nrows * hscale),
+            gridspec_kw=gridspec_kw,
         )
 
         for row, (row_label, modifiers) in enumerate(rows):
@@ -1243,14 +1292,14 @@ def custom_problem_plot(conn, plot_dir):
             handles,
             labels,
             loc="lower center",
-            bbox_to_anchor=(0.5, -0.05),  # 75),
+            bbox_to_anchor=legend_pos,  # 75),
             ncols=min(6, len(algorithms)),
             borderaxespad=0.0,
             frameon=False,
         )
 
         fig.savefig(
-            pdir / f"problem_scores{group}.pdf",
+            pdir / f"problem_scores{group}{'_os' if include_operator_set else ''}.pdf",
             dpi=600,
             bbox_inches="tight",
             transparent=True,
@@ -1577,16 +1626,25 @@ def main():
         # custom_pprof_plot(conn, PLOT_DIR)
 
         # custom_problem_plot(conn, PLOT_DIR)
-        # custom_interval_plot(conn, PLOT_DIR)
-        custom_interval_plot(
+        custom_problem_plot(
             conn,
             PLOT_DIR,
             include_operator_set=True,
-            show_test_acc=False,
-            wscale=7,
-            hscale=7,
+            wscale=7 / 2,
+            hscale=15 / 2,
             legend_pos=(0.5, 0.03),
         )
+
+        # custom_interval_plot(conn, PLOT_DIR)
+        # custom_interval_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     include_operator_set=True,
+        #     show_test_acc=False,
+        #     wscale=7,
+        #     hscale=7,
+        #     legend_pos=(0.5, 0.03),
+        # )
 
         # custom_problem_convergence_plot(conn, PLOT_DIR)
         # custom_problem_convergence_plot(

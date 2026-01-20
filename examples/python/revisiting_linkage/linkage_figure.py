@@ -1,3 +1,4 @@
+from gettext import Catalog
 from typing import Literal
 
 import matplotlib
@@ -7,7 +8,8 @@ import numpy as np
 import scipy
 import seaborn as sns
 from matplotlib.patches import Circle, Rectangle
-from networkx.drawing.nx_agraph import graphviz_layout
+
+# from networkx.drawing.nx_agraph import graphviz_layout
 from pygom import *
 from seaborn.utils import relative_luminance
 
@@ -154,29 +156,72 @@ def learn_lt(
     return lt2subsets(lt), lt, Z
 
 
+def custom_tree_layout(graph, root=None, dx: float = 1, dy: float = 0.75):
+    if root is None:
+        root = list(graph.nodes)[0]
+
+    q = set([root])
+    parent = dict()
+    info = dict()
+    pos = dict()
+    while len(q):
+        c = q.pop()
+        p, nth_child, num_children = parent.get(c, (None, 0, 1))
+        pd, pdx = (-1, dx) if p is None else info[p]
+        px, py = pos.get(p, (0, dy))
+        d = pd + 1
+
+        if num_children < 2:
+            xy = px, py - dy
+            cdx = pdx
+        else:
+            cdx = pdx / num_children
+            s = pdx / (num_children - 1)
+            x = px - pdx / 2 + nth_child * s
+            xy = x, py - dy
+        info[c] = d, cdx
+        pos[c] = xy
+
+        cs = list(graph.adj[c].keys())
+        for i, n in enumerate(cs):
+            if n not in parent:
+                parent[n] = c, i, len(cs)
+                q.add(n)
+
+    return pos
+
+
 def draw_nx(
     graph,
     ax,
     margins=0.2,
     root=None,
+    pos=None,
+    layout="custom",
     labels=None,
     edgecolors="black",
     node_color="white",
     node_size=1200,
     xscale=1 / 1.75,
     yscale=1 / 3,
+    dx=1,
+    dy=0.45,
     label_offset=(0, 0),
     hide_ticks=True,
     label_kwargs=dict(),
     **kwargs,
 ):
-    pos = graphviz_layout(
-        graph,
-        # root="0",
-        root=root,
-        prog="dot",  # , args="ranksep=0,nodesep=0"
-    )
-    pos = {n: (x * xscale, y * yscale) for n, (x, y) in pos.items()}
+    if pos is None:
+        # pos = graphviz_layout(
+        #     graph,
+        #     # root="0",
+        #     root=root,
+        #     prog="dot",  # , args="ranksep=0,nodesep=0"
+        # )
+        # pos = {n: (x * xscale, y * yscale) for n, (x, y) in pos.items()}
+
+        pos = custom_tree_layout(graph, root=root, dx=dx, dy=dy)
+
     nx.draw_networkx(
         graph,
         pos,
@@ -200,7 +245,14 @@ def draw_nx(
     return pos
 
 
-def draw_lt(Z, n, ax, include_full_fos: bool = False, **kwargs):
+def draw_lt(
+    Z,
+    n,
+    ax,
+    include_full_fos: bool = False,
+    label_kwargs=dict(font_size="medium"),
+    **kwargs,
+):
     fos = nx.DiGraph()
     subsets = []
     for i in range(n):
@@ -218,10 +270,16 @@ def draw_lt(Z, n, ax, include_full_fos: bool = False, **kwargs):
         fos.add_edge(n + i, left, show=show)
         fos.add_edge(n + i, right, show=show)
 
+    root = 2 * n - 2
+    pos = custom_tree_layout(fos, root=root, dx=2.5, dy=1)
+    ymin = min(y for _, y in pos.values())
+    pos = {node: (x, ymin) if node < n else (x, y) for node, (x, y) in pos.items()}
+
     draw_nx(
         fos,
         ax,
-        root=2 * n - 1,
+        root=root,
+        pos=pos,
         labels={n: fos.nodes[n]["label"] for n in fos},
         nodelist=[n for n in fos if fos.nodes[n]["show"]],
         edgelist=[
@@ -231,6 +289,7 @@ def draw_lt(Z, n, ax, include_full_fos: bool = False, **kwargs):
         ],
         edgecolors="none",
         arrows=False,
+        label_kwargs=label_kwargs,
         **kwargs,
     )
 
@@ -346,7 +405,8 @@ def example_solution():
             axes["T"].add_patch(
                 Circle(
                     pos[n],
-                    radius=27.5,  # np.sqrt(node_size / np.pi),
+                    # radius=27.5,  # np.sqrt(node_size / np.pi),
+                    radius=0.16,  # np.sqrt(node_size / np.pi),
                     lw=0,
                     alpha=0.2,  # 5,
                     color="black",
@@ -371,7 +431,8 @@ def example_solution():
     )
     nx.draw_networkx_labels(
         template_structure,
-        {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+        # {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+        {n: (x + 0.19, y - 0.075) for n, (x, y) in pos.items()},
         {n: f"${{}}_{n}$" for n in template_structure},
         ax=axes["T"],
     )
@@ -449,7 +510,7 @@ def example_node_proximity():
         TN
         """,
         figsize=(8, 4),
-        gridspec_kw=dict(width_ratios=[1.5, 1]),
+        gridspec_kw=dict(width_ratios=[1.75, 1]),
     )
 
     # axes["T"].set_axis_off()
@@ -486,7 +547,7 @@ def example_node_proximity():
         vmin=0,
         vmax=1,
         square=True,
-        annot_kws=dict(fontsize="small"),
+        annot_kws=dict(fontsize="x-small"),
         ax=axes["N"],
         cbar=False,
     )
@@ -745,7 +806,13 @@ def linkage_example():
     if ncols > 3:
         draw_measure(node_proximity, None, "Node", axes[0, 3], cbar=False)
 
-    draw_nx(template_structure, root=0, margins=(0.2, 0.3), ax=axes[1, 0])
+    draw_nx(
+        template_structure,
+        root=0,
+        margins=(0.2, 0.3),
+        dx=0.7,
+        ax=axes[1, 0],
+    )
     axes[1, 0].set_title("Template")
 
     # scipy.cluster.hierarchy.dendrogram(Z, ax=axes[1, 1])
