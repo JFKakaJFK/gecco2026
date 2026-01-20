@@ -400,6 +400,15 @@ def example_solution():
             for n in template_structure
         },
     )
+    pos = draw_nx(
+        template_structure,
+        axes["T"],
+        labels=False,
+        xscale=1,
+        yscale=1,
+        node_size=node_size,
+        node_color="none",
+    )
     for n in template_structure:
         if not active[n]:
             axes["T"].add_patch(
