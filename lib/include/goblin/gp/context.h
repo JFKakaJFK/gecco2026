@@ -1,4 +1,5 @@
 #pragma once
+#include <print>
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
@@ -658,8 +659,8 @@ class GPContext {
     S& solution, 
     std::vector<float>& node_type,
     std::vector<float>& node_value, 
-    bool discount_size, 
-    usize& size
+    usize& size,
+    bool discount_size = false
   ) const {
     // initially we haven't visited anything, so we set everything to be inactive
     if constexpr (!std::is_const<S>()) {
@@ -675,8 +676,6 @@ class GPContext {
     // (node, call_stack_idx, is_post_order)
     std::vector<std::tuple<usize, isize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
-
-    size = 0;
 
     // For each output, walk the tree in post-order
     // Multiple trees will be considered 'different' individuals, in as much that nothing will denote 
@@ -697,7 +696,7 @@ class GPContext {
       // While there are still nodes to visit
       while(!node_stack.empty()) {
         // Hit the max size, but still have more nodes to process
-        if (size + temp_type.size() >= max_expression_size) {
+        if (size + temp_type.size() == max_expression_size) {
           return;
         }
 
@@ -792,6 +791,8 @@ class GPContext {
             }
           }
 
+          std::println("type: {}", static_cast<float>(type));
+
           temp_type.push_back(static_cast<float>(type));
 
           if (type == ValueKind::Input) {
@@ -810,6 +811,9 @@ class GPContext {
           }
         }
       }
+
+      std::println("Type: {}", temp_type);
+      std::println("Value: {}", temp_value);
 
       size += temp_type.size();
 
