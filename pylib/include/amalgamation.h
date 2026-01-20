@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -3920,7 +3919,6 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/ims.h continued                                                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4060,23 +4058,24 @@ class IMS final : public MethodBase {
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
 
-        if(opts.population_logfile.has_value()){
-            AoSSet p; // copy is needed because p needs to be non-const, and that is the case because logging for the sr problem at this point in time might do a test set evaluation...
-            if(opts.population_log_resolution == "archive"){
-                const auto& a = populations[p_idx].archive();
-                for(usize i = 0; i < a.size(); i++){
-                    p.add(a[i]);
-                }
-            } else if(opts.population_log_resolution == "population"){
-                const auto& s = populations[p_idx].get_solutions();
-                for(usize i = 0; i < s.size(); i++){
-                    p.add(s[i]);
-                }
-            } else {
-                throw std::runtime_error("Unknown population log resolution.");
+        if (opts.population_logfile.has_value()) {
+          AoSSet p;  // copy is needed because p needs to be non-const, and that is the case because logging for the sr
+                     // problem at this point in time might do a test set evaluation...
+          if (opts.population_log_resolution == "archive") {
+            const auto& a = populations[p_idx].archive();
+            for (usize i = 0; i < a.size(); i++) {
+              p.add(a[i]);
             }
+          } else if (opts.population_log_resolution == "population") {
+            const auto& s = populations[p_idx].get_solutions();
+            for (usize i = 0; i < s.size(); i++) {
+              p.add(s[i]);
+            }
+          } else {
+            throw std::runtime_error("Unknown population log resolution.");
+          }
 
-            debug_log(problem, opts.population_logfile.value(), "", "", p);
+          debug_log(problem, opts.population_logfile.value(), "", "", p);
         }
 
         if (archive->change_count() > 0) {
@@ -4158,7 +4157,6 @@ class IMS final : public MethodBase {
 #define _GOBLIN_LIB_INIT_H
 
 #include <variant>
-
 
 namespace goblin {
 
@@ -4301,13 +4299,11 @@ class CompleteInit final : public DiscreteInitBase {
 
 #endif /* _GOBLIN_LIB_INIT_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INSTANCE_H
 #define _GOBLIN_GP_INSTANCE_H
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
@@ -4318,23 +4314,17 @@ class CompleteInit final : public DiscreteInitBase {
 #include <iterator>
 #include <ranges>
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h included by goblin/gp/context.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
-
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/template.h included by goblin/gp/operator.h                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_TEMPLATE_H
 #define _GOBLIN_GP_TEMPLATE_H
-
-
 
 namespace goblin {
 struct TemplateNode {
@@ -4480,7 +4470,6 @@ struct Template {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -5010,7 +4999,6 @@ class OpMax : public OperatorBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_OPERATOR_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h continued                                                          //
@@ -5800,7 +5788,6 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5823,8 +5810,6 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
-
-
 
 namespace goblin {
 
@@ -6400,10 +6385,8 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
-
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
-
 
 namespace goblin {
 
@@ -6736,13 +6719,11 @@ class SRProblem : public GPInstanceBase {
 
 #endif /* _GOBLIN_GP_SR_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
-
 
 namespace goblin {
 
@@ -6784,9 +6765,7 @@ class ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
-
 #include <numbers>
-
 
 // TODO
 // - [ ] Permute (scramble arguments to function, either fixed or random perm)
@@ -7359,7 +7338,6 @@ class Repeat final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
-
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -7595,8 +7573,6 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
-
-
 namespace goblin {
 
 class Sphere final : public ObjectiveBase {
@@ -7776,8 +7752,6 @@ class CirclesInASquare final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 #define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 
-
-
 namespace goblin {
 
 class LeadingSpheres final : public ObjectiveBase {
@@ -7830,8 +7804,6 @@ class LeadingSpheres final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_PROBLEM_H
 #define _GOBLIN_BENCH_PROBLEM_H
 
-
-
 namespace goblin {
 
 class MOFunctionBase {
@@ -7847,6 +7819,28 @@ class MOFunctionBase {
   };
 
   virtual ~MOFunctionBase() {};
+};
+
+class PyFunctionBase : MOFunctionBase {
+ public:
+  virtual usize num_objectives() const override = 0;
+  virtual usize num_discrete() const override = 0;
+  virtual usize num_continuous() const override = 0;
+
+  virtual std::tuple<Vec<CType>, CType> eval(SolutionBase& solution) = 0;
+
+  void evaluate(SolutionBase& solution) override {
+    solution.discrete_active().fill(true);
+    solution.continuous_active().fill(true);
+    auto [objectives, cv] = eval(solution);
+    solution.quality().objectives = objectives;
+    solution.quality().constraint_value = cv;
+  };
+  void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
+    evaluate(solution);
+  };
+
+  virtual ~PyFunctionBase() {};
 };
 
 class Objectives final : public MOFunctionBase {
@@ -8098,15 +8092,11 @@ class BenchmarkInstance final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -8228,14 +8218,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8593,9 +8580,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8691,18 +8675,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -10010,7 +9990,6 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11412,7 +11391,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

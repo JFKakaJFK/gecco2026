@@ -30,6 +30,28 @@ class MOFunctionBase {
   virtual ~MOFunctionBase() {};
 };
 
+class PyFunctionBase : MOFunctionBase {
+ public:
+  virtual usize num_objectives() const override = 0;
+  virtual usize num_discrete() const override = 0;
+  virtual usize num_continuous() const override = 0;
+
+  virtual std::tuple<Vec<CType>, CType> eval(SolutionBase& solution) = 0;
+
+  void evaluate(SolutionBase& solution) override {
+    solution.discrete_active().fill(true);
+    solution.continuous_active().fill(true);
+    auto [objectives, cv] = eval(solution);
+    solution.quality().objectives = objectives;
+    solution.quality().constraint_value = cv;
+  };
+  void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
+    evaluate(solution);
+  };
+
+  virtual ~PyFunctionBase() {};
+};
+
 class Objectives final : public MOFunctionBase {
  public:
   Objectives(std::vector<std::shared_ptr<ObjectiveBase>> objectives) : objectives(std::move(objectives)) {

@@ -155,23 +155,24 @@ class IMS final : public MethodBase {
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
 
-        if(opts.population_logfile.has_value()){
-            AoSSet p; // copy is needed because p needs to be non-const, and that is the case because logging for the sr problem at this point in time might do a test set evaluation...
-            if(opts.population_log_resolution == "archive"){
-                const auto& a = populations[p_idx].archive();
-                for(usize i = 0; i < a.size(); i++){
-                    p.add(a[i]);
-                }
-            } else if(opts.population_log_resolution == "population"){
-                const auto& s = populations[p_idx].get_solutions();
-                for(usize i = 0; i < s.size(); i++){
-                    p.add(s[i]);
-                }
-            } else {
-                throw std::runtime_error("Unknown population log resolution.");
+        if (opts.population_logfile.has_value()) {
+          AoSSet p;  // copy is needed because p needs to be non-const, and that is the case because logging for the sr
+                     // problem at this point in time might do a test set evaluation...
+          if (opts.population_log_resolution == "archive") {
+            const auto& a = populations[p_idx].archive();
+            for (usize i = 0; i < a.size(); i++) {
+              p.add(a[i]);
             }
+          } else if (opts.population_log_resolution == "population") {
+            const auto& s = populations[p_idx].get_solutions();
+            for (usize i = 0; i < s.size(); i++) {
+              p.add(s[i]);
+            }
+          } else {
+            throw std::runtime_error("Unknown population log resolution.");
+          }
 
-            debug_log(problem, opts.population_logfile.value(), "", "", p);
+          debug_log(problem, opts.population_logfile.value(), "", "", p);
         }
 
         if (archive->change_count() > 0) {
