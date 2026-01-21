@@ -1,4 +1,4 @@
-from gettext import Catalog
+from itertools import chain, combinations
 from typing import Literal
 
 import matplotlib
@@ -571,6 +571,207 @@ def example_node_proximity():
     )
 
 
+def example_node_proximity2():
+    d = 2
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    node_proximity = ctx.normalized_node_proximity()
+
+    S = node_proximity.copy()
+    S[np.triu_indices_from(S)] = ((S - 1.0) * -(1 + 2 * d))[np.triu_indices_from(S)]
+
+    nodes = list(range(len(template_structure.nodes)))
+    co_occurrences = np.zeros((len(nodes), len(nodes)))
+    intermediate_nodes = {
+        (0, 1): {},
+        (0, 2): {},
+        (0, 3): {1},
+        (0, 4): {1},
+        (0, 5): {2},
+        (0, 6): {2},
+        #
+        (1, 2): {0},
+        (1, 3): {},
+        (1, 4): {},
+        (1, 5): {0, 2},
+        (1, 6): {0, 2},
+        #
+        (2, 3): {0, 1},
+        (2, 4): {0, 1},
+        (2, 5): {},
+        (2, 6): {},
+        #
+        (3, 4): {1},
+        (3, 5): {0, 1, 2},
+        (3, 6): {0, 1, 2},
+        #
+        (4, 5): {0, 1, 2},
+        (4, 6): {0, 1, 2},
+        #
+        (5, 6): {2},
+    }
+    for combination in chain.from_iterable(
+        combinations(nodes, l) for l in range(2, len(nodes) + 1)
+    ):
+        c = set(combination)
+        for i in nodes:
+            if i in c:
+                for j in nodes[:i]:
+                    if j in c:
+                        # valid if all intermediate nodes are in c as well...
+                        if all(n in c for n in intermediate_nodes[j, i]):
+                            co_occurrences[j, i] += 1
+
+    S[np.triu_indices_from(S)] = co_occurrences[np.triu_indices_from(S)]
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        TN
+        """,
+        figsize=(8, 4),
+        gridspec_kw=dict(width_ratios=[1.4, 1]),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = custom_tree_layout(template_structure, root=0, dy=0.6)
+    draw_nx(
+        template_structure,
+        axes["T"],
+        pos=pos,
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        # label_offset=(0, 0),
+        node_size=1200,
+        margins=(0.1, 0.075),
+    )
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+
+    ne = 0
+    dset = [[] for _ in range(1 + int(np.max(S[np.triu_indices_from(S)])))]
+    for i in range(ctx.num_discrete):
+        for j in range(i):
+            dist = int(S[j, i])
+            if dist > 1:  # and i == 4 or j == 4:
+                template_structure.add_edge(i, j, dist=dist)
+                dset[dist].append((i, j))
+                ne += 1
+    print("number of additional edges:", ne)
+
+    alpha = 0.4
+
+    def draw_edges(edges, ls="-", cs="arc3", alpha=alpha, width=1.0):
+        nx.draw_networkx_edges(
+            template_structure,
+            pos,
+            edgelist=edges,
+            style=ls,
+            alpha=alpha,
+            width=width,  # 4 / d,
+            # arrows=False,
+            arrowstyle="-",
+            connectionstyle=cs,
+            ax=axes["T"],
+        )
+
+    styles = [
+        "-",
+        (0, (8, 4)),  # "--",
+        (0, (4, 4)),  # "-.",
+        (0, (1, 4)),  # ":",
+    ]
+    # for l, (edges, ls) in enumerate(
+    #     zip(  #
+    #         dset[2:], ["--", "-.", ":"]
+    #     )
+    # ):
+    #     d = l + 2
+    #     draw_edges(edges, ls=ls)
+
+    # dist = 2
+    w = 1
+    ls = styles[1]
+    draw_edges([(0, 4), (0, 5), (1, 2), (3, 4), (5, 6)], ls=ls, width=w)
+    draw_edges([(0, 3)], ls=ls, cs="arc3,rad=0.45", width=w)
+    draw_edges([(0, 6)], ls=ls, cs="arc3,rad=-0.45", width=w)
+
+    # dist = 3
+    w = 1
+    ls = styles[2]
+    draw_edges([(1, 5), (1, 6), (2, 3), (2, 4)], ls=ls, width=w)
+
+    # dist = 4
+    w = 1
+    ls = styles[3]
+    draw_edges([(4, 5)], ls=ls, width=w)
+    draw_edges([(3, 5), (3, 6), (4, 6)], ls=ls, cs="arc3,rad=0.45", width=w)
+
+    axes["T"].set_xlabel("Template")
+
+    handles, labels = [], []
+    for d, ls in zip([1, 2, 3, 4], styles):
+        handles.append(
+            axes["T"].plot(
+                [], [], c="k", ls=ls, alpha=alpha if d > 1 else 1, label="d"
+            )[0]
+        )
+        labels.append(str(d))
+    axes["T"].legend(
+        handles,
+        labels,
+        title="Distance",
+        # title_fontproperties=dict(title_fontsize="small"),
+        frameon=False,
+        bbox_to_anchor=(0.075, 0.35),
+        # ncols=4,
+        title_fontsize="small",
+        fontsize="x-small",
+    )
+    # axes["T"].margins(y=0, tight=True)
+
+    sns.heatmap(
+        node_proximity,
+        annot=S,
+        mask=np.eye(
+            node_proximity.shape[0], dtype=np.bool_
+        ),  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        # fmt="s",
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    # axes["N"].set_title("Node Distance")
+    axes["N"].set_title("Common Subset Count")
+    axes["N"].set_xlabel("Node Proximity")
+
+    fig.align_labels()
+    # fig.align_titles()
+
+    fig.savefig(
+        "node_proximity_example2.pdf", dpi=600, transparent=True, bbox_inches="tight"
+    )
+
+    print(co_occurrences)
+    print(S)
+
+
 def example_constants():
     solution = [r"$+$", r"$\times$", r"$2.7$", "$x_0$", "$3.1$", "$x_2$", "$3.1$"]
     active = [True, True, True, True, True, False, False]
@@ -901,11 +1102,13 @@ def linkage_example():
 
 
 if __name__ == "__main__":
-    example_solution()
-    plt.show()
-    example_node_proximity()
+    # example_solution()
+    # plt.show()
+    # example_node_proximity()
+    # plt.show()
+    example_node_proximity2()
     plt.show()
     # example_constants()
     # plt.show()
-    linkage_example()
-    plt.show()
+    # linkage_example()
+    # plt.show()
