@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -3919,6 +3920,7 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/ims.h continued                                                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4158,6 +4160,7 @@ class IMS final : public MethodBase {
 
 #include <variant>
 
+
 namespace goblin {
 
 class InitBase {
@@ -4299,11 +4302,13 @@ class CompleteInit final : public DiscreteInitBase {
 
 #endif /* _GOBLIN_LIB_INIT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INSTANCE_H
 #define _GOBLIN_GP_INSTANCE_H
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
@@ -4314,17 +4319,23 @@ class CompleteInit final : public DiscreteInitBase {
 #include <iterator>
 #include <ranges>
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h included by goblin/gp/context.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/template.h included by goblin/gp/operator.h                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_TEMPLATE_H
 #define _GOBLIN_GP_TEMPLATE_H
+
+
 
 namespace goblin {
 struct TemplateNode {
@@ -4470,6 +4481,7 @@ struct Template {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -4999,6 +5011,7 @@ class OpMax : public OperatorBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_OPERATOR_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h continued                                                          //
@@ -5733,6 +5746,63 @@ class GPContext {
     return proximity;
   };
 
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_wVIG() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+        } else {
+          // use -1 as sentinel for disconnected values
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) = proximity(i, j) <= 0.0 ? 0.0 : 1.0 / proximity(i, j);
+
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return proximity;
+  };
+
+  Mat<CType> subtree_co_occurrences() const {
+    Mat<CType> proximity = Mat<CType>::Zero(num_discrete, num_discrete);
+
+    for (usize n = 0; n < num_discrete; n++) {
+        const auto& ns = nodes[n];
+        for (usize i = 0; i < ns.size(); i++) {
+            for (usize j = 0; j <= i; j++) {
+                proximity(i, j) += 1;
+                proximity(j, i) += 1;
+            }
+        }
+    }
+
+    return proximity;
+  };
+
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices
   // template <typename Scalar>
@@ -5788,6 +5858,7 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5810,6 +5881,8 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
+
+
 
 namespace goblin {
 
@@ -6385,8 +6458,10 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
+
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
+
 
 namespace goblin {
 
@@ -6719,11 +6794,13 @@ class SRProblem : public GPInstanceBase {
 
 #endif /* _GOBLIN_GP_SR_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
+
 
 namespace goblin {
 
@@ -6765,7 +6842,9 @@ class ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
+
 #include <numbers>
+
 
 // TODO
 // - [ ] Permute (scramble arguments to function, either fixed or random perm)
@@ -7338,6 +7417,7 @@ class Repeat final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
+
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -7573,6 +7653,8 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
+
+
 namespace goblin {
 
 class Sphere final : public ObjectiveBase {
@@ -7752,6 +7834,8 @@ class CirclesInASquare final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 #define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 
+
+
 namespace goblin {
 
 class LeadingSpheres final : public ObjectiveBase {
@@ -7803,6 +7887,8 @@ class LeadingSpheres final : public ObjectiveBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_PROBLEM_H
 #define _GOBLIN_BENCH_PROBLEM_H
+
+
 
 namespace goblin {
 
@@ -8092,11 +8178,15 @@ class BenchmarkInstance final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -8218,11 +8308,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8580,6 +8673,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8675,14 +8771,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9990,6 +10090,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11391,6 +11492,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

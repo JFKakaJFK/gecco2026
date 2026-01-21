@@ -2192,6 +2192,13 @@ class GPContext:
     def normalized_node_proximity(self) -> Mat[float]:
         """Normalized node proximity [1.0: same node, 0.0: no connection]"""
         pass
+
+    def normalized_w_vig(self) -> Mat[float]:
+        """Normalized node proximity [1.0: same node, 0.0: no connection]"""
+        pass
+
+    def subtree_co_occurrences(self) -> Mat[float]:
+        pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
     # / indices
     # template <typename Scalar>

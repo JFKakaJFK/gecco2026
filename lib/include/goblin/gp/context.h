@@ -752,6 +752,63 @@ class GPContext {
     return proximity;
   };
 
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_wVIG() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+        } else {
+          // use -1 as sentinel for disconnected values
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) = proximity(i, j) <= 0.0 ? 0.0 : 1.0 / proximity(i, j);
+
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return proximity;
+  };
+
+  Mat<CType> subtree_co_occurrences() const {
+    Mat<CType> proximity = Mat<CType>::Zero(num_discrete, num_discrete);
+
+    for (usize n = 0; n < num_discrete; n++) {
+        const auto& ns = nodes[n];
+        for (usize i = 0; i < ns.size(); i++) {
+            for (usize j = 0; j <= i; j++) {
+                proximity(i, j) += 1;
+                proximity(j, i) += 1;
+            }
+        }
+    }
+
+    return proximity;
+  };
+
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices
   // template <typename Scalar>
