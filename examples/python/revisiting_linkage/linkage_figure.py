@@ -629,7 +629,9 @@ def example_node_proximity2():
                         if all(n in c for n in intermediate_nodes[j, i]):
                             co_occurrences[j, i] += 1
 
-    S[np.triu_indices_from(S)] = co_occurrences[np.triu_indices_from(S)]
+    show_common_subsets = False
+    if show_common_subsets:
+        S[np.triu_indices_from(S)] = co_occurrences[np.triu_indices_from(S)]
 
     fig, axes = plt.subplot_mosaic(
         """
@@ -757,8 +759,11 @@ def example_node_proximity2():
         ax=axes["N"],
         cbar=False,
     )
-    # axes["N"].set_title("Node Distance")
-    axes["N"].set_title("Common Subset Count")
+    if show_common_subsets:
+        axes["N"].set_title("Common Subset Count")
+    else:
+        axes["N"].set_title("Node Distance")
+
     axes["N"].set_xlabel("Node Proximity")
 
     fig.align_labels()
