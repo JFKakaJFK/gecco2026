@@ -6,7 +6,7 @@ import numpy as np
 from pygom import KernelVersion
 
 from src.db import create_db
-from src.experiment.config import ExperimentConfig, cfg
+from src.experiment.experiment_config import ExperimentConfig, cfg
 from src.experiment.run import run_cpu_tasks, run_gpu_tasks
 from src.experiment.task import Task, problems
 from src.plot.plots import plot
@@ -117,10 +117,10 @@ def main():
     # run_date = "2026-01-14_17_26_08"
     output_directory = Path("results") / run_date
 
-    run_experiment(output_directory, cfg.CPU_ALL_KERNEL_POPULATION)
-    run_experiment(output_directory, cfg.CPU_ALL_KERNEL_OBSERVATION)
-
-    run_experiment(output_directory, cfg.CPU_KERNEL_POP_OBS)
+    run_experiment(output_directory, cfg.SIMPLE_FEYNMAN)
+    run_experiment(output_directory, cfg.TRIG_FEYNMAN)
+    run_experiment(output_directory, cfg.SQRT_FEYNMAN)
+    run_experiment(output_directory, cfg.EXP_FEYNMAN)
 
 
 if __name__ == "__main__":

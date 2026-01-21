@@ -12,7 +12,7 @@ import pygom.gp as gp
 from pygom import KernelVersion as KV
 from tqdm import tqdm
 
-from src.experiment.config import OPERATOR_SETS
+from src.experiment.experiment_config import OPERATOR_SETS
 from src.experiment.task import Task
 
 JobQueue = list[

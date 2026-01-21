@@ -11,7 +11,7 @@ import sympy as sym
 from pygom import KernelVersion
 from sklearn.model_selection import KFold, train_test_split
 
-from src.experiment.config import ExperimentConfig
+from src.experiment.experiment_config import ExperimentConfig
 
 # REPEATS_TOTAL = 15
 # NUM_FOLDS = 5
@@ -106,7 +106,7 @@ def problems(
         if not dry_run:
             eq_dir.mkdir(parents=True, exist_ok=True)
 
-        match problem.type:
+        match problem.problem_type:
             case "synthetic":
                 X, y = synthetic_problem(
                     problem.name,
@@ -122,7 +122,7 @@ def problems(
                 )
 
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.25, random_state=rng.integers(2**32 - 1)
+            X, y, test_size=cfg.test_size, random_state=rng.integers(2**32 - 1)
         )
 
         # the "task" needs to be transferrable across processes
@@ -162,12 +162,14 @@ def problems(
 
             for obs in cfg.iter_observations():
                 # Skip datasets that do not have enough observations
-                # 0.75 = due to train_test_split
-                # (1 - 1 / num_folds) = due to k_fold
-                if obs > problem.observations * 0.75 * (1 - 1 / cfg.num_folds):
+                train_fold_frac = (1 - cfg.test_size) * (1 - 1 / cfg.num_folds)
+                if obs > problem.observations * train_fold_frac:
                     continue
 
                 for feat in cfg.iter_features():
+                    if feat is None:
+                        feat = problem.features
+
                     # Skip datasets that do not have enough features
                     if feat > problem.features:
                         continue
