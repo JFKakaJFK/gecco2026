@@ -1,4 +1,6 @@
 #pragma once
+#include <memory>
+#include "fitness.h"
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
 
@@ -139,8 +141,34 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
+class SolutionDataBase {
+    public:
+
+    virtual std::unique_ptr<SolutionDataBase> clone() const = 0;
+
+    virtual ~SolutionDataBase() = default;
+};
+
 class SolutionBase {
  public:
+
+  // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
+  virtual QualityBase& quality() = 0;
+  virtual const QualityBase& quality() const = 0;
+
+  // needed to allow placement
+  virtual void set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
+  virtual void assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
+
+  // read/write access to existing additions
+  virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
+  virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
+  // addition/deletion of data members
+  virtual void add_data(std::unique_ptr<SolutionDataBase> data) = 0;
+  virtual void remove_data_at(usize idx) = 0;
+
+  // existing fields ...
+
   virtual Quality& quality() = 0;
   virtual const Quality& quality() const = 0;
 
