@@ -800,8 +800,8 @@ class GPContext {
         const auto& ns = nodes[n];
         for (usize i = 0; i < ns.size(); i++) {
             for (usize j = 0; j <= i; j++) {
-                proximity(i, j) += 1;
-                proximity(j, i) += 1;
+                proximity(ns[i], ns[j]) += 1;
+                proximity(ns[j], ns[i]) += 1;
             }
         }
     }

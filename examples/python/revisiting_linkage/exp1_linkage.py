@@ -61,7 +61,7 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [5, 7]:
+            for height in [3, 5, 7]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
                 )
@@ -145,7 +145,7 @@ def methods(info, ctx):
         # "Node (wVIG, static)",
         "Node (peter)",
         "Node (peter, static)",
-        "Univariate"
+        "Univariate",
     ]:
         custom_similarity = None
         if "Node" in similarity:
@@ -159,18 +159,31 @@ def methods(info, ctx):
 
                 # print(np.array(ctx.normalized_w_vig().tolist()))
 
-                custom_similarity=c.np.array(ctx.normalized_w_vig().tolist())
+                custom_similarity = c.np.array(ctx.normalized_w_vig().tolist())
             elif "peter" in similarity:
                 S = np.array(ctx.subtree_co_occurrences().tolist())
-                import seaborn as sns
                 import matplotlib.pyplot as plt
-                fig, ax = plt.subplots()
-                sns.heatmap(S, annot=True, ax=ax, cmap="Blues")
-                fig.savefig(f"sim_peter_{ctx.num_discrete}.png", dpi=600, bbox_inches="tight")
+                import seaborn as sns
 
-                custom_similarity=c.np.array(ctx.subtree_co_occurrences().tolist())
+                fig, ax = plt.subplots(figsize=(10, 10))
+                sns.heatmap(
+                    S,
+                    mask=np.eye(S.shape[0], dtype=np.bool_),
+                    annot=S.shape[0] < 64,
+                    ax=ax,
+                    square=True,
+                    annot_kws=dict(fontsize=("x-small" if S.shape[0] > 7 else None)),
+                    cmap="Blues",
+                    cbar=False,
+                )
+                ax.grid(visible=False)
+                fig.savefig(
+                    f"sim_peter_{ctx.num_discrete}.png", dpi=600, bbox_inches="tight"
+                )
+
+                custom_similarity = c.np.array(ctx.subtree_co_occurrences().tolist())
             else:
-                custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
+                custom_similarity = c.np.array(ctx.normalized_node_proximity().tolist())
         discrete_model_kwargs = dict(
             # linkage learning parameters
             metric="random" if "Random" in similarity else "mi",
@@ -201,7 +214,9 @@ def methods(info, ctx):
         yield (
             f'"{similarity}"',
             c.MixedGOMEA(
-                discrete_model= c.UnivariateFOS() if similarity == "Univariate" else c.LinkageTreeFOS(**discrete_model_kwargs),
+                discrete_model=c.UnivariateFOS()
+                if similarity == "Univariate"
+                else c.LinkageTreeFOS(**discrete_model_kwargs),
                 population_options=c.PopulationOptions(
                     forced_improvements=False,  # not used per default as per https://arxiv.org/pdf/1904.02050
                 ),
@@ -266,8 +281,8 @@ def status():
 
 
 def main():
-    # status()
-    # exit()
+    status()
+    exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
     # run_tasks(
