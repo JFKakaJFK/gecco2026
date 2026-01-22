@@ -44,7 +44,7 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 SEED = 42
 
-BUDGET = c.Budget(max_generations=21)
+BUDGET = c.Budget(max_generations=41)
 
 
 def problems(rng):
@@ -142,13 +142,26 @@ def methods(info, ctx):
         "$MI$",  # plain MI
         "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
         r"$MI_{mask\ inactive}$",  # Mask inactive
-        r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
-        r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
+        # r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
+        # r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
         "Node",  # Normalized pairwise node proximity
-        "Node (static)",  # same, but first LT is kept throughout
-        r"Node * $MI_{mask\ inactive}$",
+        # "Node (static)",  # same, but first LT is kept throughout
+        # r"Node * $MI_{mask\ inactive}$",
         "Random",  # Random similiarty
+        "Node (wVIG)",
+        # "Node (wVIG, static)",
+        "Node (peter)",
+        # "Node (peter, static)",
+        # "Univariate",
     ]:
+        custom_similarity = None
+        if "Node" in similarity:
+            if "wVIG" in similarity:
+                custom_similarity = c.np.array(ctx.normalized_w_vig().tolist())
+            elif "peter" in similarity:
+                custom_similarity = c.np.array(ctx.subtree_co_occurrences().tolist())
+            else:
+                custom_similarity = c.np.array(ctx.normalized_node_proximity().tolist())
         discrete_model_kwargs = dict(
             # linkage learning parameters
             metric="random" if "Random" in similarity else "mi",
@@ -160,9 +173,7 @@ def methods(info, ctx):
             if "active" in similarity
             else "none",
             normalize_initial_linkage_bias="adjusted" in similarity,
-            custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
-            if "Node" in similarity
-            else None,
+            custom_similarity=custom_similarity,
             custom_similarity_agg="mul"
             if "*" in similarity
             else (
@@ -528,13 +539,13 @@ def analyze_subset_stats(
 
 def main():
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     # clean=True,
-    #     # limit=1,
-    #     # max_workers=44,
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        # clean=True,
+        # limit=1,
+        # max_workers=44,
+    )
 
     with load_results(
         LOG_DIR,

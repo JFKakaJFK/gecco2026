@@ -7,7 +7,8 @@ import networkx as nx
 import numpy as np
 import scipy
 import seaborn as sns
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Circle, PathPatch, Rectangle
+from matplotlib.path import Path
 
 # from networkx.drawing.nx_agraph import graphviz_layout
 from pygom import *
@@ -571,6 +572,321 @@ def example_node_proximity():
     )
 
 
+def example_peter_proximity():
+    d = 2
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    vig_proximity = ctx.normalized_w_vig()
+    peter_proximity = ctx.subtree_co_occurrences()
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        TN
+        """,
+        figsize=(8, 4),
+        gridspec_kw=dict(width_ratios=[1.75, 1]),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = draw_nx(
+        template_structure,
+        axes["T"],
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        # label_offset=(0, 0),
+        node_size=1200,
+        margins=0.175,
+    )
+
+    x0, y0 = pos[0]
+    x1, y1 = pos[1]
+    x2, y2 = pos[2]
+    x3, y3 = pos[3]
+    x4, y4 = pos[4]
+    x5, y5 = pos[5]
+    x6, y6 = pos[6]
+    xy = np.array([list(pos[i]) for i in range(7)])
+    v = np.array([[(xy[j] - xy[i]).tolist() for j in range(7)] for i in range(7)])
+
+    def vl(v_):
+        return np.sqrt(np.dot(v_, v_))
+
+    def n(v_):
+        return v_ / vl(v_)
+
+    def rot(v_, deg):
+        rad = deg / 180.0 * np.pi
+        return np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]]) @ v_
+
+    def point(xy, marker="x", s=100, **kwargs):
+        axes["T"].scatter([xy[0]], [xy[1]], marker=marker, s=s, **kwargs)
+
+    def vec(xy, v_, pt_kwargs=None, **kwargs):
+        if pt_kwargs is None:
+            pt_kwargs = {}
+        if "color" not in pt_kwargs:
+            pt_kwargs["color"] = kwargs.get("color")
+        point(xy, **pt_kwargs)
+        xy2 = xy + v_
+        axes["T"].plot([xy[0], xy2[0]], [xy[1], xy2[1]], **kwargs)
+
+    def shortest_angle(v0, v1):
+        n0, n1 = n(v0), n(v1)
+        return np.arccos(np.dot(n0, n1)) / np.pi * 180
+
+    def intersect(xy0, v0, xy1, v1):
+        xy01 = xy0 + v0
+        xy11 = xy1 + v1
+
+        x1, y1 = xy0
+        x2, y2 = xy01
+        x3, y3 = xy1
+        x4, y4 = xy11
+
+        a = x1 * y2 - y1 * x2
+        b = x3 * y4 - y3 * x4
+        d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+
+        assert np.abs(d) > 1e-6
+        xyi = (a * (xy1 - xy11) - b * (xy0 - xy01)) / d
+
+        # vec(xy0, v0, color="red")
+        # vec(xy1, v1, color="blue")
+        # point(xyi, color="orange")
+        return xyi
+
+    X, Y = np.array([1.0, 0.0]), np.array([0.0, 1.0])
+
+    def arc_between(xy0, xy1, cxy):
+        txy0, txy1 = xy0 - cxy, xy1 - cxy
+
+        theta1, theta2 = shortest_angle(X, txy0), shortest_angle(X, txy1)
+        if txy0[1] < 0.0:
+            theta1 = 360.0 - theta1
+        if txy1[1] < 0.0:
+            theta2 = 360.0 - theta2
+
+        flip = theta1 > theta2
+        if flip:
+            theta1, theta2 = theta2, theta1
+
+        if theta2 - theta1 > (360.0 - theta2) + theta1:
+            flip = not flip
+            theta1, theta2 = theta2, theta1
+        arc = Path.arc(theta1, theta2)
+
+        r, r1 = vl(xy0 - cxy), vl(xy1 - cxy)
+        assert np.abs(r - r1) < 1e-6, (r, r1)
+
+        yield Path.MOVETO, xy1 if flip else xy0
+        for c, v in zip(arc.codes[1:-1], arc.vertices[1:-1]):
+            yield c, v * r + cxy
+        yield Path.LINETO, xy0 if flip else xy1
+        yield Path.MOVETO, xy1
+
+    dz = 0.175
+    f1_lt = xy[1] + n(rot(v[1, 3], -90.0)) * dz
+    f1_rt = xy[1] + n(rot(v[1, 4], 90.0)) * dz
+    f1_rb = xy[4] + n(rot(v[4, 1], -90.0)) * dz
+    f1_br = xy[4] + n(rot(v[4, 3], 90.0)) * dz
+    f1_lb = xy[3] + n(rot(v[3, 1], 90.0)) * dz
+    f1_bl = xy[3] + n(rot(v[3, 4], -90.0)) * dz
+
+    path_f1 = [
+        (Path.MOVETO, f1_lb),
+        (Path.LINETO, f1_lt),
+        *arc_between(f1_lt, f1_rt, xy[1]),
+        (Path.LINETO, f1_rt),
+        #
+        (Path.LINETO, f1_rb),
+        *arc_between(f1_rb, f1_br, xy[4]),
+        (Path.LINETO, f1_br),
+        #
+        (Path.LINETO, f1_bl),
+        *arc_between(f1_bl, f1_lb, xy[3]),
+        (Path.LINETO, f1_lb),
+        #
+        (Path.CLOSEPOLY, f1_lb),
+    ]
+
+    f2_lt = xy[2] + n(rot(v[2, 5], -90.0)) * dz
+    f2_rt = xy[2] + n(rot(v[2, 6], 90.0)) * dz
+    f2_rb = xy[6] + n(rot(v[6, 2], -90.0)) * dz
+    f2_br = xy[6] + n(rot(v[6, 3], 90.0)) * dz
+    f2_lb = xy[5] + n(rot(v[5, 2], 90.0)) * dz
+    f2_bl = xy[5] + n(rot(v[5, 6], -90.0)) * dz
+    path_f2 = [
+        (Path.MOVETO, f2_lb),
+        (Path.LINETO, f2_lt),
+        *arc_between(f2_lt, f2_rt, xy[2]),
+        (Path.LINETO, f2_rt),
+        #
+        (Path.LINETO, f2_rb),
+        *arc_between(f2_rb, f2_br, xy[6]),
+        (Path.LINETO, f2_br),
+        #
+        (Path.LINETO, f2_bl),
+        *arc_between(f2_bl, f2_lb, xy[5]),
+        (Path.LINETO, f2_lb),
+        #
+        (Path.CLOSEPOLY, f2_lb),
+    ]
+
+    dz = 0.2
+
+    f0_lt = xy[0] + n(rot(v[0, 1], -90.0)) * dz
+    f0_rt = xy[0] + n(rot(v[0, 2], 90.0)) * dz
+    f0_rm = xy[2] + n(rot(v[2, 0], -90.0)) * dz
+    f0_mr = xy[2] + n(rot(v[2, 3], 90.0)) * dz
+    f0_lm = xy[1] + n(rot(v[1, 0], 90.0)) * dz
+    f0_ml = xy[1] + n(rot(v[1, 2], -90.0)) * dz
+
+    f1_lt = xy[1] + n(rot(v[1, 3], -90.0)) * dz
+    f1_rt = xy[1] + n(rot(v[1, 4], 90.0)) * dz
+    f1_rb = xy[4] + n(rot(v[4, 1], -90.0)) * dz
+    f1_br = xy[4] + n(rot(v[4, 3], 90.0)) * dz
+    f1_lb = xy[3] + n(rot(v[3, 1], 90.0)) * dz
+    f1_bl = xy[3] + n(rot(v[3, 4], -90.0)) * dz
+
+    f2_lt = xy[2] + n(rot(v[2, 5], -90.0)) * dz
+    f2_rt = xy[2] + n(rot(v[2, 6], 90.0)) * dz
+    f2_rb = xy[6] + n(rot(v[6, 2], -90.0)) * dz
+    f2_br = xy[6] + n(rot(v[6, 3], 90.0)) * dz
+    f2_lb = xy[5] + n(rot(v[5, 2], 90.0)) * dz
+    f2_bl = xy[5] + n(rot(v[5, 6], -90.0)) * dz
+    path_f0 = [
+        (Path.MOVETO, f0_lm),
+        (Path.LINETO, f0_lt),
+        *arc_between(f0_lt, f0_rt, xy[0]),
+        (Path.LINETO, f0_rt),
+        #
+        (Path.LINETO, f0_rm),
+        *arc_between(f0_rm, f2_rt, xy[2]),
+        (Path.LINETO, f2_rt),
+        #
+        (Path.LINETO, f2_rb),
+        *arc_between(f2_rb, f2_br, xy[6]),
+        (Path.LINETO, f2_br),
+        #
+        (Path.LINETO, f1_bl),
+        *arc_between(f1_bl, f1_lb, xy[3]),
+        (Path.LINETO, f1_lb),
+        #
+        (Path.LINETO, f1_lt),
+        *arc_between(f1_lt, f0_lm, xy[1]),
+        (Path.LINETO, f0_lm),
+        #
+        (Path.CLOSEPOLY, f0_lm),
+    ]
+
+    path_kwargs = dict(
+        edgecolor="k",
+        linewidth=1.0,
+        ls="--",
+        facecolor="none",
+        alpha=0.25,
+    )
+
+    def draw_path(path, **kwargs):
+        kw = {**path_kwargs}
+        for k, v in kwargs.items():
+            kw[k] = v
+        codes, verts = zip(*path)
+        axes["T"].add_patch(PathPatch(Path(verts, codes), **kw))
+
+    draw_path(path_f1)
+    draw_path(path_f2)
+    draw_path(path_f0)  # , ls="-.")
+
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+    axes["T"].set_xlabel("Template")
+
+    axes["T"].set_aspect(1)
+
+    S = vig_proximity.copy()
+    S[np.triu_indices_from(S)] = peter_proximity[np.triu_indices_from(S)]
+
+    # S = peter_proximity.copy()
+
+    A = peter_proximity.copy()
+    A[np.tril_indices_from(A)] = 1.0 / vig_proximity[np.tril_indices_from(A)]
+
+    mask = np.eye(vig_proximity.shape[0], dtype=np.bool_)
+    m1 = mask.copy()
+    m1[np.tril_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+        np.tril_indices_from(A)
+    ]
+    sns.heatmap(
+        # 3 - A,
+        A,
+        annot=A,
+        mask=m1,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        # fmt="s",
+        cmap="Blues",
+        vmin=0,
+        vmax=2,
+        # cmap="Blues_r",
+        # vmin=0,
+        # vmax=4,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    m2 = mask.copy()
+    m2[np.triu_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+        np.triu_indices_from(A)
+    ]
+    sns.heatmap(
+        A,
+        annot=np.array(
+            [
+                [
+                    rf"${{}}^1\!/\!{{}}_{{{str(A[i, j])[0]}}}$"
+                    # str(A[i, j])[0]
+                    for j in range(A.shape[1])
+                ]
+                for i in range(A.shape[0])
+            ]
+        ),
+        mask=m2,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        fmt="s",
+        cmap="Blues_r",
+        vmin=1,
+        vmax=4,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    axes["N"].set_title("#Common Subfunctions")
+    axes["N"].set_xlabel("Node Proximity")
+
+    fig.align_labels()
+    # fig.align_titles()
+
+    fig.savefig(
+        "node_proximity_example_peter.pdf",
+        dpi=600,
+        transparent=True,
+        bbox_inches="tight",
+    )
+
+
 def example_node_proximity2():
     d = 2
     template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
@@ -1111,7 +1427,8 @@ if __name__ == "__main__":
     # plt.show()
     # example_node_proximity()
     # plt.show()
-    example_node_proximity2()
+    # example_node_proximity2()
+    example_peter_proximity()
     plt.show()
     # example_constants()
     # plt.show()

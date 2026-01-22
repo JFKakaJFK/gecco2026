@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pygom
 import seaborn as sns
+from autorank import autorank, create_report, latex_table, plot_stats
 from matplotlib.patches import Rectangle
 from pygom import *
 from rliable import library as rly
@@ -40,7 +41,7 @@ matplotlib.rcParams["ps.fonttype"] = 42
 
 
 RESULT_DIR = pathlib.Path("results") / "linkage"  #  "linkage_wrong_init"
-RESULT_DIR = pathlib.Path("results") / "linkage_extended"
+# RESULT_DIR = pathlib.Path("results") / "linkage_extended"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
@@ -63,6 +64,20 @@ m_order = {
             "$MI_{masked}$",
             "Node",
             "Node (static)",
+        ]
+    )
+}
+
+m_order2 = {
+    m: i
+    for i, m in enumerate(
+        [
+            "Random",
+            "$MI_{adjusted}$",
+            "$MI$",
+            "Node (static)",
+            "$MI_{masked}$",
+            "Node",
         ]
     )
 }
@@ -637,8 +652,280 @@ def custom_cmp_plot(
         score_dicts.append(score_dict)
 
     algorithms = sorted(set(algorithms))
+    keys = {m: m_order2.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+    algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    fig, ax = plt.subplots(figsize=(7, 6))
+
+    for is_upper, score_dict in enumerate(score_dicts):
+        comparisons = {
+            (algorithms[i], algorithms[j]): (
+                score_dict[algorithms[i]],
+                score_dict[algorithms[j]],
+            )
+            for i in range(len(algorithms))
+            for j in range(i)
+        }
+        average_probabilities, average_prob_cis = rly.get_interval_estimates(
+            comparisons, metrics.probability_of_improvement, reps=2000
+        )
+
+        P = np.empty((len(algorithms), len(algorithms)))
+        M = np.triu(np.ones_like(P, dtype=np.bool_))
+
+        A = [["" for _ in algorithms] for _ in algorithms]
+
+        for i, a in enumerate(algorithms):
+            for j, b in enumerate(algorithms):
+                if j >= i:
+                    continue
+
+                P[i, j] = P[j, i] = (
+                    1.0 - average_probabilities[(a, b)]
+                    if is_upper
+                    else average_probabilities[(a, b)]
+                )
+
+                lower, upper = average_prob_cis[(a, b)]
+                if is_upper:
+                    lower, upper = 1.0 - lower, 1.0 - upper
+
+                A[j][i] = A[i][j] = (
+                    f"{float(P[i, j]):.2f}\n${{}}_{{[{float(lower):.2f},{float(upper):.2f}]}}$"
+                )
+        A = np.array(A)
+
+        if len(score_dicts) == 1:
+            data, mask, annot, xticklabels, yticklabels = (
+                P[1:, :-1],
+                M[1:, :-1],
+                A[1:, :-1],
+                algorithms[:-1],
+                algorithms[1:],
+            )
+        elif is_upper:
+            data, mask, annot, xticklabels, yticklabels = (
+                P.T,
+                M.T,
+                A.T,
+                algorithms,
+                algorithms,
+            )
+        else:
+            data, mask, annot, xticklabels, yticklabels = (
+                P,
+                M,
+                A,
+                algorithms,
+                algorithms,
+            )
+
+        print(is_upper, max_evaluations[is_upper], data, mask)
+
+        sns.heatmap(
+            data,
+            mask=mask,
+            annot=annot,
+            fmt="s",
+            # annot_kws=dict(fontsize="x-small"),
+            annot_kws=dict(fontsize="small"),
+            # annot=True,
+            # mask=np.eye(len(algorithms), dtype=np.bool_),
+            vmin=0,
+            vmax=1,
+            square=True,
+            xticklabels=xticklabels,
+            yticklabels=yticklabels,
+            cbar_kws=dict(shrink=0.95, label="P(A > B)"),
+            cbar=not is_upper,
+            ax=ax,
+        )
+
+        if len(score_dicts) > 1:
+            ax.text(
+                x=0.8 if is_upper else -0.15,
+                y=1.03 if is_upper else -0.1,
+                s=f"{max_evaluations[is_upper]}{['\n', ' '][is_upper]}Evaluations",
+                ha="center",
+                va="center",
+                size="medium",
+                transform=ax.transAxes,
+            )
+
+    # ax.text(
+    #     x=0.75,
+    #     y=0.75,
+    #     s=r"P(A > B)",
+    #     ha="center",
+    #     va="center",
+    #     size="large",
+    #     transform=ax.transAxes,
+    # )
+
+    # ax.text(
+    #     x=0.75,
+    #     y=0.75,
+    #     s=r"P(B > A) = 1 - P(A > B)",
+    #     ha="center",
+    #     va="center",
+    #     size="medium",
+    #     transform=ax.transAxes,
+    # )
+
+    # ax.set_xticks(
+    #     [i + 0.5 for i in range(len(algorithms) - 1)],
+    #     labels=algorithms[:-1],
+    #     rotation=-15,
+    #     ha="left",
+    #     rotation_mode="anchor",
+    # )
+
+    ax.set_ylabel("A")
+    ax.set_xlabel("B")
+
+    if len(score_dicts) > 1:
+        ax.set_title("B")
+        ax.text(
+            x=1.03,
+            y=0.5,
+            s="A",
+            ha="center",
+            va="center",
+            size="medium",
+            transform=ax.transAxes,
+        )
+
+    fig.align_labels()
+
+    fig.savefig(
+        pdir / f"cmp{filename_suffix}.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    progress.update()
+
+
+def custom_cmp_plot2(
+    conn,
+    plot_dir,
+    metric: str = "1.0 - nmse_train::DOUBLE",
+    metric_label: str = "$R^2$ Train",
+    method_where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",
+    problem_query: str = r"problem_name",
+    modifier_query: str = r"format('H={}{}', template_height, IF(linear_scaling, ' LS', ''))",
+):
+    progress = tqdm(total=1)
+    pdir = plot_dir / "custom"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    df = (
+        conn.execute(f"""
+        SELECT
+            method_name AS method,
+            format('{{}}.{{}}.{{}}.{{}}', {problem_query}, {modifier_query}, fold, run) AS run,
+            {metric} AS value
+        FROM results
+        WHERE status != 'Running' AND status != 'Aborted' AND {method_where_query}
+        ORDER BY run
+    """)
+        .df()
+        .pivot(index="run", values="value", columns="method")
+    )
+
+    algorithms = sorted(set(df.columns))
     keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
     algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+    res = autorank(
+        df, alpha=0.05, verbose=True, order="descending", rope=0.01, nsamples=2000
+    )
+
+    print(res)
+
+    create_report(res)
+
+    plot_stats(res)
+    plt.savefig(
+        pdir / "cmp_autorank.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    rows = []
+    for h_value, h_where_query in [  #
+        ("H = 5", r"template_height::INTEGER = 5::INTEGER"),
+        ("H = 7", r"template_height::INTEGER = 7::INTEGER"),
+    ]:
+        for ls_value, ls_where_query in [  #
+            ("LS = No", r"linear_scaling::BOOLEAN = false"),
+            ("LS = Yes", r"linear_scaling::BOOLEAN = true"),
+        ]:
+            where = " AND ".join([h_where_query, ls_where_query, method_where_query])
+
+            df = (
+                conn.execute(f"""
+                SELECT
+                    method_name AS method,
+                    format('{{}}.{{}}.{{}}.{{}}', {problem_query}, {modifier_query}, fold, run) AS run,
+                    {metric} AS value
+                FROM results
+                WHERE status != 'Running' AND status != 'Aborted' AND {where}
+                ORDER BY run
+            """)
+                .df()
+                .pivot(index="run", values="value", columns="method")
+            )
+
+            res = autorank(df, alpha=0.05, verbose=True, order="descending")
+
+            rows.append((f"{h_value}, {ls_value}", res))
+
+    fig, axes = plt.subplots(
+        nrows=2, ncols=2, figsize=(16, 4), gridspec_kw=dict(hspace=0.05)
+    )
+
+    with matplotlib.rc_context({"font.size": 10}):
+        for ax, (title, res) in zip(axes.flat, rows):
+            plot_stats(res, ax=ax)
+
+        for ax, (title, res) in zip(axes.flat, rows):
+            ax.set_title(title, y=0.825)
+
+    fig.savefig(
+        pdir / "cmp_autorank_split.pdf",
+        dpi=600,
+        bbox_inches="tight",
+        transparent=True,
+    )
+
+    plt.clf()
+
+    # res = autorank(
+    #     df,
+    #     alpha=0.05,
+    #     verbose=True,
+    #     order="descending",
+    #     rope=0.01,
+    #     nsamples=2000,
+    #     approach="bayesian",
+    # )
+
+    # print(res)
+
+    # create_report(res)
+
+    # latex_table(res)
+
+    progress.update()
+
+    exit()
 
     fig, ax = plt.subplots(figsize=(7, 6))
 
@@ -1626,14 +1913,14 @@ def main():
         # custom_pprof_plot(conn, PLOT_DIR)
 
         # custom_problem_plot(conn, PLOT_DIR)
-        custom_problem_plot(
-            conn,
-            PLOT_DIR,
-            include_operator_set=True,
-            wscale=7 / 2,
-            hscale=15 / 2,
-            legend_pos=(0.5, 0.03),
-        )
+        # custom_problem_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     include_operator_set=True,
+        #     wscale=7 / 2,
+        #     hscale=15 / 2,
+        #     legend_pos=(0.5, 0.03),
+        # )
 
         # custom_interval_plot(conn, PLOT_DIR)
         # custom_interval_plot(
@@ -1659,7 +1946,8 @@ def main():
         #     filename="convergence_per_problem_h7ls",
         # )
 
-        # custom_cmp_plot(conn, PLOT_DIR)
+        custom_cmp_plot(conn, PLOT_DIR)
+        custom_cmp_plot2(conn, PLOT_DIR)
 
         exit()
 
