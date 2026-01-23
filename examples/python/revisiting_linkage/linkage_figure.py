@@ -583,15 +583,16 @@ def example_peter_proximity():
     )
     template_structure = ctx2graph(ctx)
 
+    node_proximity = ctx.normalized_node_proximity()
     vig_proximity = ctx.normalized_w_vig()
     peter_proximity = ctx.subtree_co_occurrences()
 
     fig, axes = plt.subplot_mosaic(
         """
-        TN
+        TNP
         """,
-        figsize=(8, 4),
-        gridspec_kw=dict(width_ratios=[1.75, 1]),
+        figsize=(10, 4),
+        gridspec_kw=dict(width_ratios=[1, 0.75, 0.75], wspace=0.25),
     )
 
     # axes["T"].set_axis_off()
@@ -603,8 +604,8 @@ def example_peter_proximity():
         xscale=1,
         yscale=1,
         # label_offset=(0, 0),
-        node_size=1200,
-        margins=0.175,
+        node_size=800,
+        margins=0.15,  # 75,
     )
 
     x0, y0 = pos[0]
@@ -803,9 +804,11 @@ def example_peter_proximity():
         codes, verts = zip(*path)
         axes["T"].add_patch(PathPatch(Path(verts, codes), **kw))
 
-    draw_path(path_f1)
-    draw_path(path_f2)
-    draw_path(path_f0)  # , ls="-.")
+    highglight_subfns = False
+    if highglight_subfns:
+        draw_path(path_f1)
+        draw_path(path_f2)
+        draw_path(path_f0)  # , ls="-.")
 
     # nx.draw_networkx_labels(
     #     template_structure,
@@ -817,70 +820,100 @@ def example_peter_proximity():
 
     axes["T"].set_aspect(1)
 
-    S = vig_proximity.copy()
-    S[np.triu_indices_from(S)] = peter_proximity[np.triu_indices_from(S)]
-
-    # S = peter_proximity.copy()
-
-    A = peter_proximity.copy()
-    A[np.tril_indices_from(A)] = 1.0 / vig_proximity[np.tril_indices_from(A)]
-
-    mask = np.eye(vig_proximity.shape[0], dtype=np.bool_)
-    m1 = mask.copy()
-    m1[np.tril_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
-        np.tril_indices_from(A)
-    ]
     sns.heatmap(
-        # 3 - A,
-        A,
-        annot=A,
-        mask=m1,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
-        # fmt="s",
+        node_proximity,
+        annot=node_proximity,
+        mask=np.eye(node_proximity.shape[0], dtype=np.bool_),
         cmap="Blues",
         vmin=0,
-        vmax=2,
-        # cmap="Blues_r",
-        # vmin=0,
-        # vmax=4,
+        vmax=1,
         square=True,
-        annot_kws=dict(fontsize="x-small"),
+        annot_kws=dict(fontsize="xx-small"),
         ax=axes["N"],
         cbar=False,
     )
-    m2 = mask.copy()
-    m2[np.triu_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
-        np.triu_indices_from(A)
-    ]
-    sns.heatmap(
-        A,
-        annot=np.array(
-            [
-                [
-                    rf"${{}}^1\!/\!{{}}_{{{str(A[i, j])[0]}}}$"
-                    # str(A[i, j])[0]
-                    for j in range(A.shape[1])
-                ]
-                for i in range(A.shape[0])
-            ]
-        ),
-        mask=m2,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
-        fmt="s",
-        cmap="Blues_r",
-        vmin=1,
-        vmax=4,
-        square=True,
-        annot_kws=dict(fontsize="x-small"),
-        ax=axes["N"],
-        cbar=False,
-    )
-    axes["N"].set_title("#Common Subfunctions")
     axes["N"].set_xlabel("Node Proximity")
+    axes["N"].tick_params(labelsize="x-small", pad=2, length=2)
+
+    sns.heatmap(
+        peter_proximity,
+        annot=peter_proximity,
+        mask=np.eye(peter_proximity.shape[0], dtype=np.bool_),
+        cmap="Blues",
+        vmin=0,
+        vmax=3,
+        square=True,
+        annot_kws=dict(fontsize="xx-small"),
+        ax=axes["P"],
+        cbar=False,
+    )
+    axes["P"].set_xlabel("#Common Subfunctions")
+    axes["P"].tick_params(labelsize="x-small", pad=2, length=2)
+
+    # S = vig_proximity.copy()
+    # S[np.triu_indices_from(S)] = peter_proximity[np.triu_indices_from(S)]
+
+    # # S = peter_proximity.copy()
+
+    # A = peter_proximity.copy()
+    # A[np.tril_indices_from(A)] = 1.0 / vig_proximity[np.tril_indices_from(A)]
+
+    # mask = np.eye(vig_proximity.shape[0], dtype=np.bool_)
+    # m1 = mask.copy()
+    # m1[np.tril_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+    #     np.tril_indices_from(A)
+    # ]
+    # sns.heatmap(
+    #     # 3 - A,
+    #     A,
+    #     annot=A,
+    #     mask=m1,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+    #     # fmt="s",
+    #     cmap="Blues",
+    #     vmin=0,
+    #     vmax=2,
+    #     # cmap="Blues_r",
+    #     # vmin=0,
+    #     # vmax=4,
+    #     square=True,
+    #     annot_kws=dict(fontsize="x-small"),
+    #     ax=axes["N"],
+    #     cbar=False,
+    # )
+    # m2 = mask.copy()
+    # m2[np.triu_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+    #     np.triu_indices_from(A)
+    # ]
+    # sns.heatmap(
+    #     A,
+    #     annot=np.array(
+    #         [
+    #             [
+    #                 rf"${{}}^1\!/\!{{}}_{{{str(A[i, j])[0]}}}$"
+    #                 # str(A[i, j])[0]
+    #                 for j in range(A.shape[1])
+    #             ]
+    #             for i in range(A.shape[0])
+    #         ]
+    #     ),
+    #     mask=m2,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+    #     fmt="s",
+    #     cmap="Blues_r",
+    #     vmin=1,
+    #     vmax=4,
+    #     square=True,
+    #     annot_kws=dict(fontsize="x-small"),
+    #     ax=axes["N"],
+    #     cbar=False,
+    # )
+    # axes["N"].set_title("#Common Subfunctions")
+    # axes["N"].set_xlabel("Node Proximity")
 
     fig.align_labels()
     # fig.align_titles()
 
     fig.savefig(
-        "node_proximity_example_peter.pdf",
+        "node_proximity_example_both.pdf",
         dpi=600,
         transparent=True,
         bbox_inches="tight",

@@ -4316,6 +4316,7 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
+#include <queue>
 #include <iterator>
 #include <ranges>
 
@@ -5150,12 +5151,12 @@ class GPContext {
         output_roots[i - nsubtrees] = tree_root;
       }
 
-      std::vector<std::tuple<const TemplateNode*, usize>> node_stack{std::make_tuple(
+      std::queue<std::tuple<const TemplateNode*, usize>> node_queue; node_queue.emplace(
           (is_subtree ? &expression_template.subexpressions[i] : &expression_template.outputs[i - nsubtrees]),
-          tree_root)};
-      while (!node_stack.empty()) {
-        auto [nptr, idx] = node_stack.back();
-        node_stack.pop_back();
+          tree_root);
+      while (!node_queue.empty()) {
+        auto [nptr, idx] = node_queue.front();
+        node_queue.pop();
 
         // structure lookup tables
 
@@ -5179,18 +5180,11 @@ class GPContext {
           }
         }
 
-        // since node_stack reverses the order, the children are pushed in reverse to match the breadth-first order
-        std::vector<std::tuple<const TemplateNode*, usize>> child_stack;
-        child_stack.reserve(nptr->children.size());
         for (const auto& c : nptr->children) {
           usize c_idx = index++;
           _parent[c_idx] = idx;
           children[idx].push_back(c_idx);
-          child_stack.emplace_back(&c, c_idx);
-        }
-        while (!child_stack.empty()) {
-          node_stack.push_back(child_stack.back());
-          child_stack.pop_back();
+          node_queue.emplace(&c, c_idx);
         }
 
         // domain <-> value mapping
@@ -5794,8 +5788,8 @@ class GPContext {
         const auto& ns = nodes[n];
         for (usize i = 0; i < ns.size(); i++) {
             for (usize j = 0; j <= i; j++) {
-                proximity(i, j) += 1;
-                proximity(j, i) += 1;
+                proximity(ns[i], ns[j]) += 1;
+                proximity(ns[j], ns[i]) += 1;
             }
         }
     }

@@ -1,5 +1,6 @@
 import pathlib
 import re
+from urllib.parse import quote
 
 import matplotlib
 import matplotlib.cm as cm
@@ -36,8 +37,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "linkage_details"
-RESULT_DIR = pathlib.Path("results") / "linkage_details_large"
+RESULT_DIR = pathlib.Path("results") / "learning"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -54,11 +54,14 @@ def problems(rng):
     seeds = [int(rng.integers(2**32)) for _ in range(REPEATS_PER_FOLD)]
 
     for problem in [  #
-        "Airfoil",
+        # "Airfoil",
         "Bike Sharing",
-        "Concrete Compressive Strength",
+        # "Concrete Compressive Strength",
         "Dow Chemical",
-        "Tower",
+        # "Tower",
+        # "sqrt(exp(sqrt(x10 ** 2)))"
+        "x0 - (x1 / (x2 - (x3 / x4)))",
+        "x0 - exp(sqrt(x10 ** 2))",
     ]:
         for (
             fold,
@@ -82,17 +85,28 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
-            for height in [
-                4
-                # 5
-            ]:
+            for height in [5]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
                 )
                 for operator_set, operators in [
+                    # (
+                    #     "small",
+                    #     [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
+                    # ),
                     (
-                        "small",
-                        [c.OpAdd(), c.OpSub(), c.OpMul(), c.OpDiv(), c.OpSin()],
+                        "custom",
+                        [
+                            c.OpAdd(),
+                            c.OpSub(),
+                            c.OpMul(),
+                            c.OpDiv(),
+                            c.OpSin(),
+                            c.OpSqrt(),
+                            c.OpSquare(),
+                            c.OpExp(),
+                            c.OpLog(),
+                        ],
                     )
                 ]:
                     for linear_scaling in [  #
@@ -194,7 +208,7 @@ def methods(info, ctx):
         )
 
         yield (
-            f'"GP-GOMEA ({similarity})"',
+            f'"{similarity}"',
             lambda run_path: c.MixedGOMEA(
                 discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                 population_options=c.PopulationOptions(
@@ -212,6 +226,8 @@ def methods(info, ctx):
                     initial_population_size=initial_population_size,
                     max_num_populations=max_num_populations,
                     restart_stale_populations=restart_stale_populations,
+                    population_logfile=str(run_path / "population_stats.csv"),
+                    population_log_resolution="population",
                 ),
             ),
         )
@@ -279,7 +295,8 @@ def analyze_subset_stats(
     )
 
     def fmt_name(name):
-        n = re.match(r"^GP-GOMEA \((.+)\)$", name).group(1)
+        rm = re.match(r"^GP-GOMEA \((.+)\)$", name)
+        n = rm.group(1) if rm else name
         n = method2name(n)
         return "Node / Node (static)" if n == "Node" else n
 
@@ -389,13 +406,19 @@ def analyze_subset_stats(
                                 [problem, method, generation],
                             ).df()
 
+                            not_done = True
                             if run is not None:
-                                runs = sorted(stats["run"].unique().tolist())
-                                sim = stats[stats["run"] == runs[run]][
-                                    "similarity"
-                                ].values[0]
-                                avg_similarity = np.array([r.tolist() for r in sim])
-                            else:
+                                try:
+                                    runs = sorted(stats["run"].unique().tolist())
+                                    sim = stats[stats["run"] == runs[run]][
+                                        "similarity"
+                                    ].values[0]
+                                    avg_similarity = np.array([r.tolist() for r in sim])
+                                    not_done = False
+                                except Exception as e:
+                                    not_done = True
+
+                            if not_done:
                                 similarities = [
                                     np.array([r.tolist() for r in s])
                                     for s in (stats["similarity"])
@@ -632,7 +655,7 @@ def analyze_subset_stats(
                         cb.outline.set_linewidth(0.0)
 
                 fig.savefig(
-                    pdir / f"similarities_{problem.lower().replace(' ', '-')}.pdf",
+                    pdir / f"similarities_{quote(problem, safe=' (){}$_+-"')}.pdf",
                     dpi=600,
                     bbox_inches="tight",
                     transparent=True,
@@ -655,7 +678,7 @@ def main():
         LOG_DIR,
         file_pattern="stats",
         # enable pre-processing the .csv logs into .parquet files
-        # preprocess=True,
+        preprocess=True,
         parquet_dir=PARQUET_DIR / "stats",
     ) as conn:
         load_results(
@@ -685,7 +708,6 @@ def main():
         with sns.axes_style("white"):
             analyze_subset_stats(conn, PLOT_DIR / "stats")
 
-        exit()
         plot_convergence_so(
             PLOT_DIR / "convergence",
             conn,
