@@ -63,7 +63,6 @@ class GPContext {
         num_continuous(const_repr == ConstantRepr::Pool ? constant_pool_size
                                                         : (const_repr == ConstantRepr::None ? 0 : num_discrete)),
         max_expression_size(max_expression_size),
-        max_tree_size(determine_max_tree_size(expression_template)),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         operators(std::move(operators)) {
@@ -677,6 +676,8 @@ class GPContext {
     std::vector<std::tuple<usize, isize, bool>> node_stack;
     node_stack.reserve(max_expression_size);
 
+    size = 0;
+
     // For each output, walk the tree in post-order
     // Multiple trees will be considered 'different' individuals, in as much that nothing will denote 
     // n output trees as belonging to the same individual. This will be handled on the evaluation side.
@@ -688,8 +689,8 @@ class GPContext {
       // Vectors to hold temporary type and value data
       std::vector<float> temp_type;
       std::vector<float> temp_value;
-      temp_type.reserve(max_tree_size);
-      temp_value.reserve(max_tree_size);
+      temp_type.reserve(max_expression_size - size);
+      temp_value.reserve(max_expression_size - size);
 
       node_stack.emplace_back(n, 0, false);
       
@@ -704,6 +705,9 @@ class GPContext {
         auto [idx, call_stack_idx, is_post_order] = node_stack.back();
         usize node_stack_idx = node_stack.size() - 1;
 
+        std::println("Idx: {} | call_stack_idx: {} | is_post: {}", idx, call_stack_idx, is_post_order);
+        std::println("node_stack_idx: {}", node_stack_idx);
+
         // Mark current node as active
         if constexpr (!std::is_const<S>()) {
           solution.discrete_active()(idx) = true;
@@ -713,6 +717,8 @@ class GPContext {
         DType value = domain2value(idx, solution.discrete_values()(idx));
         usize v_idx = value_idx[value];
         enum ValueKind type = value_kind[value];
+
+        std::println("value: {} | v_dix: {} | type: {}", value, v_idx, int(type));
 
         bool update_tree = false;
 
@@ -727,24 +733,24 @@ class GPContext {
             visited(idx) = 0;
 
             // Get the previous call stack entry
-            usize caller = call_stack[call_stack_idx];
+            usize calling_node = call_stack[call_stack_idx];
 
             // TODO
-            isize frames = 1;
+            isize num_frames = 1;
 
-            auto p = parent(idx);
-            while (p.has_value()) {
-              if (p.value() == caller) {
-                caller = call_stack[call_stack_idx - frames++];
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                calling_node = call_stack[call_stack_idx - num_frames++];
               }
-              p = parent(p.value());
+              pidx = parent(pidx.value());
             }
 
-            auto& child_nodes = children[caller];
-            assert(idx != child_nodes[v_idx % child_nodes.size()] && "Self reference found.");
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
 
             node_stack.pop_back();
-            node_stack.emplace_back(child_nodes[v_idx % child_nodes.size()], call_stack_idx - frames, false);
+            node_stack.emplace_back(cnodes[v_idx % cnodes.size()], call_stack_idx - num_frames, false);
           } else if (type == ValueKind::Subtree) {
             visited(idx) = 0;
 
@@ -819,8 +825,8 @@ class GPContext {
 
       // Pad vectors with placeholder values such that the solutions and subtrees
       // are at constant intervals in memory
-      temp_type.resize(max_tree_size, std::numeric_limits<float>::max());
-      temp_value.resize(max_tree_size, std::numeric_limits<float>::max());
+      temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
+      temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
       // Append temporary vectors to final vectors
       node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
@@ -899,8 +905,8 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
     // TODO max_expression_size is not correct
-    temp_type.resize(max_tree_size, std::numeric_limits<float>::max());
-    temp_value.resize(max_tree_size, std::numeric_limits<float>::max());
+    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
+    temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
     node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
@@ -926,7 +932,6 @@ class GPContext {
   usize num_discrete;
   usize num_continuous;
   usize max_expression_size;
-  usize max_tree_size;
   usize num_parameters;
   usize max_num_children;
 
@@ -955,20 +960,6 @@ class GPContext {
                                           // node (without subtrees)
 
  private:
-  size_t determine_max_tree_size(const Template& expression_template) {
-    size_t maximum = 0;
-
-    // Determine the size of the largest output and/or subexpression tree
-    for (const auto& o : expression_template.outputs) {
-      maximum = std::max(maximum, o.max_num_nodes);
-    }
-    for (const auto& s : expression_template.subexpressions) {
-      maximum = std::max(maximum, s.max_num_nodes);
-    }
-
-    return maximum;
-  }
-
   Arr2D<DType> _value2domain;
   std::vector<usize> _parent;  // node -> parent or invalid index for root nodes
 };
