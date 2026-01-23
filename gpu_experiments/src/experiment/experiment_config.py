@@ -10,13 +10,19 @@ T = TypeVar("T")
 
 ProblemType = Literal["synthetic", "pmlb"]
 
-KERNEL_VERSIONS: tuple[KV, ...] = (
+ALL_KV: tuple[KV, ...] = (
     KV.baseline,
     KV.restrict,
     KV.shared_memory,
     KV.block_reduce,
     KV.single_kernel,
     KV.single_kernel_fmaf,
+    KV.single_kernel_inplace,
+)
+
+MAIN_KV: tuple[KV, ...] = (
+    KV.shared_memory,
+    KV.block_reduce,
     KV.single_kernel_inplace,
 )
 
@@ -138,7 +144,7 @@ TEST_CONFIG = ExperimentConfig(
     num_features=1,
     # templates=[TemplateConfig(2, 3), TemplateConfig(2, 4)],
     # operator_sets=["small", "all"],
-    gpu=GPUConfig(enabled=True, kernels=(KERNEL_VERSIONS)),
+    gpu=GPUConfig(enabled=True, kernels=(ALL_KV)),
     use_target=True,
 )
 
@@ -154,6 +160,7 @@ ARITH_FEYNMAN_CONFIG = ExperimentConfig(
     num_observations=100_000,
     num_features=None,
     operator_sets="arith",
+    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
     use_target=True,
 )
 
@@ -169,8 +176,10 @@ TRIG_FEYNMAN_CONFIG = ExperimentConfig(
     num_observations=100_000,
     num_features=None,
     operator_sets="trig",
-    gpu=GPUConfig(enabled=True, kernels=(KERNEL_VERSIONS)),
+    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
     use_target=True,
+    num_folds=10,
+    num_iterations=1,
 )
 
 SQRT_FEYNMAN_CONFIG = ExperimentConfig(
@@ -185,8 +194,10 @@ SQRT_FEYNMAN_CONFIG = ExperimentConfig(
     num_observations=100_000,
     num_features=None,
     operator_sets="square",
-    gpu=GPUConfig(enabled=True, kernels=(KERNEL_VERSIONS)),
+    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
     use_target=True,
+    num_folds=10,
+    num_iterations=1,
 )
 
 EXP_FEYNMAN_CONFIG = ExperimentConfig(
@@ -196,8 +207,10 @@ EXP_FEYNMAN_CONFIG = ExperimentConfig(
     num_observations=100_000,
     num_features=None,
     operator_sets="exp",
-    gpu=GPUConfig(enabled=True, kernels=(KERNEL_VERSIONS)),
+    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
     use_target=True,
+    num_folds=10,
+    num_iterations=1,
 )
 
 
