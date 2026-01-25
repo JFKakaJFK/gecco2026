@@ -51,7 +51,10 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 
 def method2name(m):
-    return {"$MI_{mask\\ inactive}$": "$MI_{masked}$"}.get(m, m)
+    return {
+        "$MI_{mask\\ inactive}$": "$MI_{masked}$",
+        "Node (peter)": "#CS",
+    }.get(m, m)
 
 
 m_order = {
@@ -64,6 +67,8 @@ m_order = {
             "$MI_{masked}$",
             "Node",
             "Node (static)",
+            "#CS",
+            "Univariate",
         ]
     )
 }
@@ -72,10 +77,12 @@ m_order2 = {
     m: i
     for i, m in enumerate(
         [
+            "Univariate",
             "Random",
             "$MI_{adjusted}$",
             "$MI$",
             "Node (static)",
+            "#CS",
             "$MI_{masked}$",
             "Node",
         ]
@@ -90,8 +97,45 @@ PALETTE = {
     "$MI_{masked}$": "#D55E00",  # vermillion red
     "Node": "#0072B2",  # blue
     "Node (static)": "#56B4E9",  # sky blue
-    # "#F0E442", # yellow
+    "#CS": "#F0E442",  # yellow
+    "Univariate": "#bdbdbd",  # gray
 }
+
+TCOLORS = [
+    "#ebac23",  # yellow
+    "#b80058",  # lipstick
+    "#008cf9",  # azure
+    "#006e00",  # green
+    "#00bbad",  # caribbean
+    "#d163e6",  # lavender
+    "#b24502",  # brown
+    "#ff9287",  # coral
+    "#5954d6",  # indigo
+    "#00c6f8",  # turquoise
+    "#878500",  # olive
+    "#00a76c",  # jade
+    "#bdbdbd",  # gray
+]
+
+# PALETTE = {
+#     m: c
+#     for m, c in zip(
+#         [
+#             "Random",
+#             "$MI$",
+#             "$MI_{adjusted}$",
+#             "$MI_{masked}$",
+#             "Node",
+#             "Node (static)",
+#             "Node (peter)",
+#             "Node (peter, static)",
+#             "Node (wVIG)",
+#             "Node (wVIG, static)",
+#             "Univariate",
+#         ],
+#         TCOLORS,
+#     )
+# }
 
 
 def custom_problem_convergence_plot(
@@ -326,7 +370,7 @@ def custom_problem_convergence_plot(
         labels,
         loc="lower center",
         bbox_to_anchor=legend_pos,
-        ncols=min(6, len(algorithms)),
+        ncols=len(algorithms),  # min(6, len(algorithms)),
         borderaxespad=0.0,
         labelspacing=0,
         frameon=False,
@@ -597,7 +641,7 @@ def custom_convergence_plot(
         labels,
         loc="lower center",
         bbox_to_anchor=(0.475, -0.03),
-        ncols=min(6, len(algorithms)),
+        ncols=len(algorithms),  # min(6, len(algorithms)),
         borderaxespad=0.0,
         labelspacing=0,
         frameon=False,
@@ -655,7 +699,7 @@ def custom_cmp_plot(
     keys = {m: m_order2.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
     algorithms = sorted(set(algorithms), key=lambda m: keys[m])
 
-    fig, ax = plt.subplots(figsize=(7, 6))
+    fig, ax = plt.subplots(figsize=(8, 6))
 
     for is_upper, score_dict in enumerate(score_dicts):
         comparisons = {
@@ -733,7 +777,7 @@ def custom_cmp_plot(
             # mask=np.eye(len(algorithms), dtype=np.bool_),
             vmin=0,
             vmax=1,
-            square=True,
+            # square=True,
             xticklabels=xticklabels,
             yticklabels=yticklabels,
             cbar_kws=dict(shrink=0.95, label="P(A > B)"),
@@ -835,6 +879,8 @@ def custom_cmp_plot2(
         .df()
         .pivot(index="run", values="value", columns="method")
     )
+
+    df.columns = [method2name(m) for m in df.columns]
 
     algorithms = sorted(set(df.columns))
     keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
@@ -1283,7 +1329,7 @@ def custom_pprof_plot(
         labels,
         loc="lower center",
         bbox_to_anchor=(0.5, -0.125),
-        ncols=min(6, len(algorithms)),
+        ncols=len(algorithms),  # min(6, len(algorithms)),
         borderaxespad=0.0,
         labelspacing=0,
         frameon=False,
@@ -1309,18 +1355,17 @@ def custom_problem_plot(
     hscale=4.5,
     gridspec_kw=dict(wspace=0.05, hspace=0.1),
     legend_pos=(0.5, -0.05),
+    groups=(
+        (
+            "_main",
+            r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
+        ),
+    ),
 ):
     pdir = plot_dir / "custom"
     pdir.mkdir(parents=True, exist_ok=True)
 
-    for group, m_where_query in tqdm(
-        [  #
-            (
-                "_main",
-                r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
-            )
-        ]
-    ):
+    for group, m_where_query in tqdm(groups):
         problems = []
         algorithms = []
         rows = []
@@ -1580,7 +1625,7 @@ def custom_problem_plot(
             labels,
             loc="lower center",
             bbox_to_anchor=legend_pos,  # 75),
-            ncols=min(6, len(algorithms)),
+            ncols=len(algorithms),  # min(6, len(algorithms)),
             borderaxespad=0.0,
             frameon=False,
         )
@@ -1604,26 +1649,25 @@ def custom_interval_plot(
     hscale: float = 3.25,
     gridspec_kw=dict(wspace=0.05, hspace=0.1),
     legend_pos=(0.5, -0.0),
+    groups=(
+        (
+            "_main",
+            r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
+        ),  # random, mi, mi_a, mi_m, node
+        # (
+        #     "_masking",
+        #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|Node).*'",
+        # ),  # mi, any, all, masked
+        # (
+        #     "_hybrid",
+        #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|any|all).*'",
+        # ),  # mi, node, static, hybrid
+    ),
 ):
     pdir = plot_dir / "custom" / "intervals"
     pdir.mkdir(parents=True, exist_ok=True)
 
-    for group, m_where_query in tqdm(
-        [  #
-            (
-                "_main",
-                r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
-            ),  # random, mi, mi_a, mi_m, node
-            # (
-            #     "_masking",
-            #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|Node).*'",
-            # ),  # mi, any, all, masked
-            # (
-            #     "_hybrid",
-            #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|any|all).*'",
-            # ),  # mi, node, static, hybrid
-        ]
-    ):
+    for group, m_where_query in tqdm(groups):
         algorithms = []
         rows = []
         for metric_label, metric in [  #
@@ -1883,7 +1927,7 @@ def custom_interval_plot(
             labels,
             loc="lower center",
             bbox_to_anchor=legend_pos,
-            ncols=min(6, len(algorithms)),
+            ncols=len(algorithms),  # min(6, len(algorithms)),
             borderaxespad=0.0,
             frameon=False,
         )
@@ -1909,10 +1953,34 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
-        # custom_convergence_plot(conn, PLOT_DIR)
-        # custom_pprof_plot(conn, PLOT_DIR)
+        where_query = r"method_name NOT SIMILAR TO '.*(\*|any|all|peter, static|wVIG|peter|Univariate).*'"
+        where_query = (
+            r"method_name NOT SIMILAR TO '.*(\*|any|all|peter, static|wVIG).*'"
+        )
 
-        # custom_problem_plot(conn, PLOT_DIR)
+        # custom_convergence_plot(conn, PLOT_DIR, where_query=where_query)
+        # custom_pprof_plot(conn, PLOT_DIR, method_where_query=where_query)
+
+        # custom_problem_plot(conn, PLOT_DIR, groups=(("_main", where_query),))
+
+        # custom_interval_plot(conn, PLOT_DIR, groups=(("_main", where_query),))
+
+        # custom_problem_convergence_plot(conn, PLOT_DIR, where_query=where_query)
+        # custom_problem_convergence_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     where_query=rf"{where_query} AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
+        #     wscale=3,
+        #     hscale=3,
+        #     gridspec_kw=dict(hspace=0.15),
+        #     supxlabel_kwargs=dict(y=-0.1),
+        #     legend_pos=(0.5, -0.11),
+        #     filename="convergence_per_problem_h7ls",
+        # )
+
+        # custom_cmp_plot2(conn, PLOT_DIR, method_where_query=where_query)
+        custom_cmp_plot(conn, PLOT_DIR, method_where_query=where_query)
+
         # custom_problem_plot(
         #     conn,
         #     PLOT_DIR,
@@ -1921,8 +1989,6 @@ def main():
         #     hscale=15 / 2,
         #     legend_pos=(0.5, 0.03),
         # )
-
-        # custom_interval_plot(conn, PLOT_DIR)
         # custom_interval_plot(
         #     conn,
         #     PLOT_DIR,
@@ -1932,22 +1998,6 @@ def main():
         #     hscale=7,
         #     legend_pos=(0.5, 0.03),
         # )
-
-        # custom_problem_convergence_plot(conn, PLOT_DIR)
-        # custom_problem_convergence_plot(
-        #     conn,
-        #     PLOT_DIR,
-        #     where_query=r"method_name NOT SIMILAR TO '.*(\*|any|all).*' AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
-        #     wscale=3,
-        #     hscale=3,
-        #     gridspec_kw=dict(hspace=0.15),
-        #     supxlabel_kwargs=dict(y=-0.1),
-        #     legend_pos=(0.5, -0.11),
-        #     filename="convergence_per_problem_h7ls",
-        # )
-
-        custom_cmp_plot(conn, PLOT_DIR)
-        custom_cmp_plot2(conn, PLOT_DIR)
 
         exit()
 

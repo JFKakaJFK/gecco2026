@@ -308,7 +308,7 @@ def draw_measure(H, MI, label, ax, **kwargs):
         S,
         square=True,
         annot=True,
-        linewidths=4,
+        linewidths=0,
         cmap="Blues",
         vmin=0,
         vmax=2,
@@ -317,11 +317,14 @@ def draw_measure(H, MI, label, ax, **kwargs):
     )
 
     if MI is not None:
-        x, y = [], []
+        offset = 0  # .1
+        x, y = [-1 + offset], [0]
         for i in range(1, S.shape[0]):
             x += [i - 1, i, i]
             y += [i, i, i + 1]
-        ax.plot(x, y, color="black", linewidth=2)
+        x += [x[-1]]
+        y += [y[-1] + offset]
+        ax.plot(x, y, color="black", linewidth=8)
 
     ax.set_title(label)
 
@@ -371,19 +374,24 @@ def example_solution():
 
     fig, axes = plt.subplot_mosaic(
         """
-        TE
         TR
         """,
-        figsize=(8, 6),
-        gridspec_kw=dict(hspace=0.0, height_ratios=[0.15, 1]),
+        figsize=(8, 3),
+        # sharex=True,
+        # sharey=True,
+        # layout="constrained",
+        gridspec_kw=dict(width_ratios=[1.25, 1]),
     )
 
-    axes["E"].set_axis_off()
+    t_ax = axes["T"]
+    # t_pos = axes["T"].get_position()
+    # axes["T"].set_axis_off()
+    # t_ax = fig.add_axes([t_pos.x0, t_pos.y0, t_pos.x1 - t_pos.x0, 1.0])
 
     node_size = 800
     pos = draw_nx(
         template_structure,
-        axes["T"],
+        t_ax,
         labels=False,  # {n: template_structure.nodes[n]["label"] for n in template_structure},
         alpha=[1.0 if active[n] else 0.5 for n in template_structure.nodes],
         node_color=[
@@ -403,7 +411,7 @@ def example_solution():
     )
     pos = draw_nx(
         template_structure,
-        axes["T"],
+        t_ax,
         labels=False,
         xscale=1,
         yscale=1,
@@ -412,11 +420,11 @@ def example_solution():
     )
     for n in template_structure:
         if not active[n]:
-            axes["T"].add_patch(
+            t_ax.add_patch(
                 Circle(
                     pos[n],
                     # radius=27.5,  # np.sqrt(node_size / np.pi),
-                    radius=0.16,  # np.sqrt(node_size / np.pi),
+                    radius=0.13,  # np.sqrt(node_size / np.pi),
                     lw=0,
                     alpha=0.2,  # 5,
                     color="black",
@@ -437,16 +445,21 @@ def example_solution():
             else "w"
             for n in template_structure
         },
-        ax=axes["T"],
+        ax=t_ax,
     )
     nx.draw_networkx_labels(
         template_structure,
         # {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
         {n: (x + 0.19, y - 0.075) for n, (x, y) in pos.items()},
         {n: f"${{}}_{n}$" for n in template_structure},
-        ax=axes["T"],
+        ax=t_ax,
     )
-    axes["T"].set_xlabel("Template Structure")
+    t_ax.set_aspect(1)
+    t_ax.margins(x=0.1, y=0.1)
+    # axes["T"].set_xlabel("Template Structure")
+    t_ax.set_xlabel("Template Structure")
+
+    # axes["R"].margins(x=0.1, y=0.1)
 
     # axes["E"].text(
     #     0.5, 0.5, expr, ha="center", va="center", transform=axes["E"].transAxes
@@ -493,10 +506,51 @@ def example_solution():
                 )
             )
     axes["R"].set_yticks([])
-    axes["R"].set_title("Expression Semantics\n" + expr + "\n")
+    axes["R"].set_title(expr + "\nExpression Semantics\n\n")  # \n" + expr + "\n")
     axes["R"].set_xlabel("Internal Representation")
 
-    fig.align_labels()
+    fig.canvas.draw()
+
+    # xl1 = t_ax.xaxis.label
+    # xl2 = axes["R"].xaxis.label
+
+    # bbox1 = xl1.get_window_extent()
+    # bbox2 = xl2.get_window_extent()
+
+    # # Convert display → figure coords
+    # inv = fig.transFigure.inverted()
+    # bbox1_fig = bbox1.transformed(inv)
+    # bbox2_fig = bbox2.transformed(inv)
+
+    # y = min(bbox1.y0, bbox2.y0)
+    # print(y, bbox1, bbox2)
+
+    pos1 = t_ax.get_position()
+    pos2 = axes["R"].get_position()
+
+    # Choose a reference bottom (e.g. the lower one)
+    new_y0 = min(pos1.y0, pos2.y0)
+    new_y0 = pos1.y0 - 0.0415
+
+    # Reposition axes so their bottoms match
+    t_ax.set_position([pos1.x0, pos1.y0, pos1.width, pos1.y1 - new_y0])
+    axes["R"].set_position([pos2.x0, new_y0, pos2.width, pos2.y1 - new_y0])
+
+    # Move both labels to that exact figure y
+    # for xl, bb in ((xl1, bbox1), (xl2, bbox2)):
+    #     # xl.set_transform(fig.transFigure)
+    #     xl.set_position((bb.y0, y))
+    #     # xl.set_horizontalalignment("center")
+
+    # r_pos = axes["R"].get_position()
+    # r_ax = fig.add_axes([r_pos.x0, t_pos.y0, r_pos.x1 - r_pos.x0, 0.01])
+    # sns.despine(ax=r_ax, left=True, bottom=True)
+
+    # r_ax.set_yticks([])
+    # r_ax.set_xticks([])
+    # r_ax.set_xlabel("Internal Representation")
+
+    # fig.align_xlabels()
     # fig.align_titles()
 
     fig.savefig("template_example.pdf", dpi=600, transparent=True, bbox_inches="tight")
@@ -589,9 +643,9 @@ def example_peter_proximity():
 
     fig, axes = plt.subplot_mosaic(
         """
-        TNP
+        TPN
         """,
-        figsize=(10, 4),
+        figsize=(10, 3.5),
         gridspec_kw=dict(width_ratios=[1, 0.75, 0.75], wspace=0.25),
     )
 
@@ -605,7 +659,7 @@ def example_peter_proximity():
         yscale=1,
         # label_offset=(0, 0),
         node_size=800,
-        margins=0.15,  # 75,
+        margins=(0.1, 0.18),  # 75,
     )
 
     x0, y0 = pos[0]
@@ -694,7 +748,7 @@ def example_peter_proximity():
         yield Path.LINETO, xy0 if flip else xy1
         yield Path.MOVETO, xy1
 
-    dz = 0.175
+    dz = 0.195
     f1_lt = xy[1] + n(rot(v[1, 3], -90.0)) * dz
     f1_rt = xy[1] + n(rot(v[1, 4], 90.0)) * dz
     f1_rb = xy[4] + n(rot(v[4, 1], -90.0)) * dz
@@ -742,7 +796,7 @@ def example_peter_proximity():
         (Path.CLOSEPOLY, f2_lb),
     ]
 
-    dz = 0.2
+    dz = 0.22
 
     f0_lt = xy[0] + n(rot(v[0, 1], -90.0)) * dz
     f0_rt = xy[0] + n(rot(v[0, 2], 90.0)) * dz
@@ -801,11 +855,20 @@ def example_peter_proximity():
         kw = {**path_kwargs}
         for k, v in kwargs.items():
             kw[k] = v
-        codes, verts = zip(*path)
-        axes["T"].add_patch(PathPatch(Path(verts, codes), **kw))
+        if isinstance(path, Path):
+            pass
+        else:
+            codes, verts = zip(*path)
+            path = Path(verts, codes)
+        axes["T"].add_patch(PathPatch(path, **kw))
 
-    highglight_subfns = False
+    highglight_subfns = True
     if highglight_subfns:
+        dz = 0.17
+        draw_path(Path.circle(xy[3], radius=dz))
+        draw_path(Path.circle(xy[4], radius=dz))
+        draw_path(Path.circle(xy[5], radius=dz))
+        draw_path(Path.circle(xy[6], radius=dz))
         draw_path(path_f1)
         draw_path(path_f2)
         draw_path(path_f0)  # , ls="-.")
@@ -818,7 +881,7 @@ def example_peter_proximity():
     # )
     axes["T"].set_xlabel("Template")
 
-    axes["T"].set_aspect(1)
+    # axes["T"].set_aspect(1)
 
     sns.heatmap(
         node_proximity,
@@ -828,7 +891,7 @@ def example_peter_proximity():
         vmin=0,
         vmax=1,
         square=True,
-        annot_kws=dict(fontsize="xx-small"),
+        annot_kws=dict(fontsize="x-small"),
         ax=axes["N"],
         cbar=False,
     )
@@ -843,7 +906,7 @@ def example_peter_proximity():
         vmin=0,
         vmax=3,
         square=True,
-        annot_kws=dict(fontsize="xx-small"),
+        annot_kws=dict(fontsize="x-small"),
         ax=axes["P"],
         cbar=False,
     )
@@ -1317,8 +1380,10 @@ def linkage_example():
     fig, axes = plt.subplots(
         nrows=nrows,
         ncols=ncols,
-        figsize=(4 * ncols, 3 * nrows),
-        gridspec_kw=dict(hspace=0.4, height_ratios=[1, 0.5]),
+        figsize=(3 * ncols, 2.5 * nrows),
+        gridspec_kw=dict(
+            hspace=0.4, height_ratios=[1, 0.75], width_ratios=[0.75, 1, 1]
+        ),
     )
 
     # population
@@ -1365,7 +1430,13 @@ def linkage_example():
     pop_ax.set_yticks([])
     pop_ax.set_title("Solutions")
 
-    draw_measure(H, MI, "$MI$", axes[0, 1], cbar=False)
+    draw_measure(
+        H,
+        MI,
+        "$MI$",
+        axes[0, 1],
+        cbar=False,  # , annot_kws=dict(fontsize="large")
+    )
     draw_measure(H_masked, MI_masked, "$MI_{masked}$", axes[0, 2], cbar=False)
     if ncols > 3:
         draw_measure(node_proximity, None, "Node", axes[0, 3], cbar=False)
@@ -1375,6 +1446,7 @@ def linkage_example():
         root=0,
         margins=(0.2, 0.3),
         dx=0.7,
+        node_size=800,
         ax=axes[1, 0],
     )
     axes[1, 0].set_title("Template")

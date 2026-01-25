@@ -1,5 +1,6 @@
 import pathlib
 import re
+from urllib.parse import quote
 
 import matplotlib
 import matplotlib.cm as cm
@@ -9,8 +10,10 @@ import pandas as pd
 import pygom
 import seaborn as sns
 from matplotlib.colors import AsinhNorm, Normalize, SymLogNorm
+from matplotlib.lines import Line2D
 from pygom import *
-from sklearn.externals._packaging.version import SubLocalType
+from scipy.optimize import linear_sum_assignment
+from scipy.sparse.linalg._isolve.lsqr import eps
 
 from src.config import c, instantiate
 from src.data import prepare_problem, problem_info
@@ -242,8 +245,11 @@ def all_tasks():
             )
 
 
-def method2name(m):
-    return {"$MI_{mask\\ inactive}$": "$MI_{masked}$"}.get(m, m)
+def method2name(m: str) -> str:
+    return {
+        "$MI_{mask\\ inactive}$": "$MI_{masked}$",
+        "Node (peter)": "#Common Subfunctions",
+    }.get(m, m)
 
 
 m_order = {
@@ -261,11 +267,572 @@ m_order = {
 }
 
 
+def analyze_subset_stats3(
+    conn,
+    odir,
+    problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))",
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|wVIG|static).*'",
+    max_generation: int = 20,
+    runs=("avg", 0),
+    cmap="Blues",
+    side_methods=("Random", "#Common Subfunctions", "Node / Node (static)"),
+):
+    def fmt_name(name):
+        rm = re.match(r"^GP-GOMEA \((.+)\)$", name)
+        n = rm.group(1) if rm else name
+        n = method2name(n)
+        return "Node / Node (static)" if n == "Node" else n
+
+    problems = sorted(
+        [
+            p
+            for p, *_ in conn.sql(
+                f"SELECT DISTINCT({problem_query}) FROM fos_stats WHERE {where_query}"
+            ).fetchall()
+        ]
+    )
+
+    for run in runs:
+        for problem in problems:
+            methods = sorted(
+                [
+                    m
+                    for m, *_ in conn.execute(
+                        f"SELECT DISTINCT(method_name) FROM fos_stats WHERE {problem_query} = $1 AND {where_query}",
+                        [problem],
+                    ).fetchall()
+                ]
+            )
+
+            generations = sorted(
+                [
+                    g
+                    for g, *_ in conn.execute(
+                        f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1 AND {where_query} AND generation::UINTEGER <= $2",
+                        [problem, max_generation],
+                    ).fetchall()
+                ]
+            )
+
+            masks = {}
+            norms = {}
+            similarities = {}
+            n2m = {}
+            for method in methods:
+                n = fmt_name(method)
+                n2m[n] = method
+
+                run_query = "true"
+                if isinstance(run, int):
+                    target_run = [
+                        r
+                        for r, *_ in conn.execute(
+                            f"SELECT DISTINCT(format('{{}}.{{}}', fold, seed)) AS run FROM fos_stats WHERE {problem_query} = $1 AND {where_query} AND generation::UINTEGER <= $2 AND method_name = $3",
+                            [problem, max_generation, method],
+                        ).fetchall()
+                    ][run]
+                    run_query = f"format('{{}}.{{}}', fold, seed) = '{target_run}'"
+
+                sims = []
+                for _, generation in enumerate(generations):
+                    stats = conn.execute(
+                        f"""
+                        SELECT
+                            population_size,
+                            cluster,
+                            similarity,
+                            subsets,
+                            usage_count,
+                            evaluation_rate,
+                            acceptance_rate,
+                            avg_improvement,
+                            solution_activation_rate,
+                            variables_activation_rate,
+                            format('{{}}.{{}}', fold, seed) as run
+                        FROM fos_stats
+                        WHERE
+                            {problem_query} = $1
+                            AND method_name = $2
+                            AND generation = $3
+                            AND {where_query}
+                            AND {run_query}
+                        ORDER BY run
+                        """,
+                        [problem, method, generation],
+                    ).df()
+
+                    if len(stats) == 0:
+                        continue
+
+                    num_vars = len(stats["similarity"][0])
+                    num_subsets = len(stats["subsets"][0])
+                    trees = stats["subsets"]
+                    num_trees = len(trees)
+
+                    def lt_to_matrix(lt):
+                        M = np.zeros((num_subsets, num_vars))
+                        for s, subset in enumerate(lt):
+                            for v in subset:
+                                M[s, v] = 1.0
+                        return M
+
+                    def jaccard(A, B, e=1e-9):
+                        intersection = A @ B.T
+                        union = (
+                            A.sum(axis=1)[:, None]
+                            + B.sum(axis=1)[None, :]
+                            - intersection
+                            + eps
+                        )
+                        return intersection / union
+
+                    freqs = lt_to_matrix(trees[0])
+
+                    for lt in trees[1:]:
+                        M = lt_to_matrix(lt)
+
+                        # similarity between current tree nodes and accumulated rows
+                        S = jaccard(M, freqs)
+
+                        # Hungarian maximizes total similarity
+                        row_ind, col_ind = linear_sum_assignment(-S)
+
+                        # add aligned subsets
+                        for i, j in zip(row_ind, col_ind):
+                            freqs[j] += M[i]
+
+                    # normalize if you want frequencies
+                    freqs /= num_trees
+
+                    # freqs = np.zeros((num_subsets, num_vars))
+                    # for lt in stats["subsets"]:
+                    #     for s, subset in enumerate(lt):
+                    #         for v in subset:
+                    #             freqs[s, v] += 1.0
+                    # freqs /= num_trees
+
+                    if n not in masks:
+                        masks[n] = np.zeros_like(freqs, dtype=np.bool_)
+                        masks[n][:num_vars, :] = True  # hide univariate portion
+
+                    sims.append(freqs)
+                similarities[n] = sims
+
+                vmin, vmax = np.inf, -np.inf
+
+                ix = ~masks[n]
+                for s in sims:
+                    vmin = min(vmin, np.min(s[ix]))
+                    vmax = max(vmax, np.max(s[ix]))
+
+                norms[n] = Normalize(vmin=vmin, vmax=vmax)
+
+            # print([m for _m in methods if (m := fmt_name(_m)) not in side_methods])
+            rows = sorted(
+                [m for _m in methods if (m := fmt_name(_m)) not in side_methods],
+                key=lambda m: m_order.get(m, np.inf),
+            )
+            assert len(side_methods) <= len(rows)
+
+            nrows = len(rows)
+            ncols = len(generations) + int(len(side_methods) > 0)
+            fig, axes = plt.subplots(
+                nrows=nrows,
+                ncols=ncols,
+                sharex=True,
+                sharey=True,
+                figsize=(ncols * 4, nrows * 3),
+                gridspec_kw=dict(wspace=0.1, hspace=0.1),
+            )
+
+            heatmap_kw = dict(
+                square=True,
+                linewidths=0,
+                cbar=False,
+            )
+
+            def add_cbar(cax, norm, **kwargs):
+                cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
+                kw = dict(
+                    shrink=0.6,
+                    aspect=30,
+                    drawedges=False,
+                )
+                for k, v in kwargs.items():
+                    kw[k] = v
+                cb = fig.colorbar(
+                    cbar,
+                    ax=cax,
+                    **kw,
+                )
+                cb.outline.set_linewidth(0.0)
+                cb.ax.tick_params(
+                    labelsize="xx-small",
+                    pad=1,
+                    length=2,
+                    width=1,
+                )
+
+            def add_ticks(ax, sim):
+                # ticks, ticklabels = zip(
+                #     *[(t + 0.5, str(t)) for t in range(sim.shape[1], sim.shape[0], 5)]
+                # )
+                # ax.set_yticks(ticks, labels=ticklabels, fontsize="xx-small")
+                # ticks, ticklabels = zip(
+                #     *[(t + 0.5, str(t)) for t in range(0, sim.shape[1], 5)]
+                # )
+                # ax.set_xticks(ticks, labels=ticklabels, fontsize="xx-small")
+
+                ax.tick_params(
+                    axis="both",
+                    which="major",
+                    bottom=True,
+                    left=True,
+                    length=2,
+                    width=1,
+                )
+
+            for ri, m in enumerate(rows):
+                sims, norm, mask = similarities[m], norms[m], masks[m]
+                for ci, g in enumerate(generations):
+                    ax = axes[ri, ci]
+                    if ci < len(sims):
+                        sns.heatmap(
+                            sims[ci][sims[ci].shape[1] :, :],
+                            # mask=mask,
+                            cmap=cmap,
+                            norm=norm,
+                            ax=ax,
+                            **heatmap_kw,
+                        )
+                        add_ticks(ax, sims[ci])
+                    else:
+                        ax.set_axis_off()
+
+                    ax.set_title(m if ri > 0 else f"Generation {g}\n{m}")
+
+                    # if ri == nrows - 1:
+                    #     ax.set_xlabel(f"Generation {g}", fontsize="medium")
+
+                add_cbar(axes[ri, :], norm, location="left", pad=0.0175)
+
+                if ri < len(side_methods):
+                    sm = side_methods[ri]
+                    sims, norm, mask = similarities[sm], norms[sm], masks[sm]
+
+                    ax = axes[ri, -1]
+                    sns.heatmap(
+                        sims[0][sims[0].shape[1] :, :],
+                        # mask=mask,
+                        cmap=cmap,
+                        norm=norm,
+                        ax=ax,
+                        **heatmap_kw,
+                    )
+                    add_ticks(ax, sims[0])
+
+                    ax.set_title(sm)
+
+                    add_cbar(axes[ri, :], norm, location="right", pad=0.005)
+
+            if len(side_methods) > 0:
+                ptl = axes[0, -2].get_position()
+                ptr = axes[0, -1].get_position()
+                pbl = axes[-1, -2].get_position()
+                yr = ptl.y1 - pbl.y0
+                p = 0.01
+
+                x = (ptl.x1 + ptr.x0) / 2
+                fig.add_artist(
+                    Line2D(
+                        [x, x],
+                        [pbl.y0 - p * yr, ptl.y1 + p * yr],
+                        transform=fig.transFigure,
+                        color="black",
+                        lw=2,
+                    )
+                )
+
+            pdir = odir / f"lts{f'_run{run:03d}' if isinstance(run, int) else ''}"
+            pdir.mkdir(parents=True, exist_ok=True)
+            fig.savefig(
+                pdir / f"""lts_{quote(problem, safe=' (){}$_+-"')}.pdf""",
+                dpi=600,
+                bbox_inches="tight",
+                transparent=True,
+            )
+
+            plt.close(fig)
+
+
+def analyze_subset_stats2(
+    conn,
+    odir,
+    problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))",
+    max_generation: int = 20,
+    runs=(0, "avg"),
+    cmap="Blues",
+    # where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|wVIG|static|Random|peter).*'",
+    # side_methods=(
+    #     "Node / Node (static)",
+    #     "Node / Node (static)",
+    #     "Node / Node (static)",
+    # ),
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|wVIG|static).*'",
+    side_methods=("Random", "#Common Subfunctions", "Node / Node (static)"),
+):
+    def fmt_name(name):
+        rm = re.match(r"^GP-GOMEA \((.+)\)$", name)
+        n = rm.group(1) if rm else name
+        n = method2name(n)
+        return "Node / Node (static)" if n == "Node" else n
+
+    problems = sorted(
+        [
+            p
+            for p, *_ in conn.sql(
+                f"SELECT DISTINCT({problem_query}) FROM fos_stats WHERE {where_query}"
+            ).fetchall()
+        ]
+    )
+
+    for run in runs:
+        for problem in problems:
+            methods = sorted(
+                [
+                    m
+                    for m, *_ in conn.execute(
+                        f"SELECT DISTINCT(method_name) FROM fos_stats WHERE {problem_query} = $1 AND {where_query}",
+                        [problem],
+                    ).fetchall()
+                ]
+            )
+
+            generations = sorted(
+                [
+                    g
+                    for g, *_ in conn.execute(
+                        f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1 AND {where_query} AND generation::UINTEGER <= $2",
+                        [problem, max_generation],
+                    ).fetchall()
+                ]
+            )
+
+            masks = {}
+            norms = {}
+            similarities = {}
+            n2m = {}
+            for method in methods:
+                n = fmt_name(method)
+                n2m[n] = method
+
+                run_query = "true"
+                if isinstance(run, int):
+                    target_run = [
+                        r
+                        for r, *_ in conn.execute(
+                            f"SELECT DISTINCT(format('{{}}.{{}}', fold, seed)) AS run FROM fos_stats WHERE {problem_query} = $1 AND {where_query} AND generation::UINTEGER <= $2 AND method_name = $3",
+                            [problem, max_generation, method],
+                        ).fetchall()
+                    ][run]
+                    run_query = f"format('{{}}.{{}}', fold, seed) = '{target_run}'"
+
+                sims = []
+                for _, generation in enumerate(generations):
+                    stats = conn.execute(
+                        f"""
+                        SELECT
+                            population_size,
+                            cluster,
+                            similarity,
+                            subsets,
+                            usage_count,
+                            evaluation_rate,
+                            acceptance_rate,
+                            avg_improvement,
+                            solution_activation_rate,
+                            variables_activation_rate,
+                            format('{{}}.{{}}', fold, seed) as run
+                        FROM fos_stats
+                        WHERE
+                            {problem_query} = $1
+                            AND method_name = $2
+                            AND generation = $3
+                            AND {where_query}
+                            AND {run_query}
+                        ORDER BY run
+                        """,
+                        [problem, method, generation],
+                    ).df()
+
+                    if len(stats) == 0:
+                        continue
+
+                    _similarities = [
+                        np.array([r.tolist() for r in s]) for s in (stats["similarity"])
+                    ]
+                    if len(_similarities) < 1:
+                        continue
+                    avg_similarity = _similarities[0]
+                    for s in _similarities[1:]:
+                        avg_similarity += s
+                    avg_similarity /= len(_similarities)
+                    sims.append(avg_similarity)
+                similarities[n] = sims
+
+                vmin, vmax = np.inf, -np.inf
+                masks[n] = np.eye(sims[0].shape[0], dtype=np.bool_)
+                ix = ~masks[n]
+                for s in sims:
+                    vmin = min(vmin, np.min(s[ix]))
+                    vmax = max(vmax, np.max(s[ix]))
+
+                norms[n] = Normalize(vmin=vmin, vmax=vmax)
+
+            # print([m for _m in methods if (m := fmt_name(_m)) not in side_methods])
+            rows = sorted(
+                [m for _m in methods if (m := fmt_name(_m)) not in side_methods],
+                key=lambda m: m_order.get(m, np.inf),
+            )
+            assert len(side_methods) <= len(rows)
+
+            nrows = len(rows)
+            ncols = len(generations) + int(len(side_methods) > 0)
+            fig, axes = plt.subplots(
+                nrows=nrows,
+                ncols=ncols,
+                sharex=True,
+                sharey=True,
+                figsize=(ncols * 4, nrows * 3),
+                gridspec_kw=dict(wspace=0.1, hspace=0.1),
+            )
+
+            heatmap_kw = dict(
+                square=True,
+                linewidths=0,
+                cbar=False,
+            )
+
+            def add_cbar(cax, norm, **kwargs):
+                cbar = cm.ScalarMappable(cmap=cmap, norm=norm)
+                kw = dict(
+                    shrink=0.6,
+                    aspect=30,
+                    drawedges=False,
+                )
+                for k, v in kwargs.items():
+                    kw[k] = v
+                cb = fig.colorbar(
+                    cbar,
+                    ax=cax,
+                    **kw,
+                )
+                cb.outline.set_linewidth(0.0)
+                cb.ax.tick_params(
+                    labelsize="xx-small",
+                    pad=1,
+                    length=2,
+                    width=1,
+                )
+
+            def add_ticks(ax, sim):
+                ticks, ticklabels = zip(
+                    *[(t + 0.5, str(t)) for t in range(0, sim.shape[0], 5)]
+                )
+                ax.set_xticks(ticks, labels=ticklabels, fontsize="xx-small")
+                ax.set_yticks(ticks, labels=ticklabels, fontsize="xx-small")
+                ax.tick_params(
+                    axis="both",
+                    which="major",
+                    bottom=True,
+                    left=True,
+                    length=2,
+                    width=1,
+                )
+
+            for ri, m in enumerate(rows):
+                sims, norm, mask = similarities[m], norms[m], masks[m]
+                for ci, g in enumerate(generations):
+                    ax = axes[ri, ci]
+                    if ci < len(sims):
+                        sns.heatmap(
+                            sims[ci],
+                            mask=mask,
+                            cmap=cmap,
+                            norm=norm,
+                            ax=ax,
+                            **heatmap_kw,
+                        )
+                        add_ticks(ax, sims[ci])
+                    else:
+                        ax.set_axis_off()
+
+                    ax.set_title(m if ri > 0 else f"Generation {g}\n{m}")
+
+                    # if ri == nrows - 1:
+                    #     ax.set_xlabel(f"Generation {g}", fontsize="medium")
+
+                add_cbar(axes[ri, :], norm, location="left", pad=0.0175)
+
+                if ri < len(side_methods):
+                    sm = side_methods[ri]
+                    sims, norm, mask = similarities[sm], norms[sm], masks[sm]
+
+                    ax = axes[ri, -1]
+                    sns.heatmap(
+                        sims[0],
+                        mask=mask,
+                        cmap=cmap,
+                        norm=norm,
+                        ax=ax,
+                        **heatmap_kw,
+                    )
+                    add_ticks(ax, sims[0])
+
+                    ax.set_title(sm)
+
+                    add_cbar(axes[ri, :], norm, location="right", pad=0.005)
+
+            if len(side_methods) > 0:
+                ptl = axes[0, -2].get_position()
+                ptr = axes[0, -1].get_position()
+                pbl = axes[-1, -2].get_position()
+                yr = ptl.y1 - pbl.y0
+                p = 0.01
+
+                x = (ptl.x1 + ptr.x0) / 2
+                fig.add_artist(
+                    Line2D(
+                        [x, x],
+                        [pbl.y0 - p * yr, ptl.y1 + p * yr],
+                        transform=fig.transFigure,
+                        color="black",
+                        lw=2,
+                    )
+                )
+
+            pdir = (
+                odir / f"similarities{f'_run{run:03d}' if isinstance(run, int) else ''}"
+            )
+            pdir.mkdir(parents=True, exist_ok=True)
+            fig.savefig(
+                pdir
+                / f"""similarities_{quote(problem.lower().replace(" ", "-"), safe=' (){}$_+-"')}.pdf""",
+                dpi=600,
+                bbox_inches="tight",
+                transparent=True,
+            )
+
+            plt.close(fig)
+
+
 def analyze_subset_stats(
     conn,
     odir,
     problem_query="format('{}{}', problem_name, IF(linear_scaling, ' LS', ''))",
-    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|Random).*'",
+    where_query: str = r"method_name NOT SIMILAR TO '.*(\*|any|all|wVIG).*'",
+    max_generation: int = 20,
+    side_methods=("Random", "Fun", "Node"),
 ):
     print(conn.sql("DESCRIBE fos_stats;"))
 
@@ -322,14 +889,15 @@ def analyze_subset_stats(
                     [
                         g
                         for g, *_ in conn.execute(
-                            f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1 AND {where_query}",
-                            [problem],
+                            f"SELECT DISTINCT(generation::UINTEGER) FROM fos_stats WHERE {problem_query} = $1 AND {where_query} AND generation::UINTEGER <= $2",
+                            [problem, max_generation],
                         ).fetchall()
                     ]
                 )
 
                 nrows = int(np.ceil(len(methods) / 2))
-                ncols = len(generations)
+                ngens = len(generations)
+                ncols = ngens + +int(len(side_methods) > 0)
                 fig, axes = plt.subplots(
                     nrows=nrows,
                     ncols=ncols,
@@ -651,11 +1219,12 @@ def main():
     #     # max_workers=44,
     # )
 
+    preprocess = False
     with load_results(
         LOG_DIR,
         file_pattern="stats",
         # enable pre-processing the .csv logs into .parquet files
-        # preprocess=True,
+        preprocess=preprocess,
         parquet_dir=PARQUET_DIR / "stats",
     ) as conn:
         load_results(
@@ -675,7 +1244,7 @@ def main():
                 variables_activation_rate="DOUBLE[]",
             ),
             # enable pre-processing the .csv logs into .parquet files
-            preprocess=True,
+            preprocess=preprocess,
             parquet_dir=PARQUET_DIR / "fos_stats",
             conn=conn,
         )
@@ -683,7 +1252,9 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
         with sns.axes_style("white"):
-            analyze_subset_stats(conn, PLOT_DIR / "stats")
+            # analyze_subset_stats3(conn, PLOT_DIR / "linkage_trees")
+            analyze_subset_stats2(conn, PLOT_DIR / "stats")
+            # analyze_subset_stats(conn, PLOT_DIR / "stats")
 
         exit()
         plot_convergence_so(
