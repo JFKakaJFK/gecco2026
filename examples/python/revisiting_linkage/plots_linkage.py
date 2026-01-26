@@ -41,7 +41,7 @@ matplotlib.rcParams["ps.fonttype"] = 42
 
 
 RESULT_DIR = pathlib.Path("results") / "linkage"  #  "linkage_wrong_init"
-# RESULT_DIR = pathlib.Path("results") / "linkage_extended"
+RESULT_DIR = pathlib.Path("results") / "linkage_extended"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
@@ -1979,7 +1979,7 @@ def main():
         # )
 
         # custom_cmp_plot2(conn, PLOT_DIR, method_where_query=where_query)
-        custom_cmp_plot(conn, PLOT_DIR, method_where_query=where_query)
+        # custom_cmp_plot(conn, PLOT_DIR, method_where_query=where_query)
 
         # custom_problem_plot(
         #     conn,
@@ -1989,15 +1989,15 @@ def main():
         #     hscale=15 / 2,
         #     legend_pos=(0.5, 0.03),
         # )
-        # custom_interval_plot(
-        #     conn,
-        #     PLOT_DIR,
-        #     include_operator_set=True,
-        #     show_test_acc=False,
-        #     wscale=7,
-        #     hscale=7,
-        #     legend_pos=(0.5, 0.03),
-        # )
+        custom_interval_plot(
+            conn,
+            PLOT_DIR,
+            include_operator_set=True,
+            show_test_acc=False,
+            wscale=7,
+            hscale=8,
+            legend_pos=(0.5, 0.03),
+        )
 
         exit()
 
