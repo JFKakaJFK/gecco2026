@@ -1,6 +1,7 @@
 #pragma once
-#include <memory>
-#include "fitness.h"
+#include <typeindex>
+#include <unordered_map>
+#include <unordered_set>
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
 
@@ -9,6 +10,7 @@
 #include <cmath>
 #include <concepts>
 #include <cstdint>
+#include <memory>
 #include <cstdlib>
 #include <functional>
 #include <optional>
@@ -152,20 +154,27 @@ class SolutionDataBase {
 class SolutionBase {
  public:
 
-  // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
-  virtual QualityBase& quality() = 0;
-  virtual const QualityBase& quality() const = 0;
+  // // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
+  // virtual QualityBase& quality() = 0;
+  // virtual const QualityBase& quality() const = 0;
 
-  // needed to allow placement
-  virtual void set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
-  virtual void assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
+  // // needed to allow placement
+  // virtual void set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
+  // virtual void assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
 
-  // read/write access to existing additions
-  virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
-  virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
-  // addition/deletion of data members
-  virtual void add_data(std::unique_ptr<SolutionDataBase> data) = 0;
-  virtual void remove_data_at(usize idx) = 0;
+  // // read/write access to existing additions
+  // virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
+  // virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
+  // // addition/deletion of data members
+  // virtual void add_data(std::unique_ptr<SolutionDataBase> data) = 0;
+  // virtual void remove_data_at(usize idx) = 0;
+  // virtual std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>> data() {
+  //     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
+  // };
+
+  virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
+      return std::vector<std::unique_ptr<SolutionDataBase>>{};
+  };
 
   // existing fields ...
 

@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -380,6 +381,9 @@ class MOFitness final : public ArchiveFitnessBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/solution.h included by goblin.h                                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <typeindex>
+#include <unordered_map>
+#include <unordered_set>
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
 
@@ -507,8 +511,41 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
+class SolutionDataBase {
+    public:
+
+    virtual std::unique_ptr<SolutionDataBase> clone() const = 0;
+
+    virtual ~SolutionDataBase() = default;
+};
+
 class SolutionBase {
  public:
+
+  // // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
+  // virtual QualityBase& quality() = 0;
+  // virtual const QualityBase& quality() const = 0;
+
+  // // needed to allow placement
+  // virtual void set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
+  // virtual void assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
+
+  // // read/write access to existing additions
+  // virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
+  // virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
+  // // addition/deletion of data members
+  // virtual void add_data(std::unique_ptr<SolutionDataBase> data) = 0;
+  // virtual void remove_data_at(usize idx) = 0;
+  // virtual std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>> data() {
+  //     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
+  // };
+
+  virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
+      return std::vector<std::unique_ptr<SolutionDataBase>>{};
+  };
+
+  // existing fields ...
+
   virtual Quality& quality() = 0;
   virtual const Quality& quality() const = 0;
 
@@ -3919,6 +3956,7 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/ims.h continued                                                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4158,6 +4196,7 @@ class IMS final : public MethodBase {
 
 #include <variant>
 
+
 namespace goblin {
 
 class InitBase {
@@ -4299,11 +4338,13 @@ class CompleteInit final : public DiscreteInitBase {
 
 #endif /* _GOBLIN_LIB_INIT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INSTANCE_H
 #define _GOBLIN_GP_INSTANCE_H
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
@@ -4314,17 +4355,23 @@ class CompleteInit final : public DiscreteInitBase {
 #include <iterator>
 #include <ranges>
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h included by goblin/gp/context.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/template.h included by goblin/gp/operator.h                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_TEMPLATE_H
 #define _GOBLIN_GP_TEMPLATE_H
+
+
 
 namespace goblin {
 struct TemplateNode {
@@ -4470,6 +4517,7 @@ struct Template {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -4999,6 +5047,7 @@ class OpMax : public OperatorBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_OPERATOR_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h continued                                                          //
@@ -5788,6 +5837,7 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5810,6 +5860,8 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
+
+
 
 namespace goblin {
 
@@ -6385,8 +6437,10 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
+
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
+
 
 namespace goblin {
 
@@ -6719,11 +6773,13 @@ class SRProblem : public GPInstanceBase {
 
 #endif /* _GOBLIN_GP_SR_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
+
 
 namespace goblin {
 
@@ -6765,7 +6821,9 @@ class ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
+
 #include <numbers>
+
 
 // TODO
 // - [ ] Permute (scramble arguments to function, either fixed or random perm)
@@ -7338,6 +7396,7 @@ class Repeat final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
+
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -7573,6 +7632,8 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
+
+
 namespace goblin {
 
 class Sphere final : public ObjectiveBase {
@@ -7752,6 +7813,8 @@ class CirclesInASquare final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 #define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 
+
+
 namespace goblin {
 
 class LeadingSpheres final : public ObjectiveBase {
@@ -7803,6 +7866,8 @@ class LeadingSpheres final : public ObjectiveBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_PROBLEM_H
 #define _GOBLIN_BENCH_PROBLEM_H
+
+
 
 namespace goblin {
 
@@ -8092,11 +8157,15 @@ class BenchmarkInstance final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -8218,11 +8287,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8580,6 +8652,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8675,14 +8750,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9990,6 +10069,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11391,6 +11471,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
