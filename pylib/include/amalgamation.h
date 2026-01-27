@@ -511,16 +511,76 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
+struct ExtensionKey {
+    void* token = nullptr;
+
+    bool operator==(const ExtensionKey& other) const noexcept {
+        return token == other.token;
+    }
+};
+
+struct ExtensionKeyHash {
+    usize operator()(const ExtensionKey& key) const noexcept {
+        return std::hash<const void*>{}(key.token);
+    };
+};
+
+
+
+
 class SolutionDataBase {
     public:
 
+    // SolutionDataBase() = default;
+    // SolutionDataBase(const SolutionDataBase&) = default;
+    // SolutionDataBase(SolutionDataBase&&) = default;
+
+    SolutionDataBase& operator=(const SolutionDataBase&) = delete;
+    SolutionDataBase& operator=(SolutionDataBase&&) = delete;
+
     virtual std::unique_ptr<SolutionDataBase> clone() const = 0;
+    virtual ExtensionKey key() const = 0;
 
     virtual ~SolutionDataBase() = default;
 };
 
+// Use CRTP to automatically add keys to each subclass...
+template<typename Derived>
+class SolutionData: public SolutionDataBase {
+    public:
+    static ExtensionKey type_key() {
+        static void* anchor = nullptr;
+        return {&anchor};
+    };
+
+    ExtensionKey key() const override {
+        return type_key();
+    };
+};
+
 class SolutionBase {
  public:
+
+ // doesn't work since nanobind generates a copy instead of a move of this pointer...
+ // virtual void set_data(std::unique_ptr<SolutionDataBase> data) {
+ virtual void set_data(const SolutionDataBase& data) {
+
+ };
+
+ virtual std::optional<std::reference_wrapper<SolutionDataBase>> get_data(const ExtensionKey& key) const {
+     // throw std::runtime_error("");
+     // return nullptr;
+     return std::nullopt;
+ };
+
+ virtual void set_quality(const Quality& quality){
+
+ };
+
+ // Exposing the map directly doesn't seem to work with litgen/nanobind
+ // virtual std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash> data() {
+ //     return std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash>{};
+ // };
 
   // // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
   // virtual QualityBase& quality() = 0;
@@ -540,9 +600,9 @@ class SolutionBase {
   //     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
   // };
 
-  virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
-      return std::vector<std::unique_ptr<SolutionDataBase>>{};
-  };
+  // virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
+  //     return std::vector<std::unique_ptr<SolutionDataBase>>{};
+  // };
 
   // existing fields ...
 

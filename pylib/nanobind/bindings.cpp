@@ -153,13 +153,20 @@ namespace goblin {
 class SolutionDataBase_trampoline : public SolutionDataBase
 {
 public:
-    NB_TRAMPOLINE(SolutionDataBase, 1);
+    NB_TRAMPOLINE(SolutionDataBase, 2);
 
     std::unique_ptr<goblin::SolutionDataBase> clone() const override
     {
         NB_OVERRIDE_PURE_NAME(
             "clone", // function name (python)
             clone // function name (c++)
+        );
+    }
+    goblin::ExtensionKey key() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "key", // function name (python)
+            key // function name (c++)
         );
     }
 };
@@ -170,13 +177,30 @@ namespace goblin {
 class SolutionBase_trampoline : public SolutionBase
 {
 public:
-    NB_TRAMPOLINE(SolutionBase, 12);
+    NB_TRAMPOLINE(SolutionBase, 14);
 
-    std::vector<std::unique_ptr<goblin::SolutionDataBase>> data() override
+    void set_data(const goblin::SolutionDataBase & data) override
     {
         NB_OVERRIDE_NAME(
-            "data", // function name (python)
-            data // function name (c++)
+            "set_data", // function name (python)
+            set_data, // function name (c++)
+            data // params
+        );
+    }
+    std::optional<std::reference_wrapper<goblin::SolutionDataBase>> get_data(const goblin::ExtensionKey & key) const override
+    {
+        NB_OVERRIDE_NAME(
+            "get_data", // function name (python)
+            get_data, // function name (c++)
+            key // params
+        );
+    }
+    void set_quality(const goblin::Quality & quality) override
+    {
+        NB_OVERRIDE_NAME(
+            "set_quality", // function name (python)
+            set_quality, // function name (c++)
+            quality // params
         );
     }
     goblin::Quality & quality() override
@@ -1270,12 +1294,33 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
+  auto pyClassExtensionKey =
+      nb::class_<goblin::ExtensionKey>
+          (m, "ExtensionKey", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def_rw("token", &goblin::ExtensionKey::token, "")
+      .def("__eq__",
+          &goblin::ExtensionKey::operator==, nb::arg("other"))
+      ;
+
+
+  auto pyClassExtensionKeyHash =
+      nb::class_<goblin::ExtensionKeyHash>
+          (m, "ExtensionKeyHash", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("__call__",
+          &goblin::ExtensionKeyHash::operator(), nb::arg("key"))
+      ;
+
+
   auto pyClassSolutionDataBase =
       nb::class_<goblin::SolutionDataBase, goblin::SolutionDataBase_trampoline>
           (m, "SolutionDataBase", "")
       .def(nb::init<>()) // implicit default constructor
       .def("clone",
           &goblin::SolutionDataBase::clone)
+      .def("key",
+          &goblin::SolutionDataBase::key)
       ;
 
 
@@ -1283,8 +1328,14 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::SolutionBase, goblin::SolutionBase_trampoline>
           (m, "SolutionBase", "")
       .def(nb::init<>()) // implicit default constructor
-      .def("data",
-          &goblin::SolutionBase::data)
+      .def("set_data",
+          &goblin::SolutionBase::set_data,
+          nb::arg("data"),
+          " doesn't work since nanobind generates a copy instead of a move of this pointer...\n virtual None set_data(std::unique_ptr<SolutionDataBase> data) {")
+      .def("get_data",
+          &goblin::SolutionBase::get_data, nb::arg("key"))
+      .def("set_quality",
+          &goblin::SolutionBase::set_quality, nb::arg("quality"))
       .def("quality",
           [](goblin::SolutionBase & self) { return self.quality(); })
       .def("quality",

@@ -230,8 +230,34 @@ class Subset:
         """Auto-generated default constructor with named params"""
         pass
 
+class ExtensionKey:
+    token: Any = None
+
+    def __eq__(self, other: ExtensionKey) -> bool:
+        pass
+
+    def __init__(self) -> None:
+        """Auto-generated default constructor"""
+        pass
+
+class ExtensionKeyHash:
+    def __call__(self, key: ExtensionKey) -> int:
+        pass
+
+    def __init__(self) -> None:
+        """Auto-generated default constructor"""
+        pass
+
 class SolutionDataBase:
+
+    # SolutionDataBase() = default;
+    # SolutionDataBase(const SolutionDataBase&) = default;
+    # SolutionDataBase(SolutionDataBase&&) = default;
+
     def clone(self) -> SolutionDataBase:  # overridable (pure virtual)
+        pass
+
+    def key(self) -> ExtensionKey:  # overridable (pure virtual)
         pass
 
     def __init__(self) -> None:
@@ -239,6 +265,23 @@ class SolutionDataBase:
         pass
 
 class SolutionBase:
+    def set_data(self, data: SolutionDataBase) -> None:  # overridable
+        """doesn't work since nanobind generates a copy instead of a move of this pointer...
+        virtual None set_data(std::unique_ptr<SolutionDataBase> data) {
+        """
+        pass
+
+    def get_data(  # overridable
+        self, key: ExtensionKey
+    ) -> Optional[std.reference_wrapper[SolutionDataBase]]:
+        pass
+
+    def set_quality(self, quality: Quality) -> None:  # overridable
+        pass
+    # Exposing the map directly doesn't seem to work with litgen/nanobind
+    # virtual std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash> data() {
+    #     return std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash>{};
+    # };
 
     # // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
     # virtual QualityBase& quality() = 0;
@@ -258,8 +301,10 @@ class SolutionBase:
     #     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
     # };
 
-    def data(self) -> List[SolutionDataBase]:  # overridable
-        pass
+    # virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
+    #     return std::vector<std::unique_ptr<SolutionDataBase>>{};
+    # };
+
     # existing fields ...
 
     @overload
