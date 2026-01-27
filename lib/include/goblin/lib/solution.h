@@ -3,6 +3,7 @@
 #include <typeindex>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
 
@@ -144,100 +145,69 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
-struct ExtensionKey {
-    void* token = nullptr;
+struct SolutionExtensionKey {
+  void* token = nullptr;
 
-    bool operator==(const ExtensionKey& other) const noexcept {
-        return token == other.token;
-    }
+  bool operator==(const SolutionExtensionKey& other) const noexcept { return token == other.token; }
+
+  bool operator!=(const SolutionExtensionKey& other) const noexcept { return token != other.token; }
 };
 
-struct ExtensionKeyHash {
-    usize operator()(const ExtensionKey& key) const noexcept {
-        return std::hash<const void*>{}(key.token);
-    };
+struct SolutionExtensionKeyHash {
+  usize operator()(const SolutionExtensionKey& key) const noexcept { return std::hash<void*>{}(key.token); };
 };
 
+class SolutionExtensionBase {
+ public:
+  // SolutionExtensionBase(const SolutionExtensionBase&) = delete;
+  // SolutionExtensionBase(SolutionExtensionBase&&) = delete;
 
+  // SolutionExtensionBase& operator=(const SolutionExtensionBase&) = delete;
+  // SolutionExtensionBase& operator=(SolutionExtensionBase&&) = delete;
 
+  virtual std::unique_ptr<SolutionExtensionBase> clone() const = 0;
+  virtual SolutionExtensionKey key() const = 0;
 
-class SolutionDataBase {
-    public:
+  operator SolutionExtensionKey() const { return key(); }
 
-    // SolutionDataBase() = default;
-    // SolutionDataBase(const SolutionDataBase&) = default; // nope
-    // SolutionDataBase(SolutionDataBase&&) = default; // nope
-
-    SolutionDataBase& operator=(const SolutionDataBase&) = delete;
-    SolutionDataBase& operator=(SolutionDataBase&&) = delete;
-
-    virtual std::unique_ptr<SolutionDataBase> clone() const = 0;
-    virtual ExtensionKey key() const = 0;
-
-    virtual ~SolutionDataBase() = default;
+  virtual ~SolutionExtensionBase() = default;
 };
 
-// Use CRTP to automatically add keys to each subclass...
-template<typename Derived>
-class SolutionData: public SolutionDataBase {
-    public:
-    static ExtensionKey type_key() {
-        static void* anchor = nullptr;
-        return {&anchor};
-    };
+// Use CRTP to automatically add type (NOT instance) specific keys
+template <typename Derived>
+struct SolutionExtension : public SolutionExtensionBase {
+  static SolutionExtensionKey type_key() {
+    static u32 anchor{};
+    return {&anchor};
+  };
 
-    ExtensionKey key() const override {
-        return type_key();
-    };
+  SolutionExtensionKey key() const override { return type_key(); };
 };
 
 class SolutionBase {
  public:
+  virtual bool has_extension(const SolutionExtensionKey& key) const = 0;
+  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0;
+  virtual std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) const = 0;
+  virtual std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) = 0;
+  virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
+  virtual void clear_extensions() = 0;
 
- // doesn't work since nanobind generates a copy instead of a move of this pointer...
- // virtual void set_data(std::unique_ptr<SolutionDataBase> data) {
- virtual void set_data(const SolutionDataBase& data) {
+  virtual usize num_extensions() const = 0;
+  virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
+  virtual std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() = 0;
 
- };
+  virtual void assign_quality(const Quality& quality) {
 
- virtual std::optional<std::reference_wrapper<SolutionDataBase>> get_data(const ExtensionKey& key) const {
-     // throw std::runtime_error("");
-     // return nullptr;
-     return std::nullopt;
- };
+  };
 
- virtual void set_quality(const Quality& quality){
-
- };
-
- // Exposing the map directly doesn't seem to work with litgen/nanobind
- // virtual std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash> data() {
- //     return std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash>{};
- // };
-
-  // // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
-  // virtual QualityBase& quality() = 0;
-  // virtual const QualityBase& quality() const = 0;
-
-  // // needed to allow placement
-  // virtual void set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
-  // virtual void assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
-
-  // // read/write access to existing additions
-  // virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
-  // virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
-  // // addition/deletion of data members
-  // virtual void add_data(std::unique_ptr<SolutionDataBase> data) = 0;
-  // virtual void remove_data_at(usize idx) = 0;
-  // virtual std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>> data() {
-  //     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
+  // Exposing the map directly doesn't seem to work with litgen/nanobind
+  // virtual std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>
+  // data() {
+  //     return std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>{};
   // };
-
-  // virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
-  //     return std::vector<std::unique_ptr<SolutionDataBase>>{};
-  // };
-
-  // existing fields ...
 
   virtual Quality& quality() = 0;
   virtual const Quality& quality() const = 0;
@@ -266,6 +236,11 @@ class SolutionBase {
 
       continuous_values() = other.continuous_values();
       continuous_active() = other.continuous_active();
+
+      clear_extensions();
+      for (const auto& e : other.extensions()) {
+        get_or_insert_extension(e);
+      }
 
       quality() = other.quality();
     }
@@ -368,6 +343,7 @@ class SolutionBase {
   virtual ~SolutionBase() {};
 };
 
+
 class Solution : public SolutionBase {
  public:
   Solution(Quality quality,
@@ -387,12 +363,70 @@ class Solution : public SolutionBase {
     }
   }
 
+  Solution(const Solution& other)
+      : _discrete_values(other.discrete_values()),
+        _discrete_active(other.discrete_active()),
+        _continuous_values(other.continuous_values()),
+        _continuous_active(other.continuous_active()),
+        _quality(other.quality()) {
+    _extensions.clear();
+    for (const auto& e : other.extensions()) {
+      _extensions.push_back(e.get().clone());
+    }
+  };
+  Solution(Solution&& other)
+      : _discrete_values(std::move(other._discrete_values)),
+        _discrete_active(std::move(other._discrete_active)),
+        _continuous_values(std::move(other._continuous_values)),
+        _continuous_active(std::move(other._continuous_active)),
+        _extensions(std::move(other._extensions)),
+        _quality(std::move(other._quality)) {};
+
+  Solution& operator=(const Solution& other) {
+    if (&other != this) {
+      __goblin_runtime_assert(other.num_discrete() == num_discrete());
+      __goblin_runtime_assert(other.num_continuous() == num_continuous());
+
+      discrete_values() = other.discrete_values();
+      discrete_active() = other.discrete_active();
+
+      continuous_values() = other.continuous_values();
+      continuous_active() = other.continuous_active();
+
+      clear_extensions();
+      for (const auto& e : other.extensions()) {
+        get_or_insert_extension(e);
+      }
+
+      quality() = other.quality();
+    }
+    return *this;
+  }
+
+  Solution& operator=(Solution&& other) {
+    _discrete_values = std::move(other._discrete_values);
+    _discrete_active = std::move(other._discrete_active);
+    _continuous_values = std::move(other._continuous_values);
+    _continuous_active = std::move(other._continuous_active);
+    _extensions = std::move(other._extensions);
+    _quality = std::move(other._quality);
+
+    return *this;
+  }
+
+  // explicit
   Solution(const SolutionBase& s)
       : _discrete_values(s.discrete_values()),
         _discrete_active(s.discrete_active()),
         _continuous_values(s.continuous_values()),
         _continuous_active(s.continuous_active()),
-        _quality(s.quality()) {};
+        _quality(s.quality()) {
+    // *this = s;
+    _extensions.clear();
+    for (const auto& e : s.extensions()) {
+      _extensions.push_back(e.get().clone());
+    }
+  };
 
   Quality& quality() override final { return _quality; }
   const Quality& quality() const override final { return _quality; }
@@ -407,11 +441,75 @@ class Solution : public SolutionBase {
   RefS<Active> continuous_active() override final { return _continuous_active; }
   CRefS<Active> continuous_active() const override final { return _continuous_active; }
 
+  bool has_extension(const SolutionExtensionKey& key) const override final {
+    for (auto& e : _extensions) {
+      if ((*e).key() == key) {
+        return true;
+      }
+    }
+    return false;
+  };
+  SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) override final {
+    for (auto& e : _extensions) {
+      if ((*e).key() == extension.key()) {
+        return *e;
+      }
+    }
+    _extensions.push_back(extension.clone());
+    return *_extensions.back();
+  };
+  std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) const override final {
+    for (const auto& e : _extensions) {
+      if ((*e).key() == key) {
+        return *e;
+      }
+    }
+    return std::nullopt;
+  };
+  std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) override final {
+    for (auto& e : _extensions) {
+      if ((*e).key() == key) {
+        return *e;
+      }
+    }
+    return std::nullopt;
+  };
+  bool remove_extension(const SolutionExtensionKey& key) override final {
+    for (usize i = 0; i < _extensions.size(); i++) {
+      if ((*_extensions[i]).key() == key) {
+        std::swap(_extensions[i], _extensions.back());
+        _extensions.pop_back();
+        return true;
+      }
+    }
+    return false;
+  };
+  void clear_extensions() override final { _extensions.clear(); };
+
+  usize num_extensions() const override final { return _extensions.size(); };
+  std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const override final {
+    std::vector<std::reference_wrapper<const SolutionExtensionBase>> exts{};
+    for (const auto& e : _extensions) {
+      exts.push_back(*e);
+    }
+    return exts;
+  };
+  std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() override final {
+    std::vector<std::reference_wrapper<SolutionExtensionBase>> exts{};
+    for (auto& e : _extensions) {
+      exts.push_back(*e);
+    }
+    return exts;
+  };
+
  private:
   Vec<DType> _discrete_values;
   Active _discrete_active;
   Vec<CType> _continuous_values;
   Active _continuous_active;
+  std::vector<std::unique_ptr<SolutionExtensionBase>> _extensions{};
   Quality _quality;
 };
 
@@ -500,6 +598,69 @@ class SolutionHandle : public SolutionBase {
   RefS<Active> continuous_active() override final { return arena->continuous_active.row(idx); }
   CRefS<Active> continuous_active() const override final { return arena->continuous_active.row(idx); }
 
+  bool has_extension(const SolutionExtensionKey& key) const override final {
+    for (auto& e : arena->extensions[idx]) {
+      if ((*e).key() == key) {
+        return true;
+      }
+    }
+    return false;
+  };
+  SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) override final {
+    for (auto& e : arena->extensions[idx]) {
+      if ((*e).key() == extension.key()) {
+        return *e;
+      }
+    }
+    arena->extensions[idx].push_back(extension.clone());
+    return *arena->extensions[idx].back();
+  };
+  std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) const override final {
+    for (const auto& e : arena->extensions[idx]) {
+      if ((*e).key() == key) {
+        return *e;
+      }
+    }
+    return std::nullopt;
+  };
+  std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
+      const SolutionExtensionKey& key) override final {
+    for (auto& e : arena->extensions[idx]) {
+      if ((*e).key() == key) {
+        return *e;
+      }
+    }
+    return std::nullopt;
+  };
+  bool remove_extension(const SolutionExtensionKey& key) override final {
+    for (usize i = 0; i < arena->extensions[idx].size(); i++) {
+      if ((*arena->extensions[idx][i]).key() == key) {
+        std::swap(arena->extensions[idx][i], arena->extensions[idx].back());
+        arena->extensions[idx].pop_back();
+        return true;
+      }
+    }
+    return false;
+  };
+  void clear_extensions() override final { arena->extensions[idx].clear(); };
+
+  usize num_extensions() const override final { return arena->extensions[idx].size(); };
+  std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const override final {
+    std::vector<std::reference_wrapper<const SolutionExtensionBase>> exts{};
+    for (const auto& e : arena->extensions[idx]) {
+      exts.push_back(*e);
+    }
+    return exts;
+  };
+  std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() override final {
+    std::vector<std::reference_wrapper<SolutionExtensionBase>> exts{};
+    for (auto& e : arena->extensions[idx]) {
+      exts.push_back(*e);
+    }
+    return exts;
+  };
+
   SolutionHandle(SoASet<StorageOrder>* arena, usize idx) : arena(arena), idx(idx) {};
 
  private:
@@ -524,6 +685,7 @@ class SoASet : public SolutionSetBase {
         continuous(std::move(other.continuous)),
         discrete_active(std::move(other.discrete_active)),
         continuous_active(std::move(other.continuous_active)),
+        extensions(std::move(other.extensions)),
         quality(std::move(other.quality)) {
     for (auto& h : handles) {
       h.arena = this;
@@ -542,6 +704,7 @@ class SoASet : public SolutionSetBase {
       continuous = std::move(other.continuous);
       discrete_active = std::move(other.discrete_active);
       continuous_active = std::move(other.continuous_active);
+      extensions = std::move(other.extensions);
       quality = std::move(other.quality);
 
       for (auto& h : handles) {
@@ -578,6 +741,7 @@ class SoASet : public SolutionSetBase {
       continuous_active.conservativeResize(new_capacity, _num_continuous);
 
       quality.reserve(new_capacity);
+      extensions.reserve(new_capacity);
 
       handles.reserve(new_capacity);
       for (usize i = _capacity; i < new_capacity; i++) {
@@ -636,6 +800,14 @@ class SoASet : public SolutionSetBase {
       quality[_size] = _s.quality();
     }
 
+    if (extensions.size() == _size) {
+      extensions.emplace_back();
+    }
+    extensions[_size].clear();
+    for (const auto& e : _s.extensions()) {
+      extensions[_size].push_back(e.get().clone());
+    }
+
     _size++;
   }
 
@@ -648,6 +820,7 @@ class SoASet : public SolutionSetBase {
       continuous.row(idx) = continuous.row(_size);
       discrete_active.row(idx) = discrete_active.row(_size);
       continuous_active.row(idx) = continuous_active.row(_size);
+      std::swap(extensions[idx], extensions[_size]);
       quality[idx] = quality[_size];
 
       // ! no need to adjust the handles, but any references to handles may be
@@ -678,6 +851,7 @@ class SoASet : public SolutionSetBase {
   Eigen::Matrix<BType, Eigen::Dynamic, Eigen::Dynamic, StorageOrder> discrete_active;
   Eigen::Matrix<BType, Eigen::Dynamic, Eigen::Dynamic, StorageOrder> continuous_active;
 
+  std::vector<std::vector<std::unique_ptr<SolutionExtensionBase>>> extensions;
   std::vector<Quality> quality;
 };
 

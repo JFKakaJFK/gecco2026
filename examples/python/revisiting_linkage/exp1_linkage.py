@@ -132,16 +132,58 @@ def methods(info, ctx):
     restart_stale_populations = True  # restart the last population if it has converged
 
     for similarity in [  #
-        "$MI$",  # plain MI
-        "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
-        r"$MI_{mask\ inactive}$",  # Mask inactive
-        r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
-        r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
-        "Node",  # Normalized pairwise node proximity
-        "Node (static)",  # same, but first LT is kept throughout
-        r"Node * $MI_{mask\ inactive}$",
-        "Random",  # Random similiarty
+        # "$MI$",  # plain MI
+        # "$MI_{adjusted}$",  # adjusted MI as per https://arxiv.org/pdf/1904.02050
+        # r"$MI_{mask\ inactive}$",  # Mask inactive
+        # r"$MI_{any\ active}$",  # Mask inactive + only consider partially active variables/variable pairs
+        # r"$MI_{all\ active}$",  # Mask inactive + only consider fully active variables
+        # "Node",  # Normalized pairwise node proximity
+        # "Node (static)",  # same, but first LT is kept throughout
+        # r"Node * $MI_{mask\ inactive}$",
+        # "Random",  # Random similiarty
+        # "Node (wVIG)",
+        # "Node (wVIG, static)",
+        "Node (peter)",
+        "Node (peter, static)",
+        "Univariate",
     ]:
+        custom_similarity = None
+        if "Node" in similarity:
+            if "wVIG" in similarity:
+                # S = np.array(ctx.normalized_node_proximity().tolist())
+                # depth = int(np.log2(1 + ctx.num_discrete) - 1)
+                # S = ((S - 1.0) * -(1 + 2 * depth)) # proximity to distance
+                # # print(depth, S, np.where(S > 0, 1.0 / S, 0.0))
+                # S = np.where(S > 0, 1.0 / S, 0.0) # distance as per wVIG
+                # custom_similarity=c.np.array(S.tolist())
+
+                # print(np.array(ctx.normalized_w_vig().tolist()))
+
+                custom_similarity = c.np.array(ctx.normalized_w_vig().tolist())
+            elif "peter" in similarity:
+                # S = np.array(ctx.subtree_co_occurrences().tolist())
+                # import matplotlib.pyplot as plt
+                # import seaborn as sns
+
+                # fig, ax = plt.subplots(figsize=(10, 10))
+                # sns.heatmap(
+                #     S,
+                #     mask=np.eye(S.shape[0], dtype=np.bool_),
+                #     annot=S.shape[0] < 64,
+                #     ax=ax,
+                #     square=True,
+                #     annot_kws=dict(fontsize=("x-small" if S.shape[0] > 7 else None)),
+                #     cmap="Blues",
+                #     cbar=False,
+                # )
+                # ax.grid(visible=False)
+                # fig.savefig(
+                #     f"sim_peter_{ctx.num_discrete}.png", dpi=600, bbox_inches="tight"
+                # )
+
+                custom_similarity = c.np.array(ctx.subtree_co_occurrences().tolist())
+            else:
+                custom_similarity = c.np.array(ctx.normalized_node_proximity().tolist())
         discrete_model_kwargs = dict(
             # linkage learning parameters
             metric="random" if "Random" in similarity else "mi",
@@ -153,9 +195,7 @@ def methods(info, ctx):
             if "active" in similarity
             else "none",
             normalize_initial_linkage_bias="adjusted" in similarity,
-            custom_similarity=c.np.array(ctx.normalized_node_proximity().tolist())
-            if "Node" in similarity
-            else None,
+            custom_similarity=custom_similarity,
             custom_similarity_agg="mul"
             if "*" in similarity
             else (
@@ -174,7 +214,9 @@ def methods(info, ctx):
         yield (
             f'"{similarity}"',
             c.MixedGOMEA(
-                discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
+                discrete_model=c.UnivariateFOS()
+                if similarity == "Univariate"
+                else c.LinkageTreeFOS(**discrete_model_kwargs),
                 population_options=c.PopulationOptions(
                     forced_improvements=False,  # not used per default as per https://arxiv.org/pdf/1904.02050
                 ),
@@ -239,14 +281,14 @@ def status():
 
 
 def main():
-    # status()
-    # exit()
+    status()
+    exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
     # run_tasks(
     #     LOG_DIR,
     #     all_tasks(),
-    #     clean=True,
+    #     # clean=True,
     #     # limit=1,
     #     max_workers=44,  # server has 44 physical cores
     # )

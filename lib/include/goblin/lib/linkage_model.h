@@ -25,6 +25,13 @@
 namespace goblin {
 class LinkageModelBase {
  public:
+  // LinkageModelBase() = default;
+  // LinkageModelBase(const LinkageModelBase&) = delete;
+  // LinkageModelBase(LinkageModelBase&&) = delete;
+
+  // LinkageModelBase& operator=(const LinkageModelBase&) = delete;
+  // LinkageModelBase& operator=(LinkageModelBase&&) = delete;
+
   virtual void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) = 0;
   virtual FOS subsets(Rng& rng,
                       InstanceBase& problem,

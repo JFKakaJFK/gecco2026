@@ -230,34 +230,38 @@ class Subset:
         """Auto-generated default constructor with named params"""
         pass
 
-class ExtensionKey:
+class SolutionExtensionKey:
     token: Any = None
 
-    def __eq__(self, other: ExtensionKey) -> bool:
+    def __eq__(self, other: SolutionExtensionKey) -> bool:
+        pass
+
+    def __ne__(self, other: SolutionExtensionKey) -> bool:
         pass
 
     def __init__(self) -> None:
         """Auto-generated default constructor"""
         pass
 
-class ExtensionKeyHash:
-    def __call__(self, key: ExtensionKey) -> int:
+class SolutionExtensionKeyHash:
+    def __call__(self, key: SolutionExtensionKey) -> int:
         pass
 
     def __init__(self) -> None:
         """Auto-generated default constructor"""
         pass
 
-class SolutionDataBase:
+class SolutionExtensionBase:
+    # SolutionExtensionBase(const SolutionExtensionBase&) = delete;
+    # SolutionExtensionBase(SolutionExtensionBase&&) = delete;
 
-    # SolutionDataBase() = default;
-    # SolutionDataBase(const SolutionDataBase&) = default;
-    # SolutionDataBase(SolutionDataBase&&) = default;
+    # SolutionExtensionBase& operator=(const SolutionExtensionBase&) = delete;
+    # SolutionExtensionBase& operator=(SolutionExtensionBase&&) = delete;
 
-    def clone(self) -> SolutionDataBase:  # overridable (pure virtual)
+    def clone(self) -> SolutionExtensionBase:  # overridable (pure virtual)
         pass
 
-    def key(self) -> ExtensionKey:  # overridable (pure virtual)
+    def key(self) -> SolutionExtensionKey:  # overridable (pure virtual)
         pass
 
     def __init__(self) -> None:
@@ -265,47 +269,58 @@ class SolutionDataBase:
         pass
 
 class SolutionBase:
-    def set_data(self, data: SolutionDataBase) -> None:  # overridable
-        """doesn't work since nanobind generates a copy instead of a move of this pointer...
-        virtual None set_data(std::unique_ptr<SolutionDataBase> data) {
-        """
+    def has_extension(  # overridable (pure virtual)
+        self, key: SolutionExtensionKey
+    ) -> bool:
         pass
 
-    def get_data(  # overridable
-        self, key: ExtensionKey
-    ) -> Optional[std.reference_wrapper[SolutionDataBase]]:
+    def get_or_insert_extension(  # overridable (pure virtual)
+        self, extension: SolutionExtensionBase
+    ) -> SolutionExtensionBase:
         pass
 
-    def set_quality(self, quality: Quality) -> None:  # overridable
+    @overload
+    def get_extension(  # overridable (pure virtual)
+        self, key: SolutionExtensionKey
+    ) -> Optional[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    @overload
+    def get_extension(  # overridable (pure virtual)
+        self, key: SolutionExtensionKey
+    ) -> Optional[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    def remove_extension(  # overridable (pure virtual)
+        self, key: SolutionExtensionKey
+    ) -> bool:
+        pass
+
+    def clear_extensions(self) -> None:  # overridable (pure virtual)
+        pass
+
+    def num_extensions(self) -> int:  # overridable (pure virtual)
+        pass
+
+    @overload
+    def extensions(  # overridable (pure virtual)
+        self,
+    ) -> List[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    @overload
+    def extensions(  # overridable (pure virtual)
+        self,
+    ) -> List[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    def assign_quality(self, quality: Quality) -> None:  # overridable
         pass
     # Exposing the map directly doesn't seem to work with litgen/nanobind
-    # virtual std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash> data() {
-    #     return std::unordered_map<ExtensionKey, std::unique_ptr<SolutionDataBase>, ExtensionKeyHash>{};
+    # virtual std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>
+    # data() {
+    #     return std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>{};
     # };
-
-    # // convenience for reading/writing to the existing one (copy uses this to get to the clone() member)
-    # virtual QualityBase& quality() = 0;
-    # virtual const QualityBase& quality() const = 0;
-
-    # // needed to allow placement
-    # virtual None set_quality(std::unique_ptr<QualityBase> quality) = 0;               // takes ownership
-    # virtual None assign_quality(const std::unique_ptr<QualityBase>& quality) = 0;     // clones
-
-    # // read/write access to existing additions
-    # virtual std::span<const std::unique_ptr<SolutionDataBase>> data() const = 0;
-    # virtual std::span<std::unique_ptr<SolutionDataBase>> data() = 0;
-    # / addition/deletion of data members
-    # virtual None add_data(std::unique_ptr<SolutionDataBase> data) = 0;
-    # virtual None remove_data_at(usize idx) = 0;
-    # virtual std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>> data() {
-    #     return std::unordered_map<std::type_index, std::unique_ptr<SolutionDataBase>>{};
-    # };
-
-    # virtual std::vector<std::unique_ptr<SolutionDataBase>> data() {
-    #     return std::vector<std::unique_ptr<SolutionDataBase>>{};
-    # };
-
-    # existing fields ...
 
     @overload
     def quality(self) -> Quality:  # overridable (pure virtual)
@@ -405,7 +420,16 @@ class Solution(SolutionBase):
         pass
 
     @overload
+    def __init__(self, other: Solution) -> None:
+        pass
+
+    @overload
+    def __init__(self, other: Solution) -> None:
+        pass
+
+    @overload
     def __init__(self, s: SolutionBase) -> None:
+        """explicit"""
         pass
 
     @overload
@@ -446,6 +470,43 @@ class Solution(SolutionBase):
 
     @overload
     def continuous_active(self) -> CRefS[np.ndarray]:
+        pass
+
+    def has_extension(self, key: SolutionExtensionKey) -> bool:
+        pass
+
+    def get_or_insert_extension(
+        self, extension: SolutionExtensionBase
+    ) -> SolutionExtensionBase:
+        pass
+
+    @overload
+    def get_extension(
+        self, key: SolutionExtensionKey
+    ) -> Optional[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    @overload
+    def get_extension(
+        self, key: SolutionExtensionKey
+    ) -> Optional[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    def remove_extension(self, key: SolutionExtensionKey) -> bool:
+        pass
+
+    def clear_extensions(self) -> None:
+        pass
+
+    def num_extensions(self) -> int:
+        pass
+
+    @overload
+    def extensions(self) -> List[std.reference_wrapper[SolutionExtensionBase]]:
+        pass
+
+    @overload
+    def extensions(self) -> List[std.reference_wrapper[SolutionExtensionBase]]:
         pass
 
 class SolutionSetBase:
@@ -962,6 +1023,13 @@ class UPGMA:
 #
 
 class LinkageModelBase:
+    # LinkageModelBase() = default;
+    # LinkageModelBase(const LinkageModelBase&) = delete;
+    # LinkageModelBase(LinkageModelBase&&) = delete;
+
+    # LinkageModelBase& operator=(const LinkageModelBase&) = delete;
+    # LinkageModelBase& operator=(LinkageModelBase&&) = delete;
+
     def init(  # overridable (pure virtual)
         self,
         rng: Rng,
@@ -2267,6 +2335,13 @@ class GPContext:
 
     def normalized_node_proximity(self) -> Mat[float]:
         """Normalized node proximity [1.0: same node, 0.0: no connection]"""
+        pass
+
+    def normalized_w_vig(self) -> Mat[float]:
+        """Normalized node proximity [1.0: same node, 0.0: no connection]"""
+        pass
+
+    def subtree_co_occurrences(self) -> Mat[float]:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
     # / indices

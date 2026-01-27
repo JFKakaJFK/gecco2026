@@ -150,19 +150,19 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class SolutionDataBase_trampoline : public SolutionDataBase
+class SolutionExtensionBase_trampoline : public SolutionExtensionBase
 {
 public:
-    NB_TRAMPOLINE(SolutionDataBase, 2);
+    NB_TRAMPOLINE(SolutionExtensionBase, 2);
 
-    std::unique_ptr<goblin::SolutionDataBase> clone() const override
+    std::unique_ptr<goblin::SolutionExtensionBase> clone() const override
     {
         NB_OVERRIDE_PURE_NAME(
             "clone", // function name (python)
             clone // function name (c++)
         );
     }
-    goblin::ExtensionKey key() const override
+    goblin::SolutionExtensionKey key() const override
     {
         NB_OVERRIDE_PURE_NAME(
             "key", // function name (python)
@@ -177,29 +177,81 @@ namespace goblin {
 class SolutionBase_trampoline : public SolutionBase
 {
 public:
-    NB_TRAMPOLINE(SolutionBase, 14);
+    NB_TRAMPOLINE(SolutionBase, 21);
 
-    void set_data(const goblin::SolutionDataBase & data) override
+    bool has_extension(const goblin::SolutionExtensionKey & key) const override
     {
-        NB_OVERRIDE_NAME(
-            "set_data", // function name (python)
-            set_data, // function name (c++)
-            data // params
-        );
-    }
-    std::optional<std::reference_wrapper<goblin::SolutionDataBase>> get_data(const goblin::ExtensionKey & key) const override
-    {
-        NB_OVERRIDE_NAME(
-            "get_data", // function name (python)
-            get_data, // function name (c++)
+        NB_OVERRIDE_PURE_NAME(
+            "has_extension", // function name (python)
+            has_extension, // function name (c++)
             key // params
         );
     }
-    void set_quality(const goblin::Quality & quality) override
+    goblin::SolutionExtensionBase & get_or_insert_extension(const goblin::SolutionExtensionBase & extension) override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "get_or_insert_extension", // function name (python)
+            get_or_insert_extension, // function name (c++)
+            extension // params
+        );
+    }
+    std::optional<std::reference_wrapper<const goblin::SolutionExtensionBase>> get_extension(const goblin::SolutionExtensionKey & key) const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "get_extension", // function name (python)
+            get_extension, // function name (c++)
+            key // params
+        );
+    }
+    std::optional<std::reference_wrapper<goblin::SolutionExtensionBase>> get_extension(const goblin::SolutionExtensionKey & key) override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "get_extension", // function name (python)
+            get_extension, // function name (c++)
+            key // params
+        );
+    }
+    bool remove_extension(const goblin::SolutionExtensionKey & key) override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "remove_extension", // function name (python)
+            remove_extension, // function name (c++)
+            key // params
+        );
+    }
+    void clear_extensions() override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "clear_extensions", // function name (python)
+            clear_extensions // function name (c++)
+        );
+    }
+    usize num_extensions() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "num_extensions", // function name (python)
+            num_extensions // function name (c++)
+        );
+    }
+    std::vector<std::reference_wrapper<const goblin::SolutionExtensionBase>> extensions() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "extensions", // function name (python)
+            extensions // function name (c++)
+        );
+    }
+    std::vector<std::reference_wrapper<goblin::SolutionExtensionBase>> extensions() override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "extensions", // function name (python)
+            extensions // function name (c++)
+        );
+    }
+    void assign_quality(const goblin::Quality & quality) override
     {
         NB_OVERRIDE_NAME(
-            "set_quality", // function name (python)
-            set_quality, // function name (c++)
+            "assign_quality", // function name (python)
+            assign_quality, // function name (c++)
             quality // params
         );
     }
@@ -1294,33 +1346,35 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
-  auto pyClassExtensionKey =
-      nb::class_<goblin::ExtensionKey>
-          (m, "ExtensionKey", "")
+  auto pyClassSolutionExtensionKey =
+      nb::class_<goblin::SolutionExtensionKey>
+          (m, "SolutionExtensionKey", "")
       .def(nb::init<>()) // implicit default constructor
-      .def_rw("token", &goblin::ExtensionKey::token, "")
+      .def_rw("token", &goblin::SolutionExtensionKey::token, "")
       .def("__eq__",
-          &goblin::ExtensionKey::operator==, nb::arg("other"))
+          &goblin::SolutionExtensionKey::operator==, nb::arg("other"))
+      .def("__ne__",
+          &goblin::SolutionExtensionKey::operator!=, nb::arg("other"))
       ;
 
 
-  auto pyClassExtensionKeyHash =
-      nb::class_<goblin::ExtensionKeyHash>
-          (m, "ExtensionKeyHash", "")
+  auto pyClassSolutionExtensionKeyHash =
+      nb::class_<goblin::SolutionExtensionKeyHash>
+          (m, "SolutionExtensionKeyHash", "")
       .def(nb::init<>()) // implicit default constructor
       .def("__call__",
-          &goblin::ExtensionKeyHash::operator(), nb::arg("key"))
+          &goblin::SolutionExtensionKeyHash::operator(), nb::arg("key"))
       ;
 
 
-  auto pyClassSolutionDataBase =
-      nb::class_<goblin::SolutionDataBase, goblin::SolutionDataBase_trampoline>
-          (m, "SolutionDataBase", "")
+  auto pyClassSolutionExtensionBase =
+      nb::class_<goblin::SolutionExtensionBase, goblin::SolutionExtensionBase_trampoline>
+          (m, "SolutionExtensionBase", "")
       .def(nb::init<>()) // implicit default constructor
       .def("clone",
-          &goblin::SolutionDataBase::clone)
+          &goblin::SolutionExtensionBase::clone)
       .def("key",
-          &goblin::SolutionDataBase::key)
+          &goblin::SolutionExtensionBase::key)
       ;
 
 
@@ -1328,14 +1382,26 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::SolutionBase, goblin::SolutionBase_trampoline>
           (m, "SolutionBase", "")
       .def(nb::init<>()) // implicit default constructor
-      .def("set_data",
-          &goblin::SolutionBase::set_data,
-          nb::arg("data"),
-          " doesn't work since nanobind generates a copy instead of a move of this pointer...\n virtual None set_data(std::unique_ptr<SolutionDataBase> data) {")
-      .def("get_data",
-          &goblin::SolutionBase::get_data, nb::arg("key"))
-      .def("set_quality",
-          &goblin::SolutionBase::set_quality, nb::arg("quality"))
+      .def("has_extension",
+          &goblin::SolutionBase::has_extension, nb::arg("key"))
+      .def("get_or_insert_extension",
+          &goblin::SolutionBase::get_or_insert_extension, nb::arg("extension"))
+      .def("get_extension",
+          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::SolutionBase::get_extension, nb::const_), nb::arg("key"))
+      .def("get_extension",
+          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::SolutionBase::get_extension), nb::arg("key"))
+      .def("remove_extension",
+          &goblin::SolutionBase::remove_extension, nb::arg("key"))
+      .def("clear_extensions",
+          &goblin::SolutionBase::clear_extensions)
+      .def("num_extensions",
+          &goblin::SolutionBase::num_extensions)
+      .def("extensions",
+          [](goblin::SolutionBase & self) { return self.extensions(); })
+      .def("extensions",
+          [](goblin::SolutionBase & self) { return self.extensions(); })
+      .def("assign_quality",
+          &goblin::SolutionBase::assign_quality, nb::arg("quality"))
       .def("quality",
           [](goblin::SolutionBase & self) { return self.quality(); })
       .def("quality",
@@ -1372,8 +1438,13 @@ void py_init_module_pygoblin(nb::module_& m) {
           (m, "Solution", "")
       .def(nb::init<goblin::Quality, std::optional<Vec<DType>>, std::optional<Vec<CType>>>(),
           nb::arg("quality"), nb::arg("discrete_values").none() = nb::none(), nb::arg("continuous_values").none() = nb::none())
+      .def(nb::init<const goblin::Solution &>(),
+          nb::arg("other"))
+      .def(nb::init<goblin::Solution &&>(),
+          nb::arg("other"))
       .def(nb::init<const goblin::SolutionBase &>(),
-          nb::arg("s"))
+          nb::arg("s"),
+          "explicit")
       .def("quality",
           [](goblin::Solution & self) { return self.quality(); })
       .def("quality",
@@ -1394,6 +1465,24 @@ void py_init_module_pygoblin(nb::module_& m) {
           [](goblin::Solution & self) { return self.continuous_active(); })
       .def("continuous_active",
           [](goblin::Solution & self) { return self.continuous_active(); })
+      .def("has_extension",
+          &goblin::Solution::has_extension, nb::arg("key"))
+      .def("get_or_insert_extension",
+          &goblin::Solution::get_or_insert_extension, nb::arg("extension"))
+      .def("get_extension",
+          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::Solution::get_extension, nb::const_), nb::arg("key"))
+      .def("get_extension",
+          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::Solution::get_extension), nb::arg("key"))
+      .def("remove_extension",
+          &goblin::Solution::remove_extension, nb::arg("key"))
+      .def("clear_extensions",
+          &goblin::Solution::clear_extensions)
+      .def("num_extensions",
+          &goblin::Solution::num_extensions)
+      .def("extensions",
+          [](goblin::Solution & self) { return self.extensions(); })
+      .def("extensions",
+          [](goblin::Solution & self) { return self.extensions(); })
       ;
 
 
@@ -2474,6 +2563,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::normalized_root_proximity, " Matrix of size `num_discrete x num_discrete`, where the entry i,j\n corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)\n if both are from the same tree, otherwise 0")
       .def("normalized_node_proximity",
           &goblin::GPContext::normalized_node_proximity, "Normalized node proximity [1.0: same node, 0.0: no connection]")
+      .def("normalized_w_vig",
+          &goblin::GPContext::normalized_wVIG, "Normalized node proximity [1.0: same node, 0.0: no connection]")
+      .def("subtree_co_occurrences",
+          &goblin::GPContext::subtree_co_occurrences)
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
       .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
       .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")

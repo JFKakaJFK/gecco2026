@@ -1,4 +1,4 @@
-from gettext import Catalog
+from itertools import chain, combinations
 from typing import Literal
 
 import matplotlib
@@ -7,7 +7,8 @@ import networkx as nx
 import numpy as np
 import scipy
 import seaborn as sns
-from matplotlib.patches import Circle, Rectangle
+from matplotlib.patches import Circle, PathPatch, Rectangle
+from matplotlib.path import Path
 
 # from networkx.drawing.nx_agraph import graphviz_layout
 from pygom import *
@@ -307,7 +308,7 @@ def draw_measure(H, MI, label, ax, **kwargs):
         S,
         square=True,
         annot=True,
-        linewidths=4,
+        linewidths=0,
         cmap="Blues",
         vmin=0,
         vmax=2,
@@ -316,11 +317,14 @@ def draw_measure(H, MI, label, ax, **kwargs):
     )
 
     if MI is not None:
-        x, y = [], []
+        offset = 0  # .1
+        x, y = [-1 + offset], [0]
         for i in range(1, S.shape[0]):
             x += [i - 1, i, i]
             y += [i, i, i + 1]
-        ax.plot(x, y, color="black", linewidth=2)
+        x += [x[-1]]
+        y += [y[-1] + offset]
+        ax.plot(x, y, color="black", linewidth=8)
 
     ax.set_title(label)
 
@@ -370,19 +374,24 @@ def example_solution():
 
     fig, axes = plt.subplot_mosaic(
         """
-        TE
         TR
         """,
-        figsize=(8, 6),
-        gridspec_kw=dict(hspace=0.0, height_ratios=[0.15, 1]),
+        figsize=(8, 3),
+        # sharex=True,
+        # sharey=True,
+        # layout="constrained",
+        gridspec_kw=dict(width_ratios=[1.25, 1]),
     )
 
-    axes["E"].set_axis_off()
+    t_ax = axes["T"]
+    # t_pos = axes["T"].get_position()
+    # axes["T"].set_axis_off()
+    # t_ax = fig.add_axes([t_pos.x0, t_pos.y0, t_pos.x1 - t_pos.x0, 1.0])
 
     node_size = 800
     pos = draw_nx(
         template_structure,
-        axes["T"],
+        t_ax,
         labels=False,  # {n: template_structure.nodes[n]["label"] for n in template_structure},
         alpha=[1.0 if active[n] else 0.5 for n in template_structure.nodes],
         node_color=[
@@ -402,7 +411,7 @@ def example_solution():
     )
     pos = draw_nx(
         template_structure,
-        axes["T"],
+        t_ax,
         labels=False,
         xscale=1,
         yscale=1,
@@ -411,11 +420,11 @@ def example_solution():
     )
     for n in template_structure:
         if not active[n]:
-            axes["T"].add_patch(
+            t_ax.add_patch(
                 Circle(
                     pos[n],
                     # radius=27.5,  # np.sqrt(node_size / np.pi),
-                    radius=0.16,  # np.sqrt(node_size / np.pi),
+                    radius=0.13,  # np.sqrt(node_size / np.pi),
                     lw=0,
                     alpha=0.2,  # 5,
                     color="black",
@@ -436,16 +445,21 @@ def example_solution():
             else "w"
             for n in template_structure
         },
-        ax=axes["T"],
+        ax=t_ax,
     )
     nx.draw_networkx_labels(
         template_structure,
         # {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
         {n: (x + 0.19, y - 0.075) for n, (x, y) in pos.items()},
         {n: f"${{}}_{n}$" for n in template_structure},
-        ax=axes["T"],
+        ax=t_ax,
     )
-    axes["T"].set_xlabel("Template Structure")
+    t_ax.set_aspect(1)
+    t_ax.margins(x=0.1, y=0.1)
+    # axes["T"].set_xlabel("Template Structure")
+    t_ax.set_xlabel("Template Structure")
+
+    # axes["R"].margins(x=0.1, y=0.1)
 
     # axes["E"].text(
     #     0.5, 0.5, expr, ha="center", va="center", transform=axes["E"].transAxes
@@ -492,10 +506,51 @@ def example_solution():
                 )
             )
     axes["R"].set_yticks([])
-    axes["R"].set_title("Expression Semantics\n" + expr + "\n")
+    axes["R"].set_title(expr + "\nExpression Semantics\n\n")  # \n" + expr + "\n")
     axes["R"].set_xlabel("Internal Representation")
 
-    fig.align_labels()
+    fig.canvas.draw()
+
+    # xl1 = t_ax.xaxis.label
+    # xl2 = axes["R"].xaxis.label
+
+    # bbox1 = xl1.get_window_extent()
+    # bbox2 = xl2.get_window_extent()
+
+    # # Convert display → figure coords
+    # inv = fig.transFigure.inverted()
+    # bbox1_fig = bbox1.transformed(inv)
+    # bbox2_fig = bbox2.transformed(inv)
+
+    # y = min(bbox1.y0, bbox2.y0)
+    # print(y, bbox1, bbox2)
+
+    pos1 = t_ax.get_position()
+    pos2 = axes["R"].get_position()
+
+    # Choose a reference bottom (e.g. the lower one)
+    new_y0 = min(pos1.y0, pos2.y0)
+    new_y0 = pos1.y0 - 0.0415
+
+    # Reposition axes so their bottoms match
+    t_ax.set_position([pos1.x0, pos1.y0, pos1.width, pos1.y1 - new_y0])
+    axes["R"].set_position([pos2.x0, new_y0, pos2.width, pos2.y1 - new_y0])
+
+    # Move both labels to that exact figure y
+    # for xl, bb in ((xl1, bbox1), (xl2, bbox2)):
+    #     # xl.set_transform(fig.transFigure)
+    #     xl.set_position((bb.y0, y))
+    #     # xl.set_horizontalalignment("center")
+
+    # r_pos = axes["R"].get_position()
+    # r_ax = fig.add_axes([r_pos.x0, t_pos.y0, r_pos.x1 - r_pos.x0, 0.01])
+    # sns.despine(ax=r_ax, left=True, bottom=True)
+
+    # r_ax.set_yticks([])
+    # r_ax.set_xticks([])
+    # r_ax.set_xlabel("Internal Representation")
+
+    # fig.align_xlabels()
     # fig.align_titles()
 
     fig.savefig("template_example.pdf", dpi=600, transparent=True, bbox_inches="tight")
@@ -569,6 +624,569 @@ def example_node_proximity():
     fig.savefig(
         "node_proximity_example.pdf", dpi=600, transparent=True, bbox_inches="tight"
     )
+
+
+def example_peter_proximity():
+    d = 2
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    node_proximity = ctx.normalized_node_proximity()
+    vig_proximity = ctx.normalized_w_vig()
+    peter_proximity = ctx.subtree_co_occurrences()
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        TPN
+        """,
+        figsize=(10, 3.5),
+        gridspec_kw=dict(width_ratios=[1, 0.75, 0.75], wspace=0.25),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = draw_nx(
+        template_structure,
+        axes["T"],
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        # label_offset=(0, 0),
+        node_size=800,
+        margins=(0.1, 0.18),  # 75,
+    )
+
+    x0, y0 = pos[0]
+    x1, y1 = pos[1]
+    x2, y2 = pos[2]
+    x3, y3 = pos[3]
+    x4, y4 = pos[4]
+    x5, y5 = pos[5]
+    x6, y6 = pos[6]
+    xy = np.array([list(pos[i]) for i in range(7)])
+    v = np.array([[(xy[j] - xy[i]).tolist() for j in range(7)] for i in range(7)])
+
+    def vl(v_):
+        return np.sqrt(np.dot(v_, v_))
+
+    def n(v_):
+        return v_ / vl(v_)
+
+    def rot(v_, deg):
+        rad = deg / 180.0 * np.pi
+        return np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]]) @ v_
+
+    def point(xy, marker="x", s=100, **kwargs):
+        axes["T"].scatter([xy[0]], [xy[1]], marker=marker, s=s, **kwargs)
+
+    def vec(xy, v_, pt_kwargs=None, **kwargs):
+        if pt_kwargs is None:
+            pt_kwargs = {}
+        if "color" not in pt_kwargs:
+            pt_kwargs["color"] = kwargs.get("color")
+        point(xy, **pt_kwargs)
+        xy2 = xy + v_
+        axes["T"].plot([xy[0], xy2[0]], [xy[1], xy2[1]], **kwargs)
+
+    def shortest_angle(v0, v1):
+        n0, n1 = n(v0), n(v1)
+        return np.arccos(np.dot(n0, n1)) / np.pi * 180
+
+    def intersect(xy0, v0, xy1, v1):
+        xy01 = xy0 + v0
+        xy11 = xy1 + v1
+
+        x1, y1 = xy0
+        x2, y2 = xy01
+        x3, y3 = xy1
+        x4, y4 = xy11
+
+        a = x1 * y2 - y1 * x2
+        b = x3 * y4 - y3 * x4
+        d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+
+        assert np.abs(d) > 1e-6
+        xyi = (a * (xy1 - xy11) - b * (xy0 - xy01)) / d
+
+        # vec(xy0, v0, color="red")
+        # vec(xy1, v1, color="blue")
+        # point(xyi, color="orange")
+        return xyi
+
+    X, Y = np.array([1.0, 0.0]), np.array([0.0, 1.0])
+
+    def arc_between(xy0, xy1, cxy):
+        txy0, txy1 = xy0 - cxy, xy1 - cxy
+
+        theta1, theta2 = shortest_angle(X, txy0), shortest_angle(X, txy1)
+        if txy0[1] < 0.0:
+            theta1 = 360.0 - theta1
+        if txy1[1] < 0.0:
+            theta2 = 360.0 - theta2
+
+        flip = theta1 > theta2
+        if flip:
+            theta1, theta2 = theta2, theta1
+
+        if theta2 - theta1 > (360.0 - theta2) + theta1:
+            flip = not flip
+            theta1, theta2 = theta2, theta1
+        arc = Path.arc(theta1, theta2)
+
+        r, r1 = vl(xy0 - cxy), vl(xy1 - cxy)
+        assert np.abs(r - r1) < 1e-6, (r, r1)
+
+        yield Path.MOVETO, xy1 if flip else xy0
+        for c, v in zip(arc.codes[1:-1], arc.vertices[1:-1]):
+            yield c, v * r + cxy
+        yield Path.LINETO, xy0 if flip else xy1
+        yield Path.MOVETO, xy1
+
+    dz = 0.195
+    f1_lt = xy[1] + n(rot(v[1, 3], -90.0)) * dz
+    f1_rt = xy[1] + n(rot(v[1, 4], 90.0)) * dz
+    f1_rb = xy[4] + n(rot(v[4, 1], -90.0)) * dz
+    f1_br = xy[4] + n(rot(v[4, 3], 90.0)) * dz
+    f1_lb = xy[3] + n(rot(v[3, 1], 90.0)) * dz
+    f1_bl = xy[3] + n(rot(v[3, 4], -90.0)) * dz
+
+    path_f1 = [
+        (Path.MOVETO, f1_lb),
+        (Path.LINETO, f1_lt),
+        *arc_between(f1_lt, f1_rt, xy[1]),
+        (Path.LINETO, f1_rt),
+        #
+        (Path.LINETO, f1_rb),
+        *arc_between(f1_rb, f1_br, xy[4]),
+        (Path.LINETO, f1_br),
+        #
+        (Path.LINETO, f1_bl),
+        *arc_between(f1_bl, f1_lb, xy[3]),
+        (Path.LINETO, f1_lb),
+        #
+        (Path.CLOSEPOLY, f1_lb),
+    ]
+
+    f2_lt = xy[2] + n(rot(v[2, 5], -90.0)) * dz
+    f2_rt = xy[2] + n(rot(v[2, 6], 90.0)) * dz
+    f2_rb = xy[6] + n(rot(v[6, 2], -90.0)) * dz
+    f2_br = xy[6] + n(rot(v[6, 3], 90.0)) * dz
+    f2_lb = xy[5] + n(rot(v[5, 2], 90.0)) * dz
+    f2_bl = xy[5] + n(rot(v[5, 6], -90.0)) * dz
+    path_f2 = [
+        (Path.MOVETO, f2_lb),
+        (Path.LINETO, f2_lt),
+        *arc_between(f2_lt, f2_rt, xy[2]),
+        (Path.LINETO, f2_rt),
+        #
+        (Path.LINETO, f2_rb),
+        *arc_between(f2_rb, f2_br, xy[6]),
+        (Path.LINETO, f2_br),
+        #
+        (Path.LINETO, f2_bl),
+        *arc_between(f2_bl, f2_lb, xy[5]),
+        (Path.LINETO, f2_lb),
+        #
+        (Path.CLOSEPOLY, f2_lb),
+    ]
+
+    dz = 0.22
+
+    f0_lt = xy[0] + n(rot(v[0, 1], -90.0)) * dz
+    f0_rt = xy[0] + n(rot(v[0, 2], 90.0)) * dz
+    f0_rm = xy[2] + n(rot(v[2, 0], -90.0)) * dz
+    f0_mr = xy[2] + n(rot(v[2, 3], 90.0)) * dz
+    f0_lm = xy[1] + n(rot(v[1, 0], 90.0)) * dz
+    f0_ml = xy[1] + n(rot(v[1, 2], -90.0)) * dz
+
+    f1_lt = xy[1] + n(rot(v[1, 3], -90.0)) * dz
+    f1_rt = xy[1] + n(rot(v[1, 4], 90.0)) * dz
+    f1_rb = xy[4] + n(rot(v[4, 1], -90.0)) * dz
+    f1_br = xy[4] + n(rot(v[4, 3], 90.0)) * dz
+    f1_lb = xy[3] + n(rot(v[3, 1], 90.0)) * dz
+    f1_bl = xy[3] + n(rot(v[3, 4], -90.0)) * dz
+
+    f2_lt = xy[2] + n(rot(v[2, 5], -90.0)) * dz
+    f2_rt = xy[2] + n(rot(v[2, 6], 90.0)) * dz
+    f2_rb = xy[6] + n(rot(v[6, 2], -90.0)) * dz
+    f2_br = xy[6] + n(rot(v[6, 3], 90.0)) * dz
+    f2_lb = xy[5] + n(rot(v[5, 2], 90.0)) * dz
+    f2_bl = xy[5] + n(rot(v[5, 6], -90.0)) * dz
+    path_f0 = [
+        (Path.MOVETO, f0_lm),
+        (Path.LINETO, f0_lt),
+        *arc_between(f0_lt, f0_rt, xy[0]),
+        (Path.LINETO, f0_rt),
+        #
+        (Path.LINETO, f0_rm),
+        *arc_between(f0_rm, f2_rt, xy[2]),
+        (Path.LINETO, f2_rt),
+        #
+        (Path.LINETO, f2_rb),
+        *arc_between(f2_rb, f2_br, xy[6]),
+        (Path.LINETO, f2_br),
+        #
+        (Path.LINETO, f1_bl),
+        *arc_between(f1_bl, f1_lb, xy[3]),
+        (Path.LINETO, f1_lb),
+        #
+        (Path.LINETO, f1_lt),
+        *arc_between(f1_lt, f0_lm, xy[1]),
+        (Path.LINETO, f0_lm),
+        #
+        (Path.CLOSEPOLY, f0_lm),
+    ]
+
+    path_kwargs = dict(
+        edgecolor="k",
+        linewidth=1.0,
+        ls="--",
+        facecolor="none",
+        alpha=0.25,
+    )
+
+    def draw_path(path, **kwargs):
+        kw = {**path_kwargs}
+        for k, v in kwargs.items():
+            kw[k] = v
+        if isinstance(path, Path):
+            pass
+        else:
+            codes, verts = zip(*path)
+            path = Path(verts, codes)
+        axes["T"].add_patch(PathPatch(path, **kw))
+
+    highglight_subfns = True
+    if highglight_subfns:
+        dz = 0.17
+        draw_path(Path.circle(xy[3], radius=dz))
+        draw_path(Path.circle(xy[4], radius=dz))
+        draw_path(Path.circle(xy[5], radius=dz))
+        draw_path(Path.circle(xy[6], radius=dz))
+        draw_path(path_f1)
+        draw_path(path_f2)
+        draw_path(path_f0)  # , ls="-.")
+
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+    axes["T"].set_xlabel("Template")
+
+    # axes["T"].set_aspect(1)
+
+    sns.heatmap(
+        node_proximity,
+        annot=node_proximity,
+        mask=np.eye(node_proximity.shape[0], dtype=np.bool_),
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    axes["N"].set_xlabel("Node Proximity")
+    axes["N"].tick_params(labelsize="x-small", pad=2, length=2)
+
+    sns.heatmap(
+        peter_proximity,
+        annot=peter_proximity,
+        mask=np.eye(peter_proximity.shape[0], dtype=np.bool_),
+        cmap="Blues",
+        vmin=0,
+        vmax=3,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["P"],
+        cbar=False,
+    )
+    axes["P"].set_xlabel("#Common Subfunctions")
+    axes["P"].tick_params(labelsize="x-small", pad=2, length=2)
+
+    # S = vig_proximity.copy()
+    # S[np.triu_indices_from(S)] = peter_proximity[np.triu_indices_from(S)]
+
+    # # S = peter_proximity.copy()
+
+    # A = peter_proximity.copy()
+    # A[np.tril_indices_from(A)] = 1.0 / vig_proximity[np.tril_indices_from(A)]
+
+    # mask = np.eye(vig_proximity.shape[0], dtype=np.bool_)
+    # m1 = mask.copy()
+    # m1[np.tril_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+    #     np.tril_indices_from(A)
+    # ]
+    # sns.heatmap(
+    #     # 3 - A,
+    #     A,
+    #     annot=A,
+    #     mask=m1,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+    #     # fmt="s",
+    #     cmap="Blues",
+    #     vmin=0,
+    #     vmax=2,
+    #     # cmap="Blues_r",
+    #     # vmin=0,
+    #     # vmax=4,
+    #     square=True,
+    #     annot_kws=dict(fontsize="x-small"),
+    #     ax=axes["N"],
+    #     cbar=False,
+    # )
+    # m2 = mask.copy()
+    # m2[np.triu_indices_from(A)] = np.ones_like(A, dtype=np.bool_)[
+    #     np.triu_indices_from(A)
+    # ]
+    # sns.heatmap(
+    #     A,
+    #     annot=np.array(
+    #         [
+    #             [
+    #                 rf"${{}}^1\!/\!{{}}_{{{str(A[i, j])[0]}}}$"
+    #                 # str(A[i, j])[0]
+    #                 for j in range(A.shape[1])
+    #             ]
+    #             for i in range(A.shape[0])
+    #         ]
+    #     ),
+    #     mask=m2,  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+    #     fmt="s",
+    #     cmap="Blues_r",
+    #     vmin=1,
+    #     vmax=4,
+    #     square=True,
+    #     annot_kws=dict(fontsize="x-small"),
+    #     ax=axes["N"],
+    #     cbar=False,
+    # )
+    # axes["N"].set_title("#Common Subfunctions")
+    # axes["N"].set_xlabel("Node Proximity")
+
+    fig.align_labels()
+    # fig.align_titles()
+
+    fig.savefig(
+        "node_proximity_example_both.pdf",
+        dpi=600,
+        transparent=True,
+        bbox_inches="tight",
+    )
+
+
+def example_node_proximity2():
+    d = 2
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    node_proximity = ctx.normalized_node_proximity()
+
+    S = node_proximity.copy()
+    S[np.triu_indices_from(S)] = ((S - 1.0) * -(1 + 2 * d))[np.triu_indices_from(S)]
+
+    nodes = list(range(len(template_structure.nodes)))
+    co_occurrences = np.zeros((len(nodes), len(nodes)))
+    intermediate_nodes = {
+        (0, 1): {},
+        (0, 2): {},
+        (0, 3): {1},
+        (0, 4): {1},
+        (0, 5): {2},
+        (0, 6): {2},
+        #
+        (1, 2): {0},
+        (1, 3): {},
+        (1, 4): {},
+        (1, 5): {0, 2},
+        (1, 6): {0, 2},
+        #
+        (2, 3): {0, 1},
+        (2, 4): {0, 1},
+        (2, 5): {},
+        (2, 6): {},
+        #
+        (3, 4): {1},
+        (3, 5): {0, 1, 2},
+        (3, 6): {0, 1, 2},
+        #
+        (4, 5): {0, 1, 2},
+        (4, 6): {0, 1, 2},
+        #
+        (5, 6): {2},
+    }
+    for combination in chain.from_iterable(
+        combinations(nodes, l) for l in range(2, len(nodes) + 1)
+    ):
+        c = set(combination)
+        for i in nodes:
+            if i in c:
+                for j in nodes[:i]:
+                    if j in c:
+                        # valid if all intermediate nodes are in c as well...
+                        if all(n in c for n in intermediate_nodes[j, i]):
+                            co_occurrences[j, i] += 1
+
+    show_common_subsets = False
+    if show_common_subsets:
+        S[np.triu_indices_from(S)] = co_occurrences[np.triu_indices_from(S)]
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        TN
+        """,
+        figsize=(8, 4),
+        gridspec_kw=dict(width_ratios=[1.4, 1]),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = custom_tree_layout(template_structure, root=0, dy=0.6)
+    draw_nx(
+        template_structure,
+        axes["T"],
+        pos=pos,
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        # label_offset=(0, 0),
+        node_size=1200,
+        margins=(0.1, 0.075),
+    )
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+
+    ne = 0
+    dset = [[] for _ in range(1 + int(np.max(S[np.triu_indices_from(S)])))]
+    for i in range(ctx.num_discrete):
+        for j in range(i):
+            dist = int(S[j, i])
+            if dist > 1:  # and i == 4 or j == 4:
+                template_structure.add_edge(i, j, dist=dist)
+                dset[dist].append((i, j))
+                ne += 1
+    print("number of additional edges:", ne)
+
+    alpha = 0.4
+
+    def draw_edges(edges, ls="-", cs="arc3", alpha=alpha, width=1.0):
+        nx.draw_networkx_edges(
+            template_structure,
+            pos,
+            edgelist=edges,
+            style=ls,
+            alpha=alpha,
+            width=width,  # 4 / d,
+            # arrows=False,
+            arrowstyle="-",
+            connectionstyle=cs,
+            ax=axes["T"],
+        )
+
+    styles = [
+        "-",
+        (0, (8, 4)),  # "--",
+        (0, (4, 4)),  # "-.",
+        (0, (1, 4)),  # ":",
+    ]
+    # for l, (edges, ls) in enumerate(
+    #     zip(  #
+    #         dset[2:], ["--", "-.", ":"]
+    #     )
+    # ):
+    #     d = l + 2
+    #     draw_edges(edges, ls=ls)
+
+    # dist = 2
+    w = 1
+    ls = styles[1]
+    draw_edges([(0, 4), (0, 5), (1, 2), (3, 4), (5, 6)], ls=ls, width=w)
+    draw_edges([(0, 3)], ls=ls, cs="arc3,rad=0.45", width=w)
+    draw_edges([(0, 6)], ls=ls, cs="arc3,rad=-0.45", width=w)
+
+    # dist = 3
+    w = 1
+    ls = styles[2]
+    draw_edges([(1, 5), (1, 6), (2, 3), (2, 4)], ls=ls, width=w)
+
+    # dist = 4
+    w = 1
+    ls = styles[3]
+    draw_edges([(4, 5)], ls=ls, width=w)
+    draw_edges([(3, 5), (3, 6), (4, 6)], ls=ls, cs="arc3,rad=0.45", width=w)
+
+    axes["T"].set_xlabel("Template")
+
+    handles, labels = [], []
+    for d, ls in zip([1, 2, 3, 4], styles):
+        handles.append(
+            axes["T"].plot(
+                [], [], c="k", ls=ls, alpha=alpha if d > 1 else 1, label="d"
+            )[0]
+        )
+        labels.append(str(d))
+    axes["T"].legend(
+        handles,
+        labels,
+        title="Distance",
+        # title_fontproperties=dict(title_fontsize="small"),
+        frameon=False,
+        bbox_to_anchor=(0.075, 0.35),
+        # ncols=4,
+        title_fontsize="small",
+        fontsize="x-small",
+    )
+    # axes["T"].margins(y=0, tight=True)
+
+    sns.heatmap(
+        node_proximity,
+        annot=S,
+        mask=np.eye(
+            node_proximity.shape[0], dtype=np.bool_
+        ),  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        # fmt="s",
+        cmap="Blues",
+        vmin=0,
+        vmax=1,
+        square=True,
+        annot_kws=dict(fontsize="x-small"),
+        ax=axes["N"],
+        cbar=False,
+    )
+    if show_common_subsets:
+        axes["N"].set_title("Common Subset Count")
+    else:
+        axes["N"].set_title("Node Distance")
+
+    axes["N"].set_xlabel("Node Proximity")
+
+    fig.align_labels()
+    # fig.align_titles()
+
+    fig.savefig(
+        "node_proximity_example2.pdf", dpi=600, transparent=True, bbox_inches="tight"
+    )
+
+    print(co_occurrences)
+    print(S)
 
 
 def example_constants():
@@ -762,8 +1380,10 @@ def linkage_example():
     fig, axes = plt.subplots(
         nrows=nrows,
         ncols=ncols,
-        figsize=(4 * ncols, 3 * nrows),
-        gridspec_kw=dict(hspace=0.4, height_ratios=[1, 0.5]),
+        figsize=(3 * ncols, 2.5 * nrows),
+        gridspec_kw=dict(
+            hspace=0.4, height_ratios=[1, 0.75], width_ratios=[0.75, 1, 1]
+        ),
     )
 
     # population
@@ -810,7 +1430,13 @@ def linkage_example():
     pop_ax.set_yticks([])
     pop_ax.set_title("Solutions")
 
-    draw_measure(H, MI, "$MI$", axes[0, 1], cbar=False)
+    draw_measure(
+        H,
+        MI,
+        "$MI$",
+        axes[0, 1],
+        cbar=False,  # , annot_kws=dict(fontsize="large")
+    )
     draw_measure(H_masked, MI_masked, "$MI_{masked}$", axes[0, 2], cbar=False)
     if ncols > 3:
         draw_measure(node_proximity, None, "Node", axes[0, 3], cbar=False)
@@ -820,6 +1446,7 @@ def linkage_example():
         root=0,
         margins=(0.2, 0.3),
         dx=0.7,
+        node_size=800,
         ax=axes[1, 0],
     )
     axes[1, 0].set_title("Template")
@@ -901,11 +1528,14 @@ def linkage_example():
 
 
 if __name__ == "__main__":
-    example_solution()
-    plt.show()
-    example_node_proximity()
+    # example_solution()
+    # plt.show()
+    # example_node_proximity()
+    # plt.show()
+    # example_node_proximity2()
+    example_peter_proximity()
     plt.show()
     # example_constants()
     # plt.show()
-    linkage_example()
-    plt.show()
+    # linkage_example()
+    # plt.show()

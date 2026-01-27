@@ -19,6 +19,7 @@ set(
     archive
     fitness
     solution
+    solution_extension
     default_gradients
     problem
     amalgam
