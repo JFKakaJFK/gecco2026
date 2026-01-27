@@ -41,7 +41,7 @@ matplotlib.rcParams["ps.fonttype"] = 42
 
 
 RESULT_DIR = pathlib.Path("results") / "linkage"  #  "linkage_wrong_init"
-RESULT_DIR = pathlib.Path("results") / "linkage_extended"
+# RESULT_DIR = pathlib.Path("results") / "linkage_extended"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
 PLOT_DIR = RESULT_DIR / "plots"
@@ -1954,29 +1954,36 @@ def main():
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
         where_query = r"method_name NOT SIMILAR TO '.*(\*|any|all|peter, static|wVIG|peter|Univariate).*'"
-        where_query = (
-            r"method_name NOT SIMILAR TO '.*(\*|any|all|peter, static|wVIG).*'"
-        )
+        # where_query = (
+        #     r"method_name NOT SIMILAR TO '.*(\*|any|all|peter, static|wVIG).*'"
+        # )
 
         # custom_convergence_plot(conn, PLOT_DIR, where_query=where_query)
         # custom_pprof_plot(conn, PLOT_DIR, method_where_query=where_query)
 
         # custom_problem_plot(conn, PLOT_DIR, groups=(("_main", where_query),))
 
-        # custom_interval_plot(conn, PLOT_DIR, groups=(("_main", where_query),))
-
-        # custom_problem_convergence_plot(conn, PLOT_DIR, where_query=where_query)
-        # custom_problem_convergence_plot(
+        # custom_interval_plot(
         #     conn,
         #     PLOT_DIR,
-        #     where_query=rf"{where_query} AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
-        #     wscale=3,
-        #     hscale=3,
-        #     gridspec_kw=dict(hspace=0.15),
-        #     supxlabel_kwargs=dict(y=-0.1),
-        #     legend_pos=(0.5, -0.11),
-        #     filename="convergence_per_problem_h7ls",
+        #     groups=(("_main_wide", where_query),),
+        #     wscale=8,
+        #     hscale=3.5,
+        #     legend_pos=(0.5, 0.03),
         # )
+
+        # custom_problem_convergence_plot(conn, PLOT_DIR, where_query=where_query)
+        custom_problem_convergence_plot(
+            conn,
+            PLOT_DIR,
+            where_query=rf"{where_query} AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
+            wscale=3,
+            hscale=2.75,
+            gridspec_kw=dict(hspace=0.15),
+            supxlabel_kwargs=dict(y=-0.1),
+            legend_pos=(0.5, -0.11),
+            filename="convergence_per_problem_h7ls_wide",
+        )
 
         # custom_cmp_plot2(conn, PLOT_DIR, method_where_query=where_query)
         # custom_cmp_plot(conn, PLOT_DIR, method_where_query=where_query)
@@ -1989,15 +1996,15 @@ def main():
         #     hscale=15 / 2,
         #     legend_pos=(0.5, 0.03),
         # )
-        custom_interval_plot(
-            conn,
-            PLOT_DIR,
-            include_operator_set=True,
-            show_test_acc=False,
-            wscale=7,
-            hscale=8,
-            legend_pos=(0.5, 0.03),
-        )
+        # custom_interval_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     include_operator_set=True,
+        #     show_test_acc=False,
+        #     wscale=7,
+        #     hscale=8,
+        #     legend_pos=(0.5, 0.03),
+        # )
 
         exit()
 
