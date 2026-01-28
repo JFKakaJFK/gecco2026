@@ -21,6 +21,14 @@ namespace goblin {
 // -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
 // -> performance issue?
 
+class QualityBase {
+ public:
+
+ virtual std::unique_ptr<QualityBase> clone() const = 0;
+
+ virtual ~QualityBase() = default;
+};
+
 /// Something that describes how good a solution is
 class Quality {
  public:

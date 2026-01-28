@@ -76,6 +76,7 @@ void check_eq(SolutionBase& lhs, SolutionBase& rhs, usize i) {
       REQUIRE_MESSAGE(_r.has_value(), "idx: ", i);
       SolutionExtensionBase& r = _r.value().get();
 
+      // no general comparison required - all point where a specific extension is needed know about the concrete type
       if(typeid(l) == typeid(AExt)){
           REQUIRE_MESSAGE(static_cast<const AExt&>(l) == r, "idx: ", i);
       }
@@ -95,6 +96,11 @@ void check_set(SolutionSetBase& set) {
   Solution s(f.worst(), discrete, continuous);
   s.quality().objectives = Vec<CType>::Zero(2);
 
+  REQUIRE(s.num_extensions() == 0);
+  REQUIRE(!s.has_extension(AExt::type_key()));
+  REQUIRE(!s.has_extension(BExt::type_key()));
+  REQUIRE(!s.has_extension(CExt::type_key()));
+
   s.get_or_insert_extension(AExt(1));
   REQUIRE(static_cast<AExt&>(s.get_or_insert_extension(AExt(2))).idx == 1);
   s.get_or_insert_extension(BExt(1.0));
@@ -103,6 +109,9 @@ void check_set(SolutionSetBase& set) {
   REQUIRE(static_cast<CExt&>(s.get_or_insert_extension(CExt(false))).value == true);
 
   REQUIRE(s.num_extensions() == 3);
+  REQUIRE(s.has_extension(AExt::type_key()));
+  REQUIRE(s.has_extension(BExt::type_key()));
+  REQUIRE(s.has_extension(CExt::type_key()));
 
   static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx = 2;
   REQUIRE(static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx == 2);

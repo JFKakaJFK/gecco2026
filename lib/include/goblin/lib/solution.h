@@ -195,6 +195,8 @@ class SolutionBase {
   virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
   virtual void clear_extensions() = 0;
 
+  // Instead have an ExtensionProxy that behaves like a vector/iterator but does not allocate full copies??
+  // - size, begin, end, -> original collection iterator wrapper...
   virtual usize num_extensions() const = 0;
   virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
   virtual std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() = 0;
@@ -342,7 +344,6 @@ class SolutionBase {
 
   virtual ~SolutionBase() {};
 };
-
 
 class Solution : public SolutionBase {
  public:
