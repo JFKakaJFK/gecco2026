@@ -28,7 +28,7 @@ sns.set_theme(context="notebook", style="whitegrid")
 
 
 def get_modifiers(
-    conn: duckdb.DuckDBPyConnection,
+    connection: duckdb.DuckDBPyConnection,
     modifier_query: str | None = None,
     modifier_labels: list[str] | None = None,
     default_query: str | None = None,
@@ -43,7 +43,7 @@ def get_modifiers(
                 literal_eval,
                 set(
                     str(m)
-                    for m, *_ in conn.sql(
+                    for m, *_ in connection.sql(
                         f"SELECT {modifier_query} FROM results"
                     ).fetchall()
                     if m is not None
@@ -62,7 +62,7 @@ def get_modifiers(
 
     if default_query is not None:
         modifiers = sorted(
-            [m for m, *_ in conn.sql(default_query).fetchall() if m is not None]
+            [m for m, *_ in connection.sql(default_query).fetchall() if m is not None]
         )
 
         return modifiers, 0, None
@@ -74,8 +74,8 @@ def get_modifiers(
 
 
 def plot_convergence(
-    plot_dir: Path,
-    conn: duckdb.DuckDBPyConnection,
+    plot_directory: Path,
+    connection: duckdb.DuckDBPyConnection,
     kernels: list[str] | None = None,
     kernel_query: str = "kernel",
     row_modifier_query: str | None = None,
@@ -96,7 +96,7 @@ def plot_convergence(
     ymax: float | str | None = None,
 ):
     row_modifiers, num_row_modifiers, row_modifier_query = get_modifiers(
-        conn,
+        connection,
         modifier_query=row_modifier_query,
         modifier_labels=row_modifier_labels,
         allow_none=True,
@@ -104,7 +104,7 @@ def plot_convergence(
     )
 
     col_modifiers, num_col_modifiers, col_modifier_query = get_modifiers(
-        conn,
+        connection,
         modifier_query=col_modifier_query,
         modifier_labels=col_modifier_labels,
         default_query="SELECT DISTINCT(problem) FROM results",
@@ -115,7 +115,9 @@ def plot_convergence(
         kernels = sorted(
             [
                 d
-                for d, *_ in conn.sql("SELECT DISTINCT(kernel) FROM results").fetchall()
+                for d, *_ in connection.sql(
+                    "SELECT DISTINCT(kernel) FROM results"
+                ).fetchall()
                 if d is not None
             ]
         )
@@ -159,7 +161,7 @@ def plot_convergence(
                     ax = axes[row_mi, col_mi]
 
                     if row_modifier is not None:
-                        xlim = conn.execute(
+                        xlim = connection.execute(
                             f"""
                                 SELECT MIN({metric}) as xmin, MAX({metric}) as xmax FROM results
                                 WHERE 
@@ -181,7 +183,7 @@ def plot_convergence(
                             ax.set_axis_off()  # hide the plot
                             continue
                     else:
-                        xlim = conn.execute(
+                        xlim = connection.execute(
                             f"""
                                 SELECT MIN({metric}) as xmin, MAX({metric}) as xmax FROM results
                                 WHERE 
@@ -222,7 +224,7 @@ def plot_convergence(
                             GROUP BY ALL
                             """
                         try:
-                            part = conn.execute(
+                            part = connection.execute(
                                 q,
                                 [kernels, col_modifier, row_modifier]
                                 if row_modifier
@@ -335,12 +337,12 @@ def plot_convergence(
 
             log_str = "_logx" if log_x else ""
 
-            if not plot_dir.is_dir():
-                os.makedirs(plot_dir, exist_ok=True)
+            if not plot_directory.is_dir():
+                os.makedirs(plot_directory, exist_ok=True)
 
             for fmt in ["pdf", "png"]:
                 fig.savefig(
-                    plot_dir
+                    plot_directory
                     / f"convergence_{metric_label.replace(' ', '-').replace('/', '|')}{log_str}.{fmt}",
                     dpi=600,
                     # transparent=True,
@@ -351,8 +353,8 @@ def plot_convergence(
 
 
 def plot_fraction_target_reached(
-    plot_dir: Path,
-    conn: duckdb.DuckDBPyConnection,
+    plot_directory: Path,
+    connection: duckdb.DuckDBPyConnection,
     kernels: list[str] | None = None,
     kernel_query: str = "kernel",
     row_modifier_query: str | None = None,
@@ -362,14 +364,14 @@ def plot_fraction_target_reached(
     unit_query: str = "run",
 ):
     row_modifiers, num_row_modifiers, row_modifier_query = get_modifiers(
-        conn,
+        connection,
         modifier_query=row_modifier_query,
         modifier_labels=row_modifier_labels,
         allow_none=True,
     )
 
     col_modifiers, num_col_modifiers, col_modifier_query = get_modifiers(
-        conn,
+        connection,
         modifier_query=col_modifier_query,
         modifier_labels=col_modifier_labels,
         default_query="SELECT DISTINCT(problem) FROM results",
@@ -379,7 +381,9 @@ def plot_fraction_target_reached(
         kernels = sorted(
             [
                 d
-                for d, *_ in conn.sql("SELECT DISTINCT(kernel) FROM results").fetchall()
+                for d, *_ in connection.sql(
+                    "SELECT DISTINCT(kernel) FROM results"
+                ).fetchall()
                 if d is not None
             ]
         )
@@ -431,7 +435,7 @@ def plot_fraction_target_reached(
                 GROUP BY kernel
             """
 
-            df = conn.execute(
+            df = connection.execute(
                 q,
                 [col_modifier, row_modifier]
                 if row_modifier is not None
@@ -501,12 +505,12 @@ def plot_fraction_target_reached(
         frameon=False,
     )
 
-    if not plot_dir.is_dir():
-        os.makedirs(plot_dir, exist_ok=True)
+    if not plot_directory.is_dir():
+        os.makedirs(plot_directory, exist_ok=True)
 
     for fmt in ["pdf", "png"]:
         fig.savefig(
-            plot_dir / f"target_reached.{fmt}",
+            plot_directory / f"target_reached.{fmt}",
             dpi=600,
             # transparent=True,
             bbox_inches="tight",
@@ -515,35 +519,35 @@ def plot_fraction_target_reached(
     pbar.close()
 
 
-def plot(output_dir: Path):
+def create_plots(output_directory: Path):
     print("Starting plot creation...")
 
-    db_path = output_dir / "experiments.duckdb"
-    plot_dir = output_dir / "plots"
+    database_path = output_directory / "experiments.duckdb"
+    plot_directory = output_directory / "plots"
 
-    conn = duckdb.connect(db_path)
+    connection = duckdb.connect(database_path)
 
-    for cfg in tqdm(CONFIGS.values(), ascii=True):
+    for config in tqdm(CONFIGS.values(), ascii=True):
         plot_convergence(
-            plot_dir / cfg.name,
-            conn,
-            kernels=cfg.kernels,
-            y_var=cfg.y_var,
-            y_agg=cfg.y_agg,
-            y_label=cfg.y_label,
-            unit_query=cfg.unit_query,
-            row_modifier_query=cfg.row_modifier_query,
-            row_modifier_labels=cfg.row_modifier_labels,
-            row_sort_key=cfg.row_sort_key,
-            col_modifier_query=cfg.col_modifier_query,
-            col_modifier_labels=cfg.col_modifier_labels,
-            col_sort_key=cfg.col_sort_key,
-            metrics=cfg.metrics,
-            metric_labels=cfg.metric_labels,
-            ylog=cfg.ylog,
-            ymin=cfg.ymin,
-            ymax=cfg.ymax,
-            nsamples=cfg.nsamples,
+            plot_directory / config.name,
+            connection,
+            kernels=config.kernels,
+            y_var=config.y_var,
+            y_agg=config.y_agg,
+            y_label=config.y_label,
+            unit_query=config.unit_query,
+            row_modifier_query=config.row_modifier_query,
+            row_modifier_labels=config.row_modifier_labels,
+            row_sort_key=config.row_sort_key,
+            col_modifier_query=config.col_modifier_query,
+            col_modifier_labels=config.col_modifier_labels,
+            col_sort_key=config.col_sort_key,
+            metrics=config.metrics,
+            metric_labels=config.metric_labels,
+            ylog=config.ylog,
+            ymin=config.ymin,
+            ymax=config.ymax,
+            nsamples=config.nsamples,
         )
 
-    conn.close()
+    connection.close()

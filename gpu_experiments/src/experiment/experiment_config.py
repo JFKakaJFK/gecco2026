@@ -1,10 +1,9 @@
-from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Literal, TypeVar
 
 from pygom import KernelVersion as KV
 
-from src.experiment.problem_config import PROBLEMS
+from src.experiment.dataset_config import DATASETS, DatasetConfig
 
 T = TypeVar("T")
 
@@ -25,21 +24,6 @@ MAIN_KV: tuple[KV, ...] = (
     KV.block_reduce,
     KV.single_kernel_inplace,
 )
-
-
-@dataclass(frozen=True)
-class ProblemConfig:
-    name: str
-    type: ProblemType
-    observations: int
-    features: int
-    target: float | list[float] | None = None
-
-    def target_objectives(self) -> list[float] | None:
-        if isinstance(self.target, float):
-            return [self.target]
-
-        return self.target
 
 
 @dataclass(frozen=True)
@@ -74,36 +58,38 @@ OPERATOR_SETS: dict[str, str] = {
 }
 
 
-def ensure_iter(x: T | list[T]) -> list[T]:
-    if isinstance(x, list):
-        return x
-    else:
-        return [x]
-
-
 @dataclass
 class ExperimentConfig:
+    """
+    Attributes:
+        population_sizes (list[int] | None): Sets the population sizes that
+        will be included in the experiment. When equal to 'None', it is assumed
+        that it is in the search space
+        num_features (list[int] | None): Determines the number of features to be used.
+        If equal to 'None', the amount of features available in the dataset will be used.
+    """
+
     name: str
 
-    # Problem space
-    problems: list[ProblemConfig] | ProblemConfig
-    population_sizes: list[int] | int
-    num_observations: list[int] | int
-    num_features: list[int] | int | None
-    templates: list[TemplateConfig] | TemplateConfig = field(
-        default_factory=TemplateConfig
-    )
-    operator_sets: list[str] | str = "all"
-
-    use_target: bool = False
-
-    num_folds: int = 5
-    num_iterations: int = 3
-    test_size: float = 0.25
+    # Problem Space
+    datasets: list[DatasetConfig]
+    population_sizes: list[int] | None  # None when in search space
+    num_observations: list[int]
+    num_features: list[int] | None  # Will take the num_features from DatasetConfig
+    templates: list[TemplateConfig]
+    operator_sets: list[str]
 
     # Execution
-    cpu: CPUConfig = field(default_factory=CPUConfig)
-    gpu: GPUConfig = field(default_factory=GPUConfig)
+    use_target: bool
+    num_folds: int
+    num_iterations: int
+    test_size: float
+    cpu: CPUConfig
+    gpu: GPUConfig
+
+    # Search Space
+    search_space: dict[str, list[int]] = field(default_factory=dict)
+    required_rate: float | None = None
 
     def determine_observations(self, observations):
         return [
@@ -111,118 +97,163 @@ class ExperimentConfig:
             for obs in observations
         ]
 
-    def iter_problems(self) -> Iterable[ProblemConfig]:
-        return ensure_iter(self.problems)
+    def get_target_objectives(self, dataset: DatasetConfig) -> list[float] | None:
+        if dataset not in self.datasets:
+            print(dataset)
+            raise ValueError("Dataset not found in config")
 
-    def iter_population(self) -> Iterable[int]:
-        return ensure_iter(self.population_sizes)
-
-    def iter_observations(self) -> Iterable[int]:
-        return self.determine_observations(ensure_iter(self.num_observations))
-
-    def iter_features(self) -> Iterable[int]:
-        return ensure_iter(self.num_features)
-
-    def iter_templates(self) -> Iterable[TemplateConfig]:
-        return ensure_iter(self.templates)
-
-    def iter_operators(self) -> Iterable[str]:
-        return ensure_iter(self.operator_sets)
-
-    def get_target_objectives(self, problem: ProblemConfig) -> list[float] | None:
-        if problem not in self.iter_problems():
-            raise ValueError("Problem not found in config")
-
-        return ensure_iter(problem.target_objectives())
+        return dataset.target_objectives()
 
 
-TEST_CONFIG = ExperimentConfig(
-    name="test",
-    problems=PROBLEMS["sin"],
-    population_sizes=[1024, 2048],
-    num_observations=[10_000, 100_000],
-    num_features=1,
-    # templates=[TemplateConfig(2, 3), TemplateConfig(2, 4)],
-    # operator_sets=["small", "all"],
-    gpu=GPUConfig(enabled=True, kernels=(ALL_KV)),
+TEST_EXECUTION_CONFIG = ExperimentConfig(
+    name="test_execution",
+    # Problem Definition
+    datasets=[DATASETS["feynman_I_11_19"], DATASETS["feynman_I_12_1"]],
+    population_sizes=[64, 128],
+    num_observations=[100, 200],
+    num_features=None,
+    templates=[TemplateConfig(2, 3), TemplateConfig(2, 4)],
+    operator_sets=["arith"],
+    # Execution Parameters
     use_target=True,
+    num_folds=3,
+    num_iterations=2,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=True, kernels=(KV.block_reduce, KV.single_kernel)),
 )
 
-ARITH_FEYNMAN_CONFIG = ExperimentConfig(
-    name="arith_feynman",
-    problems=[
-        PROBLEMS["feynman_I_11_19"],
-        PROBLEMS["feynman_I_12_1"],
-        PROBLEMS["feynman_I_18_4"],
-        PROBLEMS["feynman_II_2_42"],
-    ],
-    population_sizes=4096,
-    num_observations=100_000,
+TEST_SEARCH_CONFIG = ExperimentConfig(
+    name="test_search",
+    # Problem Definition
+    datasets=[DATASETS["feynman_I_11_19"], DATASETS["feynman_I_12_1"]],
+    population_sizes=None,
+    num_observations=[100, 1_000],
     num_features=None,
-    operator_sets="arith",
-    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
+    templates=[TemplateConfig(2, 4)],
+    operator_sets=["arith"],
+    # Execution Parameters
     use_target=True,
-)
-
-TRIG_FEYNMAN_CONFIG = ExperimentConfig(
-    name="trig_feynman",
-    problems=[
-        PROBLEMS["feynman_I_18_12"],
-        PROBLEMS["feynman_II_15_4"],
-        PROBLEMS["feynman_III_15_12"],
-        PROBLEMS["feynman_III_17_37"],
-    ],
-    population_sizes=4096,
-    num_observations=100_000,
-    num_features=None,
-    operator_sets="trig",
-    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
-    use_target=True,
-    num_folds=10,
+    num_folds=5,
     num_iterations=1,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=True, kernels=(KV.block_reduce, KV.single_kernel)),
+    # Search Space
+    search_space={"population_size": [8, 16, 32, 64, 128, 256, 512, 1024, 2048]},
+    required_rate=0.8,
 )
 
-SQRT_FEYNMAN_CONFIG = ExperimentConfig(
-    name="sqrt_feynman",
-    problems=[
-        PROBLEMS["feynman_I_8_14"],
-        PROBLEMS["feynman_I_50_26"],
-        PROBLEMS["feynman_II_6_11"],
-        PROBLEMS["feynman_III_10_19"],
+SEARCH_ARITH_FEYNMAN_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="search_arith_feynman",
+    datasets=[
+        DATASETS["feynman_I_11_19"],
+        DATASETS["feynman_I_12_1"],
+        DATASETS["feynman_I_13_12"],
+        DATASETS["feynman_I_18_4"],
     ],
-    population_sizes=4096,
-    num_observations=100_000,
+    population_sizes=None,
+    num_observations=[10**i for i in range(2, 6)],  # 100 - 100_000
     num_features=None,
-    operator_sets="square",
-    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
+    templates=[TemplateConfig(2, 4)],
+    operator_sets=["arith"],
+    # Execution Parameters
     use_target=True,
-    num_folds=10,
+    num_folds=50,
     num_iterations=1,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=ALL_KV),
+    # Search Space
+    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    required_rate=49 / 50,
 )
 
-EXP_FEYNMAN_CONFIG = ExperimentConfig(
-    name="exp_feynman",
-    problems=PROBLEMS["feynman_I_44_4"],
-    population_sizes=4096,
-    num_observations=100_000,
+SEARCH_TRIG_FEYNMAN_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="search_trig_feynman",
+    datasets=[
+        DATASETS["feynman_I_12_11"],
+        DATASETS["feynman_II_15_4"],
+        DATASETS["feynman_III_15_12"],
+        DATASETS["feynman_III_17_37"],
+    ],
+    population_sizes=None,
+    num_observations=[10**i for i in range(2, 6)],  # 100 - 100_000
     num_features=None,
-    operator_sets="exp",
-    gpu=GPUConfig(enabled=True, kernels=(MAIN_KV)),
+    templates=[TemplateConfig(2, 4)],
+    operator_sets=["trig"],
+    # Execution Parameters
     use_target=True,
-    num_folds=10,
+    num_folds=50,
     num_iterations=1,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=ALL_KV),
+    # Search Space
+    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    required_rate=49 / 50,
+)
+
+SEARCH_SQUARE_FEYNMAN_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="search_square_feynman",
+    datasets=[
+        DATASETS["feynman_I_8_14"],
+        DATASETS["feynman_II_24_17"],
+    ],
+    population_sizes=None,
+    num_observations=[10**i for i in range(2, 6)],  # 100 - 100_000
+    num_features=None,
+    templates=[TemplateConfig(2, 4)],
+    operator_sets=["square"],
+    # Execution Parameters
+    use_target=True,
+    num_folds=50,
+    num_iterations=1,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=ALL_KV),
+    # Search Space
+    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    required_rate=49 / 50,
+)
+
+SEARCH_EXP_FEYNMAN_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="search_exp_feynman",
+    datasets=[
+        DATASETS["feynman_I_44_4"],
+    ],
+    population_sizes=None,
+    num_observations=[10**i for i in range(2, 6)],  # 100 - 100_000
+    num_features=None,
+    templates=[TemplateConfig(2, 4)],
+    operator_sets=["exp"],
+    # Execution Parameters
+    use_target=True,
+    num_folds=50,
+    num_iterations=1,
+    test_size=0.25,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=ALL_KV),
+    # Search Space
+    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    required_rate=49 / 50,
 )
 
 
 class Configs:
     # Test experiment
-    TEST = TEST_CONFIG
+    TEST_EXECUTION = TEST_EXECUTION_CONFIG
+    TEST_SEARCH = TEST_SEARCH_CONFIG
 
     # Feynman experiments
-    SIMPLE_FEYNMAN = ARITH_FEYNMAN_CONFIG
-    TRIG_FEYNMAN = TRIG_FEYNMAN_CONFIG
-    SQRT_FEYNMAN = SQRT_FEYNMAN_CONFIG
-    EXP_FEYNMAN = EXP_FEYNMAN_CONFIG
+    # ARITH_FEYNMAN = ARITH_FEYNMAN_CONFIG
+    # TRIG_FEYNMAN = TRIG_FEYNMAN_CONFIG
+    # SQRT_FEYNMAN = SQRT_FEYNMAN_CONFIG
+    # EXP_FEYNMAN = EXP_FEYNMAN_CONFIG
 
 
 cfg = Configs()

@@ -1,115 +1,166 @@
-from collections.abc import Generator
+import csv
+import os
+from collections.abc import Callable
 from datetime import datetime
+from itertools import chain, product
 from pathlib import Path
 
-import numpy as np
 from pygom import KernelVersion
 
 from src.db import create_db
 from src.experiment.experiment_config import ExperimentConfig, cfg
-from src.experiment.run import run_cpu_tasks, run_gpu_tasks
-from src.experiment.task import Task, problems
-from src.plot.plots import plot
+from src.experiment.problem import Problem, generate_problems
+from src.experiment.run import run_cpu_tasks, run_gpu_tasks, run_tasks
+from src.experiment.task import (
+    TaskTransform,
+    cpu_transform,
+    gpu_transform,
+    override_tasks,
+    task_factory,
+)
+from src.plot.plots import create_plots
 
-LINE_UP = "\033[1A"
-LINE_CLEAR = "\x1b[2K"
-
-
-def print_status(msg: str, dry_run: bool, n: int = 0):
-    if dry_run:
-        return
-
-    if n > 0:
-        for _ in range(n):
-            print(LINE_UP, end=LINE_CLEAR)
-
-    print(msg)
+MIN_POPULATION = 8
+MAX_POPULATION = 65536
 
 
-def cpu_jobs(
-    problems: Generator[Task],
-) -> Generator[Task]:
-    yield from problems
+def hardware_helper(hardware: str | KernelVersion):
+    if hardware == "cpu":
+        return run_cpu_tasks, cpu_transform()
+    else:
+        return run_gpu_tasks, gpu_transform(hardware)
 
 
-def gpu_jobs(
-    problems: Generator[Task], kernels: tuple[KernelVersion, ...]
-) -> Generator[Task]:
-    for task in problems:
-        for kernel in kernels:
-            new_task: Task = dict(task)
-            new_task["accelerated"] = True
-            new_task["kernel"] = kernel
+def grid_search_helper(
+    problem: Problem,
+    config: ExperimentConfig,
+    runner: Callable[..., float | None],
+    hardware_transform: TaskTransform,
+    writer: csv.DictWriter[str],
+    output_directory: Path,
+    required_rate: float,
+    kernel_str: str,
+) -> dict[str, int] | None:
+    search_space: dict[str, list[int]] = config.search_space
 
-            yield new_task
+    factory = task_factory(problem, config, output_directory)
 
+    for values in product(*search_space.values()):
+        tasks = hardware_transform(factory())
 
-def all_jobs(output_dir: Path, cfg: ExperimentConfig, dry_run: bool = False):
-    # Run CPU jobs
-    if cfg.cpu.enabled:
-        print_status("Starting CPU tasks...", dry_run)
+        overrides: dict[str, int] = dict(zip(search_space.keys(), values, strict=True))
 
-        run_cpu_tasks(
-            output_dir,
-            cpu_jobs(
-                problems(np.random.default_rng(seed=42), output_dir, cfg, dry_run)
-            ),
-            dry_run=dry_run,
+        rate: float = run_tasks(
+            tasks,
+            override_tasks(overrides),
+            runner,
+            output_directory,
+            required_rate=required_rate,
         )
 
-        print_status("Finished with CPU tasks", dry_run, n=1)
+        writer.writerow({**problem, **overrides, "kernel": kernel_str, "rate": rate})
 
-    print_status("Starting GPU tasks...", dry_run)
+        if rate is not None and rate >= required_rate:
+            return (overrides, rate)
 
-    # Run GPU jobs
-    run_gpu_tasks(
-        output_dir,
-        gpu_jobs(
-            problems(
-                np.random.default_rng(seed=42),
-                output_dir,
-                cfg,
-                dry_run,
-            ),
-            cfg.gpu.kernels,
-        ),
+    return None
+
+
+def grid_search(config: ExperimentConfig, directory: Path):
+    output_directory = directory / config.name
+
+    os.makedirs(output_directory, exist_ok=True)
+
+    search_space: dict[str : list[int]] = config.search_space
+    required_rate: float | None = config.required_rate
+
+    hardware: tuple[KernelVersion | str, ...] = (
+        config.gpu.kernels if config.gpu.enabled else ()
+    ) + (("cpu",) if config.cpu.enabled else ())
+
+    # Check if search space is not empty
+    if not search_space:
+        raise ValueError("Search space cannot be empty for grid search")
+
+    # Check if required_rate is defined
+    if required_rate is None:
+        raise ValueError("Required rate cannot be None for grid search")
+
+    results_path = output_directory / "grid_search_results.csv"
+    fieldnames: list[str] = list(
+        dict.fromkeys(
+            chain(
+                Problem.__annotations__,
+                search_space,
+                ["kernel", "rate"],
+            )
+        )
+    )
+
+    with open(results_path, "w", newline="") as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+
+        # Loop over problems
+        for problem in generate_problems(config):
+            # Loop over hardware
+            for h in hardware:
+                runner, transform = hardware_helper(h)
+
+                kernel_str: str = (
+                    str(h).replace("KernelVersion.", "") if h != "cpu" else "cpu"
+                )
+
+                # Perform grid search for problem
+                grid_search_helper(
+                    problem,
+                    config,
+                    runner,
+                    transform,
+                    writer,
+                    output_directory,
+                    required_rate,
+                    kernel_str,
+                )
+
+
+def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = False):
+    output_directory = directory / config.name
+
+    if not dry_run:
+        os.makedirs(output_directory, exist_ok=True)
+
+    cpu_batches = []
+    gpu_batches = []
+
+    # Loop over problems
+    for problem in generate_problems(config):
+        factory = task_factory(problem, config, output_directory, dry_run=dry_run)
+
+        if config.cpu.enabled:
+            cpu_batches.append(cpu_transform()(factory()))
+
+        if config.gpu.enabled:
+            for kernel in config.gpu.kernels:
+                gpu_batches.append(gpu_transform(kernel)(factory()))
+
+    run_tasks(
+        chain.from_iterable(cpu_batches),
+        None,
+        run_cpu_tasks,
+        output_directory,
         dry_run=dry_run,
     )
 
-    print_status("Finished with GPU tasks", dry_run, n=2)
+    run_tasks(
+        chain.from_iterable(gpu_batches),
+        None,
+        run_gpu_tasks,
+        output_directory,
+        dry_run=dry_run,
+    )
 
-
-def print_experiment_header(name: str) -> None:
-    title = f"### {name.replace('_', ' ').title()} Experiment ###"
-    line = "#" * len(title)
-
-    print(line)
-    print(title)
-    print(line)
-
-
-def run_experiment(dir: Path, config: ExperimentConfig, dry_run: bool = False):
-    # if not dry_run:
-    print_experiment_header(config.name)
-
-    output_directory = dir / config.name
-
-    all_jobs(output_directory, config, dry_run)
-
-    if not dry_run:
-        print_status("Starting database creation...", dry_run)
-        create_db(output_directory)
-        print_status("Finished with database creation", dry_run, n=1)
-
-        # print_status("Starting plot creation...", dry_run)
-        # plot(output_directory)
-        # print_status("Finished with plot creation", dry_run, n=1)
-
-
-def plot_experiment(dir: Path, config_name: str):
-    output_directory = dir / config_name
-
-    plot(output_directory)
+    create_db(output_directory)
 
 
 def main():
@@ -117,10 +168,8 @@ def main():
     # run_date = "2026-01-14_17_26_08"
     output_directory = Path("results") / run_date
 
-    run_experiment(output_directory, cfg.SIMPLE_FEYNMAN)
-    run_experiment(output_directory, cfg.TRIG_FEYNMAN)
-    run_experiment(output_directory, cfg.SQRT_FEYNMAN)
-    run_experiment(output_directory, cfg.EXP_FEYNMAN)
+    # run_experiment(cfg.TEST_EXECUTION, output_directory)
+    grid_search(cfg.TEST_SEARCH, output_directory)
 
 
 if __name__ == "__main__":
