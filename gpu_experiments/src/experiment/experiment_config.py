@@ -91,10 +91,10 @@ class ExperimentConfig:
     search_space: dict[str, list[int]] = field(default_factory=dict)
     required_rate: float | None = None
 
-    def determine_observations(self, observations):
+    def determine_observations(self):
         return [
             int(obs * (1 - self.test_size) * (1 - 1 / self.num_folds))
-            for obs in observations
+            for obs in self.num_observations
         ]
 
     def get_target_objectives(self, dataset: DatasetConfig) -> list[float] | None:
