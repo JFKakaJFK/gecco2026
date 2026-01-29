@@ -67,10 +67,11 @@ class MOBinaryGOMEA final : public MethodBase {
         throw std::runtime_error("");
       }
 
+      auto&     q = static_cast<MOQuality&>(s[0].quality());
       for (usize i = 0; i < problem.num_objectives(); i++) {
-        obj[i] = s[0].quality().objectives(i);
+        obj[i] = q.objectives(i);
       }
-      *con = s[0].quality().constraint_value;
+      *con = q.constraint_value;
     };
 
     try {

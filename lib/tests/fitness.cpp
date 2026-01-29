@@ -13,13 +13,13 @@ TEST_CASE("goblin::lib::fitness") {
   Eigen::Vector3d b(1.0, 0.0, 0.0);
   Eigen::Vector3d c(0.0, 0.0, 0.1);
 
-  auto qa = f.worst();
+  auto _qa = f.worst(); auto& qa = static_cast<MOQuality&>(*_qa);
   qa.objectives = a.cast<CType>();
   qa.constraint_value = 0.0;
-  auto qb = f.worst();
+  auto _qb = f.worst(); auto& qb = static_cast<MOQuality&>(*_qb);
   qb.objectives = b.cast<CType>();
   qb.constraint_value = 0.0;
-  auto qc = f.worst();
+  auto _qc = f.worst(); auto& qc = static_cast<MOQuality&>(*_qc);
   qc.objectives = c.cast<CType>();
   qc.constraint_value = 0.0;
 

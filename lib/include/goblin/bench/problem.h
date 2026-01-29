@@ -42,8 +42,8 @@ class PyFunctionBase : MOFunctionBase {
     solution.discrete_active().fill(true);
     solution.continuous_active().fill(true);
     auto [objectives, cv] = eval(solution);
-    solution.quality().objectives = objectives;
-    solution.quality().constraint_value = cv;
+    static_cast<MOQuality&>(solution.quality()).objectives = objectives;
+    static_cast<MOQuality&>(solution.quality()).constraint_value = cv;
   };
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
     evaluate(solution);
@@ -70,27 +70,30 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    auto&q = static_cast<MOQuality&>(solution.quality());
+    q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
                                               solution.discrete_active(), solution.continuous_active());
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+      q.objectives(i) = ov;
+      q.constraint_value += std::max(CType(0.0), cv);
     }
   };
 
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    auto& q = static_cast<MOQuality&>(solution.quality());
+    const auto& pq = static_cast<const MOQuality&>(parent.quality());
+    q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
-          parent.continuous_active(), parent.quality().objectives(i), parent.quality().constraint_value,
+          parent.continuous_active(), pq.objectives(i), pq.constraint_value,
           subset.discrete, subset.continuous);
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+      q.objectives(i) = ov;
+      q.constraint_value += std::max(CType(0.0), cv);
     }
   };
 
@@ -201,9 +204,10 @@ class BenchmarkInstance final : public InstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    auto& q = static_cast<MOQuality&>(s.quality());
+    q.objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(q.objectives.size()) >= fitness().num_objectives());
+    q.constraint_value = 0.0;
     _target.update(s, false);
   };
 

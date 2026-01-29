@@ -66,8 +66,8 @@ void check_eq(SolutionBase& lhs, SolutionBase& rhs, usize i) {
   REQUIRE_MESSAGE((lhs.continuous_active() == rhs.continuous_active()).all(), "idx: ", i,
                   ", lhs: ", lhs.continuous_active(), ", rhs: ", rhs.continuous_active());
 
-  REQUIRE_MESSAGE(lhs.quality().objectives == rhs.quality().objectives, "idx: ", i);
-  REQUIRE_MESSAGE(lhs.quality().constraint_value == rhs.quality().constraint_value, "idx: ", i);
+  REQUIRE_MESSAGE(static_cast<const MOQuality&>(lhs.quality()).objectives == static_cast<const MOQuality&>(rhs.quality()).objectives, "idx: ", i);
+  REQUIRE_MESSAGE(static_cast<const MOQuality&>(lhs.quality()).constraint_value == static_cast<const MOQuality&>(rhs.quality()).constraint_value, "idx: ", i);
 
   REQUIRE_MESSAGE(lhs.num_extensions() == rhs.num_extensions(), "idx: ", i);
   for(const auto& _l: lhs.extensions()){
@@ -94,7 +94,7 @@ void check_set(SolutionSetBase& set) {
   auto discrete = Vec<DType>::Zero(2);
   auto continuous = Vec<CType>::Zero(3);
   Solution s(f.worst(), discrete, continuous);
-  s.quality().objectives = Vec<CType>::Zero(2);
+  static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
 
   REQUIRE(s.num_extensions() == 0);
   REQUIRE(!s.has_extension(AExt::type_key()));
@@ -173,7 +173,7 @@ TEST_CASE("goblin::lib::solution_extension") {
     auto discrete = Vec<DType>::Zero(2);
     auto continuous = Vec<CType>::Zero(3);
     Solution s(f.worst(), discrete, continuous);
-    s.quality().objectives = Vec<CType>::Zero(2);
+    static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
 
     aos_set.add(s);
     soa_set.add(s);

@@ -21,41 +21,31 @@ namespace goblin {
 // -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
 // -> performance issue?
 
+/// Something that describes how good a solution is
 class QualityBase {
  public:
 
  virtual std::unique_ptr<QualityBase> clone() const = 0;
 
  virtual ~QualityBase() = default;
-};
 
-/// Something that describes how good a solution is
-class Quality {
- public:
-  Quality() = delete;
-
-  Vec<CType> objectives;
-  CType constraint_value;
-
- private:
-  friend class MOFitness;  // Allow constructing qualities
-  Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
-      : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+ // protected:
+ // QualityBase() = default;
 };
 
 class FitnessBase {
  public:
   virtual usize num_objectives() const = 0;
 
-  virtual Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+  virtual Ordering cmp(const QualityBase& lhs, const QualityBase& rhs, std::optional<usize> objective) const = 0;
 
-  virtual CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+  virtual CType distance(const QualityBase& lhs, const QualityBase& rhs, std::optional<usize> objective) const = 0;
 
   virtual void log_header(std::ostream& os) const = 0;
 
-  virtual void log(std::ostream& os, const Quality& quality) const = 0;
+  virtual void log(std::ostream& os, const QualityBase& quality) const = 0;
 
-  virtual std::string format(const Quality& quality) const {
+  virtual std::string format(const QualityBase& quality) const {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
@@ -66,9 +56,20 @@ class FitnessBase {
 
 class ArchiveFitnessBase : public FitnessBase {
  public:
-  virtual Quality worst() const = 0;
+  virtual std::unique_ptr<QualityBase> worst() const = 0;
 
   virtual ~ArchiveFitnessBase() = default;
+};
+
+/// Something that describes how good a solution is
+class MOQuality : public QualityBase {
+ public:
+    std::unique_ptr<QualityBase> clone() const override {
+        return std::make_unique<MOQuality>(*this);
+    };
+
+  Vec<CType> objectives;
+  CType constraint_value;
 };
 
 class MOFitness final : public ArchiveFitnessBase {
@@ -79,18 +80,19 @@ class MOFitness final : public ArchiveFitnessBase {
 
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
-  void log(std::ostream& os, const Quality& quality) const override final {
+  void log(std::ostream& os, const QualityBase& quality) const override final {
+      const auto& q = static_cast<const MOQuality&>(quality);
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
         os << ',';
       }
-      os << quality.objectives(i);
+      os << q.objectives(i);
     }
-    os << "]\"," << quality.constraint_value;
+    os << "]\"," << q.constraint_value;
   };
 
-  std::string format(const Quality& quality) const override final {
+  std::string format(const QualityBase& quality) const override final {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
@@ -98,40 +100,46 @@ class MOFitness final : public ArchiveFitnessBase {
 
   usize num_objectives() const override final { return _num_objectives; };
 
-  Ordering cmp(const Quality& lhs,
-               const Quality& rhs,
+  Ordering cmp(const QualityBase& lhs,
+               const QualityBase& rhs,
                std::optional<usize> objective = std::nullopt) const override final {
+    const auto& ql = static_cast<const MOQuality&>(lhs);
+    const auto& qr = static_cast<const MOQuality&>(rhs);
     // Constraints are always minimized
-    Ordering o = cmp(lhs.constraint_value, rhs.constraint_value, _epsilon, true);
+    Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
 
     if (o == Ordering::Equal || o == Ordering::NonDominated) {
       if (objective.has_value()) {
-        o = cmp(lhs.objectives(objective.value()), rhs.objectives(objective.value()), _epsilon, _minimize);
+        o = cmp(ql.objectives(objective.value()), qr.objectives(objective.value()), _epsilon, _minimize);
       } else {
         for (usize i = 0; i < _num_objectives && o != Ordering::NonDominated; i++) {
-          o = o | cmp(lhs.objectives(i), rhs.objectives(i), _epsilon, _minimize);
+          o = o | cmp(ql.objectives(i), qr.objectives(i), _epsilon, _minimize);
         }
       }
     }
     return o;
   };
 
-  CType distance(const Quality& lhs,
-                 const Quality& rhs,
+  CType distance(const QualityBase& lhs,
+                 const QualityBase& rhs,
                  std::optional<usize> objective = std::nullopt) const override final {
+    const auto& ql = static_cast<const MOQuality&>(lhs);
+    const auto& qr = static_cast<const MOQuality&>(rhs);
     CType dist;
     if (objective.has_value()) {
-      dist = distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
+      dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
     } else {
-      dist = (lhs.objectives - rhs.objectives).norm();
+      dist = (ql.objectives - qr.objectives).norm();
     }
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
 
-  Quality worst() const override final {
-    return Quality(Vec<CType>::Constant(_num_objectives, (_minimize ? CType(1.0) : CType(-1.0)) *
-                                                             std::numeric_limits<CType>().infinity()),
-                   std::numeric_limits<CType>().infinity());
+  std::unique_ptr<QualityBase> worst() const override final {
+      const CType inf = std::numeric_limits<CType>().infinity();
+      auto q = std::make_unique<MOQuality>();
+      q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
+      q->constraint_value = inf;
+                   return q;
   };
 
  private:

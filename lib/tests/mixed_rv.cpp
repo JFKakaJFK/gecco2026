@@ -24,7 +24,7 @@ TEST_CASE("goblin::methods::mixed_rv") {
   auto [front, _] = rvg.run(sphere, budget);
 
   REQUIRE(front->empty() == false);
-  CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+  REQUIRE(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives[0] <= 1e-8);
 
   auto mixed_full = MixedGOMEA(PopulationOptions(), RvOptions{.max_nis = 100},
                                IMSOptions{
@@ -36,7 +36,7 @@ TEST_CASE("goblin::methods::mixed_rv") {
   front = std::get<0>(mixed_full.run(sphere, budget));
 
   REQUIRE(front->empty() == false);
-  CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+  REQUIRE(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives[0] <= 1e-8);
 
   for (usize i = 0; i <= 1; i++) {
     auto mixed_lt = MixedGOMEA(PopulationOptions(), RvOptions{.intron_aware = i > 0, .max_nis = 100},
@@ -49,6 +49,6 @@ TEST_CASE("goblin::methods::mixed_rv") {
     front = std::get<0>(mixed_lt.run(sphere, budget));
 
     REQUIRE(front->empty() == false);
-    CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+    REQUIRE(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives[0] <= 1e-8);
   }
 }

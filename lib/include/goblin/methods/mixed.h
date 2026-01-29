@@ -775,7 +775,7 @@ class Population {
         std::println("Continuous Active: ({})", cactive_ok);
         std::println("  Solution: {}", s_cactive);
         std::println("  Parent:   {}", p_cactive);
-        std::println("Quality: ({})", quality_ok);
+        std::println("  Quality: ({})", quality_ok);
         std::println("  Solution: {}", s_quality);
         std::println("  Parent:   {}", p_quality);
         std::abort();
@@ -794,7 +794,7 @@ class Population {
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      auto expected = copy[i].quality(), actual = set[i].quality();
+      auto expected = static_cast<const MOQuality&>(copy[i].quality()), actual = static_cast<const MOQuality&>(set[i].quality());
       bool definitely_different =
           (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
       if (expected.objectives.array().isFinite().all()) {

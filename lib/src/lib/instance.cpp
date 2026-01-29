@@ -15,13 +15,15 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
     return grads;
   }
 
-  std::vector<Quality> actual;
+  // back up qualities
+  std::vector<std::unique_ptr<QualityBase>> actual;
   actual.reserve(indices.size());
   for (size_t i = 0; i < indices.size(); i++) {
-    actual.push_back(solutions[indices[i]].quality());
+    actual.push_back(solutions[indices[i]].quality().clone());
   }
 
-  std::vector<Quality> q_e(indices.size(), archive_fitness().worst());
+  std::vector<std::unique_ptr<QualityBase>> q_e;
+  q_e.reserve(indices.size());
 
   std::vector<usize> solutions_to_evaluate;
   solutions_to_evaluate.reserve(indices.size());
@@ -40,8 +42,9 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
     evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
     evaluations += solutions_to_evaluate.size();
 
+    q_e.clear();
     for (size_t i = 0; i < indices.size(); i++) {
-      q_e[i] = solutions[indices[i]].quality();
+        q_e.push_back(solutions[indices[i]].quality().clone());
     }
 
     // +e
@@ -56,9 +59,9 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
     evaluations += solutions_to_evaluate.size();
 
     for (size_t i = 0; i < indices.size(); i++) {
-      CType dist = fitness().distance(q_e[i], solutions[indices[i]].quality(), std::nullopt) / ee;
+      CType dist = fitness().distance(*q_e[i], solutions[indices[i]].quality(), std::nullopt) / ee;
       if (!isna(dist) && dist > 0.0) {
-        Ordering o = fitness().cmp(q_e[i], solutions[indices[i]].quality(), std::nullopt);
+        Ordering o = fitness().cmp(*q_e[i], solutions[indices[i]].quality(), std::nullopt);
         if (o == Ordering::Better) {
           grads(i, c) = dist;
         } else if (o == Ordering::Worse) {
@@ -78,7 +81,7 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
 
   // restore actual quality
   for (size_t i = 0; i < indices.size(); i++) {
-    solutions[indices[i]].quality() = actual[i];
+    solutions[indices[i]].assign_quality(*actual[i]);
   }
   return grads;
 }

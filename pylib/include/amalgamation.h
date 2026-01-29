@@ -63,9 +63,15 @@ using f64 = double;
 
 // currently the python conversion between nanobind/numpy is broken - discrete
 // values + active don't translate?
-using BType = u8;  // avoid implicit bitset types
+using BType = u8;  // not using bool avoids implicit bitset types
 using DType = u16;
 using CType = f64;
+
+// Is this a good idea?
+// template <typename T>
+// using Box = std::unique_ptr<T>;
+// template <typename T>
+// using Rc = std::shared_ptr<T>;
 
 template <typename T>
 using Vec = Eigen::VectorX<T>;
@@ -239,32 +245,30 @@ namespace goblin {
 // -> performance issue?
 
 /// Something that describes how good a solution is
-class Quality {
+class QualityBase {
  public:
-  Quality() = delete;
 
-  Vec<CType> objectives;
-  CType constraint_value;
+ virtual std::unique_ptr<QualityBase> clone() const = 0;
 
- private:
-  friend class MOFitness;  // Allow constructing qualities
-  Quality(Vec<CType> objectives, CType constraint_value = CType(0.0))
-      : objectives(std::move(objectives)), constraint_value(std::max(CType(0.0), constraint_value)) {};
+ virtual ~QualityBase() = default;
+
+ // protected:
+ // QualityBase() = default;
 };
 
 class FitnessBase {
  public:
   virtual usize num_objectives() const = 0;
 
-  virtual Ordering cmp(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+  virtual Ordering cmp(const QualityBase& lhs, const QualityBase& rhs, std::optional<usize> objective) const = 0;
 
-  virtual CType distance(const Quality& lhs, const Quality& rhs, std::optional<usize> objective) const = 0;
+  virtual CType distance(const QualityBase& lhs, const QualityBase& rhs, std::optional<usize> objective) const = 0;
 
   virtual void log_header(std::ostream& os) const = 0;
 
-  virtual void log(std::ostream& os, const Quality& quality) const = 0;
+  virtual void log(std::ostream& os, const QualityBase& quality) const = 0;
 
-  virtual std::string format(const Quality& quality) const {
+  virtual std::string format(const QualityBase& quality) const {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
@@ -275,9 +279,20 @@ class FitnessBase {
 
 class ArchiveFitnessBase : public FitnessBase {
  public:
-  virtual Quality worst() const = 0;
+  virtual std::unique_ptr<QualityBase> worst() const = 0;
 
   virtual ~ArchiveFitnessBase() = default;
+};
+
+/// Something that describes how good a solution is
+class MOQuality : public QualityBase {
+ public:
+    std::unique_ptr<QualityBase> clone() const override {
+        return std::make_unique<MOQuality>(*this);
+    };
+
+  Vec<CType> objectives;
+  CType constraint_value;
 };
 
 class MOFitness final : public ArchiveFitnessBase {
@@ -288,18 +303,19 @@ class MOFitness final : public ArchiveFitnessBase {
 
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
-  void log(std::ostream& os, const Quality& quality) const override final {
+  void log(std::ostream& os, const QualityBase& quality) const override final {
+      const auto& q = static_cast<const MOQuality&>(quality);
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
         os << ',';
       }
-      os << quality.objectives(i);
+      os << q.objectives(i);
     }
-    os << "]\"," << quality.constraint_value;
+    os << "]\"," << q.constraint_value;
   };
 
-  std::string format(const Quality& quality) const override final {
+  std::string format(const QualityBase& quality) const override final {
     std::stringstream ss;
     log(ss, quality);
     return ss.str();
@@ -307,40 +323,46 @@ class MOFitness final : public ArchiveFitnessBase {
 
   usize num_objectives() const override final { return _num_objectives; };
 
-  Ordering cmp(const Quality& lhs,
-               const Quality& rhs,
+  Ordering cmp(const QualityBase& lhs,
+               const QualityBase& rhs,
                std::optional<usize> objective = std::nullopt) const override final {
+    const auto& ql = static_cast<const MOQuality&>(lhs);
+    const auto& qr = static_cast<const MOQuality&>(rhs);
     // Constraints are always minimized
-    Ordering o = cmp(lhs.constraint_value, rhs.constraint_value, _epsilon, true);
+    Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
 
     if (o == Ordering::Equal || o == Ordering::NonDominated) {
       if (objective.has_value()) {
-        o = cmp(lhs.objectives(objective.value()), rhs.objectives(objective.value()), _epsilon, _minimize);
+        o = cmp(ql.objectives(objective.value()), qr.objectives(objective.value()), _epsilon, _minimize);
       } else {
         for (usize i = 0; i < _num_objectives && o != Ordering::NonDominated; i++) {
-          o = o | cmp(lhs.objectives(i), rhs.objectives(i), _epsilon, _minimize);
+          o = o | cmp(ql.objectives(i), qr.objectives(i), _epsilon, _minimize);
         }
       }
     }
     return o;
   };
 
-  CType distance(const Quality& lhs,
-                 const Quality& rhs,
+  CType distance(const QualityBase& lhs,
+                 const QualityBase& rhs,
                  std::optional<usize> objective = std::nullopt) const override final {
+    const auto& ql = static_cast<const MOQuality&>(lhs);
+    const auto& qr = static_cast<const MOQuality&>(rhs);
     CType dist;
     if (objective.has_value()) {
-      dist = distance(lhs.objectives(objective.value()), rhs.objectives(objective.value()));
+      dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
     } else {
-      dist = (lhs.objectives - rhs.objectives).norm();
+      dist = (ql.objectives - qr.objectives).norm();
     }
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
 
-  Quality worst() const override final {
-    return Quality(Vec<CType>::Constant(_num_objectives, (_minimize ? CType(1.0) : CType(-1.0)) *
-                                                             std::numeric_limits<CType>().infinity()),
-                   std::numeric_limits<CType>().infinity());
+  std::unique_ptr<QualityBase> worst() const override final {
+      const CType inf = std::numeric_limits<CType>().infinity();
+      auto q = std::make_unique<MOQuality>();
+      q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
+      q->constraint_value = inf;
+                   return q;
   };
 
  private:
@@ -381,9 +403,6 @@ class MOFitness final : public ArchiveFitnessBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/solution.h included by goblin.h                                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include <typeindex>
-#include <unordered_map>
-#include <unordered_set>
 #ifndef _GOBLIN_LIB_SOLUTION_H
 #define _GOBLIN_LIB_SOLUTION_H
 
@@ -511,13 +530,23 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
+/* imported from another header
+class QualityBase {
+ public:
+
+ virtual std::unique_ptr<QualityBase> clone() const = 0;
+
+ virtual ~QualityBase() = default;
+};
+ */
+
 struct SolutionExtensionKey {
   void* token = nullptr;
-
-  bool operator==(const SolutionExtensionKey& other) const noexcept { return token == other.token; }
-
-  bool operator!=(const SolutionExtensionKey& other) const noexcept { return token != other.token; }
 };
+
+inline bool operator==(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token == rhs.token; }
+
+inline bool operator!=(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token != rhs.token; }
 
 struct SolutionExtensionKeyHash {
   usize operator()(const SolutionExtensionKey& key) const noexcept { return std::hash<void*>{}(key.token); };
@@ -525,12 +554,6 @@ struct SolutionExtensionKeyHash {
 
 class SolutionExtensionBase {
  public:
-  // SolutionExtensionBase(const SolutionExtensionBase&) = delete;
-  // SolutionExtensionBase(SolutionExtensionBase&&) = delete;
-
-  // SolutionExtensionBase& operator=(const SolutionExtensionBase&) = delete;
-  // SolutionExtensionBase& operator=(SolutionExtensionBase&&) = delete;
-
   virtual std::unique_ptr<SolutionExtensionBase> clone() const = 0;
   virtual SolutionExtensionKey key() const = 0;
 
@@ -553,7 +576,7 @@ struct SolutionExtension : public SolutionExtensionBase {
 class SolutionBase {
  public:
   virtual bool has_extension(const SolutionExtensionKey& key) const = 0;
-  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0;
+  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0; // this is fine
   virtual std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
       const SolutionExtensionKey& key) const = 0;
   virtual std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
@@ -561,22 +584,14 @@ class SolutionBase {
   virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
   virtual void clear_extensions() = 0;
 
+  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full copies?? (size, begin, end, proxy to underlying collection)
   virtual usize num_extensions() const = 0;
   virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
   virtual std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() = 0;
 
-  virtual void assign_quality(const Quality& quality) {
-
-  };
-
-  // Exposing the map directly doesn't seem to work with litgen/nanobind
-  // virtual std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>
-  // data() {
-  //     return std::unordered_map<SolutionExtensionKey, std::unique_ptr<SolutionDataBase>, SolutionExtensionKeyHash>{};
-  // };
-
-  virtual Quality& quality() = 0;
-  virtual const Quality& quality() const = 0;
+  virtual QualityBase& quality() = 0; // nb::rv_policy::reference_internal
+  virtual const QualityBase& quality() const = 0; // nb::rv_policy::reference_internal
+  virtual void assign_quality(const QualityBase& quality) = 0;
 
   inline usize num_discrete() const { return discrete_values().size(); };
 
@@ -608,7 +623,7 @@ class SolutionBase {
         get_or_insert_extension(e);
       }
 
-      quality() = other.quality();
+      assign_quality(other.quality());
     }
 
     return *this;
@@ -709,13 +724,12 @@ class SolutionBase {
   virtual ~SolutionBase() {};
 };
 
-
 class Solution : public SolutionBase {
  public:
-  Solution(Quality quality,
+  Solution(std::unique_ptr<QualityBase> quality,
            std::optional<Vec<DType>> discrete_values = std::nullopt,
            std::optional<Vec<CType>> continuous_values = std::nullopt)
-      : _quality(quality) {
+      : _quality(std::move(quality)) {
     if (discrete_values.has_value()) {
       _discrete_values = discrete_values.value();
       _discrete_active.resize(_discrete_values.size());
@@ -734,7 +748,7 @@ class Solution : public SolutionBase {
         _discrete_active(other.discrete_active()),
         _continuous_values(other.continuous_values()),
         _continuous_active(other.continuous_active()),
-        _quality(other.quality()) {
+        _quality(other.quality().clone()) {
     _extensions.clear();
     for (const auto& e : other.extensions()) {
       _extensions.push_back(e.get().clone());
@@ -764,7 +778,7 @@ class Solution : public SolutionBase {
         get_or_insert_extension(e);
       }
 
-      quality() = other.quality();
+      assign_quality(other.quality());
     }
     return *this;
   }
@@ -780,22 +794,24 @@ class Solution : public SolutionBase {
     return *this;
   }
 
-  // explicit
+  // explicitly not explicit since implicit conversion is the intent
   Solution(const SolutionBase& s)
       : _discrete_values(s.discrete_values()),
         _discrete_active(s.discrete_active()),
         _continuous_values(s.continuous_values()),
         _continuous_active(s.continuous_active()),
-        _quality(s.quality()) {
-    // *this = s;
+        _quality(s.quality().clone()) {
     _extensions.clear();
     for (const auto& e : s.extensions()) {
       _extensions.push_back(e.get().clone());
     }
   };
 
-  Quality& quality() override final { return _quality; }
-  const Quality& quality() const override final { return _quality; }
+  void assign_quality(const QualityBase& quality) override final {
+      _quality = quality.clone();
+  };
+  QualityBase& quality() override final { return *_quality; } // nb::rv_policy::reference_internal
+  const QualityBase& quality() const override final { return *_quality; } // nb::rv_policy::reference_internal
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
@@ -876,7 +892,7 @@ class Solution : public SolutionBase {
   Vec<CType> _continuous_values;
   Active _continuous_active;
   std::vector<std::unique_ptr<SolutionExtensionBase>> _extensions{};
-  Quality _quality;
+  std::unique_ptr<QualityBase> _quality;
 };
 
 class SolutionSetBase {
@@ -951,8 +967,11 @@ class SoASet;
 template <int StorageOrder>
 class SolutionHandle : public SolutionBase {
  public:
-  Quality& quality() override final { return arena->quality[idx]; }
-  const Quality& quality() const override final { return arena->quality[idx]; }
+ void assign_quality(const QualityBase& quality) override {
+     arena->quality[idx] = quality.clone();
+ }
+  QualityBase& quality() override final { return *arena->quality[idx]; }
+  const QualityBase& quality() const override final { return *arena->quality[idx]; }
 
   RefS<Vec<DType>> discrete_values() override final { return arena->discrete.row(idx); }
   CRefS<Vec<DType>> discrete_values() const override final { return arena->discrete.row(idx); }
@@ -1161,9 +1180,9 @@ class SoASet : public SolutionSetBase {
     continuous_active.row(_size) = _s.continuous_active();
     assert(quality.size() >= _size);
     if (quality.size() == _size) {
-      quality.push_back(_s.quality());
+      quality.push_back(_s.quality().clone());
     } else {
-      quality[_size] = _s.quality();
+      quality[_size] = _s.quality().clone();
     }
 
     if (extensions.size() == _size) {
@@ -1186,8 +1205,8 @@ class SoASet : public SolutionSetBase {
       continuous.row(idx) = continuous.row(_size);
       discrete_active.row(idx) = discrete_active.row(_size);
       continuous_active.row(idx) = continuous_active.row(_size);
-      std::swap(extensions[idx], extensions[_size]);
-      quality[idx] = quality[_size];
+      std::swap(extensions[idx], extensions[_size]); extensions[_size].clear();
+      quality[idx] = std::move(quality[_size]);
 
       // ! no need to adjust the handles, but any references to handles may be
       // out of date now...
@@ -1218,7 +1237,7 @@ class SoASet : public SolutionSetBase {
   Eigen::Matrix<BType, Eigen::Dynamic, Eigen::Dynamic, StorageOrder> continuous_active;
 
   std::vector<std::vector<std::unique_ptr<SolutionExtensionBase>>> extensions;
-  std::vector<Quality> quality;
+  std::vector<std::unique_ptr<QualityBase>> quality;
 };
 
 using DefaultSolutionSet = AoSSet;
@@ -2746,7 +2765,7 @@ class LinkageModelBase {
 
   virtual std::unique_ptr<LinkageModelBase> clone() const = 0;
 
-  virtual ~LinkageModelBase() {};
+  virtual ~LinkageModelBase() = default; //{};
 };
 
 class UnivariateFOS final : public LinkageModelBase {
@@ -6861,7 +6880,7 @@ class SRProblem : public GPInstanceBase {
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
     Array<ScalarType> params;
     for (auto i : indices) {
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, solutions[i].quality());
+      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, static_cast<MOQuality&>(solutions[i].quality()));
     }
   };
 
@@ -6892,9 +6911,9 @@ class SRProblem : public GPInstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    static_cast<MOQuality&>(s.quality()).objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(static_cast<MOQuality&>(s.quality()).objectives.size()) >= fitness().num_objectives());
+    static_cast<MOQuality&>(s.quality()).constraint_value = 0.0;
     _target.update(s, false);
   };
 
@@ -6929,17 +6948,17 @@ class SRProblem : public GPInstanceBase {
     log_solution(os, solution);
     os << "\",";
     for (usize i = 0; i < objectives.size(); i++) {
-      os << solution.quality().objectives(i) << ',';
+      os << static_cast<MOQuality&>(solution.quality()).objectives(i) << ',';
     }
     if (Y_test.size() > 0) {
       // TODO cache this -> solution gets optional second quality?
       // Then again, one can just call predict using the SKlearn regressor for actual use
       // and for all other experiments the overhead is not an issue yet
-      Quality q_test = archive_fitness().worst();
+      std::unique_ptr<QualityBase> q_test = archive_fitness().worst();
       Array<ScalarType> params;  // TODO fit FC params...
-      eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
+      eval_one(solution, X_test, Y_test, var_Y_test, params, false, static_cast<MOQuality&>(*q_test));
       for (usize i = 0; i < objectives.size(); i++) {
-        os << q_test.objectives(i) << ',';
+        os << static_cast<MOQuality&>(*q_test).objectives(i) << ',';
       }
     }
 
@@ -6987,13 +7006,13 @@ class SRProblem : public GPInstanceBase {
                 const Array<ScalarType>& var_Y,
                 const Array<ScalarType>& params,
                 bool is_train,
-                Quality& quality) {
+                MOQuality& quality) {
     usize expression_size;
     auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
     if (!out.has_value()) {
-      solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
-      solution.quality().constraint_value = 1.0;
+      quality.objectives.array() = std::numeric_limits<CType>::infinity();
+      quality.constraint_value = 1.0;
       return;
     }
 
@@ -8190,8 +8209,8 @@ class PyFunctionBase : MOFunctionBase {
     solution.discrete_active().fill(true);
     solution.continuous_active().fill(true);
     auto [objectives, cv] = eval(solution);
-    solution.quality().objectives = objectives;
-    solution.quality().constraint_value = cv;
+    static_cast<MOQuality&>(solution.quality()).objectives = objectives;
+    static_cast<MOQuality&>(solution.quality()).constraint_value = cv;
   };
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
     evaluate(solution);
@@ -8218,27 +8237,30 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    auto&q = static_cast<MOQuality&>(solution.quality());
+    q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
                                               solution.discrete_active(), solution.continuous_active());
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+      q.objectives(i) = ov;
+      q.constraint_value += std::max(CType(0.0), cv);
     }
   };
 
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    auto& q = static_cast<MOQuality&>(solution.quality());
+    const auto& pq = static_cast<const MOQuality&>(parent.quality());
+    q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
-          parent.continuous_active(), parent.quality().objectives(i), parent.quality().constraint_value,
+          parent.continuous_active(), pq.objectives(i), pq.constraint_value,
           subset.discrete, subset.continuous);
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+      q.objectives(i) = ov;
+      q.constraint_value += std::max(CType(0.0), cv);
     }
   };
 
@@ -8349,9 +8371,10 @@ class BenchmarkInstance final : public InstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    auto& q = static_cast<MOQuality&>(s.quality());
+    q.objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(q.objectives.size()) >= fitness().num_objectives());
+    q.constraint_value = 0.0;
     _target.update(s, false);
   };
 
@@ -8545,7 +8568,8 @@ class AMaLGaM final : public MethodBase {
             throw std::runtime_error("");
           }
 
-          return std::make_tuple(s[0].quality().objectives(0), s[0].quality().constraint_value);
+          auto& q = static_cast<MOQuality&>(s[0].quality());
+          return std::make_tuple(q.objectives(0), q.constraint_value);
         };
     try {
       alg.run(fn, bounds);
@@ -8682,14 +8706,15 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void evaluationFunction(gomea::solution_t<char>* solution) {
+          auto& q = static_cast<MOQuality&>(s[0].quality());
         for (usize i = 0; i < p.num_discrete(); i++) {
           solution->variables[i] %= static_cast<char>(p.discrete_domain_sizes()(i));
         }
         s[0].discrete_values() =
             Eigen::Map<Eigen::ArrayX<char>>(solution->variables.data(), solution->variables.size()).cast<DType>();
         p.evaluate(rng, s, idxs);
-        solution->setObjectiveValue(s[0].quality().objectives(0));
-        solution->setConstraintValue(s[0].quality().constraint_value);
+        solution->setObjectiveValue(q.objectives(0));
+        solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
 
         if (p.target_reached(a)) {
@@ -8701,6 +8726,7 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void partialEvaluationFunction(gomea::solution_t<char>* parent, gomea::partial_solution_t<char>* solution) {
+          auto& q = static_cast<MOQuality&>(s[0].quality());
         s[0].discrete_values() =
             Eigen::Map<Eigen::VectorX<char>>(parent->variables.data(), parent->variables.size()).cast<DType>();
         for (usize i = 0; i < solution->touched_indices.size(); i++) {
@@ -8708,8 +8734,8 @@ class DiscreteGOMEA final : public MethodBase {
           s[0].discrete_values()(solution->touched_indices[i]) = static_cast<DType>(solution->touched_variables[i]);
         }
         p.evaluate(rng, s, idxs);
-        solution->setObjectiveValue(s[0].quality().objectives(0));
-        solution->setConstraintValue(s[0].quality().constraint_value);
+        solution->setObjectiveValue(q.objectives(0));
+        solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
 
         if (p.target_reached(a)) {
@@ -8861,8 +8887,9 @@ class RvGOMEA final : public MethodBase {
       void evaluationFunction(gomea::solution_t<double>* solution) {
         s[0].continuous_values() = Eigen::Map<Eigen::VectorXd>(solution->variables.data(), solution->variables.size());
         p.evaluate(rng, s, idxs);
-        solution->setObjectiveValue(s[0].quality().objectives(0));
-        solution->setConstraintValue(s[0].quality().constraint_value);
+        auto& q = static_cast<MOQuality&>(s[0].quality());
+        solution->setObjectiveValue(q.objectives(0));
+        solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
 
         if (p.target_reached(a)) {
@@ -8879,8 +8906,9 @@ class RvGOMEA final : public MethodBase {
           s[0].continuous_values()(solution->touched_indices[i]) = solution->touched_variables[i];
         }
         p.evaluate(rng, s, idxs);
-        solution->setObjectiveValue(s[0].quality().objectives(0));
-        solution->setConstraintValue(s[0].quality().constraint_value);
+        auto q = static_cast<MOQuality&>(s[0].quality());
+        solution->setObjectiveValue(q.objectives(0));
+        solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
 
         if (p.target_reached(a)) {
@@ -8995,10 +9023,11 @@ class MOBinaryGOMEA final : public MethodBase {
         throw std::runtime_error("");
       }
 
+      auto&     q = static_cast<MOQuality&>(s[0].quality());
       for (usize i = 0; i < problem.num_objectives(); i++) {
-        obj[i] = s[0].quality().objectives(i);
+        obj[i] = q.objectives(i);
       }
-      *con = s[0].quality().constraint_value;
+      *con = q.constraint_value;
     };
 
     try {
@@ -11114,7 +11143,7 @@ class Population {
         std::println("Continuous Active: ({})", cactive_ok);
         std::println("  Solution: {}", s_cactive);
         std::println("  Parent:   {}", p_cactive);
-        std::println("Quality: ({})", quality_ok);
+        std::println("  Quality: ({})", quality_ok);
         std::println("  Solution: {}", s_quality);
         std::println("  Parent:   {}", p_quality);
         std::abort();
@@ -11133,7 +11162,7 @@ class Population {
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      auto expected = copy[i].quality(), actual = set[i].quality();
+      auto expected = static_cast<const MOQuality&>(copy[i].quality()), actual = static_cast<const MOQuality&>(set[i].quality());
       bool definitely_different =
           (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
       if (expected.objectives.array().isFinite().all()) {

@@ -82,9 +82,9 @@ TEST_CASE("goblin::gp::sr") {
       std::vector<usize> indices{0};
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+      REQUIRE(static_cast<const MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
       if (srp.num_objectives() > 1) {
-        REQUIRE(sset[0].quality().objectives(1) == 6.0);
+        REQUIRE(static_cast<const MOQuality&>(sset[0].quality()).objectives(1) == 6.0);
       }
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -109,7 +109,7 @@ TEST_CASE("goblin::gp::sr") {
 
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+      REQUIRE(static_cast<MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
 
       // ls (x0 + x1 + 42.0 -> scaled to x0 + x1)
       std::vector<CType> ls_intercepts = {42.0, 0.0};
@@ -141,7 +141,7 @@ TEST_CASE("goblin::gp::sr") {
       if (linear_scaling) {
         srp.evaluate(rng, sset, indices);
 
-        REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+        REQUIRE(static_cast<MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
       }
     }
   }
@@ -214,7 +214,7 @@ TEST_CASE("goblin::gp::sr") {
 
       REQUIRE(front->empty() == false);
       // ls values are re-computed, so there can be slight differences here, hence 10x
-      REQUIRE(front->so_solution(0).quality().objectives(0) <= vtr * 10.0);
+      REQUIRE(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives(0) <= vtr * 10.0);
     }
   }
 }

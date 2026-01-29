@@ -9,7 +9,7 @@ using namespace goblin;
 
 void print_objectives(const ArchiveBase& a) {
   for (usize i = 0; i < a.size(); i++) {
-    std::println("[{}]:{}", i, a[i].quality().objectives);
+    std::println("[{}]:{}", i, static_cast<const MOQuality&>(a[i].quality()).objectives);
   }
 };
 
@@ -20,9 +20,10 @@ std::vector<Solution> generate_front_2d(MOFitness& f, usize size, double interce
     v.emplace_back(f.worst());
     double x = intercept * static_cast<double>(i) / static_cast<double>(size - 1);
     double y = intercept + slope * x;
-    v[i].quality().constraint_value = 0.0;
-    v[i].quality().objectives(0) = x;
-    v[i].quality().objectives(1) = y;
+    auto& q = static_cast<MOQuality&>(v[i].quality());
+    q.constraint_value = 0.0;
+    q.objectives(0) = x;
+    q.objectives(1) = y;
   }
   return v;
 };

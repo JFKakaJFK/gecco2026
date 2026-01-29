@@ -29,6 +29,23 @@ namespace nb = nanobind;
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
+class QualityBase_trampoline : public QualityBase
+{
+public:
+    NB_TRAMPOLINE(QualityBase, 1);
+
+    std::unique_ptr<goblin::QualityBase> clone() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "clone", // function name (python)
+            clone // function name (c++)
+        );
+    }
+};
+}  // namespace goblin
+
+namespace goblin {
+// helper type to enable overriding virtual methods in python
 class FitnessBase_trampoline : public FitnessBase
 {
 public:
@@ -41,7 +58,7 @@ public:
             num_objectives // function name (c++)
         );
     }
-    goblin::Ordering cmp(const goblin::Quality & lhs, const goblin::Quality & rhs, std::optional<usize> objective) const override
+    goblin::Ordering cmp(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "cmp", // function name (python)
@@ -49,7 +66,7 @@ public:
             lhs, rhs, objective // params
         );
     }
-    CType distance(const goblin::Quality & lhs, const goblin::Quality & rhs, std::optional<usize> objective) const override
+    CType distance(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "distance", // function name (python)
@@ -65,7 +82,7 @@ public:
             os // params
         );
     }
-    void log(std::ostream & os, const goblin::Quality & quality) const override
+    void log(std::ostream & os, const goblin::QualityBase & quality) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "log", // function name (python)
@@ -73,7 +90,7 @@ public:
             os, quality // params
         );
     }
-    std::string format(const goblin::Quality & quality) const override
+    std::string format(const goblin::QualityBase & quality) const override
     {
         NB_OVERRIDE_NAME(
             "format", // function name (python)
@@ -91,7 +108,7 @@ class ArchiveFitnessBase_trampoline : public ArchiveFitnessBase
 public:
     NB_TRAMPOLINE(ArchiveFitnessBase, 7);
 
-    goblin::Quality worst() const override
+    std::unique_ptr<goblin::QualityBase> worst() const override
     {
         NB_OVERRIDE_PURE_NAME(
             "worst", // function name (python)
@@ -105,7 +122,7 @@ public:
             num_objectives // function name (c++)
         );
     }
-    goblin::Ordering cmp(const goblin::Quality & lhs, const goblin::Quality & rhs, std::optional<usize> objective) const override
+    goblin::Ordering cmp(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "cmp", // function name (python)
@@ -113,7 +130,7 @@ public:
             lhs, rhs, objective // params
         );
     }
-    CType distance(const goblin::Quality & lhs, const goblin::Quality & rhs, std::optional<usize> objective) const override
+    CType distance(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "distance", // function name (python)
@@ -129,7 +146,7 @@ public:
             os // params
         );
     }
-    void log(std::ostream & os, const goblin::Quality & quality) const override
+    void log(std::ostream & os, const goblin::QualityBase & quality) const override
     {
         NB_OVERRIDE_PURE_NAME(
             "log", // function name (python)
@@ -137,7 +154,7 @@ public:
             os, quality // params
         );
     }
-    std::string format(const goblin::Quality & quality) const override
+    std::string format(const goblin::QualityBase & quality) const override
     {
         NB_OVERRIDE_NAME(
             "format", // function name (python)
@@ -247,26 +264,26 @@ public:
             extensions // function name (c++)
         );
     }
-    void assign_quality(const goblin::Quality & quality) override
+    goblin::QualityBase & quality() override
     {
-        NB_OVERRIDE_NAME(
+        NB_OVERRIDE_PURE_NAME(
+            "quality", // function name (python)
+            quality // function name (c++)
+        );
+    }
+    const goblin::QualityBase & quality() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "quality", // function name (python)
+            quality // function name (c++)
+        );
+    }
+    void assign_quality(const goblin::QualityBase & quality) override
+    {
+        NB_OVERRIDE_PURE_NAME(
             "assign_quality", // function name (python)
             assign_quality, // function name (c++)
             quality // params
-        );
-    }
-    goblin::Quality & quality() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "quality", // function name (python)
-            quality // function name (c++)
-        );
-    }
-    const goblin::Quality & quality() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "quality", // function name (python)
-            quality // function name (c++)
         );
     }
     RefS<Vec<DType>> discrete_values() override
@@ -1256,12 +1273,12 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
 
 
-  auto pyClassQuality =
-      nb::class_<goblin::Quality>
-          (m, "Quality", "/ Something that describes how good a solution is")
-      // (default constructor explicitly deleted)
-      .def_rw("objectives", &goblin::Quality::objectives, "")
-      .def_rw("constraint_value", &goblin::Quality::constraint_value, "")
+  auto pyClassQualityBase =
+      nb::class_<goblin::QualityBase, goblin::QualityBase_trampoline>
+          (m, "QualityBase", "/ Something that describes how good a solution is")
+      .def(nb::init<>()) // implicit default constructor
+      .def("clone",
+          &goblin::QualityBase::clone)
       ;
 
 
@@ -1293,6 +1310,17 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
+  auto pyClassMOQuality =
+      nb::class_<goblin::MOQuality, goblin::QualityBase>
+          (m, "MOQuality", "/ Something that describes how good a solution is")
+      .def(nb::init<>()) // implicit default constructor
+      .def("clone",
+          &goblin::MOQuality::clone)
+      .def_rw("objectives", &goblin::MOQuality::objectives, "")
+      .def_rw("constraint_value", &goblin::MOQuality::constraint_value, "")
+      ;
+
+
   auto pyClassMOFitness =
       nb::class_<goblin::MOFitness, goblin::ArchiveFitnessBase>
           (m, "MOFitness", nb::is_final(), "\n(final class)")
@@ -1308,9 +1336,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("num_objectives",
           &goblin::MOFitness::num_objectives)
       .def("cmp",
-          nb::overload_cast<const goblin::Quality &, const goblin::Quality &, std::optional<usize>>(&goblin::MOFitness::cmp, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
+          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::cmp, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
       .def("distance",
-          nb::overload_cast<const goblin::Quality &, const goblin::Quality &, std::optional<usize>>(&goblin::MOFitness::distance, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
+          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::distance, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
       .def("worst",
           &goblin::MOFitness::worst)
       ;
@@ -1322,14 +1350,20 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassSubset =
       nb::class_<goblin::Subset>
           (m, "Subset", "")
-      .def("__init__", [](goblin::Subset * self, std::vector<usize> discrete = std::vector<usize>(), std::vector<usize> continuous = std::vector<usize>())
+      .def("__init__", [](goblin::Subset * self, const std::optional<const std::vector<usize>> & discrete = std::nullopt, const std::optional<const std::vector<usize>> & continuous = std::nullopt)
       {
           new (self) goblin::Subset();  // placement new
           auto r_ctor_ = self;
-          r_ctor_->discrete = discrete;
-          r_ctor_->continuous = continuous;
+          if (discrete.has_value())
+              r_ctor_->discrete = discrete.value();
+          else
+              r_ctor_->discrete = std::vector<usize>();
+          if (continuous.has_value())
+              r_ctor_->continuous = continuous.value();
+          else
+              r_ctor_->continuous = std::vector<usize>();
       },
-      nb::arg("discrete") = std::vector<usize>(), nb::arg("continuous") = std::vector<usize>()
+      nb::arg("discrete").none() = nb::none(), nb::arg("continuous").none() = nb::none()
       )
       .def_rw("discrete", &goblin::Subset::discrete, "")
       .def_rw("continuous", &goblin::Subset::continuous, "")
@@ -1351,10 +1385,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           (m, "SolutionExtensionKey", "")
       .def(nb::init<>()) // implicit default constructor
       .def_rw("token", &goblin::SolutionExtensionKey::token, "")
-      .def("__eq__",
-          &goblin::SolutionExtensionKey::operator==, nb::arg("other"))
-      .def("__ne__",
-          &goblin::SolutionExtensionKey::operator!=, nb::arg("other"))
       ;
 
 
@@ -1385,7 +1415,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("has_extension",
           &goblin::SolutionBase::has_extension, nb::arg("key"))
       .def("get_or_insert_extension",
-          &goblin::SolutionBase::get_or_insert_extension, nb::arg("extension"))
+          &goblin::SolutionBase::get_or_insert_extension,
+          nb::arg("extension"),
+          "this is fine")
       .def("get_extension",
           nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::SolutionBase::get_extension, nb::const_), nb::arg("key"))
       .def("get_extension",
@@ -1400,12 +1432,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           [](goblin::SolutionBase & self) { return self.extensions(); })
       .def("extensions",
           [](goblin::SolutionBase & self) { return self.extensions(); })
-      .def("assign_quality",
-          &goblin::SolutionBase::assign_quality, nb::arg("quality"))
-      .def("quality",
-          [](goblin::SolutionBase & self) { return self.quality(); })
-      .def("quality",
-          [](goblin::SolutionBase & self) { return self.quality(); })
       .def("num_discrete",
           &goblin::SolutionBase::num_discrete)
       .def("discrete_values",
@@ -1432,11 +1458,16 @@ void py_init_module_pygoblin(nb::module_& m) {
           "/ Inherits a subset of the decision variables from the donor, returning True\n/ if there was a change to the active variables and an evaluation is needed.\n/\n/ The `always_inherit_continuous` determines if the corresponding continuous\n/ variables are also inherited for discrete only subsets.")
       ;
 
+  pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality, nb::const_), nb::rv_policy::reference_internal);
+  pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality), nb::rv_policy::reference_internal);
+
+
+
 
   auto pyClassSolution =
       nb::class_<goblin::Solution, goblin::SolutionBase>
           (m, "Solution", "")
-      .def(nb::init<goblin::Quality, std::optional<Vec<DType>>, std::optional<Vec<CType>>>(),
+      .def(nb::init<std::unique_ptr<goblin::QualityBase>, std::optional<Vec<DType>>, std::optional<Vec<CType>>>(),
           nb::arg("quality"), nb::arg("discrete_values").none() = nb::none(), nb::arg("continuous_values").none() = nb::none())
       .def(nb::init<const goblin::Solution &>(),
           nb::arg("other"))
@@ -1444,11 +1475,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           nb::arg("other"))
       .def(nb::init<const goblin::SolutionBase &>(),
           nb::arg("s"),
-          "explicit")
-      .def("quality",
-          [](goblin::Solution & self) { return self.quality(); })
-      .def("quality",
-          [](goblin::Solution & self) { return self.quality(); })
+          "explicitly not explicit since implicit conversion is the intent")
       .def("discrete_values",
           [](goblin::Solution & self) { return self.discrete_values(); })
       .def("discrete_values",
@@ -1484,6 +1511,11 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("extensions",
           [](goblin::Solution & self) { return self.extensions(); })
       ;
+
+  pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality, nb::const_), nb::rv_policy::reference_internal);
+  pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality), nb::rv_policy::reference_internal);
+
+
 
 
   auto pyClassSolutionSetBase =
@@ -1766,16 +1798,28 @@ void py_init_module_pygoblin(nb::module_& m) {
       auto pyClassUPGMA_ClassMerge =
           nb::class_<goblin::UPGMA::Merge>
               (pyClassUPGMA, "Merge", "")
-          .def("__init__", [](goblin::UPGMA::Merge * self, usize left = usize(), usize right = usize(), CType distance = CType(), usize size = usize())
+          .def("__init__", [](goblin::UPGMA::Merge * self, const std::optional<const usize> & left = std::nullopt, const std::optional<const usize> & right = std::nullopt, const std::optional<const CType> & distance = std::nullopt, const std::optional<const usize> & size = std::nullopt)
           {
               new (self) goblin::UPGMA::Merge();  // placement new
               auto r_ctor_ = self;
-              r_ctor_->left = left;
-              r_ctor_->right = right;
-              r_ctor_->distance = distance;
-              r_ctor_->size = size;
+              if (left.has_value())
+                  r_ctor_->left = left.value();
+              else
+                  r_ctor_->left = usize();
+              if (right.has_value())
+                  r_ctor_->right = right.value();
+              else
+                  r_ctor_->right = usize();
+              if (distance.has_value())
+                  r_ctor_->distance = distance.value();
+              else
+                  r_ctor_->distance = CType();
+              if (size.has_value())
+                  r_ctor_->size = size.value();
+              else
+                  r_ctor_->size = usize();
           },
-          nb::arg("left") = usize(), nb::arg("right") = usize(), nb::arg("distance") = CType(), nb::arg("size") = usize()
+          nb::arg("left").none() = nb::none(), nb::arg("right").none() = nb::none(), nb::arg("distance").none() = nb::none(), nb::arg("size").none() = nb::none()
           )
           .def_rw("left", &goblin::UPGMA::Merge::left, "")
           .def_rw("right", &goblin::UPGMA::Merge::right, "")
@@ -1937,9 +1981,37 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::TrackingOptions>
           (m, "TrackingOptions", "")
       // (default constructor explicitly deleted)
-      .def(nb::init<std::filesystem::path, std::optional<std::vector<std::tuple<std::string, std::string>>>, usize, u64, bool, bool, u64, u64, u64, u64, u64, u64, std::chrono::nanoseconds, u64, std::chrono::nanoseconds>(),
-          nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100, nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true, nb::arg("report_intermediate_results") = true, nb::arg("initial_evaluations_until_next_report") = 10, nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000, nb::arg("initial_generations_until_next_report") = 1, nb::arg("generation_factor") = 2, nb::arg("max_generations_until_next_report") = 100, nb::arg("initial_time_until_next_report") = std::chrono::seconds(1), nb::arg("time_factor") = 2, nb::arg("max_time_until_next_report") = std::chrono::minutes(10),
-          " TODO at some point think about enabling dynamically setting the logging\n precision for floating points\n TODO at some point allow these params on Tracked::run to reduce the amount\n of config object nesting?")
+      .def("__init__",
+          [](goblin::TrackingOptions * self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, const std::optional<const std::chrono::nanoseconds> & initial_time_until_next_report = std::nullopt, u64 time_factor = 2, const std::optional<const std::chrono::nanoseconds> & max_time_until_next_report = std::nullopt)
+          {
+              auto ctor_wrapper = [](goblin::TrackingOptions* self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1), u64 time_factor = 2, std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10)) ->  void
+              {
+                  new(self) goblin::TrackingOptions(logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report, time_factor, max_time_until_next_report); // placement new
+              };
+              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::TrackingOptions * self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, const std::optional<const std::chrono::nanoseconds> & initial_time_until_next_report = std::nullopt, u64 time_factor = 2, const std::optional<const std::chrono::nanoseconds> & max_time_until_next_report = std::nullopt)
+              {
+
+                  const std::chrono::nanoseconds& initial_time_until_next_report_or_default = [&]() -> const std::chrono::nanoseconds {
+                      if (initial_time_until_next_report.has_value())
+                          return initial_time_until_next_report.value();
+                      else
+                          return std::chrono::seconds(1);
+                  }();
+
+                  const std::chrono::nanoseconds& max_time_until_next_report_or_default = [&]() -> const std::chrono::nanoseconds {
+                      if (max_time_until_next_report.has_value())
+                          return max_time_until_next_report.value();
+                      else
+                          return std::chrono::minutes(10);
+                  }();
+
+                  ctor_wrapper(self, logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report_or_default, time_factor, max_time_until_next_report_or_default);
+              };
+
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report, time_factor, max_time_until_next_report);
+          },
+          nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100, nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true, nb::arg("report_intermediate_results") = true, nb::arg("initial_evaluations_until_next_report") = 10, nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000, nb::arg("initial_generations_until_next_report") = 1, nb::arg("generation_factor") = 2, nb::arg("max_generations_until_next_report") = 100, nb::arg("initial_time_until_next_report").none() = nb::none(), nb::arg("time_factor") = 2, nb::arg("max_time_until_next_report").none() = nb::none(),
+          " TODO at some point think about enabling dynamically setting the logging\n precision for floating points\n TODO at some point allow these params on Tracked::run to reduce the amount\n of config object nesting?\n\n\nPython bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * initial_time_until_next_report: std.chrono.seconds(1)\n        * max_time_until_next_report: std.chrono.minutes(10)")
       .def_rw("archive_capacity", &goblin::TrackingOptions::archive_capacity, "")
       .def_rw("max_evaluations_until_archive_adaption", &goblin::TrackingOptions::max_evaluations_until_archive_adaption, "")
       .def_rw("consider_evaluation_time", &goblin::TrackingOptions::consider_evaluation_time, "")
@@ -2143,13 +2215,16 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassTemplateNode =
       nb::class_<goblin::TemplateNode>
           (m, "TemplateNode", "")
-      .def("__init__", [](goblin::TemplateNode * self, std::vector<goblin::TemplateNode> children = std::vector<goblin::TemplateNode>())
+      .def("__init__", [](goblin::TemplateNode * self, const std::optional<const std::vector<goblin::TemplateNode>> & children = std::nullopt)
       {
           new (self) goblin::TemplateNode();  // placement new
           auto r_ctor_ = self;
-          r_ctor_->children = children;
+          if (children.has_value())
+              r_ctor_->children = children.value();
+          else
+              r_ctor_->children = std::vector<goblin::TemplateNode>();
       },
-      nb::arg("children") = std::vector<goblin::TemplateNode>()
+      nb::arg("children").none() = nb::none()
       )
       .def_rw("children", &goblin::TemplateNode::children, "")
       .def_static("full_nary",
@@ -3170,14 +3245,93 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassBenchmarkInstance =
       nb::class_<goblin::BenchmarkInstance, goblin::InstanceBase>
           (m, "BenchmarkInstance", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+      .def("__init__",
+          [](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
                                        std::shared_ptr<goblin::MOFunctionBase>,
-                                       std::shared_ptr<goblin::ObjectiveBase>>, std::variant<DType, Vec<DType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::variant<CType, Vec<CType>>, std::optional<AnyInit>, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>>, std::optional<usize>>(),
-          nb::arg("objectives"), nb::arg("discrete_domain") = DType(2), nb::arg("continuous_lower_bound") = -std::numeric_limits<CType>::infinity(), nb::arg("continuous_upper_bound") = std::numeric_limits<CType>::infinity(), nb::arg("continuous_init_lower_bound") = CType(0.0), nb::arg("continuous_init_upper_bound") = CType(1.0), nb::arg("init").none() = nb::none(), nb::arg("target").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none())
+                                       std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
+          {
+              auto ctor_wrapper = [](goblin::BenchmarkInstance* self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+                                               std::shared_ptr<goblin::MOFunctionBase>,
+                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, std::variant<DType, Vec<DType>> discrete_domain = DType(2), std::variant<CType, Vec<CType>> continuous_lower_bound = -std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_upper_bound = std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0), std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0), std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt) ->  void
+              {
+                  new(self) goblin::BenchmarkInstance(objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size); // placement new
+              };
+              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+                                               std::shared_ptr<goblin::MOFunctionBase>,
+                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
+              {
+
+                  const std::variant<DType, Vec<DType>>& discrete_domain_or_default = [&]() -> const std::variant<DType, Vec<DType>> {
+                      if (discrete_domain.has_value())
+                          return discrete_domain.value();
+                      else
+                          return DType(2);
+                  }();
+
+                  const std::variant<CType, Vec<CType>>& continuous_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_lower_bound.has_value())
+                          return continuous_lower_bound.value();
+                      else
+                          return -std::numeric_limits<CType>::infinity();
+                  }();
+
+                  const std::variant<CType, Vec<CType>>& continuous_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_upper_bound.has_value())
+                          return continuous_upper_bound.value();
+                      else
+                          return std::numeric_limits<CType>::infinity();
+                  }();
+
+                  const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_init_lower_bound.has_value())
+                          return continuous_init_lower_bound.value();
+                      else
+                          return CType(0.0);
+                  }();
+
+                  const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_init_upper_bound.has_value())
+                          return continuous_init_upper_bound.value();
+                      else
+                          return CType(1.0);
+                  }();
+
+                  ctor_wrapper(self, objectives, discrete_domain_or_default, continuous_lower_bound_or_default, continuous_upper_bound_or_default, continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default, init, target, target_archive_size);
+              };
+
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size);
+          },
+          nb::arg("objectives"), nb::arg("discrete_domain").none() = nb::none(), nb::arg("continuous_lower_bound").none() = nb::none(), nb::arg("continuous_upper_bound").none() = nb::none(), nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(), nb::arg("init").none() = nb::none(), nb::arg("target").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none(),
+          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * discrete_domain: int(2)\n        * continuous_lower_bound: -std.numeric_limits<float>.infinity()\n        * continuous_upper_bound: std.numeric_limits<float>.infinity()\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
       .def("set_init",
           &goblin::BenchmarkInstance::set_init, nb::arg("init"))
       .def("set_initial_bounds",
-          &goblin::BenchmarkInstance::set_initial_bounds, nb::arg("continuous_init_lower_bound") = CType(0.0), nb::arg("continuous_init_upper_bound") = CType(1.0))
+          [](goblin::BenchmarkInstance & self, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt)
+          {
+              auto set_initial_bounds_adapt_mutable_param_with_default_value = [&self](const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt)
+              {
+
+                  const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_init_lower_bound.has_value())
+                          return continuous_init_lower_bound.value();
+                      else
+                          return CType(0.0);
+                  }();
+
+                  const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
+                      if (continuous_init_upper_bound.has_value())
+                          return continuous_init_upper_bound.value();
+                      else
+                          return CType(1.0);
+                  }();
+
+                  self.set_initial_bounds(continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default);
+              };
+
+              set_initial_bounds_adapt_mutable_param_with_default_value(continuous_init_lower_bound, continuous_init_upper_bound);
+          },
+          nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(),
+          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
       .def("register_target",
           nb::overload_cast<CRefS<Vec<CType>>>(&goblin::BenchmarkInstance::register_target), nb::arg("target_objectives"))
       .def("register_target",
@@ -3333,8 +3487,30 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassAMaLGaMSamplingModel =
       nb::class_<goblin::AMaLGaMSamplingModel, goblin::RvSamplingModelBase>
           (m, "AMaLGaMSamplingModel", nb::is_final(), "\n(final class)")
-      .def(nb::init<bool, CType, CType, CType, CType, CType, usize>(),
-          nb::arg("use_mahalanobis_distance_for_sdr") = false, nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("distribution_multiplier_increase") = 1.0 / 0.9, nb::arg("min_distribution_multiplier") = 1e-10, nb::arg("num_cholesky_tries") = 1)
+      .def("__init__",
+          [](goblin::AMaLGaMSamplingModel * self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, const std::optional<const CType> & distribution_multiplier_increase = std::nullopt, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1)
+          {
+              auto ctor_wrapper = [](goblin::AMaLGaMSamplingModel* self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, CType distribution_multiplier_increase = 1.0 / 0.9, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1) ->  void
+              {
+                  new(self) goblin::AMaLGaMSamplingModel(use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase, min_distribution_multiplier, num_cholesky_tries); // placement new
+              };
+              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::AMaLGaMSamplingModel * self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, const std::optional<const CType> & distribution_multiplier_increase = std::nullopt, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1)
+              {
+
+                  const CType& distribution_multiplier_increase_or_default = [&]() -> const CType {
+                      if (distribution_multiplier_increase.has_value())
+                          return distribution_multiplier_increase.value();
+                      else
+                          return 1.0 / 0.9;
+                  }();
+
+                  ctor_wrapper(self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase_or_default, min_distribution_multiplier, num_cholesky_tries);
+              };
+
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase, min_distribution_multiplier, num_cholesky_tries);
+          },
+          nb::arg("use_mahalanobis_distance_for_sdr") = false, nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("distribution_multiplier_increase").none() = nb::none(), nb::arg("min_distribution_multiplier") = 1e-10, nb::arg("num_cholesky_tries") = 1,
+          "Python bindings defaults:\n    If distribution_multiplier_increase is None, then its default value will be: 1.0 / 0.9")
       .def("init",
           &goblin::AMaLGaMSamplingModel::init, nb::arg("subset"))
       .def("inherit",
@@ -3444,20 +3620,44 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassFosStats =
       nb::class_<goblin::FosStats>
           (m, "FosStats", "")
-      .def("__init__", [](goblin::FosStats * self, std::vector<CType> solution_activation_rate = std::vector<CType>(), std::vector<CType> variables_activation_rate = std::vector<CType>(), std::vector<u64> usage_count = std::vector<u64>(), std::vector<u64> evaluation_count = std::vector<u64>(), std::vector<u64> acceptance_count = std::vector<u64>(), std::vector<CType> cumulative_fitness_difference = std::vector<CType>(), std::vector<u64> finite_acceptance_count = std::vector<u64>(), Mat<CType> similarity = Mat<CType>())
+      .def("__init__", [](goblin::FosStats * self, const std::optional<const std::vector<CType>> & solution_activation_rate = std::nullopt, const std::optional<const std::vector<CType>> & variables_activation_rate = std::nullopt, const std::optional<const std::vector<u64>> & usage_count = std::nullopt, const std::optional<const std::vector<u64>> & evaluation_count = std::nullopt, const std::optional<const std::vector<u64>> & acceptance_count = std::nullopt, const std::optional<const std::vector<CType>> & cumulative_fitness_difference = std::nullopt, const std::optional<const std::vector<u64>> & finite_acceptance_count = std::nullopt, const std::optional<const Mat<CType>> & similarity = std::nullopt)
       {
           new (self) goblin::FosStats();  // placement new
           auto r_ctor_ = self;
-          r_ctor_->solution_activation_rate = solution_activation_rate;
-          r_ctor_->variables_activation_rate = variables_activation_rate;
-          r_ctor_->usage_count = usage_count;
-          r_ctor_->evaluation_count = evaluation_count;
-          r_ctor_->acceptance_count = acceptance_count;
-          r_ctor_->cumulative_fitness_difference = cumulative_fitness_difference;
-          r_ctor_->finite_acceptance_count = finite_acceptance_count;
-          r_ctor_->similarity = similarity;
+          if (solution_activation_rate.has_value())
+              r_ctor_->solution_activation_rate = solution_activation_rate.value();
+          else
+              r_ctor_->solution_activation_rate = std::vector<CType>();
+          if (variables_activation_rate.has_value())
+              r_ctor_->variables_activation_rate = variables_activation_rate.value();
+          else
+              r_ctor_->variables_activation_rate = std::vector<CType>();
+          if (usage_count.has_value())
+              r_ctor_->usage_count = usage_count.value();
+          else
+              r_ctor_->usage_count = std::vector<u64>();
+          if (evaluation_count.has_value())
+              r_ctor_->evaluation_count = evaluation_count.value();
+          else
+              r_ctor_->evaluation_count = std::vector<u64>();
+          if (acceptance_count.has_value())
+              r_ctor_->acceptance_count = acceptance_count.value();
+          else
+              r_ctor_->acceptance_count = std::vector<u64>();
+          if (cumulative_fitness_difference.has_value())
+              r_ctor_->cumulative_fitness_difference = cumulative_fitness_difference.value();
+          else
+              r_ctor_->cumulative_fitness_difference = std::vector<CType>();
+          if (finite_acceptance_count.has_value())
+              r_ctor_->finite_acceptance_count = finite_acceptance_count.value();
+          else
+              r_ctor_->finite_acceptance_count = std::vector<u64>();
+          if (similarity.has_value())
+              r_ctor_->similarity = similarity.value();
+          else
+              r_ctor_->similarity = Mat<CType>();
       },
-      nb::arg("solution_activation_rate") = std::vector<CType>(), nb::arg("variables_activation_rate") = std::vector<CType>(), nb::arg("usage_count") = std::vector<u64>(), nb::arg("evaluation_count") = std::vector<u64>(), nb::arg("acceptance_count") = std::vector<u64>(), nb::arg("cumulative_fitness_difference") = std::vector<CType>(), nb::arg("finite_acceptance_count") = std::vector<u64>(), nb::arg("similarity") = Mat<CType>()
+      nb::arg("solution_activation_rate").none() = nb::none(), nb::arg("variables_activation_rate").none() = nb::none(), nb::arg("usage_count").none() = nb::none(), nb::arg("evaluation_count").none() = nb::none(), nb::arg("acceptance_count").none() = nb::none(), nb::arg("cumulative_fitness_difference").none() = nb::none(), nb::arg("finite_acceptance_count").none() = nb::none(), nb::arg("similarity").none() = nb::none()
       )
       .def_rw("solution_activation_rate", &goblin::FosStats::solution_activation_rate, "whats the proportion of solutions where initially at least one of the")
       .def_rw("variables_activation_rate", &goblin::FosStats::variables_activation_rate, "conditioned on solutions with at least one active variables in the subset, whats")
@@ -3524,8 +3724,65 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassMixedGOMEA =
       nb::class_<goblin::MixedGOMEA, goblin::MethodBase>
           (m, "MixedGOMEA", "")
-      .def(nb::init<goblin::PopulationOptions, goblin::RvOptions, goblin::IMSOptions, std::shared_ptr<goblin::LinkageModelBase>, std::shared_ptr<goblin::LinkageModelBase>, std::shared_ptr<goblin::RvSamplingModelBase>, std::string>(),
-          nb::arg("population_options") = goblin::PopulationOptions(), nb::arg("rv_options") = goblin::RvOptions(), nb::arg("ims_options") = goblin::IMSOptions(), nb::arg("discrete_model") = std::make_shared<goblin::LinkageTreeFOS>(), nb::arg("continuous_model") = std::make_shared<goblin::FullFOS>(), nb::arg("sampling_model") = std::make_shared<goblin::AMaLGaMSamplingModel>(), nb::arg("repr") = "aos")
+      .def("__init__",
+          [](goblin::MixedGOMEA * self, const std::optional<const goblin::PopulationOptions> & population_options = std::nullopt, const std::optional<const goblin::RvOptions> & rv_options = std::nullopt, const std::optional<const goblin::IMSOptions> & ims_options = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & discrete_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & continuous_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>> & sampling_model = std::nullopt, std::string repr = "aos")
+          {
+              auto ctor_wrapper = [](goblin::MixedGOMEA* self, goblin::PopulationOptions population_options = goblin::PopulationOptions(), goblin::RvOptions rv_options = goblin::RvOptions(), goblin::IMSOptions ims_options = goblin::IMSOptions(), std::shared_ptr<goblin::LinkageModelBase> discrete_model = std::make_shared<goblin::LinkageTreeFOS>(), std::shared_ptr<goblin::LinkageModelBase> continuous_model = std::make_shared<goblin::FullFOS>(), std::shared_ptr<goblin::RvSamplingModelBase> sampling_model = std::make_shared<goblin::AMaLGaMSamplingModel>(), std::string repr = "aos") ->  void
+              {
+                  new(self) goblin::MixedGOMEA(population_options, rv_options, ims_options, discrete_model, continuous_model, sampling_model, repr); // placement new
+              };
+              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::MixedGOMEA * self, const std::optional<const goblin::PopulationOptions> & population_options = std::nullopt, const std::optional<const goblin::RvOptions> & rv_options = std::nullopt, const std::optional<const goblin::IMSOptions> & ims_options = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & discrete_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & continuous_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>> & sampling_model = std::nullopt, std::string repr = "aos")
+              {
+
+                  const goblin::PopulationOptions& population_options_or_default = [&]() -> const goblin::PopulationOptions {
+                      if (population_options.has_value())
+                          return population_options.value();
+                      else
+                          return goblin::PopulationOptions();
+                  }();
+
+                  const goblin::RvOptions& rv_options_or_default = [&]() -> const goblin::RvOptions {
+                      if (rv_options.has_value())
+                          return rv_options.value();
+                      else
+                          return goblin::RvOptions();
+                  }();
+
+                  const goblin::IMSOptions& ims_options_or_default = [&]() -> const goblin::IMSOptions {
+                      if (ims_options.has_value())
+                          return ims_options.value();
+                      else
+                          return goblin::IMSOptions();
+                  }();
+
+                  const std::shared_ptr<goblin::LinkageModelBase>& discrete_model_or_default = [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
+                      if (discrete_model.has_value())
+                          return discrete_model.value();
+                      else
+                          return std::make_shared<goblin::LinkageTreeFOS>();
+                  }();
+
+                  const std::shared_ptr<goblin::LinkageModelBase>& continuous_model_or_default = [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
+                      if (continuous_model.has_value())
+                          return continuous_model.value();
+                      else
+                          return std::make_shared<goblin::FullFOS>();
+                  }();
+
+                  const std::shared_ptr<goblin::RvSamplingModelBase>& sampling_model_or_default = [&]() -> const std::shared_ptr<goblin::RvSamplingModelBase> {
+                      if (sampling_model.has_value())
+                          return sampling_model.value();
+                      else
+                          return std::make_shared<goblin::AMaLGaMSamplingModel>();
+                  }();
+
+                  ctor_wrapper(self, population_options_or_default, rv_options_or_default, ims_options_or_default, discrete_model_or_default, continuous_model_or_default, sampling_model_or_default, repr);
+              };
+
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, population_options, rv_options, ims_options, discrete_model, continuous_model, sampling_model, repr);
+          },
+          nb::arg("population_options").none() = nb::none(), nb::arg("rv_options").none() = nb::none(), nb::arg("ims_options").none() = nb::none(), nb::arg("discrete_model").none() = nb::none(), nb::arg("continuous_model").none() = nb::none(), nb::arg("sampling_model").none() = nb::none(), nb::arg("repr") = "aos",
+          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * population_options: PopulationOptions()\n        * rv_options: RvOptions()\n        * ims_options: IMSOptions()\n        * discrete_model: std.make_shared<LinkageTreeFOS>()\n        * continuous_model: std.make_shared<FullFOS>()\n        * sampling_model: std.make_shared<AMaLGaMSamplingModel>()")
       .def("run",
           &goblin::MixedGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
       .def("current_generation",

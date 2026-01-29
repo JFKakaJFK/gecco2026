@@ -30,7 +30,7 @@ TEST_CASE("goblin::lib::instance_default_gradient") {
 
   REQUIRE(!sphere.target_reached(archive));  // the starting point is not good
 
-  Quality prev = solutions[0].quality();
+  std::unique_ptr<QualityBase> prev = solutions[0].quality().clone();
 
   SUBCASE("gradients()") {
     Subset full;
@@ -53,11 +53,11 @@ TEST_CASE("goblin::lib::instance_default_gradient") {
 
       if ((i + 1) % 10 == 0) {
         sphere.evaluate(rng, solutions, indices);
-        REQUIRE_MESSAGE(sphere.fitness().cmp(solutions[0].quality(), prev, std::nullopt) == Ordering::Better, i,
-                        ", P:", sphere.fitness().format(prev), ", C:", sphere.fitness().format(solutions[0].quality()),
+        REQUIRE_MESSAGE(sphere.fitness().cmp(solutions[0].quality(), *prev, std::nullopt) == Ordering::Better, i,
+                        ", P:", sphere.fitness().format(*prev), ", C:", sphere.fitness().format(solutions[0].quality()),
                         ", V: ", solutions[0].continuous_values(),
                         ", G: ", grads.row(0));  // the solution improves after a few gradient steps
-        prev = solutions[0].quality();
+        prev = solutions[0].quality().clone();
       }
     }
 
@@ -66,7 +66,7 @@ TEST_CASE("goblin::lib::instance_default_gradient") {
 
   SUBCASE("gradient_steps()") {
     sphere.gradient_steps(rng, solutions, parents, indices, 100);
-    REQUIRE(sphere.fitness().cmp(solutions[0].quality(), prev, std::nullopt) ==
+    REQUIRE(sphere.fitness().cmp(solutions[0].quality(), *prev, std::nullopt) ==
             Ordering::Better);  // the solution improves after a few gradient steps
   }
 

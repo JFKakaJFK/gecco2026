@@ -153,7 +153,7 @@ class SRProblem : public GPInstanceBase {
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
     Array<ScalarType> params;
     for (auto i : indices) {
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, solutions[i].quality());
+      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, static_cast<MOQuality&>(solutions[i].quality()));
     }
   };
 
@@ -184,9 +184,9 @@ class SRProblem : public GPInstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    static_cast<MOQuality&>(s.quality()).objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(static_cast<MOQuality&>(s.quality()).objectives.size()) >= fitness().num_objectives());
+    static_cast<MOQuality&>(s.quality()).constraint_value = 0.0;
     _target.update(s, false);
   };
 
@@ -221,17 +221,17 @@ class SRProblem : public GPInstanceBase {
     log_solution(os, solution);
     os << "\",";
     for (usize i = 0; i < objectives.size(); i++) {
-      os << solution.quality().objectives(i) << ',';
+      os << static_cast<MOQuality&>(solution.quality()).objectives(i) << ',';
     }
     if (Y_test.size() > 0) {
       // TODO cache this -> solution gets optional second quality?
       // Then again, one can just call predict using the SKlearn regressor for actual use
       // and for all other experiments the overhead is not an issue yet
-      Quality q_test = archive_fitness().worst();
+      std::unique_ptr<QualityBase> q_test = archive_fitness().worst();
       Array<ScalarType> params;  // TODO fit FC params...
-      eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
+      eval_one(solution, X_test, Y_test, var_Y_test, params, false, static_cast<MOQuality&>(*q_test));
       for (usize i = 0; i < objectives.size(); i++) {
-        os << q_test.objectives(i) << ',';
+        os << static_cast<MOQuality&>(*q_test).objectives(i) << ',';
       }
     }
 
@@ -279,13 +279,13 @@ class SRProblem : public GPInstanceBase {
                 const Array<ScalarType>& var_Y,
                 const Array<ScalarType>& params,
                 bool is_train,
-                Quality& quality) {
+                MOQuality& quality) {
     usize expression_size;
     auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
     if (!out.has_value()) {
-      solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
-      solution.quality().constraint_value = 1.0;
+      quality.objectives.array() = std::numeric_limits<CType>::infinity();
+      quality.constraint_value = 1.0;
       return;
     }
 
