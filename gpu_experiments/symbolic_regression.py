@@ -9,7 +9,7 @@ from pygom import KernelVersion
 
 from src.db import create_db
 from src.experiment.experiment_config import ExperimentConfig, cfg
-from src.experiment.problem import Problem, generate_problems
+from src.experiment.problem import Problem, format_problem, generate_problems
 from src.experiment.run import run_cpu_tasks, run_gpu_tasks, run_tasks
 from src.experiment.task import (
     TaskTransform,
@@ -67,6 +67,8 @@ def grid_search_helper(
 
 
 def grid_search(config: ExperimentConfig, directory: Path):
+    print(f"Starting with {config.name}")
+
     output_directory = directory / config.name
 
     os.makedirs(output_directory, exist_ok=True)
@@ -103,6 +105,8 @@ def grid_search(config: ExperimentConfig, directory: Path):
 
         # Loop over problems
         for problem in generate_problems(config):
+            print(format_problem(problem))
+
             # Loop over hardware
             for h in hardware:
                 runner, transform = hardware_helper(h)

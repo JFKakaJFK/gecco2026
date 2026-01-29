@@ -179,6 +179,7 @@ def run_cpu_tasks(
         max_failures = math.ceil(n_jobs * (1 - required_rate))
 
     failure_count = 0
+    completed = 0
 
     with ProcessPoolExecutor(max_workers=max_workers) as pool:
         futures = {
@@ -197,14 +198,12 @@ def run_cpu_tasks(
 
                     if not determine_task_success(log_path):
                         failure_count += 1
-
                 except Exception as e:
                     print(e)
                     failure_count += 1
-
-                    return
-
-                progress.update()
+                finally:
+                    completed += 1
+                    progress.update()
 
                 if required_rate is not None and failure_count > max_failures:
                     pool.shutdown(wait=False, cancel_futures=True)
@@ -212,7 +211,7 @@ def run_cpu_tasks(
 
                     progress.close()
 
-                    return 1 - failure_count / n_jobs
+                    return 1 - failure_count / completed
 
         except KeyboardInterrupt:
             pool.shutdown(wait=False, cancel_futures=True)
@@ -223,7 +222,7 @@ def run_cpu_tasks(
             return
 
     if required_rate is not None:
-        return 1 - failure_count / n_jobs
+        return 1 - failure_count / completed
 
 
 # Cursed, but works
@@ -379,7 +378,7 @@ def run_gpu_tasks(
             fn(*args, **kwargs)
 
     if required_rate is not None:
-        return 1 - failure_counter.value / n_jobs
+        return 1 - failure_counter.value / completed
 
 
 def run_tasks(

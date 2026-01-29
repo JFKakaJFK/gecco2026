@@ -1,16 +1,36 @@
 from collections.abc import Generator
 from typing import TypedDict
 
+from src.experiment.dataset_config import DatasetConfig
 from src.experiment.experiment_config import ExperimentConfig, TemplateConfig
 
 
 class Problem(TypedDict):
-    dataset: str
+    dataset: DatasetConfig
     population_size: int | None
     num_observations: int
     num_features: int
     template: TemplateConfig
     operator_set: str
+
+
+def format_problem(problem: Problem) -> str:
+    pop = (
+        str(problem["population_size"])
+        if problem["population_size"] is not None
+        else "auto"
+    )
+
+    return (
+        "Problem(\n"
+        f"  dataset           = {problem['dataset'].name}\n"
+        f"  population_size   = {pop}\n"
+        f"  num_observations  = {problem['num_observations']}\n"
+        f"  num_features      = {problem['num_features']}\n"
+        f"  template          = {problem['template']}\n"
+        f"  operator_set      = {problem['operator_set']}\n"
+        ")"
+    )
 
 
 ProblemGenerator = Generator[Problem]
