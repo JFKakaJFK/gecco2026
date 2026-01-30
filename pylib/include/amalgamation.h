@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -250,8 +251,22 @@ class QualityBase {
 
   virtual ~QualityBase() = default;
 
-  // protected:
-  // QualityBase() = default;
+  template <typename T>
+  const T& as() const {
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(this);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<const T&>(*this);
+  }
+  template <typename T>
+  T& as() {
+#ifndef NDEBUG
+    auto p = dynamic_cast<T*>(this);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<T&>(*this);
+  }
 };
 
 class FitnessBase {
@@ -300,7 +315,7 @@ class MOFitness : public ArchiveFitnessBase {
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
   void log(std::ostream& os, const QualityBase& quality) const override final {
-    const auto& q = static_cast<const MOQuality&>(quality);
+    const auto& q = quality.as<MOQuality>();
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -322,8 +337,8 @@ class MOFitness : public ArchiveFitnessBase {
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
                std::optional<usize> objective = std::nullopt) const override final {
-    const auto& ql = static_cast<const MOQuality&>(lhs);
-    const auto& qr = static_cast<const MOQuality&>(rhs);
+    const auto& ql = lhs.as<MOQuality>();
+    const auto& qr = rhs.as<MOQuality>();
     // Constraints are always minimized
     Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
 
@@ -342,8 +357,8 @@ class MOFitness : public ArchiveFitnessBase {
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
                  std::optional<usize> objective = std::nullopt) const override final {
-    const auto& ql = static_cast<const MOQuality&>(lhs);
-    const auto& qr = static_cast<const MOQuality&>(rhs);
+    const auto& ql = lhs.as<MOQuality>();
+    const auto& qr = rhs.as<MOQuality>();
     CType dist;
     if (objective.has_value()) {
       dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
@@ -621,7 +636,7 @@ class SolutionBase {
 
   template <typename T>
   const T& quality_as() const {
-      const auto& q = quality();
+    const auto& q = quality();
 #ifndef NDEBUG
     auto p = dynamic_cast<const T*>(&q);
     assert(p != nullptr && "Quality type mismatch");
@@ -630,7 +645,7 @@ class SolutionBase {
   }
   template <typename T>
   T& quality_as() {
-      auto& q = quality();
+    auto& q = quality();
 #ifndef NDEBUG
     auto p = dynamic_cast<T*>(&q);
     assert(p != nullptr && "Quality type mismatch");
@@ -679,65 +694,66 @@ class SolutionBase {
   ///
   /// The `always_inherit_continuous` determines if the corresponding continuous
   /// variables are also inherited for discrete only subsets.
-  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
-                                         const Subset& subset,
-                                         bool always_inherit_continuous) {
-    bool any_active_changed = false, anything_changed = false;
-    bool is_continuous = subset.continuous.size() > 0;
-    bool is_discrete = subset.discrete.size() > 0;
+  // virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
+  //                                        const Subset& subset,
+  //                                        bool always_inherit_continuous) {
+  //   bool any_active_changed = false, anything_changed = false;
+  //   bool is_continuous = subset.continuous.size() > 0;
+  //   bool is_discrete = subset.discrete.size() > 0;
 
-    // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-    //        "All discrete indices must be valid continuous indices if the continuous "
-    //        "values should be inherited with the discrete ones.");
+  //   // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+  //   //        "All discrete indices must be valid continuous indices if the continuous "
+  //   //        "values should be inherited with the discrete ones.");
 
-    if (is_discrete) {
-      bool inherit_continuous = !is_continuous && always_inherit_continuous;
-      bool inherit_by_index = num_continuous() >= num_discrete();
-      for (usize di, i = 0; i < subset.discrete.size(); i++) {
-        di = subset.discrete[i];
-        if (discrete_values()(di) != donor.discrete_values()(di)) {
-          any_active_changed |= discrete_active()(di);
-          anything_changed = true;
-          discrete_values()(di) = donor.discrete_values()(di);
-        }
+  //   if (is_discrete) {
+  //     bool inherit_continuous = !is_continuous && always_inherit_continuous;
+  //     bool inherit_by_index = num_continuous() >= num_discrete();
+  //     for (usize di, i = 0; i < subset.discrete.size(); i++) {
+  //       di = subset.discrete[i];
+  //       if (discrete_values()(di) != donor.discrete_values()(di)) {
+  //         any_active_changed |= discrete_active()(di);
+  //         anything_changed = true;
+  //         discrete_values()(di) = donor.discrete_values()(di);
+  //       }
 
-        // yes, the indices here should be from the discrete subset!
-        if (inherit_continuous && inherit_by_index) {
-          if (continuous_values()(di) != donor.continuous_values()(di)) {
-            any_active_changed |= continuous_active()(di);
-            anything_changed = true;
-            continuous_values()(di) = donor.continuous_values()(di);
-          }
-        }
-      }
+  //       // yes, the indices here should be from the discrete subset!
+  //       if (inherit_continuous && inherit_by_index) {
+  //         if (continuous_values()(di) != donor.continuous_values()(di)) {
+  //           any_active_changed |= continuous_active()(di);
+  //           anything_changed = true;
+  //           continuous_values()(di) = donor.continuous_values()(di);
+  //         }
+  //       }
+  //     }
 
-      if (inherit_continuous && !inherit_by_index) {
-        for (usize i = 0; i < num_continuous(); i++) {
-          // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-          // useful...
-          if (continuous_values()(i) != donor.continuous_values()(i)) {
-            any_active_changed |= continuous_active()(i);
-            anything_changed = true;
-            continuous_values()(i) = donor.continuous_values()(i);
-          }
-        }
-      }
-    }
-    if (is_continuous) {
-      for (usize ci, i = 0; i < subset.continuous.size(); i++) {
-        ci = subset.continuous[i];
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
-        if (continuous_values()(ci) != donor.continuous_values()(ci)) {
-          any_active_changed |= continuous_active()(ci);
-          anything_changed = true;
-          continuous_values()(ci) = donor.continuous_values()(ci);
-        }
-      }
-    }
+  //     if (inherit_continuous && !inherit_by_index) {
+  //       for (usize i = 0; i < num_continuous(); i++) {
+  //         // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not
+  //         really
+  //         // useful...
+  //         if (continuous_values()(i) != donor.continuous_values()(i)) {
+  //           any_active_changed |= continuous_active()(i);
+  //           anything_changed = true;
+  //           continuous_values()(i) = donor.continuous_values()(i);
+  //         }
+  //       }
+  //     }
+  //   }
+  //   if (is_continuous) {
+  //     for (usize ci, i = 0; i < subset.continuous.size(); i++) {
+  //       ci = subset.continuous[i];
+  //       // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+  //       // useful...
+  //       if (continuous_values()(ci) != donor.continuous_values()(ci)) {
+  //         any_active_changed |= continuous_active()(ci);
+  //         anything_changed = true;
+  //         continuous_values()(ci) = donor.continuous_values()(ci);
+  //       }
+  //     }
+  //   }
 
-    return std::make_tuple(any_active_changed, anything_changed);
-  };
+  //   return std::make_tuple(any_active_changed, anything_changed);
+  // };
 
   // virtual void reject(const SolutionBase& backup,
   //                     bool always_inherit_continuous,
@@ -1908,8 +1924,27 @@ class InstanceBase {
   /// Note: What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.
   virtual const ArchiveFitnessBase& archive_fitness() const = 0;
 
-  // corresponds to e.g. ERCs / one constant per edge in GP
-  virtual bool always_inherit_continuous() const { return false; };
+  // // corresponds to e.g. ERCs / one constant per edge in GP
+  // virtual bool always_inherit_continuous() const { return false; };
+
+  /// The offspring inherits a subset of the decision variables from the donor, returning true if there was a change to
+  /// the active variables and an evaluation is needed, possibly with problem specific modifications.
+  ///
+  /// Returns a `(any_active_changed, anything_changed)` tuple
+  virtual std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                                  const SolutionBase& donor,
+                                                  const Subset& subset) const {
+    bool any_active_changed = false, anything_changed = false;
+
+    for (usize i : subset.discrete) {
+      if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
+        any_active_changed |= offspring.discrete_active()(i);
+        anything_changed = true;
+        offspring.discrete_values()(i) = donor.discrete_values()(i);
+      }
+    }
+    return std::make_tuple(any_active_changed, anything_changed);
+  };
 
   // useful for discrete linkage learning in GP
   // - needed to be able to perform constant binning
@@ -3580,912 +3615,13 @@ class MethodBase {
 #endif /* _GOBLIN_LIB_METHOD_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/lib/ims.h included by goblin.h                                                  //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_LIB_IMS_H
-#define _GOBLIN_LIB_IMS_H
-
-#include <cstddef>
-
-// TODO fix this, lib should not depend on bench!!!
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/tracked.h included by goblin/lib/ims.h                                    //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_TRACKED_H
-#define _GOBLIN_BENCH_TRACKED_H
-
-#include <exception>
-#include <filesystem>
-#include <fstream>
-#include <ostream>
-#include <string>
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/timer.h included by goblin/bench/tracked.h                                //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_BENCH_TIMER_H
-#define _GOBLIN_BENCH_TIMER_H
-
-
-
-namespace goblin {
-class Timer {
- public:
-  void start() { start_time_ = std::make_optional(std::chrono::high_resolution_clock::now()); }
-
-  void stop() {
-    auto now = std::chrono::high_resolution_clock::now();
-    if (start_time_.has_value()) {
-      total_time_ += std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time_.value());
-      start_time_ = std::nullopt;
-    }
-  }
-
-  std::chrono::nanoseconds elapsed() const { return total_time_; }
-
- private:
-  std::chrono::nanoseconds total_time_{0};
-  std::optional<std::chrono::high_resolution_clock::time_point> start_time_ = std::nullopt;
-};
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_TIMER_H */
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/bench/tracked.h continued                                                       //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace goblin {
-
-template <typename T>
-inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
-  if (escape) {
-    os << '"';
-  }
-  os << '[';
-  usize i = 0;
-  for (const auto& e : span) {
-    if (i++ > 0) {
-      os << ',';
-    }
-    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
-#ifdef __cpp_lib_print
-      std::print(os,
-#else
-      os << std::format(
-#endif
-                 "{:d}", e);
-    } else {
-      os << e;
-    }
-  }
-  os << ']';
-  if (escape) {
-    os << '"';
-  }
-};
-
-template <typename EigenLike>
-inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
-  if (escape) {
-    os << '"';
-  }
-  os << '[';
-  if (m.rows() > 1 && m.cols() > 1) {
-    for (isize r = 0; r < m.rows(); r++) {
-      if (r > 0) {
-        os << ',';
-      }
-      if (indent) {
-        os << "\n  ";
-      }
-      os << '[';
-      for (isize c = 0; c < m.cols(); c++) {
-        if (c > 0) {
-          os << ',';
-        }
-
-        // fmt to alwyas use the decimal instead of the ascii byte value for
-        // (unsigned) chars
-        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-          std::print(os,
-#else
-          os << std::format(
-#endif
-                     "{:d}", m(r, c));
-        } else {
-          os << m(r, c);
-        }
-      }
-      os << ']';
-    }
-    if (indent) {
-      os << '\n';
-    }
-  } else {
-    for (isize i = 0; i < m.size(); i++) {
-      if (i > 0) {
-        os << ',';
-      }
-      // fmt to alwyas use the decimal instead of the ascii byte value for
-      // (unsigned) chars
-      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
-#ifdef __cpp_lib_print
-        std::print(os,
-#else
-        os << std::format(
-#endif
-                   "{:d}", m(i));
-      } else {
-        os << m(i);
-      }
-    }
-  }
-  os << ']';
-  if (escape) {
-    os << '"';
-  }
-};
-
-template <typename T>
-inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
-  std::ostringstream os;
-  log_helper(os, t, escape, indent);
-  return os.str();
-};
-
-class TrackingOptions {
- public:
-  TrackingOptions() = delete;
-  // TODO at some point think about enabling dynamically setting the logging
-  // precision for floating points
-  // TODO at some point allow these params on Tracked::run to reduce the amount
-  // of config object nesting?
-  TrackingOptions(std::filesystem::path logpath,
-                  std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
-                  usize archive_capacity = 100,
-                  u64 max_evaluations_until_archive_adaption = 100000,
-                  bool consider_evaluation_time = true,
-                  bool report_intermediate_results = true,
-                  u64 initial_evaluations_until_next_report = 10,
-                  u64 eval_factor = 2,
-                  u64 max_evaluations_until_next_report = 1000000,
-                  u64 initial_generations_until_next_report = 1,
-                  u64 generation_factor = 2,
-                  u64 max_generations_until_next_report = 100,
-                  std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
-                  u64 time_factor = 2,
-                  std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
-      : archive_capacity(archive_capacity),
-        max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
-        consider_evaluation_time(consider_evaluation_time),
-        report_intermediate_results(report_intermediate_results),
-        initial_evaluations_until_next_report(initial_evaluations_until_next_report),
-        eval_factor(eval_factor),
-        max_evaluations_until_next_report(max_evaluations_until_next_report),
-        initial_generations_until_next_report(initial_generations_until_next_report),
-        generation_factor(generation_factor),
-        max_generations_until_next_report(max_generations_until_next_report),
-        initial_time_until_next_report(initial_time_until_next_report),
-        time_factor(time_factor),
-        max_time_until_next_report(max_time_until_next_report),
-        logpath(logpath) {
-    if (log_info.has_value()) {
-      for (auto& kv : log_info.value()) {
-        // TODO escape any '"' here?
-        log_info_headers += std::get<0>(kv) + ',';
-        log_info_values += std::get<1>(kv) + ',';
-      }
-    }
-  };
-
-  usize archive_capacity;
-  u64 max_evaluations_until_archive_adaption;
-  bool consider_evaluation_time;
-  bool report_intermediate_results;
-
-  u64 initial_evaluations_until_next_report;
-  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
-  u64 max_evaluations_until_next_report;
-
-  u64 initial_generations_until_next_report;
-  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
-  u64 max_generations_until_next_report;
-
-  std::chrono::nanoseconds initial_time_until_next_report;
-  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
-  std::chrono::nanoseconds max_time_until_next_report;
-
- private:
-  std::filesystem::path logpath;
-
-  // key-value pairs to log, e.g.
-  // [(method_name,AMaLGaM),(problem_name,Sphere),(dims,10),(run,99)]
-  std::string log_info_headers;
-  std::string log_info_values;
-
-  friend class Tracked;
-};
-
-/// An instance that intercepts evaluations
-class Tracked final : public InstanceBase {
- public:
-  Tracked() = delete;
-
-  usize num_objectives() const override final { return instance.num_objectives(); };
-
-  usize num_discrete() const override final { return instance.num_discrete(); };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
-
-  usize num_continuous() const override final { return instance.num_continuous(); };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-    return instance.continuous_init_lower_bounds();
-  };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-    return instance.continuous_init_upper_bounds();
-  };
-
-  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
-              indices);
-  };
-  void evaluate_partial(Rng& rng,
-                        SolutionSetBase& solutions,
-                        SolutionSetBase& parents,
-                        const std::vector<const Subset*>& subsets,
-                        const std::span<const usize>& indices) override final {
-    wrap_eval(
-        [&](const std::span<const usize>& _indices) {
-          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
-        },
-        solutions, indices);
-  };
-
-  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-    return instance.add_random(rng, solutions, count);
-  };
-
-  const FitnessBase& fitness() const override final { return instance.fitness(); };
-  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
-
-  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
-
-  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
-
-  void log_header(std::ostream& os) const override { instance.log_header(os); }
-
-  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
-    instance.log_solution(os, solution);
-  }
-
-  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
-
-  Mat<CType> gradients(Rng& rng,
-                       SolutionSetBase& solutions,
-                       SolutionSetBase& parents,
-                       const std::vector<const Subset*>& subsets,
-                       const std::span<const usize>& indices,
-                       u64& evaluations) override {
-    u64 evals_before = this->evaluations, _evals = evaluations;
-    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
-    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
-    return res;
-  }
-
-  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
-                                                     SolutionSetBase& solutions,
-                                                     SolutionSetBase& parents,
-                                                     const std::span<const usize>& indices,
-                                                     usize num_steps) override {
-    u64 evals_before = evaluations;
-    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
-
-    alg_timer.stop();
-    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
-
-    for (usize i : /* changed_indices */ std::get<0>(res)) {
-      archive.update(solutions[i], true);
-    }
-
-    if (instance.target_reached(archive)) {
-      status = TerminationStatus::TargetReached;
-      throw TrackingException("");
-    }
-
-    alg_timer.start();
-    return res;
-  }
-
-  /// This can be used by the algorithm to log when debugging to log an
-  /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
-  /// values need to be empty, or valid csv columns with a ',' separator at the
-  /// end (possibly escaping other ',' occurrences with '"').
-  template <typename P>
-  void request_debug_report(std::filesystem::path debug_logpath,
-                            const P& solutions,
-                            std::string_view debug_headers,
-                            std::string_view debug_values) {
-    // close the actual logfile to open up the debug logpath next
-    if (logfile.is_open()) {
-      logfile.close();
-    }
-
-    // temporarily change the logpath
-    auto tracked_generation = generation;
-    generation = method.current_generation();
-    std::swap(debug_logpath, config.logpath);
-    report(solutions, debug_headers, debug_values);
-    std::swap(debug_logpath, config.logpath);
-    generation = tracked_generation;
-
-    // close the debug logfile to open up the actual logpath again next
-    if (logfile.is_open()) {
-      logfile.close();
-    }
-  };
-
-  void request_debug_report(std::filesystem::path debug_logpath,
-                            std::string_view debug_headers,
-                            std::string_view debug_values) {
-    request_debug_report(debug_logpath, archive, debug_headers, debug_values);
-  };
-
-  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
-      InstanceBase& instance,
-      MethodBase& method,
-      Budget& budget,
-      TrackingOptions config,
-      std::optional<usize> seed = std::nullopt,
-      std::optional<usize> population_size = std::nullopt) {
-    std::random_device rd;
-    usize _seed = seed.has_value() ? seed.value()
-                                   : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
-    Tracked ti(instance, method, budget, config, _seed);
-    try {
-      ti.alg_timer.start();
-      auto [_, alg_status] = method.run(ti, budget, _seed, population_size);
-      ti.alg_timer.stop();
-      ti.status = alg_status;
-
-      // TODO why is this necessary? (alg should not be able to hit the target without the exception being thrown...)
-      if (instance.target_reached(ti.archive)) {
-        ti.status = TerminationStatus::TargetReached;
-      }
-
-      // // effectively guess the reason for stopping - assume convergence
-      // // unless the budget is exhausted or the target was reached
-      // auto elapsed = ti.alg_timer.elapsed() + ti.eval_timer.elapsed();
-      // auto ts =
-      //     budget.exhausted(ti.generation.value_or(0), ti.evaluations,
-      //     elapsed);
-      // if (ts.has_value()) {
-      //   ti.status = ts.value();
-      // } else if (instance.target_reached(ti.archive)) {
-      //   ti.status = TerminationStatus::TargetReached;
-      // } else {
-      //   ti.status = TerminationStatus::Converged;
-      // }
-    } catch (const TrackingException& e) {
-    }
-
-    ti.report(ti.archive);
-
-    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
-  };
-
- private:
-  struct TrackingException : std::runtime_error {
-    using std::runtime_error::runtime_error;
-  };
-
-  Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
-      : instance(instance),
-        method(method),
-        budget(budget),
-        config(config),
-        seed(seed),
-        status(TerminationStatus::Running),
-        archive(instance.archive_fitness(), config.archive_capacity),
-        generation(std::nullopt),
-        last_generation(0),
-        generations_at_next_report(config.initial_generations_until_next_report),
-        evaluations(0),
-        evaluations_at_next_report(config.initial_evaluations_until_next_report),
-        time_elapsed_at_next_report(config.initial_time_until_next_report) {};
-
-  template <typename E>
-  void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
-    alg_timer.stop();
-
-    // check if the budget was exhausted while the algorithm was running
-    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    generation = method.current_generation();
-    auto ts = budget.exhausted(generation.value_or(0), evaluations, elapsed);
-    if (ts.has_value()) {
-      status = ts.value();
-      throw TrackingException("");
-    }
-
-    // actually evaluate, but ensure we don't go beyond the evaluation limit
-    u64 evaluations_performed;
-    if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
-      auto evals_left = budget.max_evaluations.value() - evaluations;
-      eval_timer.start();
-      eval(indices.first(evals_left));
-      eval_timer.stop();
-      evaluations_performed = evals_left;
-
-      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
-             "Evaluation limit was not reached!");
-    } else {
-      eval_timer.start();
-      eval(indices);
-      eval_timer.stop();
-      evaluations_performed = indices.size();
-    }
-
-    // update the internal archive, and possibly stop if the target was reached
-    for (usize i = 0; i < evaluations_performed; i++) {
-      archive.update(solutions[indices[i]], true);
-      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
-                      // evaluations performed were considered...
-
-      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
-      // evaluating one by one
-      if (instance.target_reached(archive)) {
-        status = TerminationStatus::TargetReached;
-        throw TrackingException("");
-      }
-    }
-
-    evaluations_since_last_archive_adaption += evaluations_performed;
-
-    // check if we need to stop because the evaluation time/evaluations
-    // exhausted the budget
-    elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    ts = budget.exhausted(0, evaluations, elapsed);
-    if (ts.has_value()) {
-      status = ts.value();
-      throw TrackingException("");
-    }
-
-    // if we made it here, possibly report (if not, a final report
-    // will be generated - no need for doing the final report twice)
-    if (should_report()) {
-      report(archive);
-    }
-    if (evaluations_since_last_archive_adaption >= config.max_evaluations_until_archive_adaption) {
-      evaluations_since_last_archive_adaption = 0;
-      archive.adapt();
-    }
-
-    alg_timer.start();
-  };
-
-  bool should_report() {
-    if (!config.report_intermediate_results)
-      return false;
-
-    bool report_needed = false;
-    if (evaluations >= evaluations_at_next_report) {
-      report_needed = true;
-      evaluations_at_next_report =
-          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
-                                          : evaluations + config.initial_evaluations_until_next_report,
-                   evaluations + config.max_evaluations_until_next_report);
-    }
-
-    u64 g = generation.value_or(0);
-    if (g >= generations_at_next_report && g != last_generation) {
-      last_generation = g;
-      report_needed = true;
-      generations_at_next_report =
-          std::min(config.generation_factor > 1 ? g * config.generation_factor
-                                                : g + config.initial_generations_until_next_report,
-                   g + config.max_generations_until_next_report);
-    }
-
-    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
-    if (elapsed > time_elapsed_at_next_report) {
-      report_needed = true;
-      time_elapsed_at_next_report = std::min(
-          config.time_factor > 1
-              ? std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed * config.time_factor)
-              : std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed + config.initial_time_until_next_report),
-          elapsed + config.max_time_until_next_report);
-    }
-
-    return report_needed;
-  };
-
-  template <typename A>
-  void report(const A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
-    namespace fs = std::filesystem;
-    typedef std::chrono::duration<double> Seconds;
-
-    if (config.logpath == "/dev/null") {
-      return;
-    }
-
-    if (!logfile.is_open()) {
-      if (!config.logpath.parent_path().empty()) {
-        fs::create_directories(config.logpath.parent_path());
-      }
-
-      // clear the file if it was not cleared before
-      if (truncated_files.contains(config.logpath)) {
-        logfile.open(config.logpath, std::ios::out | std::ios::app | std::ios::ate);
-      } else {
-        truncated_files.insert(config.logpath);
-        logfile.open(config.logpath, std::ios::out | std::ios::trunc);
-      }
-
-      if (fs::is_empty(config.logpath)) {
-        // clang-format off
-        logfile <<
-            "status,"
-            "evaluations,"
-            "generation,"
-            "total_time_seconds,"
-            "alg_time_seconds,"
-            "eval_time_seconds,"
-            "current_population_size,"
-            "current_population_generation,"
-            << config.log_info_headers
-            << debug_headers <<
-            "seed,"
-            "discrete,"
-            "discrete_active,"
-            "continuous,"
-            "continuous_active,"
-        ;
-        // clang-format on
-        instance.log_header(logfile);
-        logfile << std::endl;  // here we want to flush
-      }
-    }
-
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
-    auto pop_info = method.current_population();
-    if (pop_info.has_value()) {
-      auto [p_size, p_gen] = pop_info.value();
-      pop_size = std::to_string(p_size);
-      pop_gen = std::to_string(p_gen);
-    }
-    Seconds alg_time = alg_timer.elapsed();
-    Seconds eval_time = eval_timer.elapsed();
-    Seconds total_time = alg_time + eval_time;
-
-    auto common =
-        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
-
-    for (usize i = 0; i < solutions.size(); i++) {
-      const auto& s = solutions[i];
-      // clang-format off
-        logfile << common;
-        log_helper(logfile,   s.discrete_values(), true); logfile << ',';
-        log_helper(logfile,   s.discrete_active(), true); logfile << ',';
-        log_helper(logfile, s.continuous_values(), true); logfile << ',';
-        log_helper(logfile, s.continuous_active(), true); logfile << ',';
-      // clang-format on
-      instance.log(logfile, s);
-      logfile << "\n";
-    }
-    logfile << std::flush;
-  };
-
-  InstanceBase& instance;
-  MethodBase& method;
-  Budget& budget;
-  TrackingOptions config;
-  usize seed;
-
-  TerminationStatus status;
-  AdaptiveGridArchive archive;
-
-  Timer alg_timer;
-  Timer eval_timer;
-
-  std::optional<u64> generation;
-  u64 last_generation;
-  u64 generations_at_next_report;
-
-  u64 evaluations;
-  u64 evaluations_at_next_report;
-  std::chrono::nanoseconds time_elapsed_at_next_report;
-
-  usize evaluations_since_last_archive_adaption;
-
-  std::ofstream logfile;
-  std::set<std::filesystem::path> truncated_files;
-};
-
-/// Tracked running was intended to unify reporting across algorithms
-/// - this method abuses that functionality to re-use that logging for
-/// other purposes controlled by the algorithm, not the tracking
-inline void debug_log(InstanceBase& problem,
-                      std::string_view path,
-                      std::string_view headers = "",
-                      std::string_view values = "",
-                      std::optional<std::reference_wrapper<const SolutionSetBase>> population = std::nullopt) {
-  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
-    if (population.has_value()) {
-      ti->request_debug_report(path, population.value().get(), headers, values);
-    } else {
-      ti->request_debug_report(path, headers, values);
-    }
-  } else {
-    throw std::runtime_error(
-        "Debug log called on an incompatible problem instance. Try using "
-        "`Tracked::run` to enable logging.");
-  }
-};
-
-template <typename T>
-inline std::string iterator2str(T&& it) {
-  std::ostringstream os;
-  os << '[';
-  usize i = 0;
-  for (const auto& e : it) {
-    if (i++ > 0) {
-      os << ',';
-    }
-    os << e;
-  }
-  os << ']';
-  return os.str();
-};
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_BENCH_TRACKED_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/lib/ims.h continued                                                             //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-namespace goblin {
-
-struct IMSOptions {
-  usize initial_population_size = 2;
-  usize max_num_populations = 25;
-  usize subgeneration_factor = 4;
-  bool restart_stale_populations = false;
-  bool stop_covered_populations = false;
-  usize initial_num_clusters = 1;
-  std::optional<usize> archive_capacity = 100;
-  bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
-  usize additional_clusters_per_start = 1;
-  std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
-
-  std::optional<std::string> population_logfile = std::nullopt;
-  std::string population_log_resolution = "archive";
-};
-
-template <typename P>
-class IMS final : public MethodBase {
-  using C = std::function<
-      P(InstanceBase& /* problem */, ArchiveBase& /* global_archive */, usize /* size */, usize /* num_clusters
-                                                                                                 */
-        )>;
-
- public:
-  IMS(C create_population, IMSOptions options = IMSOptions())
-      : create_population(create_population), options(options), total_generations(0) {};
-
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
-      InstanceBase& problem,
-      const Budget& budget,
-      std::optional<u64> seed = std::nullopt,
-      std::optional<usize> population_size = std::nullopt) override final {
-    bool is_multi_objective = problem.num_objectives() > 1;
-    IMSOptions opts = options;
-    if (opts.initial_num_clusters == 0) {
-      opts.initial_num_clusters = problem.num_objectives() + (is_multi_objective ? 1 : 0);
-    }
-
-    if (opts.initial_population_size <= opts.initial_num_clusters) {
-      opts.initial_population_size *= opts.initial_num_clusters;
-    }
-
-    if (population_size.has_value()) {
-      opts.initial_population_size = population_size.value();
-      opts.max_num_populations = 1;
-    }
-
-    if (!opts.so_parameter_space_clustering && !is_multi_objective) {
-      opts.additional_clusters_per_start = 0;
-    }
-
-    Rng rng = seeded_rng(seed);
-    auto archive =
-        opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
-            ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.archive_fitness()))
-            : std::static_pointer_cast<ArchiveBase>(
-                  std::make_shared<AdaptiveGridArchive>(problem.archive_fitness(), opts.archive_capacity.value()));
-
-    std::vector<P> populations;
-    populations.reserve(opts.max_num_populations);
-    sizes.clear();
-    sizes.reserve(opts.max_num_populations);
-    generations.clear();
-    generations.reserve(opts.max_num_populations);
-    std::vector<bool> running;
-    running.reserve(opts.max_num_populations);
-    std::vector<usize> generations_since_last_improvement;
-    generations_since_last_improvement.reserve(opts.max_num_populations);
-
-    total_generations = 0;
-    u64 evaluations = 0;
-    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
-
-    auto should_terminate = [&](usize additional_evaluations = 0,
-                                bool check_external_criterion = false) -> std::optional<TerminationStatus> {
-      std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
-      std::chrono::nanoseconds elapsed = now - t_start;
-
-      auto status = check_external_criterion
-                        ? budget.exhausted_or_external_criterion_met(total_generations,
-                                                                     evaluations + additional_evaluations, elapsed)
-                        : budget.exhausted(total_generations, evaluations + additional_evaluations, elapsed);
-      if (status.has_value()) {
-        // std::println("{}", format_as(status.value()));
-        return status;
-      }
-
-      if (problem.target_reached(*archive)) {
-        // std::println("{}", format_as(TerminationStatus::TargetReached));
-        return std::make_optional(TerminationStatus::TargetReached);
-      }
-
-      return std::nullopt;
-    };
-
-    auto any_running = [&]() {
-      for (auto r : running) {
-        if (r) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-    Vec<CType> avg_dist_to_so_elite(opts.max_num_populations);
-    p_idx = 0;
-    while (!should_terminate(/* additional_evaluations = */ 0, /* check_external_criterion = */ true) &&
-           (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
-      // init/restart population if necessary
-      if (p_idx >= populations.size()) {
-        usize size = opts.initial_population_size * std::pow(2, p_idx);
-        sizes.push_back(size);
-        populations.push_back(create_population(
-            problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
-        generations.push_back(0);
-        generations_since_last_improvement.push_back(0);
-        running.push_back(true);
-      } else if (!running[p_idx] && opts.restart_stale_populations &&
-                 (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
-        populations[p_idx].restart();
-        generations[p_idx] = 0;
-        generations_since_last_improvement[p_idx] = 0;
-        running[p_idx] = true;
-      }
-
-      // do a step, optionally terminate this or smaller ones
-      generations[p_idx]++;  // this needs to always be increased, no matter if we do
-                             // a step or not
-      if (running[p_idx]) {
-        archive->reset_change_count();
-        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
-        total_generations++;
-
-        if (opts.population_logfile.has_value()) {
-          AoSSet p;  // copy is needed because p needs to be non-const, and that is the case because logging for the sr
-                     // problem at this point in time might do a test set evaluation...
-          if (opts.population_log_resolution == "archive") {
-            const auto& a = populations[p_idx].archive();
-            for (usize i = 0; i < a.size(); i++) {
-              p.add(a[i]);
-            }
-          } else if (opts.population_log_resolution == "population") {
-            const auto& s = populations[p_idx].get_solutions();
-            for (usize i = 0; i < s.size(); i++) {
-              p.add(s[i]);
-            }
-          } else {
-            throw std::runtime_error("Unknown population log resolution.");
-          }
-
-          debug_log(problem, opts.population_logfile.value(), "", "", p);
-        }
-
-        if (archive->change_count() > 0) {
-          generations_since_last_improvement[p_idx] = 0;
-        } else {
-          generations_since_last_improvement[p_idx]++;
-        }
-
-        archive->adapt();
-
-        if (!is_multi_objective || opts.stop_covered_populations) {
-          for (usize j = 0; j < p_idx; j++) {
-            if (populations[p_idx].archive().covers(populations[j].archive())) {
-              running[j] = false;
-            }
-          }
-        }
-        if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
-          // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
-          // population is better condition
-          avg_dist_to_so_elite(p_idx) = populations[p_idx].avg_dist_to_global_so_elite();
-          for (usize j = 0; j < p_idx; j++) {
-            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(p_idx)) {
-              running[j] = false;
-            }
-          }
-        }
-        if (populations[p_idx].converged() ||
-            (opts.restart_stale_populations &&
-             generations_since_last_improvement[p_idx] >
-                 opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-          running[p_idx] = false;
-        }
-      }
-
-      // go to the next population to do a step with
-      p_idx = generations[p_idx] % opts.subgeneration_factor == 0 ? (p_idx + 1) % opts.max_num_populations : 0;
-    }
-
-    // std::println(
-    //     "{} && ({} || {} || {}) - G: {} / #P: {} of {}", !should_terminate(),
-    //     populations.size() < opts.max_num_populations,
-    //     opts.restart_stale_populations, any_running(), total_generations,
-    //     populations.size(), opts.max_num_populations);
-
-    // for (usize p_idx = 0; p_idx < archive->size(); p_idx++) {
-    //   std::println("{}", problem.format_solution((*archive)[p_idx]));
-    // }
-
-    return std::make_tuple(archive, should_terminate().value_or(TerminationStatus::Converged));
-  };
-
-  std::optional<u64> current_generation() const override final { return total_generations; };
-
-  std::optional<std::tuple<usize, u64>> current_population() const override {
-    return std::make_tuple(sizes[p_idx], generations[p_idx]);
-  };
-
- private:
-  C create_population;
-  IMSOptions options;
-  // The whole reason run is not a static method -
-  // generation reporting needs to be accessible (via an IMS instance)
-  u64 total_generations;
-
-  usize p_idx;
-  std::vector<usize> sizes;
-  std::vector<u64> generations;
-};
-
-};  // namespace goblin
-
-#endif /* _GOBLIN_LIB_IMS_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/init.h included by goblin.h                                                 //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_INIT_H
 #define _GOBLIN_LIB_INIT_H
 
 #include <variant>
+
 
 namespace goblin {
 
@@ -4628,11 +3764,13 @@ class CompleteInit final : public DiscreteInitBase {
 
 #endif /* _GOBLIN_LIB_INIT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INSTANCE_H
 #define _GOBLIN_GP_INSTANCE_H
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
@@ -4640,9 +3778,11 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
+#include <string>
 #include <queue>
 #include <iterator>
 #include <ranges>
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h included by goblin/gp/context.h                                   //
@@ -4650,11 +3790,16 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
+
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/template.h included by goblin/gp/operator.h                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_TEMPLATE_H
 #define _GOBLIN_GP_TEMPLATE_H
+
+
 
 namespace goblin {
 struct TemplateNode {
@@ -4800,6 +3945,7 @@ struct Template {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -5329,6 +4475,7 @@ class OpMax : public OperatorBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_OPERATOR_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h continued                                                          //
@@ -6169,6 +5316,7 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6191,6 +5339,8 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
+
+
 
 namespace goblin {
 
@@ -6763,11 +5913,14 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h included by goblin.h                                                    //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
+
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
+
 
 namespace goblin {
 
@@ -6934,10 +6087,62 @@ class SRProblem : public GPInstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final {
-    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
-                                               ctx.const_repr == ConstantRepr::Edges);
-  };
+  virtual std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                                  const SolutionBase& donor,
+                                                  const Subset& subset) const override {
+    const bool inherit_continuous = _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
+                                                                        ctx.const_repr == ConstantRepr::Edges) &&
+                                    ctx.const_repr != ConstantRepr::None;
+
+    // the pool size is not tied to the number of discrete variables, so the full pool instead of the paired values is
+    // inherited...
+    const bool inherit_by_index = ctx.const_repr != ConstantRepr::Pool;
+
+    bool any_active_changed = false, anything_changed = false;
+    for (usize i : subset.discrete) {
+      if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
+        any_active_changed |= offspring.discrete_active()(i);
+        anything_changed = true;
+        offspring.discrete_values()(i) = donor.discrete_values()(i);
+      }
+
+      // TODO for GCS: inherit child arities + permutations
+
+      if (inherit_continuous && inherit_by_index) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        //
+        // yes, the indices here should be from the discrete subset!
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    if (inherit_continuous && !inherit_by_index) {
+      // note: arguably just inheriting all continuous variables even if the inherited discrete values might not even be
+      // constants is not the best idea - but earlier experiments on another codebase suggested that more
+      // appropriate/interpolating continuous mixing doesn't really work and here it also is more for completeness and
+      // not used by default...
+      for (usize i = 0; i < num_continuous(); i++) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    return std::make_tuple(any_active_changed, anything_changed);
+  }
+
+  // bool always_inherit_continuous() const override final {
+  //   return ;
+  // };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));
@@ -7142,11 +6347,13 @@ class SRProblem : public GPInstanceBase {
 
 #endif /* _GOBLIN_GP_SR_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
+
 
 namespace goblin {
 
@@ -7188,7 +6395,10 @@ class ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
+
+#include <cstddef>
 #include <numbers>
+
 
 // TODO
 // - [ ] Permute (scramble arguments to function, either fixed or random perm)
@@ -7761,6 +6971,7 @@ class Repeat final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
+
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -7996,6 +7207,8 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
+
+
 namespace goblin {
 
 class Sphere final : public ObjectiveBase {
@@ -8175,6 +7388,8 @@ class CirclesInASquare final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 #define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 
+
+
 namespace goblin {
 
 class LeadingSpheres final : public ObjectiveBase {
@@ -8226,6 +7441,8 @@ class LeadingSpheres final : public ObjectiveBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_PROBLEM_H
 #define _GOBLIN_BENCH_PROBLEM_H
+
+
 
 namespace goblin {
 
@@ -8519,10 +7736,908 @@ class BenchmarkInstance final : public InstanceBase {
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/timer.h included by goblin.h                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_TIMER_H
+#define _GOBLIN_BENCH_TIMER_H
+
+
+
+namespace goblin {
+class Timer {
+ public:
+  void start() { start_time_ = std::make_optional(std::chrono::high_resolution_clock::now()); }
+
+  void stop() {
+    auto now = std::chrono::high_resolution_clock::now();
+    if (start_time_.has_value()) {
+      total_time_ += std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time_.value());
+      start_time_ = std::nullopt;
+    }
+  }
+
+  std::chrono::nanoseconds elapsed() const { return total_time_; }
+
+ private:
+  std::chrono::nanoseconds total_time_{0};
+  std::optional<std::chrono::high_resolution_clock::time_point> start_time_ = std::nullopt;
+};
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_TIMER_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/bench/tracked.h included by goblin.h                                            //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_BENCH_TRACKED_H
+#define _GOBLIN_BENCH_TRACKED_H
+
+#include <exception>
+#include <filesystem>
+#include <fstream>
+#include <ostream>
+
+
+namespace goblin {
+
+template <typename T>
+inline void log_helper(std::ostream& os, const std::vector<T>& span, bool escape = true, bool _indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  usize i = 0;
+  for (const auto& e : span) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    if constexpr (std::same_as<T, char> || std::same_as<T, u8>) {
+#ifdef __cpp_lib_print
+      std::print(os,
+#else
+      os << std::format(
+#endif
+                 "{:d}", e);
+    } else {
+      os << e;
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename EigenLike>
+inline void log_helper(std::ostream& os, const EigenLike& m, bool escape = true, bool indent = false) {
+  if (escape) {
+    os << '"';
+  }
+  os << '[';
+  if (m.rows() > 1 && m.cols() > 1) {
+    for (isize r = 0; r < m.rows(); r++) {
+      if (r > 0) {
+        os << ',';
+      }
+      if (indent) {
+        os << "\n  ";
+      }
+      os << '[';
+      for (isize c = 0; c < m.cols(); c++) {
+        if (c > 0) {
+          os << ',';
+        }
+
+        // fmt to alwyas use the decimal instead of the ascii byte value for
+        // (unsigned) chars
+        if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+          std::print(os,
+#else
+          os << std::format(
+#endif
+                     "{:d}", m(r, c));
+        } else {
+          os << m(r, c);
+        }
+      }
+      os << ']';
+    }
+    if (indent) {
+      os << '\n';
+    }
+  } else {
+    for (isize i = 0; i < m.size(); i++) {
+      if (i > 0) {
+        os << ',';
+      }
+      // fmt to alwyas use the decimal instead of the ascii byte value for
+      // (unsigned) chars
+      if constexpr (std::same_as<typename EigenLike::Scalar, char> || std::same_as<typename EigenLike::Scalar, u8>) {
+#ifdef __cpp_lib_print
+        std::print(os,
+#else
+        os << std::format(
+#endif
+                   "{:d}", m(i));
+      } else {
+        os << m(i);
+      }
+    }
+  }
+  os << ']';
+  if (escape) {
+    os << '"';
+  }
+};
+
+template <typename T>
+inline std::string log_helper(const T& t, bool escape = true, bool indent = false) {
+  std::ostringstream os;
+  log_helper(os, t, escape, indent);
+  return os.str();
+};
+
+class TrackingOptions {
+ public:
+  TrackingOptions() = delete;
+  // TODO at some point think about enabling dynamically setting the logging
+  // precision for floating points
+  // TODO at some point allow these params on Tracked::run to reduce the amount
+  // of config object nesting?
+  TrackingOptions(std::filesystem::path logpath,
+                  std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
+                  usize archive_capacity = 100,
+                  u64 max_evaluations_until_archive_adaption = 100000,
+                  bool consider_evaluation_time = true,
+                  bool report_intermediate_results = true,
+                  u64 initial_evaluations_until_next_report = 10,
+                  u64 eval_factor = 2,
+                  u64 max_evaluations_until_next_report = 1000000,
+                  u64 initial_generations_until_next_report = 1,
+                  u64 generation_factor = 2,
+                  u64 max_generations_until_next_report = 100,
+                  std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
+                  u64 time_factor = 2,
+                  std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10))
+      : archive_capacity(archive_capacity),
+        max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
+        consider_evaluation_time(consider_evaluation_time),
+        report_intermediate_results(report_intermediate_results),
+        initial_evaluations_until_next_report(initial_evaluations_until_next_report),
+        eval_factor(eval_factor),
+        max_evaluations_until_next_report(max_evaluations_until_next_report),
+        initial_generations_until_next_report(initial_generations_until_next_report),
+        generation_factor(generation_factor),
+        max_generations_until_next_report(max_generations_until_next_report),
+        initial_time_until_next_report(initial_time_until_next_report),
+        time_factor(time_factor),
+        max_time_until_next_report(max_time_until_next_report),
+        logpath(logpath) {
+    if (log_info.has_value()) {
+      for (auto& kv : log_info.value()) {
+        // TODO escape any '"' here?
+        log_info_headers += std::get<0>(kv) + ',';
+        log_info_values += std::get<1>(kv) + ',';
+      }
+    }
+  };
+
+  usize archive_capacity;
+  u64 max_evaluations_until_archive_adaption;
+  bool consider_evaluation_time;
+  bool report_intermediate_results;
+
+  u64 initial_evaluations_until_next_report;
+  u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_evaluations_until_next_report;
+
+  u64 initial_generations_until_next_report;
+  u64 generation_factor;  // 1 is linear, >= 2 is exponential spacing
+  u64 max_generations_until_next_report;
+
+  std::chrono::nanoseconds initial_time_until_next_report;
+  u64 time_factor;  // 1 is linear, >= 2 is exponential spacing
+  std::chrono::nanoseconds max_time_until_next_report;
+
+ private:
+  std::filesystem::path logpath;
+
+  // key-value pairs to log, e.g.
+  // [(method_name,AMaLGaM),(problem_name,Sphere),(dims,10),(run,99)]
+  std::string log_info_headers;
+  std::string log_info_values;
+
+  friend class Tracked;
+};
+
+/// An instance that intercepts evaluations
+class Tracked final : public InstanceBase {
+ public:
+  Tracked() = delete;
+
+  usize num_objectives() const override final { return instance.num_objectives(); };
+
+  usize num_discrete() const override final { return instance.num_discrete(); };
+  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
+
+  usize num_continuous() const override final { return instance.num_continuous(); };
+  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
+  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
+    return instance.continuous_init_lower_bounds();
+  };
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
+    return instance.continuous_init_upper_bounds();
+  };
+
+  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
+              indices);
+  };
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override final {
+    wrap_eval(
+        [&](const std::span<const usize>& _indices) {
+          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+        },
+        solutions, indices);
+  };
+
+  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+    return instance.add_random(rng, solutions, count);
+  };
+
+  const FitnessBase& fitness() const override final { return instance.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
+
+  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
+
+  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                          const SolutionBase& donor,
+                                          const Subset& subset) const override {
+    return instance.inherit_discrete(offspring, donor, subset);
+  }
+
+  // bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
+
+  void log_header(std::ostream& os) const override { instance.log_header(os); }
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    instance.log_solution(os, solution);
+  }
+
+  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    u64 evals_before = this->evaluations, _evals = evaluations;
+    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
+    return res;
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    u64 evals_before = evaluations;
+    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+
+    alg_timer.stop();
+    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
+
+    for (usize i : /* changed_indices */ std::get<0>(res)) {
+      archive.update(solutions[i], true);
+    }
+
+    if (instance.target_reached(archive)) {
+      status = TerminationStatus::TargetReached;
+      throw TrackingException("");
+    }
+
+    alg_timer.start();
+    return res;
+  }
+
+  /// This can be used by the algorithm to log when debugging to log an
+  /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
+  /// values need to be empty, or valid csv columns with a ',' separator at the
+  /// end (possibly escaping other ',' occurrences with '"').
+  template <typename P>
+  void request_debug_report(std::filesystem::path debug_logpath,
+                            const P& solutions,
+                            std::string_view debug_headers,
+                            std::string_view debug_values) {
+    // close the actual logfile to open up the debug logpath next
+    if (logfile.is_open()) {
+      logfile.close();
+    }
+
+    // temporarily change the logpath
+    auto tracked_generation = generation;
+    generation = method.current_generation();
+    std::swap(debug_logpath, config.logpath);
+    report(solutions, debug_headers, debug_values);
+    std::swap(debug_logpath, config.logpath);
+    generation = tracked_generation;
+
+    // close the debug logfile to open up the actual logpath again next
+    if (logfile.is_open()) {
+      logfile.close();
+    }
+  };
+
+  void request_debug_report(std::filesystem::path debug_logpath,
+                            std::string_view debug_headers,
+                            std::string_view debug_values) {
+    request_debug_report(debug_logpath, archive, debug_headers, debug_values);
+  };
+
+  static std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& instance,
+      MethodBase& method,
+      Budget& budget,
+      TrackingOptions config,
+      std::optional<usize> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) {
+    std::random_device rd;
+    usize _seed = seed.has_value() ? seed.value()
+                                   : std::uniform_int_distribution<usize>(1, std::numeric_limits<usize>::max())(rd);
+    Tracked ti(instance, method, budget, config, _seed);
+    try {
+      ti.alg_timer.start();
+      auto [_, alg_status] = method.run(ti, budget, _seed, population_size);
+      ti.alg_timer.stop();
+      ti.status = alg_status;
+
+      // TODO why is this necessary? (alg should not be able to hit the target without the exception being thrown...)
+      if (instance.target_reached(ti.archive)) {
+        ti.status = TerminationStatus::TargetReached;
+      }
+
+      // // effectively guess the reason for stopping - assume convergence
+      // // unless the budget is exhausted or the target was reached
+      // auto elapsed = ti.alg_timer.elapsed() + ti.eval_timer.elapsed();
+      // auto ts =
+      //     budget.exhausted(ti.generation.value_or(0), ti.evaluations,
+      //     elapsed);
+      // if (ts.has_value()) {
+      //   ti.status = ts.value();
+      // } else if (instance.target_reached(ti.archive)) {
+      //   ti.status = TerminationStatus::TargetReached;
+      // } else {
+      //   ti.status = TerminationStatus::Converged;
+      // }
+    } catch (const TrackingException& e) {
+    }
+
+    ti.report(ti.archive);
+
+    return std::make_tuple(std::make_shared<AdaptiveGridArchive>(std::move(ti.archive)), ti.status);
+  };
+
+ private:
+  struct TrackingException : std::runtime_error {
+    using std::runtime_error::runtime_error;
+  };
+
+  Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
+      : instance(instance),
+        method(method),
+        budget(budget),
+        config(config),
+        seed(seed),
+        status(TerminationStatus::Running),
+        archive(instance.archive_fitness(), config.archive_capacity),
+        generation(std::nullopt),
+        last_generation(0),
+        generations_at_next_report(config.initial_generations_until_next_report),
+        evaluations(0),
+        evaluations_at_next_report(config.initial_evaluations_until_next_report),
+        time_elapsed_at_next_report(config.initial_time_until_next_report) {};
+
+  template <typename E>
+  void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
+    alg_timer.stop();
+
+    // check if the budget was exhausted while the algorithm was running
+    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    generation = method.current_generation();
+    auto ts = budget.exhausted(generation.value_or(0), evaluations, elapsed);
+    if (ts.has_value()) {
+      status = ts.value();
+      throw TrackingException("");
+    }
+
+    // actually evaluate, but ensure we don't go beyond the evaluation limit
+    u64 evaluations_performed;
+    if (budget.max_evaluations.has_value() && evaluations + indices.size() > budget.max_evaluations.value()) {
+      auto evals_left = budget.max_evaluations.value() - evaluations;
+      eval_timer.start();
+      eval(indices.first(evals_left));
+      eval_timer.stop();
+      evaluations_performed = evals_left;
+
+      assert(budget.exhausted(0, evaluations + evaluations_performed, elapsed).has_value() &&
+             "Evaluation limit was not reached!");
+    } else {
+      eval_timer.start();
+      eval(indices);
+      eval_timer.stop();
+      evaluations_performed = indices.size();
+    }
+
+    // update the internal archive, and possibly stop if the target was reached
+    for (usize i = 0; i < evaluations_performed; i++) {
+      archive.update(solutions[indices[i]], true);
+      evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
+                      // evaluations performed were considered...
+
+      // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
+      // evaluating one by one
+      if (instance.target_reached(archive)) {
+        status = TerminationStatus::TargetReached;
+        throw TrackingException("");
+      }
+    }
+
+    evaluations_since_last_archive_adaption += evaluations_performed;
+
+    // check if we need to stop because the evaluation time/evaluations
+    // exhausted the budget
+    elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    ts = budget.exhausted(0, evaluations, elapsed);
+    if (ts.has_value()) {
+      status = ts.value();
+      throw TrackingException("");
+    }
+
+    // if we made it here, possibly report (if not, a final report
+    // will be generated - no need for doing the final report twice)
+    if (should_report()) {
+      report(archive);
+    }
+    if (evaluations_since_last_archive_adaption >= config.max_evaluations_until_archive_adaption) {
+      evaluations_since_last_archive_adaption = 0;
+      archive.adapt();
+    }
+
+    alg_timer.start();
+  };
+
+  bool should_report() {
+    if (!config.report_intermediate_results)
+      return false;
+
+    bool report_needed = false;
+    if (evaluations >= evaluations_at_next_report) {
+      report_needed = true;
+      evaluations_at_next_report =
+          std::min(config.eval_factor > 1 ? evaluations * config.eval_factor
+                                          : evaluations + config.initial_evaluations_until_next_report,
+                   evaluations + config.max_evaluations_until_next_report);
+    }
+
+    u64 g = generation.value_or(0);
+    if (g >= generations_at_next_report && g != last_generation) {
+      last_generation = g;
+      report_needed = true;
+      generations_at_next_report =
+          std::min(config.generation_factor > 1 ? g * config.generation_factor
+                                                : g + config.initial_generations_until_next_report,
+                   g + config.max_generations_until_next_report);
+    }
+
+    auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
+    if (elapsed > time_elapsed_at_next_report) {
+      report_needed = true;
+      time_elapsed_at_next_report = std::min(
+          config.time_factor > 1
+              ? std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed * config.time_factor)
+              : std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed + config.initial_time_until_next_report),
+          elapsed + config.max_time_until_next_report);
+    }
+
+    return report_needed;
+  };
+
+  template <typename A>
+  void report(const A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
+    namespace fs = std::filesystem;
+    typedef std::chrono::duration<double> Seconds;
+
+    if (config.logpath == "/dev/null") {
+      return;
+    }
+
+    if (!logfile.is_open()) {
+      if (!config.logpath.parent_path().empty()) {
+        fs::create_directories(config.logpath.parent_path());
+      }
+
+      // clear the file if it was not cleared before
+      if (truncated_files.contains(config.logpath)) {
+        logfile.open(config.logpath, std::ios::out | std::ios::app | std::ios::ate);
+      } else {
+        truncated_files.insert(config.logpath);
+        logfile.open(config.logpath, std::ios::out | std::ios::trunc);
+      }
+
+      if (fs::is_empty(config.logpath)) {
+        // clang-format off
+        logfile <<
+            "status,"
+            "evaluations,"
+            "generation,"
+            "total_time_seconds,"
+            "alg_time_seconds,"
+            "eval_time_seconds,"
+            "current_population_size,"
+            "current_population_generation,"
+            << config.log_info_headers
+            << debug_headers <<
+            "seed,"
+            "discrete,"
+            "discrete_active,"
+            "continuous,"
+            "continuous_active,"
+        ;
+        // clang-format on
+        instance.log_header(logfile);
+        logfile << std::endl;  // here we want to flush
+      }
+    }
+
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    auto pop_info = method.current_population();
+    if (pop_info.has_value()) {
+      auto [p_size, p_gen] = pop_info.value();
+      pop_size = std::to_string(p_size);
+      pop_gen = std::to_string(p_gen);
+    }
+    Seconds alg_time = alg_timer.elapsed();
+    Seconds eval_time = eval_timer.elapsed();
+    Seconds total_time = alg_time + eval_time;
+
+    auto common =
+        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
+                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
+
+    for (usize i = 0; i < solutions.size(); i++) {
+      const auto& s = solutions[i];
+      // clang-format off
+        logfile << common;
+        log_helper(logfile,   s.discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_active(), true); logfile << ',';
+        log_helper(logfile, s.continuous_values(), true); logfile << ',';
+        log_helper(logfile, s.continuous_active(), true); logfile << ',';
+      // clang-format on
+      instance.log(logfile, s);
+      logfile << "\n";
+    }
+    logfile << std::flush;
+  };
+
+  InstanceBase& instance;
+  MethodBase& method;
+  Budget& budget;
+  TrackingOptions config;
+  usize seed;
+
+  TerminationStatus status;
+  AdaptiveGridArchive archive;
+
+  Timer alg_timer;
+  Timer eval_timer;
+
+  std::optional<u64> generation;
+  u64 last_generation;
+  u64 generations_at_next_report;
+
+  u64 evaluations;
+  u64 evaluations_at_next_report;
+  std::chrono::nanoseconds time_elapsed_at_next_report;
+
+  usize evaluations_since_last_archive_adaption;
+
+  std::ofstream logfile;
+  std::set<std::filesystem::path> truncated_files;
+};
+
+/// Tracked running was intended to unify reporting across algorithms
+/// - this method abuses that functionality to re-use that logging for
+/// other purposes controlled by the algorithm, not the tracking
+inline void debug_log(InstanceBase& problem,
+                      std::string_view path,
+                      std::string_view headers = "",
+                      std::string_view values = "",
+                      std::optional<std::reference_wrapper<const SolutionSetBase>> population = std::nullopt) {
+  if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
+    if (population.has_value()) {
+      ti->request_debug_report(path, population.value().get(), headers, values);
+    } else {
+      ti->request_debug_report(path, headers, values);
+    }
+  } else {
+    throw std::runtime_error(
+        "Debug log called on an incompatible problem instance. Try using "
+        "`Tracked::run` to enable logging.");
+  }
+};
+
+template <typename T>
+inline std::string iterator2str(T&& it) {
+  std::ostringstream os;
+  os << '[';
+  usize i = 0;
+  for (const auto& e : it) {
+    if (i++ > 0) {
+      os << ',';
+    }
+    os << e;
+  }
+  os << ']';
+  return os.str();
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_BENCH_TRACKED_H */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/ims.h included by goblin.h                                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_LIB_IMS_H
+#define _GOBLIN_LIB_IMS_H
+
+
+
+namespace goblin {
+
+struct IMSOptions {
+  usize initial_population_size = 2;
+  usize max_num_populations = 25;
+  usize subgeneration_factor = 4;
+  bool restart_stale_populations = false;
+  bool stop_covered_populations = false;
+  usize initial_num_clusters = 1;
+  std::optional<usize> archive_capacity = 100;
+  bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
+  usize additional_clusters_per_start = 1;
+  std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
+
+  std::optional<std::string> population_logfile = std::nullopt;
+  std::string population_log_resolution = "archive";
+};
+
+template <typename P>
+class IMS final : public MethodBase {
+  using C = std::function<
+      P(InstanceBase& /* problem */, ArchiveBase& /* global_archive */, usize /* size */, usize /* num_clusters
+                                                                                                 */
+        )>;
+
+ public:
+  IMS(C create_population, IMSOptions options = IMSOptions())
+      : create_population(create_population), options(options), total_generations(0) {};
+
+  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& problem,
+      const Budget& budget,
+      std::optional<u64> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) override final {
+    bool is_multi_objective = problem.num_objectives() > 1;
+    IMSOptions opts = options;
+    if (opts.initial_num_clusters == 0) {
+      opts.initial_num_clusters = problem.num_objectives() + (is_multi_objective ? 1 : 0);
+    }
+
+    if (opts.initial_population_size <= opts.initial_num_clusters) {
+      opts.initial_population_size *= opts.initial_num_clusters;
+    }
+
+    if (population_size.has_value()) {
+      opts.initial_population_size = population_size.value();
+      opts.max_num_populations = 1;
+    }
+
+    if (!opts.so_parameter_space_clustering && !is_multi_objective) {
+      opts.additional_clusters_per_start = 0;
+    }
+
+    Rng rng = seeded_rng(seed);
+    auto archive =
+        opts.archive_capacity.has_value() && opts.archive_capacity.value() > 0
+            ? std::static_pointer_cast<ArchiveBase>(std::make_shared<UnboundedArchive>(problem.archive_fitness()))
+            : std::static_pointer_cast<ArchiveBase>(
+                  std::make_shared<AdaptiveGridArchive>(problem.archive_fitness(), opts.archive_capacity.value()));
+
+    std::vector<P> populations;
+    populations.reserve(opts.max_num_populations);
+    sizes.clear();
+    sizes.reserve(opts.max_num_populations);
+    generations.clear();
+    generations.reserve(opts.max_num_populations);
+    std::vector<bool> running;
+    running.reserve(opts.max_num_populations);
+    std::vector<usize> generations_since_last_improvement;
+    generations_since_last_improvement.reserve(opts.max_num_populations);
+
+    total_generations = 0;
+    u64 evaluations = 0;
+    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
+
+    auto should_terminate = [&](usize additional_evaluations = 0,
+                                bool check_external_criterion = false) -> std::optional<TerminationStatus> {
+      std::chrono::high_resolution_clock::time_point now = std::chrono::high_resolution_clock::now();
+      std::chrono::nanoseconds elapsed = now - t_start;
+
+      auto status = check_external_criterion
+                        ? budget.exhausted_or_external_criterion_met(total_generations,
+                                                                     evaluations + additional_evaluations, elapsed)
+                        : budget.exhausted(total_generations, evaluations + additional_evaluations, elapsed);
+      if (status.has_value()) {
+        // std::println("{}", format_as(status.value()));
+        return status;
+      }
+
+      if (problem.target_reached(*archive)) {
+        // std::println("{}", format_as(TerminationStatus::TargetReached));
+        return std::make_optional(TerminationStatus::TargetReached);
+      }
+
+      return std::nullopt;
+    };
+
+    auto any_running = [&]() {
+      for (auto r : running) {
+        if (r) {
+          return true;
+        }
+      }
+      return false;
+    };
+
+    Vec<CType> avg_dist_to_so_elite(opts.max_num_populations);
+    p_idx = 0;
+    while (!should_terminate(/* additional_evaluations = */ 0, /* check_external_criterion = */ true) &&
+           (populations.size() < opts.max_num_populations || opts.restart_stale_populations || any_running())) {
+      // init/restart population if necessary
+      if (p_idx >= populations.size()) {
+        usize size = opts.initial_population_size * std::pow(2, p_idx);
+        sizes.push_back(size);
+        populations.push_back(create_population(
+            problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
+        generations.push_back(0);
+        generations_since_last_improvement.push_back(0);
+        running.push_back(true);
+      } else if (!running[p_idx] && opts.restart_stale_populations &&
+                 (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
+        populations[p_idx].restart();
+        generations[p_idx] = 0;
+        generations_since_last_improvement[p_idx] = 0;
+        running[p_idx] = true;
+      }
+
+      // do a step, optionally terminate this or smaller ones
+      generations[p_idx]++;  // this needs to always be increased, no matter if we do
+                             // a step or not
+      if (running[p_idx]) {
+        archive->reset_change_count();
+        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
+        total_generations++;
+
+        if (opts.population_logfile.has_value()) {
+          AoSSet p;  // copy is needed because p needs to be non-const, and that is the case because logging for the sr
+                     // problem at this point in time might do a test set evaluation...
+          if (opts.population_log_resolution == "archive") {
+            const auto& a = populations[p_idx].archive();
+            for (usize i = 0; i < a.size(); i++) {
+              p.add(a[i]);
+            }
+          } else if (opts.population_log_resolution == "population") {
+            const auto& s = populations[p_idx].get_solutions();
+            for (usize i = 0; i < s.size(); i++) {
+              p.add(s[i]);
+            }
+          } else {
+            throw std::runtime_error("Unknown population log resolution.");
+          }
+
+          debug_log(problem, opts.population_logfile.value(), "", "", p);
+        }
+
+        if (archive->change_count() > 0) {
+          generations_since_last_improvement[p_idx] = 0;
+        } else {
+          generations_since_last_improvement[p_idx]++;
+        }
+
+        archive->adapt();
+
+        if (!is_multi_objective || opts.stop_covered_populations) {
+          for (usize j = 0; j < p_idx; j++) {
+            if (populations[p_idx].archive().covers(populations[j].archive())) {
+              running[j] = false;
+            }
+          }
+        }
+        if (!is_multi_objective) {  //  && problem.num_discrete() == 0) {  // continuous only
+          // since we only have relative comparisons, this roughly is equal to the usual avg fitness of larger
+          // population is better condition
+          avg_dist_to_so_elite(p_idx) = populations[p_idx].avg_dist_to_global_so_elite();
+          for (usize j = 0; j < p_idx; j++) {
+            if (avg_dist_to_so_elite(j) > avg_dist_to_so_elite(p_idx)) {
+              running[j] = false;
+            }
+          }
+        }
+        if (populations[p_idx].converged() ||
+            (opts.restart_stale_populations &&
+             generations_since_last_improvement[p_idx] >
+                 opts.generations_without_improvement_until_restart.value_or(total_generations))) {
+          running[p_idx] = false;
+        }
+      }
+
+      // go to the next population to do a step with
+      p_idx = generations[p_idx] % opts.subgeneration_factor == 0 ? (p_idx + 1) % opts.max_num_populations : 0;
+    }
+
+    // std::println(
+    //     "{} && ({} || {} || {}) - G: {} / #P: {} of {}", !should_terminate(),
+    //     populations.size() < opts.max_num_populations,
+    //     opts.restart_stale_populations, any_running(), total_generations,
+    //     populations.size(), opts.max_num_populations);
+
+    // for (usize p_idx = 0; p_idx < archive->size(); p_idx++) {
+    //   std::println("{}", problem.format_solution((*archive)[p_idx]));
+    // }
+
+    return std::make_tuple(archive, should_terminate().value_or(TerminationStatus::Converged));
+  };
+
+  std::optional<u64> current_generation() const override final { return total_generations; };
+
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    return std::make_tuple(sizes[p_idx], generations[p_idx]);
+  };
+
+ private:
+  C create_population;
+  IMSOptions options;
+  // The whole reason run is not a static method -
+  // generation reporting needs to be accessible (via an IMS instance)
+  u64 total_generations;
+
+  usize p_idx;
+  std::vector<usize> sizes;
+  std::vector<u64> generations;
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_LIB_IMS_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
+
+
+
 
 namespace goblin {
 
@@ -8645,11 +8760,14 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -9011,6 +9129,9 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
+
+
+
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -9107,14 +9228,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -10423,6 +10548,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10851,7 +10977,8 @@ class Population {
               }
 
               std::tie(evaluation_needed, anything_changed) =
-                  solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+                  problem.inherit_discrete(solutions[i], donors[donor_idx], *subsets[i]);
+              // solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
               if (evaluation_needed) {
                 solutions_to_evaluate[0] = i;
@@ -11335,8 +11462,10 @@ class Population {
             continue;
           }
 
-          std::tie(evaluation_needed, anything_changed) = solutions[i].inherit(
-              donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
+          std::tie(evaluation_needed, anything_changed) =
+              problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
+          // solutions[i].inherit(
+          // donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
@@ -11411,7 +11540,7 @@ class Population {
     std::uniform_real_distribution<double> U(0.0, 1.0);
     // RV must be enabled and there need to be continuous values that aren't already inherited...
     bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
-                           problem.num_continuous() > 0 && !problem.always_inherit_continuous();
+                           problem.num_continuous() > 0;  // && !problem.always_inherit_continuous();
     CType alpha = 0.5;
     Subset rv_full;
     if (enable_rv_steps) {
@@ -11476,8 +11605,8 @@ class Population {
           if (fos_idx < cluster_FOS[k].size()) {
             subsets[i] = &cluster_FOS[k][fos_idx];
 
-            auto [evaluation_needed, anything_changed] =
-                solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
+            auto [evaluation_needed, anything_changed] = problem.inherit_discrete(solutions[i], donor, *subsets[i]);
+            // solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
             if (evaluation_needed) {  // parent will be updated during acceptance
               eval2improve_idx.push_back(j);
               solutions_to_evaluate.push_back(i);
@@ -11823,6 +11952,7 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

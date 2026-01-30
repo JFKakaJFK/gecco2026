@@ -28,8 +28,22 @@ class QualityBase {
 
   virtual ~QualityBase() = default;
 
-  // protected:
-  // QualityBase() = default;
+  template <typename T>
+  const T& as() const {
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(this);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<const T&>(*this);
+  }
+  template <typename T>
+  T& as() {
+#ifndef NDEBUG
+    auto p = dynamic_cast<T*>(this);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<T&>(*this);
+  }
 };
 
 class FitnessBase {
@@ -78,7 +92,7 @@ class MOFitness : public ArchiveFitnessBase {
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
   void log(std::ostream& os, const QualityBase& quality) const override final {
-    const auto& q = static_cast<const MOQuality&>(quality);
+    const auto& q = quality.as<MOQuality>();
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -100,8 +114,8 @@ class MOFitness : public ArchiveFitnessBase {
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
                std::optional<usize> objective = std::nullopt) const override final {
-    const auto& ql = static_cast<const MOQuality&>(lhs);
-    const auto& qr = static_cast<const MOQuality&>(rhs);
+    const auto& ql = lhs.as<MOQuality>();
+    const auto& qr = rhs.as<MOQuality>();
     // Constraints are always minimized
     Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
 
@@ -120,8 +134,8 @@ class MOFitness : public ArchiveFitnessBase {
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
                  std::optional<usize> objective = std::nullopt) const override final {
-    const auto& ql = static_cast<const MOQuality&>(lhs);
-    const auto& qr = static_cast<const MOQuality&>(rhs);
+    const auto& ql = lhs.as<MOQuality>();
+    const auto& qr = rhs.as<MOQuality>();
     CType dist;
     if (objective.has_value()) {
       dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));

@@ -21,11 +21,11 @@
 #include <sstream>
 
 #include "goblin/lib/algorithms/subset_selection.h"
-#include "goblin/lib/ims.h"
 #include "goblin/lib/instance.h"
 #include "goblin/lib/linkage_model.h"
 #include "goblin/lib/method.h"
 #include "goblin/bench/tracked.h"
+#include "goblin/methods/ims.h"
 #include "goblin/methods/continuous.h"
 
 #ifndef NDEBUG
@@ -452,7 +452,8 @@ class Population {
               }
 
               std::tie(evaluation_needed, anything_changed) =
-                  solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+                  problem.inherit_discrete(solutions[i], donors[donor_idx], *subsets[i]);
+              // solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
               if (evaluation_needed) {
                 solutions_to_evaluate[0] = i;
@@ -936,8 +937,10 @@ class Population {
             continue;
           }
 
-          std::tie(evaluation_needed, anything_changed) = solutions[i].inherit(
-              donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
+          std::tie(evaluation_needed, anything_changed) =
+              problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
+          // solutions[i].inherit(
+          // donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
@@ -1012,7 +1015,7 @@ class Population {
     std::uniform_real_distribution<double> U(0.0, 1.0);
     // RV must be enabled and there need to be continuous values that aren't already inherited...
     bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
-                           problem.num_continuous() > 0 && !problem.always_inherit_continuous();
+                           problem.num_continuous() > 0;  // && !problem.always_inherit_continuous();
     CType alpha = 0.5;
     Subset rv_full;
     if (enable_rv_steps) {
@@ -1077,8 +1080,8 @@ class Population {
           if (fos_idx < cluster_FOS[k].size()) {
             subsets[i] = &cluster_FOS[k][fos_idx];
 
-            auto [evaluation_needed, anything_changed] =
-                solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
+            auto [evaluation_needed, anything_changed] = problem.inherit_discrete(solutions[i], donor, *subsets[i]);
+            // solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
             if (evaluation_needed) {  // parent will be updated during acceptance
               eval2improve_idx.push_back(j);
               solutions_to_evaluate.push_back(i);

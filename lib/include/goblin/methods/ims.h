@@ -17,7 +17,6 @@
 #include "goblin/lib/instance.h"
 #include "goblin/lib/method.h"
 #include "goblin/lib/rng.h"
-// TODO fix this, lib should not depend on bench!!!
 #include "goblin/bench/tracked.h"
 
 namespace goblin {

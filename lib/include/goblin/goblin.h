@@ -20,7 +20,6 @@
 #include "goblin/lib/algorithms/mo.h"
 #include "goblin/lib/linkage_model.h"
 #include "goblin/lib/method.h"
-#include "goblin/lib/ims.h"
 #include "goblin/lib/init.h"
 
 #include "goblin/gp/instance.h"
@@ -39,6 +38,7 @@
 #include "goblin/bench/timer.h"
 #include "goblin/bench/tracked.h"
 
+#include "goblin/methods/ims.h"
 #include "goblin/methods/amalgam.h"
 #include "goblin/methods/library.h"
 #include "goblin/methods/mo_binary.h"

@@ -294,65 +294,66 @@ class SolutionBase {
   ///
   /// The `always_inherit_continuous` determines if the corresponding continuous
   /// variables are also inherited for discrete only subsets.
-  virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
-                                         const Subset& subset,
-                                         bool always_inherit_continuous) {
-    bool any_active_changed = false, anything_changed = false;
-    bool is_continuous = subset.continuous.size() > 0;
-    bool is_discrete = subset.discrete.size() > 0;
+  // virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
+  //                                        const Subset& subset,
+  //                                        bool always_inherit_continuous) {
+  //   bool any_active_changed = false, anything_changed = false;
+  //   bool is_continuous = subset.continuous.size() > 0;
+  //   bool is_discrete = subset.discrete.size() > 0;
 
-    // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-    //        "All discrete indices must be valid continuous indices if the continuous "
-    //        "values should be inherited with the discrete ones.");
+  //   // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
+  //   //        "All discrete indices must be valid continuous indices if the continuous "
+  //   //        "values should be inherited with the discrete ones.");
 
-    if (is_discrete) {
-      bool inherit_continuous = !is_continuous && always_inherit_continuous;
-      bool inherit_by_index = num_continuous() >= num_discrete();
-      for (usize di, i = 0; i < subset.discrete.size(); i++) {
-        di = subset.discrete[i];
-        if (discrete_values()(di) != donor.discrete_values()(di)) {
-          any_active_changed |= discrete_active()(di);
-          anything_changed = true;
-          discrete_values()(di) = donor.discrete_values()(di);
-        }
+  //   if (is_discrete) {
+  //     bool inherit_continuous = !is_continuous && always_inherit_continuous;
+  //     bool inherit_by_index = num_continuous() >= num_discrete();
+  //     for (usize di, i = 0; i < subset.discrete.size(); i++) {
+  //       di = subset.discrete[i];
+  //       if (discrete_values()(di) != donor.discrete_values()(di)) {
+  //         any_active_changed |= discrete_active()(di);
+  //         anything_changed = true;
+  //         discrete_values()(di) = donor.discrete_values()(di);
+  //       }
 
-        // yes, the indices here should be from the discrete subset!
-        if (inherit_continuous && inherit_by_index) {
-          if (continuous_values()(di) != donor.continuous_values()(di)) {
-            any_active_changed |= continuous_active()(di);
-            anything_changed = true;
-            continuous_values()(di) = donor.continuous_values()(di);
-          }
-        }
-      }
+  //       // yes, the indices here should be from the discrete subset!
+  //       if (inherit_continuous && inherit_by_index) {
+  //         if (continuous_values()(di) != donor.continuous_values()(di)) {
+  //           any_active_changed |= continuous_active()(di);
+  //           anything_changed = true;
+  //           continuous_values()(di) = donor.continuous_values()(di);
+  //         }
+  //       }
+  //     }
 
-      if (inherit_continuous && !inherit_by_index) {
-        for (usize i = 0; i < num_continuous(); i++) {
-          // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-          // useful...
-          if (continuous_values()(i) != donor.continuous_values()(i)) {
-            any_active_changed |= continuous_active()(i);
-            anything_changed = true;
-            continuous_values()(i) = donor.continuous_values()(i);
-          }
-        }
-      }
-    }
-    if (is_continuous) {
-      for (usize ci, i = 0; i < subset.continuous.size(); i++) {
-        ci = subset.continuous[i];
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
-        if (continuous_values()(ci) != donor.continuous_values()(ci)) {
-          any_active_changed |= continuous_active()(ci);
-          anything_changed = true;
-          continuous_values()(ci) = donor.continuous_values()(ci);
-        }
-      }
-    }
+  //     if (inherit_continuous && !inherit_by_index) {
+  //       for (usize i = 0; i < num_continuous(); i++) {
+  //         // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not
+  //         really
+  //         // useful...
+  //         if (continuous_values()(i) != donor.continuous_values()(i)) {
+  //           any_active_changed |= continuous_active()(i);
+  //           anything_changed = true;
+  //           continuous_values()(i) = donor.continuous_values()(i);
+  //         }
+  //       }
+  //     }
+  //   }
+  //   if (is_continuous) {
+  //     for (usize ci, i = 0; i < subset.continuous.size(); i++) {
+  //       ci = subset.continuous[i];
+  //       // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+  //       // useful...
+  //       if (continuous_values()(ci) != donor.continuous_values()(ci)) {
+  //         any_active_changed |= continuous_active()(ci);
+  //         anything_changed = true;
+  //         continuous_values()(ci) = donor.continuous_values()(ci);
+  //       }
+  //     }
+  //   }
 
-    return std::make_tuple(any_active_changed, anything_changed);
-  };
+  //   return std::make_tuple(any_active_changed, anything_changed);
+  // };
 
   // virtual void reject(const SolutionBase& backup,
   //                     bool always_inherit_continuous,

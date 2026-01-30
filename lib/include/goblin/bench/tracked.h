@@ -243,7 +243,13 @@ class Tracked final : public InstanceBase {
 
   bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
 
-  bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
+  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                          const SolutionBase& donor,
+                                          const Subset& subset) const override {
+    return instance.inherit_discrete(offspring, donor, subset);
+  }
+
+  // bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
 
   void log_header(std::ostream& os) const override { instance.log_header(os); }
 

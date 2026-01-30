@@ -1,4 +1,5 @@
 #pragma once
+#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -193,10 +194,62 @@ class SRProblem : public GPInstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final {
-    return _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
-                                               ctx.const_repr == ConstantRepr::Edges);
-  };
+  virtual std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                                  const SolutionBase& donor,
+                                                  const Subset& subset) const override {
+    const bool inherit_continuous = _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
+                                                                        ctx.const_repr == ConstantRepr::Edges) &&
+                                    ctx.const_repr != ConstantRepr::None;
+
+    // the pool size is not tied to the number of discrete variables, so the full pool instead of the paired values is
+    // inherited...
+    const bool inherit_by_index = ctx.const_repr != ConstantRepr::Pool;
+
+    bool any_active_changed = false, anything_changed = false;
+    for (usize i : subset.discrete) {
+      if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
+        any_active_changed |= offspring.discrete_active()(i);
+        anything_changed = true;
+        offspring.discrete_values()(i) = donor.discrete_values()(i);
+      }
+
+      // TODO for GCS: inherit child arities + permutations
+
+      if (inherit_continuous && inherit_by_index) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        //
+        // yes, the indices here should be from the discrete subset!
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    if (inherit_continuous && !inherit_by_index) {
+      // note: arguably just inheriting all continuous variables even if the inherited discrete values might not even be
+      // constants is not the best idea - but earlier experiments on another codebase suggested that more
+      // appropriate/interpolating continuous mixing doesn't really work and here it also is more for completeness and
+      // not used by default...
+      for (usize i = 0; i < num_continuous(); i++) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    return std::make_tuple(any_active_changed, anything_changed);
+  }
+
+  // bool always_inherit_continuous() const override final {
+  //   return ;
+  // };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));

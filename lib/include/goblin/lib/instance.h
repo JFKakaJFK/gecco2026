@@ -75,8 +75,27 @@ class InstanceBase {
   /// Note: What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.
   virtual const ArchiveFitnessBase& archive_fitness() const = 0;
 
-  // corresponds to e.g. ERCs / one constant per edge in GP
-  virtual bool always_inherit_continuous() const { return false; };
+  // // corresponds to e.g. ERCs / one constant per edge in GP
+  // virtual bool always_inherit_continuous() const { return false; };
+
+  /// The offspring inherits a subset of the decision variables from the donor, returning true if there was a change to
+  /// the active variables and an evaluation is needed, possibly with problem specific modifications.
+  ///
+  /// Returns a `(any_active_changed, anything_changed)` tuple
+  virtual std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                                  const SolutionBase& donor,
+                                                  const Subset& subset) const {
+    bool any_active_changed = false, anything_changed = false;
+
+    for (usize i : subset.discrete) {
+      if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
+        any_active_changed |= offspring.discrete_active()(i);
+        anything_changed = true;
+        offspring.discrete_values()(i) = donor.discrete_values()(i);
+      }
+    }
+    return std::make_tuple(any_active_changed, anything_changed);
+  };
 
   // useful for discrete linkage learning in GP
   // - needed to be able to perform constant binning
