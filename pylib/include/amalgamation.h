@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -247,13 +246,12 @@ namespace goblin {
 /// Something that describes how good a solution is
 class QualityBase {
  public:
+  virtual std::unique_ptr<QualityBase> clone() const = 0;
 
- virtual std::unique_ptr<QualityBase> clone() const = 0;
+  virtual ~QualityBase() = default;
 
- virtual ~QualityBase() = default;
-
- // protected:
- // QualityBase() = default;
+  // protected:
+  // QualityBase() = default;
 };
 
 class FitnessBase {
@@ -287,15 +285,13 @@ class ArchiveFitnessBase : public FitnessBase {
 /// Something that describes how good a solution is
 class MOQuality : public QualityBase {
  public:
-    std::unique_ptr<QualityBase> clone() const override {
-        return std::make_unique<MOQuality>(*this);
-    };
+  std::unique_ptr<QualityBase> clone() const override { return std::make_unique<MOQuality>(*this); };
 
   Vec<CType> objectives;
   CType constraint_value;
 };
 
-class MOFitness final : public ArchiveFitnessBase {
+class MOFitness : public ArchiveFitnessBase {
  public:
   MOFitness() = delete;
   MOFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
@@ -304,7 +300,7 @@ class MOFitness final : public ArchiveFitnessBase {
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
   void log(std::ostream& os, const QualityBase& quality) const override final {
-      const auto& q = static_cast<const MOQuality&>(quality);
+    const auto& q = static_cast<const MOQuality&>(quality);
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -357,12 +353,12 @@ class MOFitness final : public ArchiveFitnessBase {
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
 
-  std::unique_ptr<QualityBase> worst() const override final {
-      const CType inf = std::numeric_limits<CType>().infinity();
-      auto q = std::make_unique<MOQuality>();
-      q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
-      q->constraint_value = inf;
-                   return q;
+  virtual std::unique_ptr<QualityBase> worst() const override {
+    const CType inf = std::numeric_limits<CType>().infinity();
+    auto q = std::make_unique<MOQuality>();
+    q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
+    q->constraint_value = inf;
+    return q;
   };
 
  private:
@@ -544,9 +540,13 @@ struct SolutionExtensionKey {
   void* token = nullptr;
 };
 
-inline bool operator==(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token == rhs.token; }
+inline bool operator==(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept {
+  return lhs.token == rhs.token;
+}
 
-inline bool operator!=(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token != rhs.token; }
+inline bool operator!=(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept {
+  return lhs.token != rhs.token;
+}
 
 struct SolutionExtensionKeyHash {
   usize operator()(const SolutionExtensionKey& key) const noexcept { return std::hash<void*>{}(key.token); };
@@ -576,22 +576,67 @@ struct SolutionExtension : public SolutionExtensionBase {
 class SolutionBase {
  public:
   virtual bool has_extension(const SolutionExtensionKey& key) const = 0;
-  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0; // this is fine
+  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0;  // this is fine
   virtual std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
       const SolutionExtensionKey& key) const = 0;
   virtual std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
       const SolutionExtensionKey& key) = 0;
+
+  template <typename T>
+  const T& extension() const {
+    auto e = get_extension(T::type_key());
+    if (!e.has_value()) {
+      throw std::runtime_error("Invalid extension access!");
+    }
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&e.value().get());
+    assert(p != nullptr && "Extension type mismatch");
+#endif
+    return static_cast<const T&>(e.value().get());
+  };
+  template <typename T>
+  T& extension() {
+    auto e = get_extension(T::type_key());
+    if (!e.has_value()) {
+      throw std::runtime_error("Invalid extension access!");
+    }
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&e.value().get());
+    assert(p != nullptr && "Extension type mismatch");
+#endif
+    return static_cast<T&>(e.value().get());
+  };
   virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
   virtual void clear_extensions() = 0;
 
-  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full copies?? (size, begin, end, proxy to underlying collection)
+  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
+  // copies?? (size, begin, end, proxy to underlying collection)
   virtual usize num_extensions() const = 0;
   virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
   virtual std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() = 0;
 
-  virtual QualityBase& quality() = 0; // nb::rv_policy::reference_internal
-  virtual const QualityBase& quality() const = 0; // nb::rv_policy::reference_internal
+  virtual QualityBase& quality() = 0;
+  virtual const QualityBase& quality() const = 0;
   virtual void assign_quality(const QualityBase& quality) = 0;
+
+  template <typename T>
+  const T& quality_as() const {
+      const auto& q = quality();
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&q);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<const T&>(q);
+  }
+  template <typename T>
+  T& quality_as() {
+      auto& q = quality();
+#ifndef NDEBUG
+    auto p = dynamic_cast<T*>(&q);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<T&>(q);
+  }
 
   inline usize num_discrete() const { return discrete_values().size(); };
 
@@ -807,11 +852,9 @@ class Solution : public SolutionBase {
     }
   };
 
-  void assign_quality(const QualityBase& quality) override final {
-      _quality = quality.clone();
-  };
-  QualityBase& quality() override final { return *_quality; } // nb::rv_policy::reference_internal
-  const QualityBase& quality() const override final { return *_quality; } // nb::rv_policy::reference_internal
+  void assign_quality(const QualityBase& quality) override final { _quality = quality.clone(); };
+  QualityBase& quality() override final { return *_quality; }              // nb::rv_policy::reference_internal
+  const QualityBase& quality() const override final { return *_quality; }  // nb::rv_policy::reference_internal
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
@@ -967,9 +1010,7 @@ class SoASet;
 template <int StorageOrder>
 class SolutionHandle : public SolutionBase {
  public:
- void assign_quality(const QualityBase& quality) override {
-     arena->quality[idx] = quality.clone();
- }
+  void assign_quality(const QualityBase& quality) override { arena->quality[idx] = quality.clone(); }
   QualityBase& quality() override final { return *arena->quality[idx]; }
   const QualityBase& quality() const override final { return *arena->quality[idx]; }
 
@@ -1205,7 +1246,8 @@ class SoASet : public SolutionSetBase {
       continuous.row(idx) = continuous.row(_size);
       discrete_active.row(idx) = discrete_active.row(_size);
       continuous_active.row(idx) = continuous_active.row(_size);
-      std::swap(extensions[idx], extensions[_size]); extensions[_size].clear();
+      std::swap(extensions[idx], extensions[_size]);
+      extensions[_size].clear();
       quality[idx] = std::move(quality[_size]);
 
       // ! no need to adjust the handles, but any references to handles may be
@@ -1916,7 +1958,7 @@ class InstanceBase {
     os << "])";
   };
 
-  virtual void log(std::ostream& os, SolutionBase& solution) {
+  virtual void log(std::ostream& os, const SolutionBase& solution) {
     os << '"';
     log_solution(os, solution);
     os << "\",";
@@ -2765,7 +2807,7 @@ class LinkageModelBase {
 
   virtual std::unique_ptr<LinkageModelBase> clone() const = 0;
 
-  virtual ~LinkageModelBase() = default; //{};
+  virtual ~LinkageModelBase() = default;  //{};
 };
 
 class UnivariateFOS final : public LinkageModelBase {
@@ -3823,7 +3865,7 @@ class Tracked final : public InstanceBase {
     instance.log_solution(os, solution);
   }
 
-  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
+  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
@@ -3867,7 +3909,7 @@ class Tracked final : public InstanceBase {
   /// end (possibly escaping other ',' occurrences with '"').
   template <typename P>
   void request_debug_report(std::filesystem::path debug_logpath,
-                            P& solutions,
+                            const P& solutions,
                             std::string_view debug_headers,
                             std::string_view debug_values) {
     // close the actual logfile to open up the debug logpath next
@@ -4063,11 +4105,8 @@ class Tracked final : public InstanceBase {
     return report_needed;
   };
 
-  // A can annoyingly not be const since in the SR case an evaluation on the
-  // test set might be necessary - shouldn't change the solution, but is not
-  // const on paper
   template <typename A>
-  void report(A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
+  void report(const A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
     namespace fs = std::filesystem;
     typedef std::chrono::duration<double> Seconds;
 
@@ -4129,21 +4168,15 @@ class Tracked final : public InstanceBase {
                     alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase* s;
-      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
-        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
-                                      // evaluations require mutable solutions
-      } else {
-        s = &solutions[i];
-      }
+      const auto& s = solutions[i];
       // clang-format off
         logfile << common;
-        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-        log_helper(logfile, s->continuous_values(), true); logfile << ',';
-        log_helper(logfile, s->continuous_active(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_active(), true); logfile << ',';
+        log_helper(logfile, s.continuous_values(), true); logfile << ',';
+        log_helper(logfile, s.continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, *s);
+      instance.log(logfile, s);
       logfile << "\n";
     }
     logfile << std::flush;
@@ -4182,7 +4215,7 @@ inline void debug_log(InstanceBase& problem,
                       std::string_view path,
                       std::string_view headers = "",
                       std::string_view values = "",
-                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+                      std::optional<std::reference_wrapper<const SolutionSetBase>> population = std::nullopt) {
   if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
     if (population.has_value()) {
       ti->request_debug_report(path, population.value().get(), headers, values);
@@ -4214,7 +4247,6 @@ inline std::string iterator2str(T&& it) {
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/ims.h continued                                                             //
@@ -4455,7 +4487,6 @@ class IMS final : public MethodBase {
 
 #include <variant>
 
-
 namespace goblin {
 
 class InitBase {
@@ -4597,13 +4628,11 @@ class CompleteInit final : public DiscreteInitBase {
 
 #endif /* _GOBLIN_LIB_INIT_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INSTANCE_H
 #define _GOBLIN_GP_INSTANCE_H
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
@@ -4615,23 +4644,17 @@ class CompleteInit final : public DiscreteInitBase {
 #include <iterator>
 #include <ranges>
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h included by goblin/gp/context.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
-
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/template.h included by goblin/gp/operator.h                                  //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_TEMPLATE_H
 #define _GOBLIN_GP_TEMPLATE_H
-
-
 
 namespace goblin {
 struct TemplateNode {
@@ -4777,7 +4800,6 @@ struct Template {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -5307,7 +5329,6 @@ class OpMax : public OperatorBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_OPERATOR_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/context.h continued                                                          //
@@ -6148,7 +6169,6 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/instance.h continued                                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6171,8 +6191,6 @@ class GPInstanceBase : public InstanceBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_INIT_H
 #define _GOBLIN_GP_INIT_H
-
-
 
 namespace goblin {
 
@@ -6748,12 +6766,41 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
-
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
 
-
 namespace goblin {
+
+class SRQuality : public MOQuality {
+ public:
+  std::unique_ptr<QualityBase> clone() const override { return std::make_unique<SRQuality>(*this); };
+
+  /// Linear scaling parameters
+  Arr2D<CType> ls_params{};
+
+  /*
+  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
+  part of what defines a solution or its accuracy - as indicated by the name, it is never
+  used to make any decisions and only tracked for analysis purposes. By making it mutable
+  it an be lazily computed only when requested.
+   */
+  /// Optional test set accuracy
+  mutable std::optional<MOQuality> test_quality = std::nullopt;
+};
+
+class SRFitness : public MOFitness {
+ public:
+  SRFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
+      : MOFitness(num_objectives, minimize, epsilon) {}
+
+  std::unique_ptr<QualityBase> worst() const override final {
+    const CType inf = std::numeric_limits<CType>().infinity();
+    auto q = std::make_unique<SRQuality>();
+    q->objectives = Vec<CType>::Constant(num_objectives(), inf);
+    q->constraint_value = inf;
+    return q;
+  };
+};
 
 class SRProblem : public GPInstanceBase {
   using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
@@ -6798,8 +6845,8 @@ class SRProblem : public GPInstanceBase {
                        : std::get<std::vector<std::string>>(objectives)),
         X_train(X_train.cast<ScalarType>()),
         Y_train(Y_train.cast<ScalarType>()),
-        _archive_fitness(MOFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
-        _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
+        _archive_fitness(SRFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
+        _fitness(SRFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
         _target(_archive_fitness),
         _gradient_mode(gradient_mode),
@@ -6811,15 +6858,6 @@ class SRProblem : public GPInstanceBase {
         (objectives_to_optimize.value() > 0 && objectives_to_optimize.value() <= this->objectives.size()));
 
     _num_continuous = this->ctx.num_continuous;
-    if (linear_scaling) {
-      _num_continuous +=
-          2 *
-          this->ctx.num_outputs;  // TODO allocate the LS coefficients separately to not mess with optimizers (not a
-                                  // problem right now, especially since they are marked as introns...) - this
-                                  // effectively is abusing the fact that the continuous values have the same type as
-                                  // the LS coefficients combined with the LS coefficients overriding the previous value
-    }
-
     _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
     _continuous_lower_bounds = -_continuous_upper_bounds;
 
@@ -6880,12 +6918,16 @@ class SRProblem : public GPInstanceBase {
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
     Array<ScalarType> params;
     for (auto i : indices) {
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, static_cast<MOQuality&>(solutions[i].quality()));
+      auto& q = solutions[i].quality_as<SRQuality>();
+      q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
+      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
     }
   };
 
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
+    auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
+    assert(p != nullptr && "Quality mismatch");
   };
 
   const FitnessBase& fitness() const override final { return _fitness; };
@@ -6911,9 +6953,10 @@ class SRProblem : public GPInstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    static_cast<MOQuality&>(s.quality()).objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(static_cast<MOQuality&>(s.quality()).objectives.size()) >= fitness().num_objectives());
-    static_cast<MOQuality&>(s.quality()).constraint_value = 0.0;
+    s.quality_as<SRQuality>().objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(s.quality_as<SRQuality>().objectives.size()) >=
+                            fitness().num_objectives());
+    s.quality_as<SRQuality>().constraint_value = 0.0;
     _target.update(s, false);
   };
 
@@ -6943,22 +6986,37 @@ class SRProblem : public GPInstanceBase {
     fitness().log_header(os);
   };
 
-  void log(std::ostream& os, SolutionBase& solution) override final {
+  void evaluate_test(const SolutionBase& solution) const {
+    const auto& q = solution.quality_as<SRQuality>();
+    if (Y_test.size() > 0 && !q.test_quality.has_value()) {
+      Solution copy = solution;  // copy is needed since active variables are not mutable...
+
+      Array<ScalarType> params;  // TODO fit FC params...
+      auto& cq = copy.quality_as<SRQuality>();
+      eval_one(copy, X_test, Y_test, var_Y_test, params, false, cq, cq.ls_params);
+
+      q.test_quality = MOQuality();
+      q.test_quality.value().objectives = copy.quality_as<SRQuality>().objectives;
+      q.test_quality.value().constraint_value = copy.quality_as<SRQuality>().constraint_value;
+    }
+  };
+
+  void log(std::ostream& os, const SolutionBase& solution) override final {
     os << '"';
     log_solution(os, solution);
     os << "\",";
+
+    const auto& q = solution.quality_as<SRQuality>();
     for (usize i = 0; i < objectives.size(); i++) {
-      os << static_cast<MOQuality&>(solution.quality()).objectives(i) << ',';
+      os << q.objectives(i) << ',';
     }
     if (Y_test.size() > 0) {
-      // TODO cache this -> solution gets optional second quality?
-      // Then again, one can just call predict using the SKlearn regressor for actual use
-      // and for all other experiments the overhead is not an issue yet
-      std::unique_ptr<QualityBase> q_test = archive_fitness().worst();
-      Array<ScalarType> params;  // TODO fit FC params...
-      eval_one(solution, X_test, Y_test, var_Y_test, params, false, static_cast<MOQuality&>(*q_test));
+      if (!q.test_quality.has_value()) {
+        evaluate_test(solution);
+      }
+
       for (usize i = 0; i < objectives.size(); i++) {
-        os << static_cast<MOQuality&>(*q_test).objectives(i) << ',';
+        os << q.test_quality.value().objectives(i) << ',';
       }
     }
 
@@ -6972,8 +7030,12 @@ class SRProblem : public GPInstanceBase {
         os << " , ";
       }
       if (linear_scaling) {
-        os << solution.continuous_values()(ctx.num_continuous + 2 * i) << " + ("
-           << solution.continuous_values()(ctx.num_continuous + 2 * i + 1) << " * (" << exprs[i] << "))";
+        const auto& q = solution.quality_as<SRQuality>();
+        if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
+          os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+        } else {
+          os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
+        }
       } else {
         os << exprs[i];
       }
@@ -7006,7 +7068,8 @@ class SRProblem : public GPInstanceBase {
                 const Array<ScalarType>& var_Y,
                 const Array<ScalarType>& params,
                 bool is_train,
-                MOQuality& quality) {
+                MOQuality& quality,
+                Arr2D<CType>& ls_params) const {
     usize expression_size;
     auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
@@ -7017,18 +7080,13 @@ class SRProblem : public GPInstanceBase {
     }
 
     Arr2D<ScalarType> Y_pred = out.value();
-
-    if (linear_scaling) {
-      Arr2D<ScalarType> Y_pred_train;
-      if (!is_train) {
-        Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size).value();
-      }
-
-      Arr2D<ScalarType> A_ls = Arr2D<ScalarType>::Ones(Y_train.rows(), 2);
+    if (linear_scaling && is_train) {
+      Mat<ScalarType> A_ls = Mat<ScalarType>::Ones(Y_train.rows(), 2);
+      ls_params.resize(2, ctx.num_outputs);
       for (usize o = 0; o < ctx.num_outputs; o++) {
-        A_ls.col(1) = (is_train ? Y_pred : Y_pred_train).col(o);
-        solution.continuous_values()(Eigen::seqN(ctx.num_continuous + 2 * o, 2)) =
-            A_ls.matrix().colPivHouseholderQr().solve(Y_train.matrix().col(o));
+        A_ls.col(1) = Y_pred.col(o);
+        Vec<ScalarType> b = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
+        ls_params.col(o) = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
       }
     }
 
@@ -7038,8 +7096,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
+            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean();
           }
         } else {
@@ -7049,8 +7107,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
+            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean() / var_Y(o);
           }
         } else {
@@ -7065,8 +7123,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  MOFitness _archive_fitness;
-  MOFitness _fitness;
+  SRFitness _archive_fitness;
+  SRFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
   std::string _gradient_mode{};
@@ -7077,20 +7135,18 @@ class SRProblem : public GPInstanceBase {
   Vec<CType> _continuous_upper_bounds{};
   Vec<CType> _continuous_init_lower_bounds{};
   Vec<CType> _continuous_init_upper_bounds{};
-  Arr2D<ScalarType> _eval_buffer{};
+  mutable Arr2D<ScalarType> _eval_buffer{};
 };
 
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_SR_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/bench/functions.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
-
 
 namespace goblin {
 
@@ -7132,9 +7188,7 @@ class ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
-
 #include <numbers>
-
 
 // TODO
 // - [ ] Permute (scramble arguments to function, either fixed or random perm)
@@ -7707,7 +7761,6 @@ class Repeat final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 #define _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
 
-
 namespace goblin {
 
 class OneMax final : public ObjectiveBase {
@@ -7943,8 +7996,6 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
-
-
 namespace goblin {
 
 class Sphere final : public ObjectiveBase {
@@ -8124,8 +8175,6 @@ class CirclesInASquare final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 #define _GOBLIN_BENCH_FUNCTIONS_MIXED_H
 
-
-
 namespace goblin {
 
 class LeadingSpheres final : public ObjectiveBase {
@@ -8178,8 +8227,6 @@ class LeadingSpheres final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_PROBLEM_H
 #define _GOBLIN_BENCH_PROBLEM_H
 
-
-
 namespace goblin {
 
 class MOFunctionBase {
@@ -8209,8 +8256,8 @@ class PyFunctionBase : MOFunctionBase {
     solution.discrete_active().fill(true);
     solution.continuous_active().fill(true);
     auto [objectives, cv] = eval(solution);
-    static_cast<MOQuality&>(solution.quality()).objectives = objectives;
-    static_cast<MOQuality&>(solution.quality()).constraint_value = cv;
+    solution.quality_as<MOQuality>().objectives = objectives;
+    solution.quality_as<MOQuality>().constraint_value = cv;
   };
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
     evaluate(solution);
@@ -8237,7 +8284,7 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto&q = static_cast<MOQuality&>(solution.quality());
+    auto& q = solution.quality_as<MOQuality>();
     q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
@@ -8250,15 +8297,14 @@ class Objectives final : public MOFunctionBase {
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto& q = static_cast<MOQuality&>(solution.quality());
-    const auto& pq = static_cast<const MOQuality&>(parent.quality());
+    auto& q = solution.quality_as<MOQuality>();
+    const auto& pq = parent.quality_as<MOQuality>();
     q.constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
-          parent.continuous_active(), pq.objectives(i), pq.constraint_value,
-          subset.discrete, subset.continuous);
+          parent.continuous_active(), pq.objectives(i), pq.constraint_value, subset.discrete, subset.continuous);
       q.objectives(i) = ov;
       q.constraint_value += std::max(CType(0.0), cv);
     }
@@ -8371,7 +8417,7 @@ class BenchmarkInstance final : public InstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    auto& q = static_cast<MOQuality&>(s.quality());
+    auto& q = s.quality_as<MOQuality>();
     q.objectives = target_objectives;
     __goblin_runtime_assert(static_cast<usize>(q.objectives.size()) >= fitness().num_objectives());
     q.constraint_value = 0.0;
@@ -8472,15 +8518,11 @@ class BenchmarkInstance final : public InstanceBase {
 
 #endif /* _GOBLIN_BENCH_PROBLEM_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/amalgam.h included by goblin.h                                          //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -8568,7 +8610,7 @@ class AMaLGaM final : public MethodBase {
             throw std::runtime_error("");
           }
 
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+          auto& q = s[0].quality_as<MOQuality>();
           return std::make_tuple(q.objectives(0), q.constraint_value);
         };
     try {
@@ -8603,14 +8645,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8706,7 +8745,7 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void evaluationFunction(gomea::solution_t<char>* solution) {
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         for (usize i = 0; i < p.num_discrete(); i++) {
           solution->variables[i] %= static_cast<char>(p.discrete_domain_sizes()(i));
         }
@@ -8726,7 +8765,7 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void partialEvaluationFunction(gomea::solution_t<char>* parent, gomea::partial_solution_t<char>* solution) {
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         s[0].discrete_values() =
             Eigen::Map<Eigen::VectorX<char>>(parent->variables.data(), parent->variables.size()).cast<DType>();
         for (usize i = 0; i < solution->touched_indices.size(); i++) {
@@ -8887,7 +8926,7 @@ class RvGOMEA final : public MethodBase {
       void evaluationFunction(gomea::solution_t<double>* solution) {
         s[0].continuous_values() = Eigen::Map<Eigen::VectorXd>(solution->variables.data(), solution->variables.size());
         p.evaluate(rng, s, idxs);
-        auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         solution->setObjectiveValue(q.objectives(0));
         solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
@@ -8906,7 +8945,7 @@ class RvGOMEA final : public MethodBase {
           s[0].continuous_values()(solution->touched_indices[i]) = solution->touched_variables[i];
         }
         p.evaluate(rng, s, idxs);
-        auto q = static_cast<MOQuality&>(s[0].quality());
+        auto q = s[0].quality_as<MOQuality>();
         solution->setObjectiveValue(q.objectives(0));
         solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
@@ -8972,9 +9011,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -9023,7 +9059,7 @@ class MOBinaryGOMEA final : public MethodBase {
         throw std::runtime_error("");
       }
 
-      auto&     q = static_cast<MOQuality&>(s[0].quality());
+      auto& q = s[0].quality_as<MOQuality>();
       for (usize i = 0; i < problem.num_objectives(); i++) {
         obj[i] = q.objectives(i);
       }
@@ -9071,18 +9107,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -10391,7 +10423,6 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -11162,7 +11193,7 @@ class Population {
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      auto expected = static_cast<const MOQuality&>(copy[i].quality()), actual = static_cast<const MOQuality&>(set[i].quality());
+      auto expected = copy[i].template quality_as<MOQuality>(), actual = set[i].template quality_as<MOQuality>();
       bool definitely_different =
           (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
       if (expected.objectives.array().isFinite().all()) {
@@ -11792,7 +11823,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

@@ -104,7 +104,7 @@ class AMaLGaM final : public MethodBase {
             throw std::runtime_error("");
           }
 
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+          auto& q = s[0].quality_as<MOQuality>();
           return std::make_tuple(q.objectives(0), q.constraint_value);
         };
     try {

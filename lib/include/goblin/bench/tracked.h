@@ -251,7 +251,7 @@ class Tracked final : public InstanceBase {
     instance.log_solution(os, solution);
   }
 
-  void log(std::ostream& os, SolutionBase& solution) override { instance.log(os, solution); };
+  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
@@ -295,7 +295,7 @@ class Tracked final : public InstanceBase {
   /// end (possibly escaping other ',' occurrences with '"').
   template <typename P>
   void request_debug_report(std::filesystem::path debug_logpath,
-                            P& solutions,
+                            const P& solutions,
                             std::string_view debug_headers,
                             std::string_view debug_values) {
     // close the actual logfile to open up the debug logpath next
@@ -491,11 +491,8 @@ class Tracked final : public InstanceBase {
     return report_needed;
   };
 
-  // A can annoyingly not be const since in the SR case an evaluation on the
-  // test set might be necessary - shouldn't change the solution, but is not
-  // const on paper
   template <typename A>
-  void report(A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
+  void report(const A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
     namespace fs = std::filesystem;
     typedef std::chrono::duration<double> Seconds;
 
@@ -557,21 +554,15 @@ class Tracked final : public InstanceBase {
                     alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase* s;
-      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
-        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
-                                      // evaluations require mutable solutions
-      } else {
-        s = &solutions[i];
-      }
+      const auto& s = solutions[i];
       // clang-format off
         logfile << common;
-        log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-        log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-        log_helper(logfile, s->continuous_values(), true); logfile << ',';
-        log_helper(logfile, s->continuous_active(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_active(), true); logfile << ',';
+        log_helper(logfile, s.continuous_values(), true); logfile << ',';
+        log_helper(logfile, s.continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, *s);
+      instance.log(logfile, s);
       logfile << "\n";
     }
     logfile << std::flush;
@@ -610,7 +601,7 @@ inline void debug_log(InstanceBase& problem,
                       std::string_view path,
                       std::string_view headers = "",
                       std::string_view values = "",
-                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+                      std::optional<std::reference_wrapper<const SolutionSetBase>> population = std::nullopt) {
   if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
     if (population.has_value()) {
       ti->request_debug_report(path, population.value().get(), headers, values);

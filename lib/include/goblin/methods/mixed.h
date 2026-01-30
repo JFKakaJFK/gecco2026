@@ -794,7 +794,7 @@ class Population {
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      auto expected = static_cast<const MOQuality&>(copy[i].quality()), actual = static_cast<const MOQuality&>(set[i].quality());
+      auto expected = copy[i].template quality_as<MOQuality>(), actual = set[i].template quality_as<MOQuality>();
       bool definitely_different =
           (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
       if (expected.objectives.array().isFinite().all()) {

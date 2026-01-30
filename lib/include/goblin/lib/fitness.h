@@ -24,13 +24,12 @@ namespace goblin {
 /// Something that describes how good a solution is
 class QualityBase {
  public:
+  virtual std::unique_ptr<QualityBase> clone() const = 0;
 
- virtual std::unique_ptr<QualityBase> clone() const = 0;
+  virtual ~QualityBase() = default;
 
- virtual ~QualityBase() = default;
-
- // protected:
- // QualityBase() = default;
+  // protected:
+  // QualityBase() = default;
 };
 
 class FitnessBase {
@@ -64,15 +63,13 @@ class ArchiveFitnessBase : public FitnessBase {
 /// Something that describes how good a solution is
 class MOQuality : public QualityBase {
  public:
-    std::unique_ptr<QualityBase> clone() const override {
-        return std::make_unique<MOQuality>(*this);
-    };
+  std::unique_ptr<QualityBase> clone() const override { return std::make_unique<MOQuality>(*this); };
 
   Vec<CType> objectives;
   CType constraint_value;
 };
 
-class MOFitness final : public ArchiveFitnessBase {
+class MOFitness : public ArchiveFitnessBase {
  public:
   MOFitness() = delete;
   MOFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
@@ -81,7 +78,7 @@ class MOFitness final : public ArchiveFitnessBase {
   void log_header(std::ostream& os) const override final { os << "objectives,constraint_value"; };
 
   void log(std::ostream& os, const QualityBase& quality) const override final {
-      const auto& q = static_cast<const MOQuality&>(quality);
+    const auto& q = static_cast<const MOQuality&>(quality);
     os << "\"[";
     for (usize i = 0; i < _num_objectives; i++) {
       if (i > 0) {
@@ -134,12 +131,12 @@ class MOFitness final : public ArchiveFitnessBase {
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
 
-  std::unique_ptr<QualityBase> worst() const override final {
-      const CType inf = std::numeric_limits<CType>().infinity();
-      auto q = std::make_unique<MOQuality>();
-      q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
-      q->constraint_value = inf;
-                   return q;
+  virtual std::unique_ptr<QualityBase> worst() const override {
+    const CType inf = std::numeric_limits<CType>().infinity();
+    auto q = std::make_unique<MOQuality>();
+    q->objectives = Vec<CType>::Constant(_num_objectives, (_minimize ? inf : -inf));
+    q->constraint_value = inf;
+    return q;
   };
 
  private:

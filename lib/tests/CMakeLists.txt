@@ -40,6 +40,7 @@ set(
     archive_objectives
     ctx_subfunction
     ctx_introns
+    quality
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)

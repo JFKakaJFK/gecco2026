@@ -13,45 +13,39 @@
 using namespace goblin;
 
 struct AExt : SolutionExtension<AExt> {
-   usize idx{};
+  usize idx{};
 
-   AExt(usize i): idx(i) {};
+  AExt(usize i) : idx(i) {};
 
-   bool operator==(const SolutionExtensionBase& other) const {
-       return typeid(*this) == typeid(other) && idx == static_cast<const AExt&>(other).idx;
-   };
+  bool operator==(const SolutionExtensionBase& other) const {
+    return typeid(*this) == typeid(other) && idx == static_cast<const AExt&>(other).idx;
+  };
 
-   std::unique_ptr<SolutionExtensionBase> clone() const override {
-     return std::make_unique<AExt>(*this);
-   };
+  std::unique_ptr<SolutionExtensionBase> clone() const override { return std::make_unique<AExt>(*this); };
 };
 
 struct BExt : SolutionExtension<BExt> {
-    double cv{};
+  double cv{};
 
-    BExt(double cv): cv(cv) {};
+  BExt(double cv) : cv(cv) {};
 
-    bool operator==(const SolutionExtensionBase& other) const {
-        return typeid(*this) == typeid(other) && cv == static_cast<const BExt&>(other).cv;
-    };
+  bool operator==(const SolutionExtensionBase& other) const {
+    return typeid(*this) == typeid(other) && cv == static_cast<const BExt&>(other).cv;
+  };
 
-    std::unique_ptr<SolutionExtensionBase> clone() const override {
-      return std::make_unique<BExt>(*this);
-    };
+  std::unique_ptr<SolutionExtensionBase> clone() const override { return std::make_unique<BExt>(*this); };
 };
 
 struct CExt : SolutionExtension<CExt> {
-    bool value{};
+  bool value{};
 
-    CExt(bool value): value(value) {};
+  CExt(bool value) : value(value) {};
 
-    bool operator==(const SolutionExtensionBase& other) const {
-        return typeid(*this) == typeid(other) && value == static_cast<const CExt&>(other).value;
-    };
+  bool operator==(const SolutionExtensionBase& other) const {
+    return typeid(*this) == typeid(other) && value == static_cast<const CExt&>(other).value;
+  };
 
-    std::unique_ptr<SolutionExtensionBase> clone() const override {
-      return std::make_unique<CExt>(*this);
-    };
+  std::unique_ptr<SolutionExtensionBase> clone() const override { return std::make_unique<CExt>(*this); };
 };
 
 void check_eq(SolutionBase& lhs, SolutionBase& rhs, usize i) {
@@ -66,26 +60,27 @@ void check_eq(SolutionBase& lhs, SolutionBase& rhs, usize i) {
   REQUIRE_MESSAGE((lhs.continuous_active() == rhs.continuous_active()).all(), "idx: ", i,
                   ", lhs: ", lhs.continuous_active(), ", rhs: ", rhs.continuous_active());
 
-  REQUIRE_MESSAGE(static_cast<const MOQuality&>(lhs.quality()).objectives == static_cast<const MOQuality&>(rhs.quality()).objectives, "idx: ", i);
-  REQUIRE_MESSAGE(static_cast<const MOQuality&>(lhs.quality()).constraint_value == static_cast<const MOQuality&>(rhs.quality()).constraint_value, "idx: ", i);
+  REQUIRE_MESSAGE(lhs.quality_as<MOQuality>().objectives == rhs.quality_as<MOQuality>().objectives, "idx: ", i);
+  REQUIRE_MESSAGE(lhs.quality_as<MOQuality>().constraint_value == rhs.quality_as<MOQuality>().constraint_value,
+                  "idx: ", i);
 
   REQUIRE_MESSAGE(lhs.num_extensions() == rhs.num_extensions(), "idx: ", i);
-  for(const auto& _l: lhs.extensions()){
-      SolutionExtensionBase& l = _l.get();
-      auto _r = rhs.get_extension(l.key());
-      REQUIRE_MESSAGE(_r.has_value(), "idx: ", i);
-      SolutionExtensionBase& r = _r.value().get();
+  for (const auto& _l : lhs.extensions()) {
+    SolutionExtensionBase& l = _l.get();
+    auto _r = rhs.get_extension(l.key());
+    REQUIRE_MESSAGE(_r.has_value(), "idx: ", i);
+    SolutionExtensionBase& r = _r.value().get();
 
-      // no general comparison required - all point where a specific extension is needed know about the concrete type
-      if(typeid(l) == typeid(AExt)){
-          REQUIRE_MESSAGE(static_cast<const AExt&>(l) == r, "idx: ", i);
-      }
-      if(typeid(l) == typeid(BExt)){
-          REQUIRE_MESSAGE(static_cast<const BExt&>(l) == r, "idx: ", i);
-      }
-      if(typeid(l) == typeid(CExt)){
-          REQUIRE_MESSAGE(static_cast<const CExt&>(l) == r, "idx: ", i);
-      }
+    // no general comparison required - all point where a specific extension is needed know about the concrete type
+    if (typeid(l) == typeid(AExt)) {
+      REQUIRE_MESSAGE(static_cast<const AExt&>(l) == r, "idx: ", i);
+    }
+    if (typeid(l) == typeid(BExt)) {
+      REQUIRE_MESSAGE(static_cast<const BExt&>(l) == r, "idx: ", i);
+    }
+    if (typeid(l) == typeid(CExt)) {
+      REQUIRE_MESSAGE(static_cast<const CExt&>(l) == r, "idx: ", i);
+    }
   }
 }
 
@@ -94,7 +89,7 @@ void check_set(SolutionSetBase& set) {
   auto discrete = Vec<DType>::Zero(2);
   auto continuous = Vec<CType>::Zero(3);
   Solution s(f.worst(), discrete, continuous);
-  static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
+  s.quality_as<MOQuality>().objectives = Vec<CType>::Zero(2);
 
   REQUIRE(s.num_extensions() == 0);
   REQUIRE(!s.has_extension(AExt::type_key()));
@@ -113,8 +108,10 @@ void check_set(SolutionSetBase& set) {
   REQUIRE(s.has_extension(BExt::type_key()));
   REQUIRE(s.has_extension(CExt::type_key()));
 
-  static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx = 2;
-  REQUIRE(static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx == 2);
+  // static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx = 2;
+  // REQUIRE(static_cast<AExt&>(s.get_extension(AExt::type_key()).value().get()).idx == 2);
+  s.extension<AExt>().idx = 2;
+  REQUIRE(s.extension<AExt>().idx == 2);
 
   const usize N = 64;  // larger than 32 (initial allocation size)
   for (usize i = 0; i < N; i++) {
@@ -127,9 +124,13 @@ void check_set(SolutionSetBase& set) {
     CHECK(set.size() == N + i + 1);
     check_eq(set[set.size() - 1], s, N + i);
 
-    static_cast<AExt&>(set[set.size() - 1].get_extension(AExt::type_key()).value().get()).idx = i;
-    static_cast<BExt&>(set[set.size() - 1].get_extension(BExt::type_key()).value().get()).cv = i;
-    static_cast<CExt&>(set[set.size() - 1].get_extension(CExt::type_key()).value().get()).value = i % 2 == 0;
+    // static_cast<AExt&>(set[set.size() - 1].get_extension(AExt::type_key()).value().get()).idx = i;
+    // static_cast<BExt&>(set[set.size() - 1].get_extension(BExt::type_key()).value().get()).cv = i;
+    // static_cast<CExt&>(set[set.size() - 1].get_extension(CExt::type_key()).value().get()).value = i % 2 == 0;
+
+    set[set.size() - 1].extension<AExt>().idx = i;
+    set[set.size() - 1].extension<BExt>().cv = i;
+    set[set.size() - 1].extension<CExt>().value = i % 2 == 0;
   }
 
   // Assignment works
@@ -173,7 +174,7 @@ TEST_CASE("goblin::lib::solution_extension") {
     auto discrete = Vec<DType>::Zero(2);
     auto continuous = Vec<CType>::Zero(3);
     Solution s(f.worst(), discrete, continuous);
-    static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
+    s.quality_as<MOQuality>().objectives = Vec<CType>::Zero(2);
 
     aos_set.add(s);
     soa_set.add(s);

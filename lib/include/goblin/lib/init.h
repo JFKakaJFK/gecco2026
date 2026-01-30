@@ -1,12 +1,12 @@
 #pragma once
-#include <cassert>
-#include <memory>
-#include <random>
 #ifndef _GOBLIN_LIB_INIT_H
 #define _GOBLIN_LIB_INIT_H
 
 #include <variant>
 #include <tuple>
+#include <cassert>
+#include <memory>
+#include <random>
 #include <optional>
 
 #include "goblin/lib/types.h"

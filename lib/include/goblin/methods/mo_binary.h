@@ -67,7 +67,7 @@ class MOBinaryGOMEA final : public MethodBase {
         throw std::runtime_error("");
       }
 
-      auto&     q = static_cast<MOQuality&>(s[0].quality());
+      auto& q = s[0].quality_as<MOQuality>();
       for (usize i = 0; i < problem.num_objectives(); i++) {
         obj[i] = q.objectives(i);
       }

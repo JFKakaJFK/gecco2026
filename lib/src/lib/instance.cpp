@@ -44,7 +44,7 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
 
     q_e.clear();
     for (size_t i = 0; i < indices.size(); i++) {
-        q_e.push_back(solutions[indices[i]].quality().clone());
+      q_e.push_back(solutions[indices[i]].quality().clone());
     }
 
     // +e

@@ -125,7 +125,7 @@ class InstanceBase {
     os << "])";
   };
 
-  virtual void log(std::ostream& os, SolutionBase& solution) {
+  virtual void log(std::ostream& os, const SolutionBase& solution) {
     os << '"';
     log_solution(os, solution);
     os << "\",";

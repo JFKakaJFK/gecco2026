@@ -43,7 +43,7 @@ class LinkageModelBase {
 
   virtual std::unique_ptr<LinkageModelBase> clone() const = 0;
 
-  virtual ~LinkageModelBase() = default; //{};
+  virtual ~LinkageModelBase() = default;  //{};
 };
 
 class UnivariateFOS final : public LinkageModelBase {

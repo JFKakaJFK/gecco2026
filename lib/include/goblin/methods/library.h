@@ -123,7 +123,7 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void evaluationFunction(gomea::solution_t<char>* solution) {
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         for (usize i = 0; i < p.num_discrete(); i++) {
           solution->variables[i] %= static_cast<char>(p.discrete_domain_sizes()(i));
         }
@@ -143,7 +143,7 @@ class DiscreteGOMEA final : public MethodBase {
       };
 
       void partialEvaluationFunction(gomea::solution_t<char>* parent, gomea::partial_solution_t<char>* solution) {
-          auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         s[0].discrete_values() =
             Eigen::Map<Eigen::VectorX<char>>(parent->variables.data(), parent->variables.size()).cast<DType>();
         for (usize i = 0; i < solution->touched_indices.size(); i++) {
@@ -304,7 +304,7 @@ class RvGOMEA final : public MethodBase {
       void evaluationFunction(gomea::solution_t<double>* solution) {
         s[0].continuous_values() = Eigen::Map<Eigen::VectorXd>(solution->variables.data(), solution->variables.size());
         p.evaluate(rng, s, idxs);
-        auto& q = static_cast<MOQuality&>(s[0].quality());
+        auto& q = s[0].quality_as<MOQuality>();
         solution->setObjectiveValue(q.objectives(0));
         solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);
@@ -323,7 +323,7 @@ class RvGOMEA final : public MethodBase {
           s[0].continuous_values()(solution->touched_indices[i]) = solution->touched_variables[i];
         }
         p.evaluate(rng, s, idxs);
-        auto q = static_cast<MOQuality&>(s[0].quality());
+        auto q = s[0].quality_as<MOQuality>();
         solution->setObjectiveValue(q.objectives(0));
         solution->setConstraintValue(q.constraint_value);
         a.update(s[0], true);

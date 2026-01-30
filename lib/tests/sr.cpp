@@ -46,12 +46,17 @@ TEST_CASE("goblin::gp::sr") {
       bool linear_scaling = ls > 0;
       SRProblem srp(ctx, X, Y, X_test, Y_test, obj, /* objectives_to_optimize = */ std::nullopt, linear_scaling);
 
+      auto f = dynamic_cast<const SRFitness*>(&srp.archive_fitness());
+      assert(f != nullptr && "Fitness mismatch");
+
       Rng rng = seeded_rng(42);
 
       AoSSet sset;
 
       Solution s(srp.archive_fitness().worst(), Vec<DType>::Zero(srp.num_discrete()),
                  Vec<CType>::Zero(srp.num_continuous()));
+      auto p = dynamic_cast<SRQuality*>(&s.quality());
+      assert(p != nullptr && "Quality mismatch");
       sset.add(s);
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -82,9 +87,9 @@ TEST_CASE("goblin::gp::sr") {
       std::vector<usize> indices{0};
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(static_cast<const MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
+      REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
       if (srp.num_objectives() > 1) {
-        REQUIRE(static_cast<const MOQuality&>(sset[0].quality()).objectives(1) == 6.0);
+        REQUIRE(sset[0].quality_as<MOQuality>().objectives(1) == 6.0);
       }
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -109,7 +114,7 @@ TEST_CASE("goblin::gp::sr") {
 
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(static_cast<MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
+      REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
 
       // ls (x0 + x1 + 42.0 -> scaled to x0 + x1)
       std::vector<CType> ls_intercepts = {42.0, 0.0};
@@ -141,7 +146,7 @@ TEST_CASE("goblin::gp::sr") {
       if (linear_scaling) {
         srp.evaluate(rng, sset, indices);
 
-        REQUIRE(static_cast<MOQuality&>(sset[0].quality()).objectives(0) == doctest::Approx(0.0));
+        REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
       }
     }
   }
@@ -214,7 +219,7 @@ TEST_CASE("goblin::gp::sr") {
 
       REQUIRE(front->empty() == false);
       // ls values are re-computed, so there can be slight differences here, hence 10x
-      REQUIRE(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives(0) <= vtr * 10.0);
+      REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives(0) <= vtr * 10.0);
     }
   }
 }

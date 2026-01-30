@@ -23,7 +23,7 @@ void check_eq(SolutionBase& lhs, SolutionBase& rhs, usize i) {
   REQUIRE_MESSAGE((lhs.continuous_active() == rhs.continuous_active()).all(), "idx: ", i,
                   ", lhs: ", lhs.continuous_active(), ", rhs: ", rhs.continuous_active());
 
-  const auto& lq = static_cast<const MOQuality&>(lhs.quality()), rq = static_cast<const MOQuality&>(rhs.quality());
+  const auto &lq = lhs.quality_as<MOQuality>(), rq = rhs.quality_as<MOQuality>();
   REQUIRE_MESSAGE(lq.objectives == rq.objectives, "idx: ", i);
   REQUIRE_MESSAGE(lq.constraint_value == rq.constraint_value, "idx: ", i);
 }
@@ -33,7 +33,7 @@ void check_set(SolutionSetBase& set) {
   auto discrete = Vec<DType>::Zero(2);
   auto continuous = Vec<CType>::Zero(3);
   Solution s(f.worst(), discrete, continuous);
-  static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
+  s.quality_as<MOQuality>().objectives = Vec<CType>::Zero(2);
 
   const usize N = 64;  // larger than 32 (initial allocation size)
   for (usize i = 0; i < N; i++) {
@@ -88,7 +88,7 @@ TEST_CASE("goblin::lib::solution") {
     auto discrete = Vec<DType>::Zero(2);
     auto continuous = Vec<CType>::Zero(3);
     Solution s(f.worst(), discrete, continuous);
-    static_cast<MOQuality&>(s.quality()).objectives = Vec<CType>::Zero(2);
+    s.quality_as<MOQuality>().objectives = Vec<CType>::Zero(2);
 
     aos_set.add(s);
     soa_set.add(s);

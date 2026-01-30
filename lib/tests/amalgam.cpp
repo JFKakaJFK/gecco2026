@@ -23,5 +23,5 @@ TEST_CASE("goblin::methods::amalgam") {
   auto [front, _] = alg.run(sphere, budget);
 
   REQUIRE(front->empty() == false);
-  CHECK(static_cast<const MOQuality&>(front->so_solution(0).quality()).objectives[0] <= 1e-8);
+  CHECK(front->so_solution(0).quality_as<MOQuality>().objectives[0] <= 1e-8);
 }

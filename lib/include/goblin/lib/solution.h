@@ -13,6 +13,7 @@
 #include <optional>
 #include <span>
 #include <type_traits>
+#include <stdexcept>
 
 #include <Eigen/Dense>
 
@@ -154,9 +155,13 @@ struct SolutionExtensionKey {
   void* token = nullptr;
 };
 
-inline bool operator==(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token == rhs.token; }
+inline bool operator==(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept {
+  return lhs.token == rhs.token;
+}
 
-inline bool operator!=(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept { return lhs.token != rhs.token; }
+inline bool operator!=(const SolutionExtensionKey& lhs, const SolutionExtensionKey& rhs) noexcept {
+  return lhs.token != rhs.token;
+}
 
 struct SolutionExtensionKeyHash {
   usize operator()(const SolutionExtensionKey& key) const noexcept { return std::hash<void*>{}(key.token); };
@@ -186,22 +191,67 @@ struct SolutionExtension : public SolutionExtensionBase {
 class SolutionBase {
  public:
   virtual bool has_extension(const SolutionExtensionKey& key) const = 0;
-  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0; // this is fine
+  virtual SolutionExtensionBase& get_or_insert_extension(const SolutionExtensionBase& extension) = 0;  // this is fine
   virtual std::optional<std::reference_wrapper<const SolutionExtensionBase>> get_extension(
       const SolutionExtensionKey& key) const = 0;
   virtual std::optional<std::reference_wrapper<SolutionExtensionBase>> get_extension(
       const SolutionExtensionKey& key) = 0;
+
+  template <typename T>
+  const T& extension() const {
+    auto e = get_extension(T::type_key());
+    if (!e.has_value()) {
+      throw std::runtime_error("Invalid extension access!");
+    }
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&e.value().get());
+    assert(p != nullptr && "Extension type mismatch");
+#endif
+    return static_cast<const T&>(e.value().get());
+  };
+  template <typename T>
+  T& extension() {
+    auto e = get_extension(T::type_key());
+    if (!e.has_value()) {
+      throw std::runtime_error("Invalid extension access!");
+    }
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&e.value().get());
+    assert(p != nullptr && "Extension type mismatch");
+#endif
+    return static_cast<T&>(e.value().get());
+  };
   virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
   virtual void clear_extensions() = 0;
 
-  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full copies?? (size, begin, end, proxy to underlying collection)
+  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
+  // copies?? (size, begin, end, proxy to underlying collection)
   virtual usize num_extensions() const = 0;
   virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
   virtual std::vector<std::reference_wrapper<SolutionExtensionBase>> extensions() = 0;
 
-  virtual QualityBase& quality() = 0; // nb::rv_policy::reference_internal
-  virtual const QualityBase& quality() const = 0; // nb::rv_policy::reference_internal
+  virtual QualityBase& quality() = 0;
+  virtual const QualityBase& quality() const = 0;
   virtual void assign_quality(const QualityBase& quality) = 0;
+
+  template <typename T>
+  const T& quality_as() const {
+    const auto& q = quality();
+#ifndef NDEBUG
+    auto p = dynamic_cast<const T*>(&q);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<const T&>(q);
+  }
+  template <typename T>
+  T& quality_as() {
+    auto& q = quality();
+#ifndef NDEBUG
+    auto p = dynamic_cast<T*>(&q);
+    assert(p != nullptr && "Quality type mismatch");
+#endif
+    return static_cast<T&>(q);
+  }
 
   inline usize num_discrete() const { return discrete_values().size(); };
 
@@ -417,11 +467,9 @@ class Solution : public SolutionBase {
     }
   };
 
-  void assign_quality(const QualityBase& quality) override final {
-      _quality = quality.clone();
-  };
-  QualityBase& quality() override final { return *_quality; } // nb::rv_policy::reference_internal
-  const QualityBase& quality() const override final { return *_quality; } // nb::rv_policy::reference_internal
+  void assign_quality(const QualityBase& quality) override final { _quality = quality.clone(); };
+  QualityBase& quality() override final { return *_quality; }              // nb::rv_policy::reference_internal
+  const QualityBase& quality() const override final { return *_quality; }  // nb::rv_policy::reference_internal
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
@@ -577,9 +625,7 @@ class SoASet;
 template <int StorageOrder>
 class SolutionHandle : public SolutionBase {
  public:
- void assign_quality(const QualityBase& quality) override {
-     arena->quality[idx] = quality.clone();
- }
+  void assign_quality(const QualityBase& quality) override { arena->quality[idx] = quality.clone(); }
   QualityBase& quality() override final { return *arena->quality[idx]; }
   const QualityBase& quality() const override final { return *arena->quality[idx]; }
 
@@ -815,7 +861,8 @@ class SoASet : public SolutionSetBase {
       continuous.row(idx) = continuous.row(_size);
       discrete_active.row(idx) = discrete_active.row(_size);
       continuous_active.row(idx) = continuous_active.row(_size);
-      std::swap(extensions[idx], extensions[_size]); extensions[_size].clear();
+      std::swap(extensions[idx], extensions[_size]);
+      extensions[_size].clear();
       quality[idx] = std::move(quality[_size]);
 
       // ! no need to adjust the handles, but any references to handles may be

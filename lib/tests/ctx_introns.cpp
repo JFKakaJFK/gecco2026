@@ -76,7 +76,7 @@ TEST_CASE("goblin::gp::ctx_introns") {
         bool at_least_one_valid = false;
         for (usize i = 0; i < N; i++) {
           // it's possible to generate semantically invalid expressions...
-          if (!isna(static_cast<const MOQuality&>(solutions[i].quality()).objectives(0))) {
+          if (!isna(solutions[i].quality_as<MOQuality>().objectives(0))) {
             at_least_one_valid = true;
             Solution before = solutions[i];
 
