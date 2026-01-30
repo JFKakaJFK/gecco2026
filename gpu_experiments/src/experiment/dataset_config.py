@@ -86,5 +86,6 @@ DATASETS: dict[str, DatasetConfig] = {
     #############################
     ### Exponential Equations ###
     #############################
+    # E = n * k_b * T * ln(V2/V1)
     "feynman_I_44_4": FeynmanDatasetConfig(name="feynman_I_44_4", features=5),
 }

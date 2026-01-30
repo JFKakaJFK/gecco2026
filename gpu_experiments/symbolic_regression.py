@@ -175,8 +175,8 @@ def main():
     # run_experiment(cfg.TEST_EXECUTION, output_directory)
     grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
     grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
-    grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
-    grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)
+    # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
+    # grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)
 
 
 if __name__ == "__main__":
