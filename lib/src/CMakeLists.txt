@@ -19,6 +19,8 @@ file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*
 # else()
 add_library(${PROJECT_NAME}
         ${HEADER_LIST}
+        lib/archive.cpp
+        lib/archive_unbounded.cpp
         lib/instance.cpp
         gp/sr.cpp
         methods/amalgam.cpp

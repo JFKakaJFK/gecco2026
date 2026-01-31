@@ -689,99 +689,6 @@ class SolutionBase {
     return *this;
   };
 
-  /// Inherits a subset of the decision variables from the donor, returning true
-  /// if there was a change to the active variables and an evaluation is needed.
-  ///
-  /// The `always_inherit_continuous` determines if the corresponding continuous
-  /// variables are also inherited for discrete only subsets.
-  // virtual std::tuple<bool, bool> inherit(const SolutionBase& donor,
-  //                                        const Subset& subset,
-  //                                        bool always_inherit_continuous) {
-  //   bool any_active_changed = false, anything_changed = false;
-  //   bool is_continuous = subset.continuous.size() > 0;
-  //   bool is_discrete = subset.discrete.size() > 0;
-
-  //   // assert((!always_inherit_continuous || num_continuous() >= num_discrete()) &&
-  //   //        "All discrete indices must be valid continuous indices if the continuous "
-  //   //        "values should be inherited with the discrete ones.");
-
-  //   if (is_discrete) {
-  //     bool inherit_continuous = !is_continuous && always_inherit_continuous;
-  //     bool inherit_by_index = num_continuous() >= num_discrete();
-  //     for (usize di, i = 0; i < subset.discrete.size(); i++) {
-  //       di = subset.discrete[i];
-  //       if (discrete_values()(di) != donor.discrete_values()(di)) {
-  //         any_active_changed |= discrete_active()(di);
-  //         anything_changed = true;
-  //         discrete_values()(di) = donor.discrete_values()(di);
-  //       }
-
-  //       // yes, the indices here should be from the discrete subset!
-  //       if (inherit_continuous && inherit_by_index) {
-  //         if (continuous_values()(di) != donor.continuous_values()(di)) {
-  //           any_active_changed |= continuous_active()(di);
-  //           anything_changed = true;
-  //           continuous_values()(di) = donor.continuous_values()(di);
-  //         }
-  //       }
-  //     }
-
-  //     if (inherit_continuous && !inherit_by_index) {
-  //       for (usize i = 0; i < num_continuous(); i++) {
-  //         // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not
-  //         really
-  //         // useful...
-  //         if (continuous_values()(i) != donor.continuous_values()(i)) {
-  //           any_active_changed |= continuous_active()(i);
-  //           anything_changed = true;
-  //           continuous_values()(i) = donor.continuous_values()(i);
-  //         }
-  //       }
-  //     }
-  //   }
-  //   if (is_continuous) {
-  //     for (usize ci, i = 0; i < subset.continuous.size(); i++) {
-  //       ci = subset.continuous[i];
-  //       // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-  //       // useful...
-  //       if (continuous_values()(ci) != donor.continuous_values()(ci)) {
-  //         any_active_changed |= continuous_active()(ci);
-  //         anything_changed = true;
-  //         continuous_values()(ci) = donor.continuous_values()(ci);
-  //       }
-  //     }
-  //   }
-
-  //   return std::make_tuple(any_active_changed, anything_changed);
-  // };
-
-  // virtual void reject(const SolutionBase& backup,
-  //                     bool always_inherit_continuous,
-  //                     std::optional<std::reference_wrapper<const Subset>> subset = std::nullopt) {
-  //   quality() = backup.quality();
-
-  //   if (subset.has_value()) {
-  //     auto& s = subset.value().get();
-  //     if (!s.discrete.empty()) {
-  //       discrete_values()(s.discrete) = backup.discrete_values()(s.discrete);
-  //       if (always_inherit_continuous) {
-  //         continuous_values()(s.discrete) = backup.continuous_values()(s.discrete);
-  //       }
-  //     }
-  //     if (!s.continuous.empty()) {
-  //       continuous_values()(s.continuous) = backup.continuous_values()(s.continuous);
-  //     }
-  //   } else {
-  //     discrete_values() = backup.discrete_values();
-  //     continuous_values() = backup.continuous_values();
-  //   }
-
-  //   // The active variables always have to be restored in full,
-  //   // since variables outside the subset can become active...
-  //   discrete_active() = backup.discrete_active();
-  //   continuous_active() = backup.continuous_active();
-  // };
-
   virtual ~SolutionBase() {};
 };
 
@@ -1349,92 +1256,15 @@ class ArchiveBase {
                                          // non-dominated by the archive but not accepted
               bool check_synched = true  // Only consider a solution accepted if it
                                          // also is accepted by all synched archives
-  ) {
-    auto [accepted, accepted_strict] = update_archive(solution, strict);
-    // the assumption is that the synched archives always are at least as //
-    // "good" as this archive (after all, we update them with each improvement
-    // on this archive!), so if the solution is not improving // this archive
-    // there is no reason to update the synched ones
-    if (accepted_strict) {
-      _change_count++;
-      for (auto& a : synched_archives) {
-        bool a_accepted = a.get().update(solution, strict);
-        if (check_synched) {
-          // The synching is only used to keep a local archive to detect
-          // stagnation GOMEA typically uses the global archive for testing if
-          // something is an improvement and for FI
-          accepted &= a_accepted;
-        }
-      }
-    }
-    return accepted;
-  };
+  );
 
   void sync_with(ArchiveBase& other) { synched_archives.push_back(other); };
-
   void unsync_all() { synched_archives.clear(); };
 
-  bool dominates(const SolutionBase& solution, bool strict) const {
-    if (!empty()) {
-      for (usize i = 0; i < fitness().num_objectives(); i++) {
-        auto o = fitness().cmp(so_solution(i).quality(), solution.quality(), std::nullopt);
-        if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
-          return true;
-        }
-      }
+  bool dominates(const SolutionBase& solution, bool strict) const;
+  bool covers(const ArchiveBase& other) const;
 
-      for (usize i = 0; i < size(); i++) {
-        auto o = fitness().cmp(operator[](i).quality(), solution.quality(), std::nullopt);
-        if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool covers(const ArchiveBase& other) const {
-    if (other.empty())
-      return true;  // any archive covers the empty archive
-    if (empty()) {
-      return false;  // an empty archive covers nothing
-    } else {
-      // at this point we return false if other contains a solution not matched
-      // by this, otherwise the archive other is indeed covered by this
-
-      // neither archive is empty, so the so solutions must be set...
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        auto o = fitness().cmp(so_solution(obj).quality(), other.so_solution(obj).quality(), obj);
-        if (o == Ordering::NonDominated || o == Ordering::Worse) {
-          return false;
-        }
-      }
-
-      for (usize other_idx = 0; other_idx < other.size(); other_idx++) {
-        bool covered = false;
-        for (usize idx = 0; idx < size(); idx++) {
-          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality(), std::nullopt);
-          if (o == Ordering::Better || o == Ordering::Equal) {
-            covered = true;
-            break;
-          } else if (o == Ordering::Worse) {
-            // Both archives only contain non-dominated solutions,
-            // so if a solution s in this archive is dominated by other AND
-            // s is non-dominated in this archive, at least one solution in
-            // other cannot be matched by this archive
-            return false;
-          }
-        }
-        if (!covered)
-          return false;
-      }
-
-      return true;
-    }
-  };
-
-  const SolutionBase& random_solution(Rng& rng) const {
+  inline const SolutionBase& random_solution(Rng& rng) const  {
     __goblin_runtime_assert(!empty());
     return operator[](std::uniform_int_distribution<usize>(0, size() - 1)(rng));
   };
@@ -10978,7 +10808,6 @@ class Population {
 
               std::tie(evaluation_needed, anything_changed) =
                   problem.inherit_discrete(solutions[i], donors[donor_idx], *subsets[i]);
-              // solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
               if (evaluation_needed) {
                 solutions_to_evaluate[0] = i;
@@ -11464,8 +11293,6 @@ class Population {
 
           std::tie(evaluation_needed, anything_changed) =
               problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
-          // solutions[i].inherit(
-          // donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
@@ -11494,9 +11321,6 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
         solutions[i] = parents[i];
 
       } else {
@@ -11539,8 +11363,8 @@ class Population {
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
     // RV must be enabled and there need to be continuous values that aren't already inherited...
-    bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
-                           problem.num_continuous() > 0;  // && !problem.always_inherit_continuous();
+    bool enable_rv_steps =
+        options.enable_mixed_forced_improvements && rv_state.options.enabled && problem.num_continuous() > 0;
     CType alpha = 0.5;
     Subset rv_full;
     if (enable_rv_steps) {
@@ -11592,8 +11416,6 @@ class Population {
                     alpha * parents[i].continuous_values()(l) + (CType(1.0) - alpha) * donor.continuous_values()(l);
               }
             }
-            // solutions[i].continuous_values() =
-            //     alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * donor.continuous_values();
             solutions_to_evaluate.push_back(i);
             eval2improve_idx.push_back(j);
           }
@@ -11606,7 +11428,6 @@ class Population {
             subsets[i] = &cluster_FOS[k][fos_idx];
 
             auto [evaluation_needed, anything_changed] = problem.inherit_discrete(solutions[i], donor, *subsets[i]);
-            // solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
             if (evaluation_needed) {  // parent will be updated during acceptance
               eval2improve_idx.push_back(j);
               solutions_to_evaluate.push_back(i);
@@ -11638,10 +11459,6 @@ class Population {
 
           if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
-            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS
-            //                     terms
-            //                                     // are handled better
             solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
@@ -11746,13 +11563,8 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled
-        //     better
         solutions[i] = parents[i];
       } else {
-        // solution_changed[i] = true;
         parents[i] = solutions[i];
       }
     }
@@ -11802,7 +11614,6 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
         solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;

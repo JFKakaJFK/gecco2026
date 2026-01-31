@@ -53,92 +53,15 @@ class ArchiveBase {
                                          // non-dominated by the archive but not accepted
               bool check_synched = true  // Only consider a solution accepted if it
                                          // also is accepted by all synched archives
-  ) {
-    auto [accepted, accepted_strict] = update_archive(solution, strict);
-    // the assumption is that the synched archives always are at least as //
-    // "good" as this archive (after all, we update them with each improvement
-    // on this archive!), so if the solution is not improving // this archive
-    // there is no reason to update the synched ones
-    if (accepted_strict) {
-      _change_count++;
-      for (auto& a : synched_archives) {
-        bool a_accepted = a.get().update(solution, strict);
-        if (check_synched) {
-          // The synching is only used to keep a local archive to detect
-          // stagnation GOMEA typically uses the global archive for testing if
-          // something is an improvement and for FI
-          accepted &= a_accepted;
-        }
-      }
-    }
-    return accepted;
-  };
+  );
 
   void sync_with(ArchiveBase& other) { synched_archives.push_back(other); };
-
   void unsync_all() { synched_archives.clear(); };
 
-  bool dominates(const SolutionBase& solution, bool strict) const {
-    if (!empty()) {
-      for (usize i = 0; i < fitness().num_objectives(); i++) {
-        auto o = fitness().cmp(so_solution(i).quality(), solution.quality(), std::nullopt);
-        if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
-          return true;
-        }
-      }
+  bool dominates(const SolutionBase& solution, bool strict) const;
+  bool covers(const ArchiveBase& other) const;
 
-      for (usize i = 0; i < size(); i++) {
-        auto o = fitness().cmp(operator[](i).quality(), solution.quality(), std::nullopt);
-        if (o == Ordering::Better || (!strict && o == Ordering::Equal)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  bool covers(const ArchiveBase& other) const {
-    if (other.empty())
-      return true;  // any archive covers the empty archive
-    if (empty()) {
-      return false;  // an empty archive covers nothing
-    } else {
-      // at this point we return false if other contains a solution not matched
-      // by this, otherwise the archive other is indeed covered by this
-
-      // neither archive is empty, so the so solutions must be set...
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        auto o = fitness().cmp(so_solution(obj).quality(), other.so_solution(obj).quality(), obj);
-        if (o == Ordering::NonDominated || o == Ordering::Worse) {
-          return false;
-        }
-      }
-
-      for (usize other_idx = 0; other_idx < other.size(); other_idx++) {
-        bool covered = false;
-        for (usize idx = 0; idx < size(); idx++) {
-          auto o = fitness().cmp(operator[](idx).quality(), other[other_idx].quality(), std::nullopt);
-          if (o == Ordering::Better || o == Ordering::Equal) {
-            covered = true;
-            break;
-          } else if (o == Ordering::Worse) {
-            // Both archives only contain non-dominated solutions,
-            // so if a solution s in this archive is dominated by other AND
-            // s is non-dominated in this archive, at least one solution in
-            // other cannot be matched by this archive
-            return false;
-          }
-        }
-        if (!covered)
-          return false;
-      }
-
-      return true;
-    }
-  };
-
-  const SolutionBase& random_solution(Rng& rng) const {
+  inline const SolutionBase& random_solution(Rng& rng) const  {
     __goblin_runtime_assert(!empty());
     return operator[](std::uniform_int_distribution<usize>(0, size() - 1)(rng));
   };
@@ -172,7 +95,7 @@ class UnboundedArchive : public ArchiveBase {
     _solutions.clear();
   };
 
-  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final {
+  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final; /* {
     std::vector<usize> sorted_dominations;
     auto [is_so_elite, is_dominated] = update_so_solutions(solution);
     if (is_dominated) {
@@ -203,12 +126,13 @@ class UnboundedArchive : public ArchiveBase {
 
     return std::make_tuple(true, true);
   };
+  */
 
   const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   // is_so_elite, is_dominated
-  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution) {
+  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution); /*  {
     if (_so_solutions.empty()) {
       _so_solutions.reserve(fitness().num_objectives());
       for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
@@ -228,6 +152,8 @@ class UnboundedArchive : public ArchiveBase {
       return std::make_tuple(false, false);
     }
   };
+
+  */
 
   DefaultSolutionSet _so_solutions;
   DefaultSolutionSet _solutions;

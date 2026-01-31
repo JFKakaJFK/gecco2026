@@ -453,7 +453,6 @@ class Population {
 
               std::tie(evaluation_needed, anything_changed) =
                   problem.inherit_discrete(solutions[i], donors[donor_idx], *subsets[i]);
-              // solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
 
               if (evaluation_needed) {
                 solutions_to_evaluate[0] = i;
@@ -939,8 +938,6 @@ class Population {
 
           std::tie(evaluation_needed, anything_changed) =
               problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
-          // solutions[i].inherit(
-          // donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
@@ -969,9 +966,6 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
         solutions[i] = parents[i];
 
       } else {
@@ -1014,8 +1008,8 @@ class Population {
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
     // RV must be enabled and there need to be continuous values that aren't already inherited...
-    bool enable_rv_steps = options.enable_mixed_forced_improvements && rv_state.options.enabled &&
-                           problem.num_continuous() > 0;  // && !problem.always_inherit_continuous();
+    bool enable_rv_steps =
+        options.enable_mixed_forced_improvements && rv_state.options.enabled && problem.num_continuous() > 0;
     CType alpha = 0.5;
     Subset rv_full;
     if (enable_rv_steps) {
@@ -1067,8 +1061,6 @@ class Population {
                     alpha * parents[i].continuous_values()(l) + (CType(1.0) - alpha) * donor.continuous_values()(l);
               }
             }
-            // solutions[i].continuous_values() =
-            //     alpha * parents[i].continuous_values() + (CType(1.0) - alpha) * donor.continuous_values();
             solutions_to_evaluate.push_back(i);
             eval2improve_idx.push_back(j);
           }
@@ -1081,7 +1073,6 @@ class Population {
             subsets[i] = &cluster_FOS[k][fos_idx];
 
             auto [evaluation_needed, anything_changed] = problem.inherit_discrete(solutions[i], donor, *subsets[i]);
-            // solutions[i].inherit(donor, *subsets[i], problem.always_inherit_continuous());
             if (evaluation_needed) {  // parent will be updated during acceptance
               eval2improve_idx.push_back(j);
               solutions_to_evaluate.push_back(i);
@@ -1113,10 +1104,6 @@ class Population {
 
           if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
-            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS
-            //                     terms
-            //                                     // are handled better
             solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
@@ -1221,13 +1208,8 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled
-        //     better
         solutions[i] = parents[i];
       } else {
-        // solution_changed[i] = true;
         parents[i] = solutions[i];
       }
     }
@@ -1277,7 +1259,6 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
         solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
