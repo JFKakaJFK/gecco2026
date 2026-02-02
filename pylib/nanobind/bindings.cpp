@@ -1332,12 +1332,14 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("cmp",
           nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::cmp, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
       .def("distance",
-          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::distance, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
+          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::distance, nb::const_),
+          nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none(),
+          "{\n    const auto& ql = lhs.as<MOQuality>();\n    const auto& qr = rhs.as<MOQuality>();\n    CType dist;\n    if (objective.has_value()) {\n      dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));\n    } else {\n      dist = (ql.objectives - qr.objectives).norm();\n    }\n    return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;\n  };\n")
       .def("worst",
           &goblin::MOFitness::worst)
       ;
   // #endif
-  // #ifndef _GOBLIN_LIB_SOLUTION_H
+  // #ifndef _GOBLIN_LIB_SUBSET_H
   //
 
 
@@ -1372,6 +1374,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("merge",
           &goblin::Subset::merge, nb::arg("other"))
       ;
+  // #endif
+  // #ifndef _GOBLIN_LIB_SOLUTION_H
+  //
 
 
   auto pyClassSolutionExtensionKey =
@@ -1749,35 +1754,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::InstanceBase::format_solution, nb::arg("solution"))
       ;
   // #endif
-  // #ifndef _GOBLIN_LIB_LINKAGE_H
-  //
-
-
-  auto pyEnumVariableSet =
-      nb::enum_<goblin::VariableSet>(m, "VariableSet", nb::is_arithmetic(), "")
-          .value("discrete", goblin::VariableSet::Discrete, "")
-          .value("continuous", goblin::VariableSet::Continuous, "")
-          .value("mixed", goblin::VariableSet::Mixed, "");
-
-
-  m.def("estimate_entropy2",
-      goblin::estimate_entropy2,
-      nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none(),
-      " TODO this method does way too much, but where else to put all of the\n modifications of the frequency counts for the entropy?\n - problem shouldn't have to know about the intron related entropy\n modifications\n - continuous stuff interacts with the introns...\n => current tradeoff is having the problem provide info about discrete\n values that actually correspond to a continuous value...");
-
-
-  auto pyEnumDiscreteIntronStrategy =
-      nb::enum_<goblin::DiscreteIntronStrategy>(m, "DiscreteIntronStrategy", nb::is_arithmetic(), " TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file\n (fine, since the template is only used here)")
-          .value("none", goblin::DiscreteIntronStrategy::None, "")
-          .value("any_active", goblin::DiscreteIntronStrategy::AnyActive, "")
-          .value("all_active", goblin::DiscreteIntronStrategy::AllActive, "")
-          .value("mark_only", goblin::DiscreteIntronStrategy::MarkOnly, "")
-          .value("weighted_any_active", goblin::DiscreteIntronStrategy::WeightedAnyActive, "");
-
-
-  m.def("estimate_entropy",
-      goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none());
-  // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
   //
 
@@ -1836,6 +1812,17 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
   //
+
+
+  auto pyEnumVariableSet =
+      nb::enum_<goblin::VariableSet>(m, "VariableSet", nb::is_arithmetic(), "")
+          .value("discrete", goblin::VariableSet::Discrete, "")
+          .value("continuous", goblin::VariableSet::Continuous, "")
+          .value("mixed", goblin::VariableSet::Mixed, "");
+
+
+  m.def("estimate_entropy",
+      goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none());
 
 
   auto pyClassLinkageModelBase =

@@ -4,7 +4,7 @@
 
 #include "goblin/bench/functions/discrete.h"
 #include "goblin/bench/problem.h"
-#include "goblin/lib/linkage.h"
+#include "goblin/lib/linkage_model.h"
 
 // using namespace std::chrono_literals;
 using namespace goblin;

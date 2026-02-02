@@ -111,10 +111,6 @@ class Ordering(enum.IntEnum):
 # #ifndef _GOBLIN_LIB_FITNESS_H
 #
 
-# TODO make quality virtual to allow arbitrary quality types?
-# -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
-# -> performance issue?
-
 class QualityBase:
     """/ Something that describes how good a solution is"""
 
@@ -197,11 +193,42 @@ class MOFitness(ArchiveFitnessBase):
         self, lhs: QualityBase, rhs: QualityBase, objective: Optional[int] = None
     ) -> Ordering:
         pass
+    # {
+    #    const auto& ql = lhs.as<MOQuality>();
+    #    const auto& qr = rhs.as<MOQuality>();
+    #    // Constraints are always minimized
+    #    Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, True);
+    #
+    #    if (o == Ordering::Equal || o == Ordering::NonDominated) {
+    #      if (objective.has_value()) {
+    #        o = cmp(ql.objectives(objective.value()), qr.objectives(objective.value()), _epsilon, _minimize);
+    #      } else {
+    #        for (usize i = 0; i < _num_objectives && o != Ordering::NonDominated; i++) {
+    #          o = o | cmp(ql.objectives(i), qr.objectives(i), _epsilon, _minimize);
+    #        }
+    #      }
+    #    }
+    #    return o;
+    #  };
+    #
 
     @overload
     def distance(
         self, lhs: QualityBase, rhs: QualityBase, objective: Optional[int] = None
     ) -> float:
+        """{
+          const auto& ql = lhs.as<MOQuality>();
+          const auto& qr = rhs.as<MOQuality>();
+          CType dist;
+          if (objective.has_value()) {
+            dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
+          } else {
+            dist = (ql.objectives - qr.objectives).norm();
+          }
+          return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
+        };
+
+        """
         pass
 
     def worst(self) -> QualityBase:
@@ -210,17 +237,10 @@ class MOFitness(ArchiveFitnessBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/lib/solution.h included by goblin.h                                             //
+#                       goblin/lib/subset.h included by goblin.h                                               //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_LIB_SOLUTION_H
+# #ifndef _GOBLIN_LIB_SUBSET_H
 #
-
-# Note the separate solution exists to hide the data ownership
-# - without it, for operations using separate arenas like
-# e.g. GOM with a donor from an archive the arena would have to be handled
-# explicitly, but that is an implementation detail GOMEA shouldn't have to know
-# about. And for other representations such as a vector of solution structs,
-# this is also nicer.
 
 class Subset:
     discrete: List[int]
@@ -256,15 +276,20 @@ class Subset:
         """
         pass
 
-# imported from another header
-# class QualityBase {
-# public:
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/lib/solution.h included by goblin.h                                             //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_LIB_SOLUTION_H
 #
-# virtual std::unique_ptr<QualityBase> clone() const = 0;
-#
-# virtual ~QualityBase() = default;
-# };
-#
+
+# Note the separate solution exists to hide the data ownership
+# - without it, for operations using separate arenas like
+# e.g. GOM with a donor from an archive the arena would have to be handled
+# explicitly, but that is an implementation detail GOMEA shouldn't have to know
+# about. And for other representations such as a vector of solution structs,
+# this is also nicer.
 
 class SolutionExtensionKey:
     token: Any = None
@@ -881,60 +906,6 @@ class InstanceBase:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/lib/linkage.h included by goblin.h                                              //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_LIB_LINKAGE_H
-#
-
-class VariableSet(enum.IntEnum):
-    discrete = enum.auto()  # (= 0b01)
-    continuous = enum.auto()  # (= 0b10)
-    mixed = enum.auto()  # (= 0b11)
-
-def estimate_entropy2(
-    problem: InstanceBase,
-    solutions: SolutionSetBase,
-    indices: std.span[int],
-    subset: std.span[int],
-    intron_strategy: str,
-    merge_continuous: bool,
-    num_continuous_bins: Optional[int],
-) -> Mat[float]:
-    """TODO this method does way too much, but where else to put all of the
-    modifications of the frequency counts for the entropy?
-    - problem shouldn't have to know about the intron related entropy
-    modifications
-    - continuous stuff interacts with the introns...
-    => current tradeoff is having the problem provide info about discrete
-    values that actually correspond to a continuous value...
-    """
-    pass
-
-class DiscreteIntronStrategy(enum.IntEnum):
-    """TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file
-    (fine, since the template is only used here)
-    """
-
-    none = enum.auto()  # (= 0)
-    any_active = enum.auto()  # (= 1)
-    all_active = enum.auto()  # (= 2)
-    mark_only = enum.auto()  # (= 3)
-    weighted_any_active = enum.auto()  # (= 4)
-
-def estimate_entropy(
-    problem: InstanceBase,
-    solutions: SolutionSetBase,
-    indices: std.span[int],
-    subset: std.span[int],
-    intron_strategy: str,
-    merge_continuous: bool,
-    num_continuous_bins: Optional[int],
-) -> Mat[float]:
-    pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/lib/algorithms/upgma.h included by goblin.h                                     //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_LIB_UPGMA_H
@@ -1006,6 +977,22 @@ class UPGMA:
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
 #
+
+class VariableSet(enum.IntEnum):
+    discrete = enum.auto()  # (= 0b01)
+    continuous = enum.auto()  # (= 0b10)
+    mixed = enum.auto()  # (= 0b11)
+
+def estimate_entropy(
+    problem: InstanceBase,
+    solutions: SolutionSetBase,
+    indices: std.span[int],
+    subset: std.span[int],
+    intron_strategy: str,
+    merge_continuous: bool,
+    num_continuous_bins: Optional[int],
+) -> Mat[float]:
+    pass
 
 class LinkageModelBase:
     # LinkageModelBase() = default;

@@ -17,12 +17,25 @@
 #include "goblin/lib/algorithms/upgma.h"
 #include "goblin/lib/assert.h"
 #include "goblin/lib/instance.h"
-#include "goblin/lib/linkage.h"
 #include "goblin/lib/rng.h"
 #include "goblin/lib/solution.h"
 #include "goblin/lib/types.h"
 
 namespace goblin {
+enum class VariableSet : u8 { Discrete = 0b01, Continuous = 0b10, Mixed = 0b11 };
+
+inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
+  return static_cast<bool>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+};
+
+Mat<CType> estimate_entropy(const InstanceBase& problem,
+                                   const SolutionSetBase& solutions,
+                                   const std::span<const usize> indices,
+                                   const std::span<const usize> subset,
+                                   const std::string& intron_strategy,
+                                   bool merge_continuous,
+                                   std::optional<usize> num_continuous_bins);
+
 class LinkageModelBase {
  public:
   // LinkageModelBase() = default;

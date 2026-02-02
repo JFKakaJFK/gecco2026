@@ -20,8 +20,12 @@ file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*
 add_library(${PROJECT_NAME}
         ${HEADER_LIST}
         lib/archive.cpp
+        lib/archive_adaptive.cpp
         lib/archive_unbounded.cpp
         lib/instance.cpp
+        lib/fitness.cpp
+        lib/entropy.cpp
+        lib/solution.cpp
         gp/sr.cpp
         methods/amalgam.cpp
         methods/mo_gomea.cpp

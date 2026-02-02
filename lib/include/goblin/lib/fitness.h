@@ -17,10 +17,6 @@
 
 namespace goblin {
 
-// TODO make quality virtual to allow arbitrary quality types?
-// -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
-// -> performance issue?
-
 /// Something that describes how good a solution is
 class QualityBase {
  public:
@@ -28,6 +24,10 @@ class QualityBase {
 
   virtual ~QualityBase() = default;
 
+  template <typename T>
+  bool is() const {
+      return dynamic_cast<const T*>(this) != nullptr;
+  }
   template <typename T>
   const T& as() const {
 #ifndef NDEBUG
@@ -113,7 +113,7 @@ class MOFitness : public ArchiveFitnessBase {
 
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
-               std::optional<usize> objective = std::nullopt) const override final {
+               std::optional<usize> objective = std::nullopt) const override final; /* {
     const auto& ql = lhs.as<MOQuality>();
     const auto& qr = rhs.as<MOQuality>();
     // Constraints are always minimized
@@ -130,10 +130,11 @@ class MOFitness : public ArchiveFitnessBase {
     }
     return o;
   };
+  */
 
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
-                 std::optional<usize> objective = std::nullopt) const override final {
+                 std::optional<usize> objective = std::nullopt) const override final; /*{
     const auto& ql = lhs.as<MOQuality>();
     const auto& qr = rhs.as<MOQuality>();
     CType dist;
@@ -144,6 +145,7 @@ class MOFitness : public ArchiveFitnessBase {
     }
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
+  */
 
   virtual std::unique_ptr<QualityBase> worst() const override {
     const CType inf = std::numeric_limits<CType>().infinity();

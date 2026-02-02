@@ -240,10 +240,6 @@ inline std::ostream& operator<<(std::ostream& os, Ordering o) {
 
 namespace goblin {
 
-// TODO make quality virtual to allow arbitrary quality types?
-// -> but then pointers are needed for everything and fitness types should downcast to their fitness type...
-// -> performance issue?
-
 /// Something that describes how good a solution is
 class QualityBase {
  public:
@@ -251,6 +247,10 @@ class QualityBase {
 
   virtual ~QualityBase() = default;
 
+  template <typename T>
+  bool is() const {
+      return dynamic_cast<const T*>(this) != nullptr;
+  }
   template <typename T>
   const T& as() const {
 #ifndef NDEBUG
@@ -336,7 +336,7 @@ class MOFitness : public ArchiveFitnessBase {
 
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
-               std::optional<usize> objective = std::nullopt) const override final {
+               std::optional<usize> objective = std::nullopt) const override final; /* {
     const auto& ql = lhs.as<MOQuality>();
     const auto& qr = rhs.as<MOQuality>();
     // Constraints are always minimized
@@ -353,10 +353,11 @@ class MOFitness : public ArchiveFitnessBase {
     }
     return o;
   };
+  */
 
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
-                 std::optional<usize> objective = std::nullopt) const override final {
+                 std::optional<usize> objective = std::nullopt) const override final; /*{
     const auto& ql = lhs.as<MOQuality>();
     const auto& qr = rhs.as<MOQuality>();
     CType dist;
@@ -367,6 +368,7 @@ class MOFitness : public ArchiveFitnessBase {
     }
     return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
   };
+  */
 
   virtual std::unique_ptr<QualityBase> worst() const override {
     const CType inf = std::numeric_limits<CType>().infinity();
@@ -412,22 +414,15 @@ class MOFitness : public ArchiveFitnessBase {
 #endif /* _GOBLIN_LIB_FITNESS_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/lib/solution.h included by goblin.h                                             //
+//                       goblin/lib/subset.h included by goblin.h                                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_LIB_SOLUTION_H
-#define _GOBLIN_LIB_SOLUTION_H
+#ifndef _GOBLIN_LIB_SUBSET_H
+#define _GOBLIN_LIB_SUBSET_H
 
 #include <cstdlib>
 #include <functional>
 
 
-
-// Note the separate solution exists to hide the data ownership
-// - without it, for operations using separate arenas like
-// e.g. GOM with a donor from an archive the arena would have to be handled
-// explicitly, but that is an implementation detail GOMEA shouldn't have to know
-// about. And for other representations such as a vector of solution structs,
-// this is also nicer.
 
 namespace goblin {
 
@@ -541,15 +536,27 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
-/* imported from another header
-class QualityBase {
- public:
+}
 
- virtual std::unique_ptr<QualityBase> clone() const = 0;
+#endif /* _GOBLIN_LIB_SUBSET_H */
 
- virtual ~QualityBase() = default;
-};
- */
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/lib/solution.h included by goblin.h                                             //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_LIB_SOLUTION_H
+#define _GOBLIN_LIB_SOLUTION_H
+
+
+
+
+// Note the separate solution exists to hide the data ownership
+// - without it, for operations using separate arenas like
+// e.g. GOM with a donor from an archive the arena would have to be handled
+// explicitly, but that is an implementation detail GOMEA shouldn't have to know
+// about. And for other representations such as a vector of solution structs,
+// this is also nicer.
+
+namespace goblin {
 
 struct SolutionExtensionKey {
   void* token = nullptr;
@@ -667,27 +674,7 @@ class SolutionBase {
   virtual RefS<Active> continuous_active() = 0;
   virtual CRefS<Active> continuous_active() const = 0;
 
-  SolutionBase& operator=(const SolutionBase& other) {
-    if (&other != this) {
-      __goblin_runtime_assert(other.num_discrete() == num_discrete());
-      __goblin_runtime_assert(other.num_continuous() == num_continuous());
-
-      discrete_values() = other.discrete_values();
-      discrete_active() = other.discrete_active();
-
-      continuous_values() = other.continuous_values();
-      continuous_active() = other.continuous_active();
-
-      clear_extensions();
-      for (const auto& e : other.extensions()) {
-        get_or_insert_extension(e);
-      }
-
-      assign_quality(other.quality());
-    }
-
-    return *this;
-  };
+  SolutionBase& operator=(const SolutionBase& other);
 
   virtual ~SolutionBase() {};
 };
@@ -1298,62 +1285,12 @@ class UnboundedArchive : public ArchiveBase {
     _solutions.clear();
   };
 
-  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final {
-    std::vector<usize> sorted_dominations;
-    auto [is_so_elite, is_dominated] = update_so_solutions(solution);
-    if (is_dominated) {
-      return std::make_tuple(false, false);
-    }
-    for (usize i = 0; i < _solutions.size(); i++) {
-      auto o = fitness().cmp(solution.quality(), _solutions[i].quality(), std::nullopt);
-      if (o == Ordering::Better) {
-        sorted_dominations.push_back(i);
-      } else if (o == Ordering::Worse) {
-        return std::make_tuple(false, false);
-      } else if (o == Ordering::Equal) {
-        // TODO only accept if not in the set already
-        return std::make_tuple(!strict, false);
-      }
-    }
-
-    if (!sorted_dominations.empty()) {
-      //   std::span<usize> si(sorted_dominations.data(),
-      //   sorted_dominations.size());
-      // _solutions.remove_indices_sorted(si); //sorted_dominations);
-      for (usize i = sorted_dominations.size(); i > 0; i--) {
-        _solutions.remove_at(sorted_dominations[i - 1]);
-      }
-    }
-
-    _solutions.add(solution);
-
-    return std::make_tuple(true, true);
-  };
-
+  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final;
   const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
   // is_so_elite, is_dominated
-  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution) {
-    if (_so_solutions.empty()) {
-      _so_solutions.reserve(fitness().num_objectives());
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        _so_solutions.add(solution);
-      }
-      return std::make_tuple(true, false);
-    } else {
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        if (fitness().cmp(solution.quality(), _so_solutions[obj].quality(), obj) == Ordering::Better) {
-          _so_solutions[obj] = solution;
-          return std::make_tuple(true, false);
-        }
-        if (fitness().cmp(solution.quality(), _so_solutions[obj].quality(), std::nullopt) == Ordering::Worse) {
-          return std::make_tuple(false, true);
-        }
-      }
-      return std::make_tuple(false, false);
-    }
-  };
+  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution);
 
   DefaultSolutionSet _so_solutions;
   DefaultSolutionSet _solutions;
@@ -1394,184 +1331,15 @@ class AdaptiveGridArchive : public ArchiveBase {
 
   const SolutionBase& so_solution(usize objective) const override final { return _so_solutions[objective]; };
 
-  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final {
-    std::vector<usize> sorted_dominations;
-    bool so_elite = update_so_solutions(solution);
-    for (usize i = 0; i < _solutions.size(); i++) {
-      auto o = _fitness.cmp(solution.quality(), _solutions[i].quality(), std::nullopt);
-      if (o == Ordering::Better) {
-        sorted_dominations.push_back(i);
-      } else if (o == Ordering::Worse) {
-        return std::make_tuple(false, false);
-      } else if (o == Ordering::Equal || same_box(solution, _solutions[i])) {
-        // same or non-dominated and same box
+  std::tuple<bool, bool> update_archive(const SolutionBase& solution, bool strict) override final;
 
-        if (so_elite || !sorted_dominations.empty()) {
-          // both cases are non-standard
-          // - we always keep so elite improvements, even if in the same box as
-          // some other solution
-          // - if the box is occupied but the new solution already dominates
-          // another we keep the new one
-          sorted_dominations.push_back(i);
-        } else {
-          bool replace = false;
-
-          // if discrete: check if diversity in parameter space is added
-          if (solution.num_discrete() > 0) {
-            usize max_dist = std::numeric_limits<usize>::max();
-            usize max_other_dist = std::numeric_limits<usize>::max();
-            usize dist, other_dist;
-            for (usize j = 0; j < _solutions.size(); j++) {
-              if (j == i)
-                continue;
-              dist = 0;
-              other_dist = 0;
-              for (usize k = 0; k < solution.num_discrete(); k++) {
-                if (solution.discrete_active()[k] &&
-                    solution.discrete_values()[k] != _solutions[j].discrete_values()[k]) {
-                  dist++;
-                }
-                if (_solutions[i].discrete_active()[k] &&
-                    _solutions[i].discrete_values()[k] != _solutions[j].discrete_values()[k]) {
-                  other_dist++;
-                }
-              }
-              if (dist < max_dist) {
-                max_dist = dist;
-              }
-              if (other_dist < max_other_dist) {
-                max_other_dist = dist;
-              }
-            }
-            if (max_dist > max_other_dist) {
-              replace = true;
-            }
-          }
-
-          if (replace) {
-            sorted_dominations.push_back(i);
-          } else {
-            return std::make_tuple(!strict, false);
-          }
-        }
-      }
-    }
-
-    if (!sorted_dominations.empty()) {
-      // _solutions.remove_sorted_indices(sorted_dominations);
-      for (usize i = sorted_dominations.size(); i > 0; i--) {
-        _solutions.remove_at(sorted_dominations[i - 1]);
-      }
-    }
-
-    _solutions.add(solution);
-
-    return std::make_tuple(true, true);
-  };
-
-  void adapt() override final {
-    if (size() > _c_max && _max_iterations > 0) {
-      // get the maximum finite distance to the best so solution for each
-      // objective
-      std::vector<CType> max_objective_dist(_fitness.num_objectives(), 0.0);
-      for (usize i = 0; i < _solutions.size(); i++) {
-        for (usize obj = 0; obj < _fitness.num_objectives(); obj++) {
-          auto d = _fitness.distance(_so_solutions[obj].quality(), _solutions[i].quality(), obj);
-          if (!isna(d) && d > max_objective_dist[obj]) {
-            max_objective_dist[obj] = d;
-          }
-        }
-      }
-
-      DefaultSolutionSet backup = _solutions;
-      usize cc = _change_count;
-
-      CType low = 1.0;
-      CType high = _max_resolution;
-      CType prev = 0.0;
-
-      if (_discretization.empty()) {
-        _discretization.resize(_fitness.num_objectives(), 0.0);
-      }
-
-      for (usize i = 0; i < _max_iterations; i++) {
-        CType mid = 0.5 * (low + high);
-
-        if (prev > 0 && prev == mid)
-          break;
-        prev = mid;
-
-        for (usize obj = 0; obj < _fitness.num_objectives(); obj++) {
-          _discretization[obj] = max_objective_dist[obj] / mid;
-          // shouldn't matter - we don't divide by it and semantically it just
-          // means "not identical" is a different box assert(discretization[obj]
-          // > 0.0);
-        }
-
-        // clear the archive and add everything back with the new discretization
-        _solutions.clear();
-        for (usize obj = 0; obj < _fitness.num_objectives(); obj++) {
-          update(_so_solutions[obj], true);
-        }
-        for (usize j = 0; j < backup.size(); j++) {
-          update(backup[j], true);
-        }
-
-        if (_solutions.size() < _c_min) {
-          low = mid;
-        } else if (_solutions.size() == _c_min) {
-          break;
-        } else {
-          high = mid;
-        }
-      }
-
-      // change count should not be affected by re-discretizing
-      _change_count = cc;
-    }
-  };
+  void adapt() override final;
 
   const ArchiveFitnessBase& fitness() const override final { return _fitness; };
 
  private:
-  bool same_box(const SolutionBase& lhs, const SolutionBase& rhs) {
-    if (_discretization.empty() && _initial_discretization.has_value()) {
-      _discretization.resize(_fitness.num_objectives(), _initial_discretization.value());
-    }
-    if (!_discretization.empty()) {
-      __goblin_runtime_assert(_discretization.size() == _fitness.num_objectives());
-      for (usize obj = 0; obj < _fitness.num_objectives(); obj++) {
-        // The original code uses floor(f1 / discretization) == floor(f2 /
-        // discretization), but since I only have relative comparisons, this is
-        // as close as it gets and semantically almost the same. Conceptually,
-        // the original code uses an infinite grid and here the grid cells are
-        // centered around each solution
-        if (_fitness.distance(lhs.quality(), rhs.quality(), obj) > _discretization[obj]) {
-          return false;
-        }
-      }
-      return true;
-    }
-    return false;
-  };
-
-  bool update_so_solutions(const SolutionBase& solution) {
-    if (_so_solutions.empty()) {
-      _so_solutions.reserve(fitness().num_objectives());
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        _so_solutions.add(solution);
-      }
-      return true;
-    } else {
-      for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
-        if (fitness().cmp(solution.quality(), _so_solutions[obj].quality(), obj) == Ordering::Better) {
-          _so_solutions[obj] = solution;
-          return true;
-        }
-      }
-    }
-    return false;
-  };
+  bool same_box(const SolutionBase& lhs, const SolutionBase& rhs);
+  bool update_so_solutions(const SolutionBase& solution);
 
   const ArchiveFitnessBase& _fitness;
   [[maybe_unused]] usize _capacity;
@@ -1841,472 +1609,6 @@ class InstanceBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_INSTANCE_H */
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/lib/linkage.h included by goblin.h                                              //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_LIB_LINKAGE_H
-#define _GOBLIN_LIB_LINKAGE_H
-
-
-
-namespace goblin {
-enum class VariableSet : u8 { Discrete = 0b01, Continuous = 0b10, Mixed = 0b11 };
-
-inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
-  return static_cast<bool>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
-};
-
-// TODO this method does way too much, but where else to put all of the
-// modifications of the frequency counts for the entropy?
-// - problem shouldn't have to know about the intron related entropy
-// modifications
-// - continuous stuff interacts with the introns...
-// => current tradeoff is having the problem provide info about discrete
-// values that actually correspond to a continuous value...
-inline Mat<CType> estimate_entropy2(const InstanceBase& problem,
-                                    const SolutionSetBase& solutions,
-                                    const std::span<const usize> indices,
-                                    const std::span<const usize> subset,
-                                    const std::string& intron_strategy,
-                                    bool merge_continuous,
-                                    std::optional<usize> num_continuous_bins) {
-  __goblin_runtime_assert(subset.size() > 0);
-
-  auto& domain_sizes = problem.discrete_domain_sizes();
-
-  usize max_value_count = 0;  // number of different discrete values to consider at most
-
-  bool intron_aware = intron_strategy != "none";
-  bool is_all_active = intron_strategy == "all_active";
-  bool is_any_active = intron_strategy == "any_active";
-  // bool is_mark_only = intron_strategy == "mark_only";
-
-  // add one more discrete value for introns
-  const usize intron_idx = max_value_count;
-  if (intron_aware) {
-    max_value_count++;
-  }
-
-  // add more discrete values for continous values considered
-  const usize first_continuous_idx = max_value_count;
-  std::vector<CType> continuous_bin_values_sorted;
-  auto insertion_idx = [&](CType v) -> usize {
-    auto lower = std::lower_bound(continuous_bin_values_sorted.begin(), continuous_bin_values_sorted.end(), v);
-    return lower != continuous_bin_values_sorted.end() ? std::distance(continuous_bin_values_sorted.begin(), lower)
-                                                       : continuous_bin_values_sorted.size();
-  };
-  if (merge_continuous) {
-    __goblin_runtime_assert(!num_continuous_bins.has_value());  // cannot merge and differentiate
-                                                                // continuous values...
-    max_value_count++;
-    // would be `is-const` in the terms of
-    // https://arxiv.org/pdf/1904.02050#section.6
-    // - all constants are considered to be the same value
-    // => ask `should this be continuous?` instead of
-    //    `what should the value be if it is continuous?`
-  } else if (problem.num_continuous() > 0 && num_continuous_bins.has_value() && num_continuous_bins.value() > 0) {
-    continuous_bin_values_sorted.reserve(num_continuous_bins.value());
-    // https://arxiv.org/pdf/1904.02050#section.6
-
-    usize i = 0, j = 0, _i, _j;
-    while (i < indices.size() && continuous_bin_values_sorted.size() < num_continuous_bins.value()) {
-      _i = i;
-      _j = j;
-      j++;
-      if (j >= subset.size()) {
-        j = 0;
-        i++;
-      }
-
-      // not actively used
-      if (intron_aware && !solutions[indices[_i]].discrete_active()(subset[_j])) {
-        continue;
-      }
-      auto v = problem.as_continuous(solutions[indices[_i]], subset[_j]);
-      // not a continuous value
-      if (!v.has_value()) {
-        continue;
-      }
-
-      CType new_active_value = v.value();
-
-      usize idx = insertion_idx(new_active_value);
-
-      // already seen before
-      if (idx < continuous_bin_values_sorted.size() && continuous_bin_values_sorted[idx] == new_active_value) {
-        continue;
-      }
-
-      // TODO insertion sort probably is faster?
-      // extend, shift values + insert at sorted position
-      continuous_bin_values_sorted.push_back(new_active_value);
-      std::shift_right(continuous_bin_values_sorted.begin() + idx, continuous_bin_values_sorted.end(), 1);
-      continuous_bin_values_sorted[idx] = new_active_value;
-    }
-
-    // IDEA: merge values that are "very close" here - no need to have multiple
-    // bins for the same semantic value
-
-    max_value_count += continuous_bin_values_sorted.size();
-  }
-
-  usize offset = max_value_count;
-  max_value_count += domain_sizes(subset).maxCoeff();
-
-  Mat<usize> counts(max_value_count, max_value_count);
-
-  auto entropy = [&](usize lhs, usize rhs) -> CType {
-    bool is_univariate = lhs == rhs;
-
-    // TODO update illustration, the order is reversed now
-    // counts is used as illustrated here:
-    // https://excalidraw.com/#json=-hFhq_364YL6anYCqyyAk,c5_JKnQ7yLwB4oTf3SZUtA
-    if (is_univariate) {
-      counts(Eigen::seqN(0, offset + domain_sizes(lhs)), 0).setZero();
-    } else {
-      counts(Eigen::seqN(0, offset + domain_sizes(lhs)), Eigen::seqN(0, offset + domain_sizes(rhs))).setZero();
-    }
-    // 0
-    for (usize i : indices) {
-      usize lhs_idx = offset + solutions[i].discrete_values()(lhs);
-
-      if (intron_aware && !solutions[i].discrete_active()(lhs)) {
-        lhs_idx = intron_idx;
-      } else if (merge_continuous || num_continuous_bins.has_value()) {
-        auto v = problem.as_continuous(solutions[i], lhs);
-        if (v.has_value()) {
-          if (merge_continuous) {
-            lhs_idx = first_continuous_idx;
-          } else {
-            // index of closest bin
-            lhs_idx =
-                first_continuous_idx + std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
-          }
-        }
-      }
-
-      usize rhs_idx = offset + solutions[i].discrete_values()(rhs);
-      if (is_univariate) {
-        rhs_idx = 0;  // use only the first column if univariate
-      } else if (intron_aware && !solutions[i].discrete_active()(rhs)) {
-        rhs_idx = intron_idx;
-      } else if (merge_continuous || num_continuous_bins.has_value()) {
-        auto v = problem.as_continuous(solutions[i], rhs);
-        if (v.has_value()) {
-          if (merge_continuous) {
-            rhs_idx = first_continuous_idx;
-          } else {
-            // index of closest bin
-            rhs_idx =
-                first_continuous_idx + std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
-          }
-        }
-      }
-
-      // 1
-
-      counts(lhs_idx, rhs_idx) += 1;
-    }
-
-    // TODO for both the following total count + entropy accumulation, there is
-    // no need anymore to have the if branches nested in the loops instead 1.
-    // skip increasing the count for introns not considered (// 1) and 2. keep
-    // track of the total (//0) Then the final loop can just first elementwise
-    // compute the contributions and then sum them up... -> less branching +
-    // Eigen vectorization
-
-    /// - none: Ignore introns
-    /// - any_active: Introns are marked as such to remove random noise and only
-    /// variable pairs with at least one active variable are considered
-    /// - all_active: Only variable pairs where both variables are active are
-    /// considered
-    /// - mark_only: Introns are marked as such to reduce noise, but pairs
-    /// consisting of only introns are still considered
-    CType total_count = static_cast<CType>(indices.size());
-    if (is_any_active) {
-      total_count -= static_cast<CType>(is_univariate ? counts(intron_idx, 0) : counts(intron_idx, intron_idx));
-    } else if (is_all_active) {
-      if (!is_univariate) {
-        total_count -= counts(intron_idx, Eigen::placeholders::all).sum();
-        total_count -= counts(Eigen::placeholders::all, intron_idx).sum();
-        // The "both are introns" count was removed twice, so we need to add it back once
-        total_count += counts(intron_idx, intron_idx);
-      } else {
-        total_count -= counts(intron_idx, 0);
-      }
-    }
-
-    // at least two different values are needed or entropy will be 0.0 anyway
-    if (total_count < CType(2.0)) {
-      return 0.0;
-    }
-
-    CType e = CType(0.0), p;
-    usize r_max = is_univariate ? 1 : (offset + domain_sizes(rhs));
-    for (usize r = 0; r < r_max; r++) {
-      for (usize l = 0; l < offset + domain_sizes(lhs); l++) {
-        if (counts(l, r) > 0) {
-          if (intron_aware &&
-              (l == intron_idx || (r == intron_idx && !is_univariate))  // we have an intron to account for
-              && (is_all_active || (is_any_active && l == r))) {
-            continue;
-          }
-
-          p = counts(l, r) / total_count;
-          e += -p * std::log2(p);
-        }
-      }
-    }
-
-    return std::max(e, CType(0.0));
-  };
-
-  Mat<CType> H(subset.size(), subset.size());
-  for (usize i = 0; i < subset.size(); i++) {
-    H(i, i) = entropy(subset[i], subset[i]);
-    for (usize j = 0; j < i; j++) {
-      H(i, j) = entropy(subset[i], subset[j]);
-      H(j, i) = H(i, j);
-    }
-  }
-
-  return H;
-};
-
-// TODO since the enum and implementation are only used in the wrapped function, move all of this code into a .cpp file
-// (fine, since the template is only used here)
-enum class DiscreteIntronStrategy : u8 { None, AnyActive, AllActive, MarkOnly, WeightedAnyActive };
-// TODO potentially try first allocating a matrix with the actual values and then doing a branch free reduction based on
-// that... O(indices * subset.size())
-template <DiscreteIntronStrategy intron_strategy>
-inline Mat<CType> estimate_entropy_impl(const InstanceBase& problem,
-                                        const SolutionSetBase& solutions,
-                                        const std::span<const usize> indices,
-                                        const std::span<const usize> subset,
-                                        bool merge_continuous,
-                                        std::optional<usize> num_continuous_bins) {
-  __goblin_runtime_assert(subset.size() > 0);
-
-  auto& domain_sizes = problem.discrete_domain_sizes();
-
-  usize max_value_count = 0;  // number of different discrete values to consider at most
-
-  // add one more discrete value for introns
-  const usize intron_idx = max_value_count;
-  if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-    max_value_count++;
-  }
-
-  // add more discrete values for continous values considered
-  const usize first_continuous_idx = max_value_count;
-  std::vector<CType> continuous_bin_values_sorted;
-  auto insertion_idx = [&](CType v) -> usize {
-    auto lower = std::lower_bound(continuous_bin_values_sorted.begin(), continuous_bin_values_sorted.end(), v);
-    return lower != continuous_bin_values_sorted.end() ? std::distance(continuous_bin_values_sorted.begin(), lower)
-                                                       : continuous_bin_values_sorted.size();
-  };
-
-  bool specialize_continuous = false;
-  if (problem.num_continuous() > 0) {
-    if (merge_continuous) {
-      __goblin_runtime_assert(!num_continuous_bins.has_value());  // cannot merge and differentiate
-                                                                  // continuous values...
-      max_value_count++;
-      specialize_continuous = true;
-      // would be `is-const` in the terms of
-      // https://arxiv.org/pdf/1904.02050#section.6
-      // - all constants are considered to be the same value
-      // => ask `should this be continuous?` instead of
-      //    `what should the value be if it is continuous?`
-    } else if (num_continuous_bins.has_value() && num_continuous_bins.value() > 0) {
-      specialize_continuous = true;
-      continuous_bin_values_sorted.reserve(num_continuous_bins.value());
-      // https://arxiv.org/pdf/1904.02050#section.6
-
-      usize i = 0, j = 0, _i, _j;
-      while (i < indices.size() && continuous_bin_values_sorted.size() < num_continuous_bins.value()) {
-        _i = i;
-        _j = j;
-        j++;
-        if (j >= subset.size()) {
-          j = 0;
-          i++;
-        }
-
-        // not actively used
-        if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-          if (!solutions[indices[_i]].discrete_active()(subset[_j])) {
-            continue;
-          }
-        }
-
-        auto v = problem.as_continuous(solutions[indices[_i]], subset[_j]);
-        // not a continuous value
-        if (!v.has_value()) {
-          continue;
-        }
-
-        CType new_active_value = v.value();
-
-        usize idx = insertion_idx(new_active_value);
-
-        // already seen before
-        if (idx < continuous_bin_values_sorted.size() && continuous_bin_values_sorted[idx] == new_active_value) {
-          continue;
-        }
-
-        // TODO insertion sort probably is faster?
-        // extend, shift values + insert at sorted position
-        continuous_bin_values_sorted.push_back(new_active_value);
-        std::shift_right(continuous_bin_values_sorted.begin() + idx, continuous_bin_values_sorted.end(), 1);
-        continuous_bin_values_sorted[idx] = new_active_value;
-      }
-
-      // IDEA: merge values that are "very close" here - no need to have multiple
-      // bins for the same semantic value
-
-      max_value_count += continuous_bin_values_sorted.size();
-    }
-  }
-
-  usize offset = max_value_count;
-  max_value_count += domain_sizes(subset).maxCoeff();
-
-  // loop over all solutions and indices and prepare the value (is read multiple times, and lots of expensive branching
-  // inside of the loop...)
-  std::optional<CType> v;
-  Eigen::Matrix<usize, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor> mapped_values(indices.size(), subset.size());
-  for (usize i = 0; i < indices.size(); i++) {
-    for (usize j = 0, s_j; j < subset.size(); j++) {
-      s_j = subset[j];
-      if constexpr (intron_strategy != DiscreteIntronStrategy::None) {
-        if (!solutions[indices[i]].discrete_active()(s_j)) {
-          mapped_values(i, j) = intron_idx;
-          continue;
-        }
-      }
-
-      v = specialize_continuous ? problem.as_continuous(solutions[indices[i]], s_j) : std::nullopt;
-      if (v.has_value()) {
-        if (merge_continuous) {
-          mapped_values(i, j) = first_continuous_idx;
-        } else {
-          // index of closest bin
-          mapped_values(i, j) =
-              first_continuous_idx + std::min(insertion_idx(v.value()), continuous_bin_values_sorted.size() - 1);
-        }
-      } else {
-        mapped_values(i, j) = offset + solutions[indices[i]].discrete_values()(s_j);
-      }
-    }
-  }
-
-  Mat<usize> counts(max_value_count, max_value_count);
-  Mat<CType> H(subset.size(), subset.size());
-  for (usize lhs = 0; lhs < subset.size(); lhs++) {
-    usize total = 0;
-    counts.col(0).setZero();
-    for (usize i = 0; i < indices.size(); i++) {
-      if constexpr (intron_strategy == DiscreteIntronStrategy::AnyActive ||
-                    intron_strategy == DiscreteIntronStrategy::WeightedAnyActive ||
-                    intron_strategy == DiscreteIntronStrategy::AllActive) {
-        if (mapped_values(i, lhs) == intron_idx) {
-          continue;
-        }
-      }
-      total++;
-      counts(mapped_values(i, lhs), 0)++;
-    }
-
-    // turn (adjusted) frequency counts into entropy
-    if (total > 1) {
-      CType e = 0.0, p;
-      for (usize i = 0; i < max_value_count; i++) {
-        if (counts(i, 0) > 0) {
-          p = static_cast<CType>(counts(i, 0)) / static_cast<CType>(total);
-          e += -p * std::log2(p);
-        }
-      }
-      if constexpr (intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
-        e *= static_cast<CType>(total) / static_cast<CType>(indices.size());
-      }
-      H(lhs, lhs) = e > 0.0 ? e : 0.0;
-    } else {
-      H(lhs, lhs) = 0.0;
-    }
-
-    for (usize rhs = 0; rhs < lhs; rhs++) {
-      total = 0;
-      counts.setZero();
-
-      for (usize i = 0; i < indices.size(); i++) {
-        if constexpr (intron_strategy == DiscreteIntronStrategy::AnyActive ||
-                      intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
-          if (mapped_values(i, lhs) == intron_idx && mapped_values(i, rhs) == intron_idx) {
-            continue;
-          }
-        }
-        if constexpr (intron_strategy == DiscreteIntronStrategy::AllActive) {
-          if (mapped_values(i, lhs) == intron_idx || mapped_values(i, rhs) == intron_idx) {
-            continue;
-          }
-        }
-        total++;
-        counts(mapped_values(i, lhs), mapped_values(i, rhs))++;
-      }
-
-      // turn (adjusted) frequency counts into entropy
-      if (total > 1) {
-        CType e = 0.0, p;
-        for (isize i = 0; i < counts.size(); i++) {
-          if (counts(i) > 0) {
-            p = static_cast<CType>(counts(i)) / static_cast<CType>(total);
-            e += -p * std::log2(p);
-          }
-        }
-        if constexpr (intron_strategy == DiscreteIntronStrategy::WeightedAnyActive) {
-          e *= static_cast<CType>(total) / static_cast<CType>(indices.size());
-        }
-        H(lhs, rhs) = e > 0.0 ? e : 0.0;
-      } else {
-        H(lhs, rhs) = 0.0;
-      }
-      H(rhs, lhs) = H(lhs, rhs);
-    }
-  }
-
-  return H;
-};
-inline Mat<CType> estimate_entropy(const InstanceBase& problem,
-                                   const SolutionSetBase& solutions,
-                                   const std::span<const usize> indices,
-                                   const std::span<const usize> subset,
-                                   const std::string& intron_strategy,
-                                   bool merge_continuous,
-                                   std::optional<usize> num_continuous_bins) {
-  if (intron_strategy == "any_active") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::AnyActive>(problem, solutions, indices, subset,
-                                                                    merge_continuous, num_continuous_bins);
-  } else if (intron_strategy == "weighted_any_active") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::WeightedAnyActive>(problem, solutions, indices, subset,
-                                                                            merge_continuous, num_continuous_bins);
-  } else if (intron_strategy == "none") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::None>(problem, solutions, indices, subset, merge_continuous,
-                                                               num_continuous_bins);
-  } else if (intron_strategy == "mark_only") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::MarkOnly>(problem, solutions, indices, subset,
-                                                                   merge_continuous, num_continuous_bins);
-  } else if (intron_strategy == "all_active") {
-    return estimate_entropy_impl<DiscreteIntronStrategy::AllActive>(problem, solutions, indices, subset,
-                                                                    merge_continuous, num_continuous_bins);
-  } else {
-    throw std::runtime_error("Unknown intron strategy.");
-  }
-}
-};  // namespace goblin
-
-#endif /* _GOBLIN_LIB_LINKAGE_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/lib/algorithms/upgma.h included by goblin.h                                     //
@@ -2652,6 +1954,20 @@ inline std::tuple<std::vector<usize>, std::vector<std::set<usize>>> non_dominate
 
 
 namespace goblin {
+enum class VariableSet : u8 { Discrete = 0b01, Continuous = 0b10, Mixed = 0b11 };
+
+inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
+  return static_cast<bool>(static_cast<u8>(lhs) & static_cast<u8>(rhs));
+};
+
+Mat<CType> estimate_entropy(const InstanceBase& problem,
+                                   const SolutionSetBase& solutions,
+                                   const std::span<const usize> indices,
+                                   const std::span<const usize> subset,
+                                   const std::string& intron_strategy,
+                                   bool merge_continuous,
+                                   std::optional<usize> num_continuous_bins);
+
 class LinkageModelBase {
  public:
   // LinkageModelBase() = default;
