@@ -29,12 +29,12 @@ inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
 };
 
 Mat<CType> estimate_entropy(const InstanceBase& problem,
-                                   const SolutionSetBase& solutions,
-                                   const std::span<const usize> indices,
-                                   const std::span<const usize> subset,
-                                   const std::string& intron_strategy,
-                                   bool merge_continuous,
-                                   std::optional<usize> num_continuous_bins);
+                            const SolutionSetBase& solutions,
+                            const std::span<const usize> indices,
+                            const std::span<const usize> subset,
+                            const std::string& intron_strategy,
+                            bool merge_continuous,
+                            std::optional<usize> num_continuous_bins);
 
 class LinkageModelBase {
  public:

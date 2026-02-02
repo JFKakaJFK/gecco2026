@@ -61,7 +61,7 @@ class ArchiveBase {
   bool dominates(const SolutionBase& solution, bool strict) const;
   bool covers(const ArchiveBase& other) const;
 
-  inline const SolutionBase& random_solution(Rng& rng) const  {
+  inline const SolutionBase& random_solution(Rng& rng) const {
     __goblin_runtime_assert(!empty());
     return operator[](std::uniform_int_distribution<usize>(0, size() - 1)(rng));
   };

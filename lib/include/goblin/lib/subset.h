@@ -134,6 +134,6 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_LIB_SUBSET_H */

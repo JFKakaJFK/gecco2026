@@ -24,5 +24,4 @@ SolutionBase& SolutionBase::operator=(const SolutionBase& other) {
   return *this;
 };
 
-
-};
+};  // namespace goblin

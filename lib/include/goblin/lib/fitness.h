@@ -26,7 +26,7 @@ class QualityBase {
 
   template <typename T>
   bool is() const {
-      return dynamic_cast<const T*>(this) != nullptr;
+    return dynamic_cast<const T*>(this) != nullptr;
   }
   template <typename T>
   const T& as() const {

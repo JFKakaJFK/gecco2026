@@ -34,7 +34,7 @@ std::tuple<bool, bool> UnboundedArchive::update_archive(const SolutionBase& solu
   return std::make_tuple(true, true);
 };
 
-std::tuple<bool, bool> UnboundedArchive::update_so_solutions(const SolutionBase& solution){
+std::tuple<bool, bool> UnboundedArchive::update_so_solutions(const SolutionBase& solution) {
   if (_so_solutions.empty()) {
     _so_solutions.reserve(fitness().num_objectives());
     for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
@@ -54,4 +54,4 @@ std::tuple<bool, bool> UnboundedArchive::update_so_solutions(const SolutionBase&
     return std::make_tuple(false, false);
   }
 };
-};
+};  // namespace goblin

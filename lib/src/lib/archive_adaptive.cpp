@@ -77,7 +77,6 @@ std::tuple<bool, bool> AdaptiveGridArchive::update_archive(const SolutionBase& s
   return std::make_tuple(true, true);
 };
 
-
 void AdaptiveGridArchive::adapt() {
   if (size() > _c_max && _max_iterations > 0) {
     // get the maximum finite distance to the best so solution for each
@@ -179,6 +178,4 @@ bool AdaptiveGridArchive::update_so_solutions(const SolutionBase& solution) {
   return false;
 };
 
-
-
-};
+};  // namespace goblin

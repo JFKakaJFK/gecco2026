@@ -249,7 +249,7 @@ class QualityBase {
 
   template <typename T>
   bool is() const {
-      return dynamic_cast<const T*>(this) != nullptr;
+    return dynamic_cast<const T*>(this) != nullptr;
   }
   template <typename T>
   const T& as() const {
@@ -536,7 +536,7 @@ inline bool operator!=(const Subset& lhs, const Subset& rhs) {
 
 using FOS = std::vector<Subset>;
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_LIB_SUBSET_H */
 
@@ -1251,7 +1251,7 @@ class ArchiveBase {
   bool dominates(const SolutionBase& solution, bool strict) const;
   bool covers(const ArchiveBase& other) const;
 
-  inline const SolutionBase& random_solution(Rng& rng) const  {
+  inline const SolutionBase& random_solution(Rng& rng) const {
     __goblin_runtime_assert(!empty());
     return operator[](std::uniform_int_distribution<usize>(0, size() - 1)(rng));
   };
@@ -1961,12 +1961,12 @@ inline constexpr bool operator&(VariableSet lhs, VariableSet rhs) noexcept {
 };
 
 Mat<CType> estimate_entropy(const InstanceBase& problem,
-                                   const SolutionSetBase& solutions,
-                                   const std::span<const usize> indices,
-                                   const std::span<const usize> subset,
-                                   const std::string& intron_strategy,
-                                   bool merge_continuous,
-                                   std::optional<usize> num_continuous_bins);
+                            const SolutionSetBase& solutions,
+                            const std::span<const usize> indices,
+                            const std::span<const usize> subset,
+                            const std::string& intron_strategy,
+                            bool merge_continuous,
+                            std::optional<usize> num_continuous_bins);
 
 class LinkageModelBase {
  public:
