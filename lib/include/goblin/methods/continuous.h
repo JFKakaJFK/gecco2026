@@ -755,7 +755,7 @@ class RvState {
       cluster_active(k) = enough_solutions;
 
       if (!cluster_active(k)) {
-        // std::println("CLUSTER {} INACTIVE", k);
+        std::println("CLUSTER {} INACTIVE", k);
         continue;
       }
 

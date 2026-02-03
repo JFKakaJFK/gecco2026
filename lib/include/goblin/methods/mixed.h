@@ -479,6 +479,7 @@ class Population {
       std::uniform_real_distribution<double> U(0.0, 1.0);
       bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
+          // std::println("LOOP");
         bool do_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
@@ -496,30 +497,42 @@ class Population {
           double p_discrete = 0.5 * actual_evaluation_balance / options.target_continuous_to_discrete_balance;
 
           do_discrete_step = U(rng) < p_discrete;
+
+          // std::println("p(RV) = {} ({}/{})", 1.0 - p_discrete, continuous_evaluations, discrete_evaluations);
         }
 
         u64 evals = 0;
         // we first do the continuous step - it might not do anything (not enough active variables or already
         // converged), so we still want to be able to do a discrete step instead
         if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+            // std::println("RV STEP");
           // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
           // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
           // solution_clusters, cluster_solutions);
           evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                               cluster_solutions);
           __assert_invariants();
+          if(evals < 1){
+              // std::println("RV STEP SKIPPED !!!!");
+          }
           evaluations += evals;
           continuous_evaluations += evals;
         }
 
         if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
+            // std::println("GP STEP");
           evals = discrete_gom_step(rng, subset_idx++);
           __assert_invariants();
           evaluations += evals;
           discrete_evaluations += evals;
+
+          if(evals < 1){
+              // std::println("GP STEP SKIPPED !!!!");
+          }
         }
 
         if (is_continuous && options.continuous_mutation_probability > 0.0) {
+            // std::println("MUT STEP");
           evaluations += continuous_mutation_step(rng);
           __assert_invariants();
         }
@@ -532,17 +545,21 @@ class Population {
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
+    // std::println(">>> GOM END - {} evals", evaluations);
+
     if (!fos_stats.empty()) {
       log_subset_statistics();
     }
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
+            // std::println("GRADIENT STEP");
       evaluations += gradient_step(rng);
       __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
+        // std::println("FI STEP");
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
       __assert_invariants();
 
@@ -571,6 +588,7 @@ class Population {
     no_evaluations_performed = evaluations == 0;
 
     generation++;
+    // std::println(">>> GEN END - {} evals", evaluations);
 
     return evaluations;
   };
@@ -586,7 +604,8 @@ class Population {
       }
     }
 
-    return no_improvement_stretch >= max_nis && no_evaluations_performed;
+    // std::println("converged? {} >= {} && {}", no_improvement_stretch, max_nis, no_evaluations_performed);
+    return no_improvement_stretch >= max_nis; // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {

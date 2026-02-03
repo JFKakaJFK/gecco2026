@@ -4,3 +4,4 @@ results/
 !datasets/*.csv
 *.pdf
 *peter*.png
+*.txt

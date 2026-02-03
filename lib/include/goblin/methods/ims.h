@@ -140,6 +140,7 @@ class IMS final : public MethodBase {
         running.push_back(true);
       } else if (!running[p_idx] && opts.restart_stale_populations &&
                  (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
+                     // std::println("[IMS]: Restarting population {}", p_idx);
         populations[p_idx].restart();
         generations[p_idx] = 0;
         generations_since_last_improvement[p_idx] = 0;
@@ -150,6 +151,11 @@ class IMS final : public MethodBase {
       generations[p_idx]++;  // this needs to always be increased, no matter if we do
                              // a step or not
       if (running[p_idx]) {
+        // TODO "update" fitness function (e.g. update mini_batch)
+        // if changed:
+        //   re-evaluate global archive
+        //   re-evaluate local archive
+
         archive->reset_change_count();
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;

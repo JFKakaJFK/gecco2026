@@ -1,3 +1,4 @@
+import numpy as np
 import pygom.gp as gp
 from pygom import AMaLGaM, BenchmarkInstance, Budget, Sphere
 from sklearn.datasets import load_diabetes
@@ -52,6 +53,21 @@ def rv_example():
     print("Target value reached:", sphere.target_reached(archive))
 
 
+def rv_custom_fitness():
+    def sphere(x: np.ndarray):
+        return np.sum(x**2), 0.0  # objective value, constraint value
+
+    alg = AMaLGaM()
+
+    # works, but only for AMaLGaM at this point
+    # will probably be adapted to be more similar to scipy.optimize at some point
+    x, objective_value, constraint_value = alg.run(
+        sphere, bounds=[(-1.0, 1.0) for _ in range(5)]
+    )
+    print(x, objective_value, constraint_value)
+
+
 if __name__ == "__main__":
     sr_example()
     rv_example()
+    # rv_custom_fitness()

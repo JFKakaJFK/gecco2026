@@ -14,6 +14,7 @@ dependencies = [
     "pandas>=1.1.5",
     "pmlb>=1.0.1.post3",
     "pygom",
+    "pyyaml>=6.0.3",
     "rliable>=1.2.0",
     "scikit-learn>=1.0.2",
     "scipy>=1.7.3",
