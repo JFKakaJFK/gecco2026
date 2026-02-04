@@ -506,7 +506,7 @@ namespace goblin {
 class InstanceBase_trampoline : public InstanceBase
 {
 public:
-    NB_TRAMPOLINE(InstanceBase, 21);
+    NB_TRAMPOLINE(InstanceBase, 23);
 
     usize num_objectives() const override
     {
@@ -578,6 +578,14 @@ public:
             "evaluate_partial", // function name (python)
             evaluate_partial, // function name (c++)
             rng, solutions, parents, subsets, indices // params
+        );
+    }
+    bool adapt(Rng & rng) override
+    {
+        NB_OVERRIDE_NAME(
+            "adapt", // function name (python)
+            adapt, // function name (c++)
+            rng // params
         );
     }
     Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
@@ -664,6 +672,212 @@ public:
             "log", // function name (python)
             log, // function name (c++)
             os, solution // params
+        );
+    }
+    CacheKey solution_cache_key(const goblin::SolutionBase & solution) const override
+    {
+        NB_OVERRIDE_NAME(
+            "solution_cache_key", // function name (python)
+            solution_cache_key, // function name (c++)
+            solution // params
+        );
+    }
+};
+}  // namespace goblin
+
+namespace goblin {
+// helper type to enable overriding virtual methods in python
+class CachedInstanceBase_trampoline : public CachedInstanceBase
+{
+public:
+    NB_TRAMPOLINE(CachedInstanceBase, 25);
+
+    usize hit_count() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "hit_count", // function name (python)
+            hit_count // function name (c++)
+        );
+    }
+    usize miss_count() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "miss_count", // function name (python)
+            miss_count // function name (c++)
+        );
+    }
+    usize num_objectives() const override
+    {
+        NB_OVERRIDE_NAME(
+            "num_objectives", // function name (python)
+            num_objectives // function name (c++)
+        );
+    }
+    usize num_discrete() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "num_discrete", // function name (python)
+            num_discrete // function name (c++)
+        );
+    }
+    CRef<Vec<DType>> discrete_domain_sizes() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "discrete_domain_sizes", // function name (python)
+            discrete_domain_sizes // function name (c++)
+        );
+    }
+    usize num_continuous() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "num_continuous", // function name (python)
+            num_continuous // function name (c++)
+        );
+    }
+    CRef<Vec<CType>> continuous_lower_bounds() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "continuous_lower_bounds", // function name (python)
+            continuous_lower_bounds // function name (c++)
+        );
+    }
+    CRef<Vec<CType>> continuous_upper_bounds() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "continuous_upper_bounds", // function name (python)
+            continuous_upper_bounds // function name (c++)
+        );
+    }
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "continuous_init_lower_bounds", // function name (python)
+            continuous_init_lower_bounds // function name (c++)
+        );
+    }
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "continuous_init_upper_bounds", // function name (python)
+            continuous_init_upper_bounds // function name (c++)
+        );
+    }
+    void evaluate(Rng & rng, goblin::SolutionSetBase & solutions, const std::span<const usize> & indices) override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "evaluate", // function name (python)
+            evaluate, // function name (c++)
+            rng, solutions, indices // params
+        );
+    }
+    void evaluate_partial(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices) override
+    {
+        NB_OVERRIDE_NAME(
+            "evaluate_partial", // function name (python)
+            evaluate_partial, // function name (c++)
+            rng, solutions, parents, subsets, indices // params
+        );
+    }
+    bool adapt(Rng & rng) override
+    {
+        NB_OVERRIDE_NAME(
+            "adapt", // function name (python)
+            adapt, // function name (c++)
+            rng // params
+        );
+    }
+    Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
+    {
+        NB_OVERRIDE_NAME(
+            "gradients", // function name (python)
+            gradients, // function name (c++)
+            rng, solutions, parents, subsets, indices, evaluations // params
+        );
+    }
+    std::tuple<std::vector<usize>, u64> gradient_steps(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::span<const usize> & indices, usize num_steps) override
+    {
+        NB_OVERRIDE_NAME(
+            "gradient_steps", // function name (python)
+            gradient_steps, // function name (c++)
+            rng, solutions, parents, indices, num_steps // params
+        );
+    }
+    void add_random(Rng & rng, goblin::SolutionSetBase & solutions, usize count) const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "add_random", // function name (python)
+            add_random, // function name (c++)
+            rng, solutions, count // params
+        );
+    }
+    const goblin::FitnessBase & fitness() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "fitness", // function name (python)
+            fitness // function name (c++)
+        );
+    }
+    const goblin::ArchiveFitnessBase & archive_fitness() const override
+    {
+        NB_OVERRIDE_PURE_NAME(
+            "archive_fitness", // function name (python)
+            archive_fitness // function name (c++)
+        );
+    }
+    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase & offspring, const goblin::SolutionBase & donor, const goblin::Subset & subset) const override
+    {
+        NB_OVERRIDE_NAME(
+            "inherit_discrete", // function name (python)
+            inherit_discrete, // function name (c++)
+            offspring, donor, subset // params
+        );
+    }
+    std::optional<CType> as_continuous(const goblin::SolutionBase & solution, usize discrete_index) const override
+    {
+        NB_OVERRIDE_NAME(
+            "as_continuous", // function name (python)
+            as_continuous, // function name (c++)
+            solution, discrete_index // params
+        );
+    }
+    bool target_reached(const goblin::ArchiveBase & archive) const override
+    {
+        NB_OVERRIDE_NAME(
+            "target_reached", // function name (python)
+            target_reached, // function name (c++)
+            archive // params
+        );
+    }
+    void log_header(std::ostream & os) const override
+    {
+        NB_OVERRIDE_NAME(
+            "log_header", // function name (python)
+            log_header, // function name (c++)
+            os // params
+        );
+    }
+    void log_solution(std::ostream & os, const goblin::SolutionBase & solution) const override
+    {
+        NB_OVERRIDE_NAME(
+            "log_solution", // function name (python)
+            log_solution, // function name (c++)
+            os, solution // params
+        );
+    }
+    void log(std::ostream & os, const goblin::SolutionBase & solution) override
+    {
+        NB_OVERRIDE_NAME(
+            "log", // function name (python)
+            log, // function name (c++)
+            os, solution // params
+        );
+    }
+    CacheKey solution_cache_key(const goblin::SolutionBase & solution) const override
+    {
+        NB_OVERRIDE_NAME(
+            "solution_cache_key", // function name (python)
+            solution_cache_key, // function name (c++)
+            solution // params
         );
     }
 };
@@ -862,7 +1076,7 @@ namespace goblin {
 class GPInstanceBase_trampoline : public GPInstanceBase
 {
 public:
-    NB_TRAMPOLINE(GPInstanceBase, 22);
+    NB_TRAMPOLINE(GPInstanceBase, 24);
 
     const goblin::GPContext & context() const override
     {
@@ -941,6 +1155,14 @@ public:
             "evaluate_partial", // function name (python)
             evaluate_partial, // function name (c++)
             rng, solutions, parents, subsets, indices // params
+        );
+    }
+    bool adapt(Rng & rng) override
+    {
+        NB_OVERRIDE_NAME(
+            "adapt", // function name (python)
+            adapt, // function name (c++)
+            rng // params
         );
     }
     Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
@@ -1027,6 +1249,14 @@ public:
             "log", // function name (python)
             log, // function name (c++)
             os, solution // params
+        );
+    }
+    CacheKey solution_cache_key(const goblin::SolutionBase & solution) const override
+    {
+        NB_OVERRIDE_NAME(
+            "solution_cache_key", // function name (python)
+            solution_cache_key, // function name (c++)
+            solution // params
         );
     }
 };
@@ -1720,6 +1950,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::InstanceBase::evaluate_partial, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
       .def("evaluate",
           nb::overload_cast<goblin::SolutionSetBase &, std::optional<u64>>(&goblin::InstanceBase::evaluate), nb::arg("solutions"), nb::arg("seed").none() = nb::none())
+      .def("adapt",
+          &goblin::InstanceBase::adapt,
+          nb::arg("rng"),
+          "/ Possibly adapts the problem in some way that may require re-evaluating any elites stored thus far (indicated by\n/ the return value)")
       .def("gradients",
           &goblin::InstanceBase::gradients,
           nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"),
@@ -1752,7 +1986,24 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::InstanceBase::log, nb::arg("os"), nb::arg("solution"))
       .def("format_solution",
           &goblin::InstanceBase::format_solution, nb::arg("solution"))
+      .def("solution_cache_key",
+          &goblin::InstanceBase::solution_cache_key, nb::arg("solution"))
       ;
+
+
+  auto pyClassCachedInstanceBase =
+      nb::class_<goblin::CachedInstanceBase, goblin::InstanceBase, goblin::CachedInstanceBase_trampoline>
+          (m, "CachedInstanceBase", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("hit_count",
+          &goblin::CachedInstanceBase::hit_count)
+      .def("miss_count",
+          &goblin::CachedInstanceBase::miss_count)
+      ;
+
+
+  m.def("cached",
+      goblin::Cached, nb::arg("problem"), nb::arg("cache_size") = 10000, nb::arg("cache_policy") = "lru");
   // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
   //
@@ -2584,8 +2835,10 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassSRProblem =
       nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
           (m, "SRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>>(),
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon") = 1e-5, nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none())
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>, std::optional<usize>>(),
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon") = 1e-5, nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none())
+      .def("adapt",
+          &goblin::SRProblem::adapt, nb::arg("rng"))
       .def("num_discrete",
           &goblin::SRProblem::num_discrete)
       .def("discrete_domain_sizes",
@@ -2636,6 +2889,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("x_train", &goblin::SRProblem::X_train, "")
       .def_rw("y_train", &goblin::SRProblem::Y_train, "")
       .def_rw("var_y_train", &goblin::SRProblem::var_Y_train, "")
+      .def_rw("x_batch", &goblin::SRProblem::X_batch, "")
+      .def_rw("y_batch", &goblin::SRProblem::Y_batch, "")
+      .def_rw("var_y_batch", &goblin::SRProblem::var_Y_batch, "")
       .def_rw("x_test", &goblin::SRProblem::X_test, "")
       .def_rw("y_test", &goblin::SRProblem::Y_test, "")
       .def_rw("var_y_test", &goblin::SRProblem::var_Y_test, "")
@@ -3320,6 +3576,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::Tracked::log_solution, nb::arg("os"), nb::arg("solution"))
       .def("log",
           &goblin::Tracked::log, nb::arg("os"), nb::arg("solution"))
+      .def("solution_cache_key",
+          &goblin::Tracked::solution_cache_key, nb::arg("solution"))
       .def("gradients",
           &goblin::Tracked::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
       .def("gradient_steps",

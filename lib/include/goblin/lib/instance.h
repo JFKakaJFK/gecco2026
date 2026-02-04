@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #ifndef _GOBLIN_LIB_INSTANCE_H
 #define _GOBLIN_LIB_INSTANCE_H
 
@@ -7,6 +8,7 @@
 #include <sstream>
 #include <tuple>
 #include <optional>
+#include <cstddef>
 
 #include "goblin/lib/types.h"
 #include "goblin/lib/fitness.h"
@@ -43,6 +45,10 @@ class InstanceBase {
     std::iota(indices.begin(), indices.end(), 0);
     evaluate(rng, solutions, indices);
   };
+
+  /// Possibly adapts the problem in some way that may require re-evaluating any elites stored thus far (indicated by
+  /// the return value)
+  virtual bool adapt(Rng& rng) { return false; };
 
   /// Returns the gradient for each index of indices (row) and continuous variable (column) with respect to the
   /// optimization goal. The number of evaluations performed to calculate the gradients are added to `evaluations`;
@@ -157,8 +163,38 @@ class InstanceBase {
     return ss.str();
   };
 
+  virtual CacheKey solution_cache_key(const SolutionBase& solution) const {
+    std::string repr = format_solution(solution);
+    // const auto* s = reinterpret_cast<const std::byte*>(repr.data());
+    // std::vector<std::byte> key(s, s + repr.size());
+    // return key;
+    return repr;
+  };
+
   virtual ~InstanceBase() {};
 };
+
+class CachedInstanceBase : public InstanceBase {
+ public:
+  virtual usize hit_count() const = 0;
+  virtual usize miss_count() const = 0;
+  virtual usize access_count() const = 0;
+  virtual usize entry_invalidation_count() const = 0;
+  virtual usize cache_invalidation_count() const = 0;
+  virtual usize evicted_count() const = 0;
+
+  virtual CType hit_ratio() const = 0;
+  virtual CType miss_ratio() const = 0;
+  /// Proportion of cache entries used w.r.t. maximum size
+  virtual CType utilization() const = 0;
+  // TODO expose cache api & stats...
+  virtual ~CachedInstanceBase() = default;
+};
+
+std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
+                                     usize cache_size = 10000,
+                                     std::string cache_policy = "lru");
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_INSTANCE_H */

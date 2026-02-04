@@ -70,29 +70,27 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto& q = solution.quality_as<MOQuality>();
-    q.constraint_value = 0.0;
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
                                               solution.discrete_active(), solution.continuous_active());
-      q.objectives(i) = ov;
-      q.constraint_value += std::max(CType(0.0), cv);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto& q = solution.quality_as<MOQuality>();
     const auto& pq = parent.quality_as<MOQuality>();
-    q.constraint_value = 0.0;
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
           parent.continuous_active(), pq.objectives(i), pq.constraint_value, subset.discrete, subset.continuous);
-      q.objectives(i) = ov;
-      q.constraint_value += std::max(CType(0.0), cv);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 

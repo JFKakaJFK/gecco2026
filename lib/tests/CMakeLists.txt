@@ -8,6 +8,7 @@ set(deps
     Eigen3::Eigen
     OpenRAND::OpenRAND
     gomea_library
+    Cache
 )
 
 set(test_target ${PROJECT_NAME}_test_main)

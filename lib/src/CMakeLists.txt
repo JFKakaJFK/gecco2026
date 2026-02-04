@@ -54,6 +54,7 @@ target_link_libraries(${PROJECT_NAME}
         Eigen3::Eigen
         OpenRAND::OpenRAND
         gomea_library
+        Cache
 )
 
 # users will need at least C++23

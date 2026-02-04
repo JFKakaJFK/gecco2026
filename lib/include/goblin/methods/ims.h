@@ -140,7 +140,7 @@ class IMS final : public MethodBase {
         running.push_back(true);
       } else if (!running[p_idx] && opts.restart_stale_populations &&
                  (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
-                     // std::println("[IMS]: Restarting population {}", p_idx);
+        // std::println("[IMS]: Restarting population {}", p_idx);
         populations[p_idx].restart();
         generations[p_idx] = 0;
         generations_since_last_improvement[p_idx] = 0;
@@ -151,10 +151,15 @@ class IMS final : public MethodBase {
       generations[p_idx]++;  // this needs to always be increased, no matter if we do
                              // a step or not
       if (running[p_idx]) {
-        // TODO "update" fitness function (e.g. update mini_batch)
-        // if changed:
-        //   re-evaluate global archive
-        //   re-evaluate local archive
+        // TODO this is batching as Marco does it, but Evi (https://arxiv.org/pdf/2402.12510v1#subsection.4.2) keeps the
+        // elite archive updated with full evaluations, and local archives are fully evaluated at the end of each
+        // generation -> this corresponds to adding an option to adapt to set it to the full problem (if available) and
+        // to add yet another archive that only stores fully evaluated solutions here
+        if (problem.adapt(rng)) {
+          // re-evaluate & re-build the archives if the problem instance changed (e.g. different mini batch)
+          reevaluate_and_rebuild_archive(rng, problem, *archive);
+          reevaluate_and_rebuild_archive(rng, problem, populations[p_idx].archive());
+        }
 
         archive->reset_change_count();
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
@@ -237,6 +242,24 @@ class IMS final : public MethodBase {
   };
 
  private:
+  void reevaluate_and_rebuild_archive(Rng& rng, InstanceBase& problem, ArchiveBase& archive) {
+    // 1. put all solutions into a solutionset
+    AoSSet solutions;
+    std::vector<usize> indices;
+    indices.reserve(archive.size());
+    for (usize i = 0; i < archive.size(); i++) {
+      solutions.add(archive[i]);
+      indices.push_back(i);
+    }
+    // 2. evaluate them
+    problem.evaluate(rng, solutions, indices);
+    // 3. re-build the archive
+    archive.clear();
+    for (usize i = 0; i < solutions.size(); i++) {
+      archive.update(solutions[i], true);
+    }
+  };
+
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -

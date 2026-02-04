@@ -1,5 +1,4 @@
 #pragma once
-#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -97,7 +96,8 @@ class SRProblem : public GPInstanceBase {
             std::string gradient_mode = "forward",
             CType gradient_epsilon = 1e-5,
             CType archive_epsilon = 0.0,
-            std::optional<bool> always_inherit_continuous = std::nullopt)
+            std::optional<bool> always_inherit_continuous = std::nullopt,
+            std::optional<usize> batch_size = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -111,7 +111,8 @@ class SRProblem : public GPInstanceBase {
         _target(_archive_fitness),
         _gradient_mode(gradient_mode),
         _gradient_epsilon(gradient_epsilon),
-        _always_inherit_continuous(always_inherit_continuous) {
+        _always_inherit_continuous(always_inherit_continuous),
+        _batch_size(batch_size) {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
@@ -165,6 +166,21 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
+  bool adapt(Rng& rng) override final {
+    if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
+      auto perm = permute(rng, X_train.rows());
+      perm.resize(_batch_size.value());
+
+      X_batch = X_train(perm, Eigen::placeholders::all);
+      Y_batch = Y_train(perm, Eigen::placeholders::all);
+
+      var_Y_batch = (Y_batch.rowwise() - Y_batch.colwise().mean()).square().colwise().mean();
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
@@ -176,11 +192,20 @@ class SRProblem : public GPInstanceBase {
   CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    // initialize the first batch if needed
+    if (_batch_size.has_value() && X_batch.size() == 0) {
+      adapt(rng);
+    }
+
     Array<ScalarType> params;
     for (auto i : indices) {
       auto& q = solutions[i].quality_as<SRQuality>();
       q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
+      if (_batch_size.has_value()) {
+        eval_one(solutions[i], X_batch, Y_batch, var_Y_batch, params, true, q, q.ls_params);
+      } else {
+        eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
+      }
     }
   };
 
@@ -368,6 +393,9 @@ class SRProblem : public GPInstanceBase {
   Arr2D<ScalarType> X_train;
   Arr2D<ScalarType> Y_train;
   Array<ScalarType> var_Y_train;
+  Arr2D<ScalarType> X_batch{};
+  Arr2D<ScalarType> Y_batch{};
+  Array<ScalarType> var_Y_batch{};
   Arr2D<ScalarType> X_test;
   Arr2D<ScalarType> Y_test;
   Array<ScalarType> var_Y_test;
@@ -443,6 +471,7 @@ class SRProblem : public GPInstanceBase {
   CType _gradient_epsilon{};
   std::optional<bool> _always_inherit_continuous{};
   usize _num_continuous{};
+  std::optional<usize> _batch_size{};
   Vec<CType> _continuous_lower_bounds{};
   Vec<CType> _continuous_upper_bounds{};
   Vec<CType> _continuous_init_lower_bounds{};

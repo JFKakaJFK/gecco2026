@@ -25,7 +25,8 @@ PLOT_DIR = RESULT_DIR / "plots"
 BUDGET = c.Budget(
     # max_generations=300,
     # max_evaluations=int(2e6)
-    max_evaluations=int(1e7)
+    max_evaluations=int(5e6)
+    # max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
 )
 
@@ -61,8 +62,8 @@ def problems(rng):
         # # "1089_USCrime",
         # "210_cloud",
         # "522_pm10",
-        # "Airfoil",
-        # "Bike Sharing",
+        "Airfoil",
+        "Bike Sharing",
         "Concrete Compressive Strength",
         # "Dow Chemical",
         # "Tower",
@@ -144,6 +145,7 @@ def problems(rng):
                                         constant_representation=constant_representation,
                                     ),
                                     seed,
+                                    # c.cached(
                                     c.SRProblem(
                                         ctx,
                                         x_train=c.np.load(str(X_path.absolute())),
@@ -166,7 +168,10 @@ def problems(rng):
                                         gradient_mode="forward",
                                         # gradient_mode="central",
                                         archive_epsilon=0.0,  # if is_synthetic else 1e-6,
+                                        batch_size=256,  # <= 64 is too noisy...
                                     ),
+                                    # cache_size=10_000,
+                                    # ),
                                     ctx,
                                 )
 
@@ -191,7 +196,7 @@ def methods(info, ctx):
     variants = []
     if constant_representation == "ercs":
         variants += [
-            # ", ERCs",
+            ", ERCs",
             # ", ERCs + Mut",
             # ", ERCs + LM",
             # ", ERCs + LM (mut)",
@@ -201,7 +206,7 @@ def methods(info, ctx):
         variants += [
             # ", $Pool_{10}$ + LM",
             # ", $Pool_{10}$ + RV (1:1)",
-            # ", $Pool_{10}$ + RV (1:2)",
+            ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
             # ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
@@ -212,7 +217,7 @@ def methods(info, ctx):
             # ", $Pool_{10}$ + RV (nrvfi,nmfi)",
             # ", $Pool_{10}$ + RV (nrvfi,nfi)",
             # ", $Pool_{10}$ + LM (mut)",
-            ", $Pool_{10}$ + RV (nfa)",
+            # ", $Pool_{10}$ + RV (nfa)",
         ]
 
     for similarity in [  #
@@ -373,13 +378,13 @@ def main():
     # status()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    run_tasks(
-        LOG_DIR,
-        all_tasks(),
-        # clean=True,
-        # limit=1,
-        # max_workers=1,  # server has 44 physical cores
-    )
+    # run_tasks(
+    #     LOG_DIR,
+    #     all_tasks(),
+    #     # clean=True,
+    #     # limit=1,
+    #     # max_workers=1,  # server has 44 physical cores
+    # )
 
     with load_results(
         LOG_DIR,
@@ -389,26 +394,27 @@ def main():
     ) as conn:
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
 
-        plot_convergence_so(
-            PLOT_DIR / f"convergence",
-            conn,
-            # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
-            y_var=f"1.0 - nmse_train::DOUBLE",
-            y_agg="MAX",  # higher R^2 is better
-            y_label=f"$R^2$ Train",
-            ymin="auto",
-            ymax="auto",
-            # merge folds and runs into one seaborn "unit"
-            unit_query="format('{}.{}', fold, run)",
-            # split up the plot into the following rows
-            modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
-            modifier_labels=[
-                "Template Height",
-                "Operators",
-                "Linear Scaling",
-            ],
-            nsamples=100,
-        )
+        for split in ["train", "test"]:
+            plot_convergence_so(
+                PLOT_DIR / f"convergence_{split}",
+                conn,
+                # y_var="1.0 - objectives[1]::DOUBLE",  # transform NMSE into R2
+                y_var=f"1.0 - nmse_{split}::DOUBLE",
+                y_agg="MAX",  # higher R^2 is better
+                y_label=f"$R^2$ {split.title()}",
+                ymin="auto",
+                ymax="auto",
+                # merge folds and runs into one seaborn "unit"
+                unit_query="format('{}.{}', fold, run)",
+                # split up the plot into the following rows
+                modifier_query="[template_height::STRING,operator_set::STRING,IF(linear_scaling, 'Yes', 'No')::STRING]",
+                modifier_labels=[
+                    "Template Height",
+                    "Operators",
+                    "Linear Scaling",
+                ],
+                nsamples=100,
+            )
 
 
 if __name__ == "__main__":

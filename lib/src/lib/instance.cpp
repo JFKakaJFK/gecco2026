@@ -1,5 +1,14 @@
 #include "goblin/lib/instance.h"
 
+#include <Cache/Cache.h>
+#include <Cache/Policy/FIFO.h>
+#include <Cache/Policy/LFU.h>
+#include <Cache/Policy/LIFO.h>
+#include <Cache/Policy/LRU.h>
+#include <Cache/Policy/MRU.h>
+#include <Cache/Policy/Random.h>
+#include <stdexcept>
+
 namespace goblin {
 Mat<CType> InstanceBase::gradients(Rng& rng,
                                    SolutionSetBase& solutions,
@@ -144,5 +153,176 @@ std::tuple<std::vector<usize>, u64> InstanceBase::gradient_steps(Rng& rng,
   evaluate_partial(rng, solutions, parents, subsets, changed_solutions);
   evaluations += changed_solutions.size();
   return std::make_tuple(changed_solutions, evaluations);
+}
+
+template <typename Cache>
+std::shared_ptr<CachedInstanceBase> cached_impl(std::shared_ptr<InstanceBase> problem, usize cache_size) {
+  struct CachedWrapper : public CachedInstanceBase {
+    CachedWrapper(std::shared_ptr<InstanceBase>&& problem, usize cache_size)
+        : problem(std::move(problem)), cache_size(cache_size), cache(cache_size) {};
+
+    usize num_objectives() const override final { return problem->num_objectives(); }
+
+    usize num_discrete() const override final { return problem->num_discrete(); }
+    CRef<Vec<DType>> discrete_domain_sizes() const override final { return problem->discrete_domain_sizes(); }
+
+    usize num_continuous() const override final { return problem->num_continuous(); }
+    CRef<Vec<CType>> continuous_lower_bounds() const override final { return problem->continuous_lower_bounds(); }
+    CRef<Vec<CType>> continuous_upper_bounds() const override final { return problem->continuous_upper_bounds(); }
+
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
+      return problem->continuous_init_lower_bounds();
+    }
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
+      return problem->continuous_init_upper_bounds();
+    }
+
+    void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+      std::vector<usize> idxs;
+      idxs.reserve(indices.size());
+      std::vector<CacheKey> keys;
+      keys.reserve(indices.size());
+
+      // 1. cache lookup
+      for (usize i : indices) {
+        auto key = problem->solution_cache_key(solutions[i]);
+        if (cache.contains(key)) {
+          solutions[i].assign_quality(*cache[key]);
+        } else {
+          idxs.push_back(i);
+          keys.push_back(key);
+        }
+      }
+
+      // 2. compute missing
+      problem->evaluate(rng, solutions, idxs);
+
+      // 3. cache update
+      for (usize i = 0; i < idxs.size(); i++) {
+        cache.insert(keys[i], solutions[idxs[i]].quality().clone());
+      }
+    };
+    void evaluate_partial(Rng& rng,
+                          SolutionSetBase& solutions,
+                          SolutionSetBase& parents,
+                          const std::vector<const Subset*>& subsets,
+                          const std::span<const usize>& indices) override final {
+      std::vector<usize> idxs;
+      idxs.reserve(indices.size());
+      std::vector<CacheKey> keys;
+      keys.reserve(indices.size());
+
+      // 1. cache lookup
+      for (usize i : indices) {
+        auto key = problem->solution_cache_key(solutions[i]);
+        if (cache.contains(key)) {
+          solutions[i].assign_quality(*cache[key]);
+        } else {
+          idxs.push_back(i);
+          keys.push_back(key);
+        }
+      }
+
+      // 2. compute missing
+      problem->evaluate_partial(rng, solutions, parents, subsets, idxs);
+
+      // 3. cache update
+      for (usize i = 0; i < idxs.size(); i++) {
+        cache.insert(keys[i], solutions[idxs[i]].quality().clone());
+      }
+    }
+
+    bool adapt(Rng& rng) override final {
+      if (problem->adapt(rng)) {
+        cache.clear();
+        return true;
+      } else {
+        return false;
+      }
+    };
+
+    Mat<CType> gradients(Rng& rng,
+                         SolutionSetBase& solutions,
+                         SolutionSetBase& parents,
+                         const std::vector<const Subset*>& subsets,
+                         const std::span<const usize>& indices,
+                         u64& evaluations) override final {
+      return problem->gradients(rng, solutions, parents, subsets, indices, evaluations);
+    }
+
+    std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                       SolutionSetBase& solutions,
+                                                       SolutionSetBase& parents,
+                                                       const std::span<const usize>& indices,
+                                                       usize num_steps) override final {
+      return problem->gradient_steps(rng, solutions, parents, indices, num_steps);
+    }
+
+    virtual void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+      return problem->add_random(rng, solutions, count);
+    }
+
+    const FitnessBase& fitness() const override final { return problem->fitness(); }
+    const ArchiveFitnessBase& archive_fitness() const override final { return problem->archive_fitness(); }
+    std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                            const SolutionBase& donor,
+                                            const Subset& subset) const override final {
+      return problem->inherit_discrete(offspring, donor, subset);
+    }
+
+    std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
+      return problem->as_continuous(solution, discrete_index);
+    }
+
+    bool target_reached(const ArchiveBase& archive) const override final { return problem->target_reached(archive); }
+
+    void log_header(std::ostream& os) const override final { return problem->log_header(os); }
+    void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
+      return problem->log_solution(os, solution);
+    }
+
+    void log(std::ostream& os, const SolutionBase& solution) override final { return problem->log(os, solution); }
+    CacheKey solution_cache_key(const SolutionBase& solution) const override final {
+      return problem->solution_cache_key(solution);
+    }
+
+    usize hit_count() const override final { return cache.hit_count(); };
+    usize miss_count() const override final { return cache.miss_count(); };
+    usize access_count() const override final {return cache.access_count();}
+    usize entry_invalidation_count() const override final {return cache.entry_invalidation_count();}
+    usize cache_invalidation_count() const override final {return cache.cache_invalidation_count();}
+    usize evicted_count() const override final {return cache.evicted_count();}
+
+    CType hit_ratio() const override final {return cache.hit_ratio();}
+    CType miss_ratio() const override final {return cache.miss_ratio();}
+    CType utilization() const override final {return cache.utilization();}
+
+    std::shared_ptr<InstanceBase> problem;
+    usize cache_size;
+    Cache cache;
+  };
+
+  return std::make_shared<CachedWrapper>(std::move(problem), cache_size);
+}
+
+std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
+                                     usize cache_size,
+                                     std::string cache_policy) {
+  using Value = std::unique_ptr<QualityBase>;
+  if (cache_policy == "fifo") {
+    return cached_impl<Cache<CacheKey, Value, Policy::FIFO>>(std::move(problem), cache_size);
+  } else if (cache_policy == "lfu") {
+    return cached_impl<Cache<CacheKey, Value, Policy::LFU>>(std::move(problem), cache_size);
+  } else if (cache_policy == "lifo") {
+    return cached_impl<Cache<CacheKey, Value, Policy::LIFO>>(std::move(problem), cache_size);
+  } else if (cache_policy == "lru") {
+    return cached_impl<Cache<CacheKey, Value, Policy::LRU>>(std::move(problem), cache_size);
+  } else if (cache_policy == "mru") {
+    return cached_impl<Cache<CacheKey, Value, Policy::MRU>>(std::move(problem), cache_size);
+  } else if (cache_policy == "random") {
+    return cached_impl<Cache<CacheKey, Value, Policy::Random>>(std::move(problem), cache_size);
+  } else {
+    throw std::runtime_error("Unknown cache policy.");
+  }
 }
 };  // namespace goblin

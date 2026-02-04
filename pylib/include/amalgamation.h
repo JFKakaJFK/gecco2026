@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <span>
 #include <vector>
+#include <string>
 
 namespace goblin {
 
@@ -92,6 +93,8 @@ template <typename T>
 using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
 using Active = Array<BType>;
+
+using CacheKey = std::string;
 
 template <typename T>
 constexpr bool isna(const T& v) {
@@ -1458,6 +1461,7 @@ struct Budget {
 #ifndef _GOBLIN_LIB_INSTANCE_H
 #define _GOBLIN_LIB_INSTANCE_H
 
+#include <cstddef>
 
 
 namespace goblin {
@@ -1490,6 +1494,10 @@ class InstanceBase {
     std::iota(indices.begin(), indices.end(), 0);
     evaluate(rng, solutions, indices);
   };
+
+  /// Possibly adapts the problem in some way that may require re-evaluating any elites stored thus far (indicated by
+  /// the return value)
+  virtual bool adapt(Rng& rng) { return false; };
 
   /// Returns the gradient for each index of indices (row) and continuous variable (column) with respect to the
   /// optimization goal. The number of evaluations performed to calculate the gradients are added to `evaluations`;
@@ -1604,8 +1612,29 @@ class InstanceBase {
     return ss.str();
   };
 
+  virtual CacheKey solution_cache_key(const SolutionBase& solution) const {
+    std::string repr = format_solution(solution);
+    // const auto* s = reinterpret_cast<const std::byte*>(repr.data());
+    // std::vector<std::byte> key(s, s + repr.size());
+    // return key;
+    return repr;
+  };
+
   virtual ~InstanceBase() {};
 };
+
+class CachedInstanceBase : public InstanceBase {
+ public:
+  virtual usize hit_count() const = 0;
+  virtual usize miss_count() const = 0;
+  // TODO expose cache api & stats...
+  virtual ~CachedInstanceBase() = default;
+};
+
+std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
+                                     usize cache_size = 10000,
+                                     std::string cache_policy = "lru");
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_INSTANCE_H */
@@ -2924,7 +2953,6 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
-#include <string>
 #include <queue>
 #include <iterator>
 #include <ranges>
@@ -5059,7 +5087,6 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h included by goblin.h                                                    //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#include "context.h"
 #ifndef _GOBLIN_GP_SR_H
 #define _GOBLIN_GP_SR_H
 
@@ -5136,7 +5163,8 @@ class SRProblem : public GPInstanceBase {
             std::string gradient_mode = "forward",
             CType gradient_epsilon = 1e-5,
             CType archive_epsilon = 0.0,
-            std::optional<bool> always_inherit_continuous = std::nullopt)
+            std::optional<bool> always_inherit_continuous = std::nullopt,
+            std::optional<usize> batch_size = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -5150,7 +5178,8 @@ class SRProblem : public GPInstanceBase {
         _target(_archive_fitness),
         _gradient_mode(gradient_mode),
         _gradient_epsilon(gradient_epsilon),
-        _always_inherit_continuous(always_inherit_continuous) {
+        _always_inherit_continuous(always_inherit_continuous),
+        _batch_size(batch_size) {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
@@ -5204,6 +5233,21 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
+  bool adapt(Rng& rng) override final {
+    if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
+      auto perm = permute(rng, X_train.rows());
+      perm.resize(_batch_size.value());
+
+      X_batch = X_train(perm, Eigen::placeholders::all);
+      Y_batch = Y_train(perm, Eigen::placeholders::all);
+
+      var_Y_batch = (Y_batch.rowwise() - Y_batch.colwise().mean()).square().colwise().mean();
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
@@ -5215,11 +5259,20 @@ class SRProblem : public GPInstanceBase {
   CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    // initialize the first batch if needed
+    if (_batch_size.has_value() && X_batch.size() == 0) {
+      adapt(rng);
+    }
+
     Array<ScalarType> params;
     for (auto i : indices) {
       auto& q = solutions[i].quality_as<SRQuality>();
       q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
+      if (_batch_size.has_value()) {
+        eval_one(solutions[i], X_batch, Y_batch, var_Y_batch, params, true, q, q.ls_params);
+      } else {
+        eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
+      }
     }
   };
 
@@ -5407,6 +5460,9 @@ class SRProblem : public GPInstanceBase {
   Arr2D<ScalarType> X_train;
   Arr2D<ScalarType> Y_train;
   Array<ScalarType> var_Y_train;
+  Arr2D<ScalarType> X_batch{};
+  Arr2D<ScalarType> Y_batch{};
+  Array<ScalarType> var_Y_batch{};
   Arr2D<ScalarType> X_test;
   Arr2D<ScalarType> Y_test;
   Array<ScalarType> var_Y_test;
@@ -5482,6 +5538,7 @@ class SRProblem : public GPInstanceBase {
   CType _gradient_epsilon{};
   std::optional<bool> _always_inherit_continuous{};
   usize _num_continuous{};
+  std::optional<usize> _batch_size{};
   Vec<CType> _continuous_lower_bounds{};
   Vec<CType> _continuous_upper_bounds{};
   Vec<CType> _continuous_init_lower_bounds{};
@@ -5542,7 +5599,6 @@ class ObjectiveBase {
 #define _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
 
 
-#include <cstddef>
 #include <numbers>
 
 
@@ -6647,29 +6703,27 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto& q = solution.quality_as<MOQuality>();
-    q.constraint_value = 0.0;
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
                                               solution.discrete_active(), solution.continuous_active());
-      q.objectives(i) = ov;
-      q.constraint_value += std::max(CType(0.0), cv);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    auto& q = solution.quality_as<MOQuality>();
     const auto& pq = parent.quality_as<MOQuality>();
-    q.constraint_value = 0.0;
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
           parent.continuous_active(), pq.objectives(i), pq.constraint_value, subset.discrete, subset.continuous);
-      q.objectives(i) = ov;
-      q.constraint_value += std::max(CType(0.0), cv);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 
@@ -7149,8 +7203,6 @@ class Tracked final : public InstanceBase {
     return instance.inherit_discrete(offspring, donor, subset);
   }
 
-  // bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
-
   void log_header(std::ostream& os) const override { instance.log_header(os); }
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override {
@@ -7158,6 +7210,10 @@ class Tracked final : public InstanceBase {
   }
 
   void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
+
+  CacheKey solution_cache_key(const SolutionBase& solution) const override final {
+    return instance.solution_cache_key(solution);
+  }
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
@@ -7670,6 +7726,7 @@ class IMS final : public MethodBase {
         running.push_back(true);
       } else if (!running[p_idx] && opts.restart_stale_populations &&
                  (p_idx == opts.max_num_populations - 1 || (!opts.stop_covered_populations && is_multi_objective))) {
+        // std::println("[IMS]: Restarting population {}", p_idx);
         populations[p_idx].restart();
         generations[p_idx] = 0;
         generations_since_last_improvement[p_idx] = 0;
@@ -7680,6 +7737,16 @@ class IMS final : public MethodBase {
       generations[p_idx]++;  // this needs to always be increased, no matter if we do
                              // a step or not
       if (running[p_idx]) {
+        // TODO this is batching as Marco does it, but Evi (https://arxiv.org/pdf/2402.12510v1#subsection.4.2) keeps the
+        // elite archive updated with full evaluations, and local archives are fully evaluated at the end of each
+        // generation -> this corresponds to adding an option to adapt to set it to the full problem (if available) and
+        // to add yet another archive that only stores fully evaluated solutions here
+        if (problem.adapt(rng)) {
+          // re-evaluate & re-build the archives if the problem instance changed (e.g. different mini batch)
+          reevaluate_and_rebuild_archive(rng, problem, *archive);
+          reevaluate_and_rebuild_archive(rng, problem, populations[p_idx].archive());
+        }
+
         archive->reset_change_count();
         evaluations += populations[p_idx].perform_generation(rng, should_terminate);
         total_generations++;
@@ -7761,6 +7828,24 @@ class IMS final : public MethodBase {
   };
 
  private:
+  void reevaluate_and_rebuild_archive(Rng& rng, InstanceBase& problem, ArchiveBase& archive) {
+    // 1. put all solutions into a solutionset
+    AoSSet solutions;
+    std::vector<usize> indices;
+    indices.reserve(archive.size());
+    for (usize i = 0; i < archive.size(); i++) {
+      solutions.add(archive[i]);
+      indices.push_back(i);
+    }
+    // 2. evaluate them
+    problem.evaluate(rng, solutions, indices);
+    // 3. re-build the archive
+    archive.clear();
+    for (usize i = 0; i < solutions.size(); i++) {
+      archive.update(solutions[i], true);
+    }
+  };
+
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -
@@ -9113,7 +9198,7 @@ class RvState {
       cluster_active(k) = enough_solutions;
 
       if (!cluster_active(k)) {
-        // std::println("CLUSTER {} INACTIVE", k);
+        std::println("CLUSTER {} INACTIVE", k);
         continue;
       }
 
@@ -9402,7 +9487,7 @@ class RvState {
 
       // archive update
       for (usize i : improved_indices[k]) {
-        archive.update(solutions[i], true);
+        archive.update(solutions[i], /* strict = */ true, /* check_synched = */ false);
       }
     }
 
@@ -9489,7 +9574,7 @@ class RvState {
         }
 
         if (improved) {
-          archive.update(solutions[i], false);
+          archive.update(solutions[i], /* strict = */ false, /* check_synched = */ false);
         }
       } else {
         solutions[i] = parents[i];
@@ -9620,7 +9705,7 @@ class RvState {
               indices_to_remove.push_back(eval2improve_idx[j]);
 
               if (improved) {
-                archive.update(solutions[i], false);
+                archive.update(solutions[i], /* strict = */ false, /* check_synched = */ false);
               }
             } else {
               solutions[i] = parents[i];
@@ -10150,6 +10235,7 @@ class Population {
       std::uniform_real_distribution<double> U(0.0, 1.0);
       bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
+        // std::println("LOOP");
         bool do_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
@@ -10167,30 +10253,42 @@ class Population {
           double p_discrete = 0.5 * actual_evaluation_balance / options.target_continuous_to_discrete_balance;
 
           do_discrete_step = U(rng) < p_discrete;
+
+          // std::println("p(RV) = {} ({}/{})", 1.0 - p_discrete, continuous_evaluations, discrete_evaluations);
         }
 
         u64 evals = 0;
         // we first do the continuous step - it might not do anything (not enough active variables or already
         // converged), so we still want to be able to do a discrete step instead
         if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+          // std::println("RV STEP");
           // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
           // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
           // solution_clusters, cluster_solutions);
           evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                               cluster_solutions);
           __assert_invariants();
+          if (evals < 1) {
+            // std::println("RV STEP SKIPPED !!!!");
+          }
           evaluations += evals;
           continuous_evaluations += evals;
         }
 
         if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
+          // std::println("GP STEP");
           evals = discrete_gom_step(rng, subset_idx++);
           __assert_invariants();
           evaluations += evals;
           discrete_evaluations += evals;
+
+          if (evals < 1) {
+            // std::println("GP STEP SKIPPED !!!!");
+          }
         }
 
         if (is_continuous && options.continuous_mutation_probability > 0.0) {
+          // std::println("MUT STEP");
           evaluations += continuous_mutation_step(rng);
           __assert_invariants();
         }
@@ -10203,17 +10301,21 @@ class Population {
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
 
+    // std::println(">>> GOM END - {} evals", evaluations);
+
     if (!fos_stats.empty()) {
       log_subset_statistics();
     }
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
+      // std::println("GRADIENT STEP");
       evaluations += gradient_step(rng);
       __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
+      // std::println("FI STEP");
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
       __assert_invariants();
 
@@ -10242,6 +10344,7 @@ class Population {
     no_evaluations_performed = evaluations == 0;
 
     generation++;
+    // std::println(">>> GEN END - {} evals", evaluations);
 
     return evaluations;
   };
@@ -10257,7 +10360,8 @@ class Population {
       }
     }
 
-    return no_improvement_stretch >= max_nis && no_evaluations_performed;
+    // std::println("converged? {} >= {} && {}", no_improvement_stretch, max_nis, no_evaluations_performed);
+    return no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {
@@ -10303,7 +10407,7 @@ class Population {
 
   /// For single objective optimization, this just is a roundabout way
   /// to return the elite to check if an IMS population should stop
-  const ArchiveBase& archive() const { return *local_archive; };
+  ArchiveBase& archive() const { return *local_archive; };
 
   const SolutionSetBase& get_solutions() const { return solutions; };
 

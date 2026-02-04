@@ -18,6 +18,7 @@
 #include <cstdint>
 #include <span>
 #include <vector>
+#include <string>
 
 namespace goblin {
 
@@ -62,6 +63,8 @@ template <typename T>
 using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
 using Active = Array<BType>;
+
+using CacheKey = std::string;
 
 template <typename T>
 constexpr bool isna(const T& v) {

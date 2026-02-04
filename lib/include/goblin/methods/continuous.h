@@ -510,6 +510,8 @@ struct RvOptions {
   std::optional<std::string> subset_logfile = std::nullopt;
   std::optional<std::string> sample_logfile = std::nullopt;
 
+  bool check_synched_archives = false;
+
   void validate() {
     __goblin_runtime_assert(0.0 <= p_accept && p_accept < 1.0);
     __goblin_runtime_assert(0.0 <= selection_percentile && selection_percentile < 1.0);
@@ -1044,7 +1046,7 @@ class RvState {
 
       // archive update
       for (usize i : improved_indices[k]) {
-        archive.update(solutions[i], true);
+        archive.update(solutions[i], /* strict = */ true, options.check_synched_archives);
       }
     }
 
@@ -1131,7 +1133,7 @@ class RvState {
         }
 
         if (improved) {
-          archive.update(solutions[i], false);
+          archive.update(solutions[i], /* strict = */ false, options.check_synched_archives);
         }
       } else {
         solutions[i] = parents[i];
@@ -1262,7 +1264,7 @@ class RvState {
               indices_to_remove.push_back(eval2improve_idx[j]);
 
               if (improved) {
-                archive.update(solutions[i], false);
+                archive.update(solutions[i], /* strict = */ false, options.check_synched_archives);
               }
             } else {
               solutions[i] = parents[i];

@@ -249,8 +249,6 @@ class Tracked final : public InstanceBase {
     return instance.inherit_discrete(offspring, donor, subset);
   }
 
-  // bool always_inherit_continuous() const override { return instance.always_inherit_continuous(); }
-
   void log_header(std::ostream& os) const override { instance.log_header(os); }
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override {
@@ -258,6 +256,10 @@ class Tracked final : public InstanceBase {
   }
 
   void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
+
+  CacheKey solution_cache_key(const SolutionBase& solution) const override final {
+    return instance.solution_cache_key(solution);
+  }
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
