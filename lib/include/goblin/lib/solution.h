@@ -189,7 +189,9 @@ class Solution : public SolutionBase {
         _continuous_values(std::move(other._continuous_values)),
         _continuous_active(std::move(other._continuous_active)),
         _extensions(std::move(other._extensions)),
-        _quality(std::move(other._quality)) {};
+        _quality(other._quality->clone()) {
+    assert(_quality != nullptr);
+  };
 
   Solution& operator=(const Solution& other) {
     if (&other != this) {
@@ -213,12 +215,14 @@ class Solution : public SolutionBase {
   }
 
   Solution& operator=(Solution&& other) {
-    _discrete_values = std::move(other._discrete_values);
-    _discrete_active = std::move(other._discrete_active);
-    _continuous_values = std::move(other._continuous_values);
-    _continuous_active = std::move(other._continuous_active);
-    _extensions = std::move(other._extensions);
-    _quality = std::move(other._quality);
+    if (&other != this) {
+      _discrete_values = std::move(other._discrete_values);
+      _discrete_active = std::move(other._discrete_active);
+      _continuous_values = std::move(other._continuous_values);
+      _continuous_active = std::move(other._continuous_active);
+      _extensions = std::move(other._extensions);
+      _quality = other._quality->clone();
+    }
 
     return *this;
   }
@@ -237,8 +241,14 @@ class Solution : public SolutionBase {
   };
 
   void assign_quality(const QualityBase& quality) override final { _quality = quality.clone(); };
-  QualityBase& quality() override final { return *_quality; }              // nb::rv_policy::reference_internal
-  const QualityBase& quality() const override final { return *_quality; }  // nb::rv_policy::reference_internal
+  QualityBase& quality() override final {
+    assert(_quality != nullptr);
+    return *_quality;
+  }
+  const QualityBase& quality() const override final {
+    assert(_quality != nullptr);
+    return *_quality;
+  }
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
@@ -395,8 +405,14 @@ template <int StorageOrder>
 class SolutionHandle : public SolutionBase {
  public:
   void assign_quality(const QualityBase& quality) override { arena->quality[idx] = quality.clone(); }
-  QualityBase& quality() override final { return *arena->quality[idx]; }
-  const QualityBase& quality() const override final { return *arena->quality[idx]; }
+  QualityBase& quality() override final {
+    assert(arena->quality[idx] != nullptr);
+    return *arena->quality[idx];
+  }
+  const QualityBase& quality() const override final {
+    assert(arena->quality[idx] != nullptr);
+    return *arena->quality[idx];
+  }
 
   RefS<Vec<DType>> discrete_values() override final { return arena->discrete.row(idx); }
   CRefS<Vec<DType>> discrete_values() const override final { return arena->discrete.row(idx); }

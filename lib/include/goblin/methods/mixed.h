@@ -604,8 +604,9 @@ class Population {
       }
     }
 
-    // std::println("converged? {} >= {} && {}", no_improvement_stretch, max_nis, no_evaluations_performed);
-    return no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
+    // this condition does not make sense for continuous only problems as it is way more strict than the NIS/FI
+    // mechanisms which force convergence if no progress is made
+    return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {

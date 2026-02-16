@@ -76,6 +76,12 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
         CMAKE_CXX_FLAGS_RELEASE
         "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
     )
+
+    # "temporary" fix for spurious warnings
+    # https://gcc.gnu.org/pipermail/gcc-bugs/2022-May/787134.html
+    # https://www.mail-archive.com/gcc-bugs%2540gcc.gnu.org/msg879964.html
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-error=maybe-uninitialized")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-error=maybe-uninitialized")
 endif()
 
 # -flto (link time optimization)

@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <variant>
+#include <stdexcept>
 
 #include "goblin/bench/functions.h"
 #include "goblin/lib/archive.h"

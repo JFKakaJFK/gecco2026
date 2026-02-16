@@ -192,8 +192,8 @@ class CachedInstanceBase : public InstanceBase {
 };
 
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
-                                     usize cache_size = 10000,
-                                     std::string cache_policy = "lru");
+                                           usize cache_size = 10000,
+                                           std::string cache_policy = "lru");
 
 };  // namespace goblin
 

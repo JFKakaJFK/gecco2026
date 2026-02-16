@@ -20,7 +20,7 @@ TEST_CASE("goblin::methods::amalgam") {
 
   auto alg = AMaLGaM();
   // alg.set_init_bounds(100, 110);
-  auto [front, _] = alg.run(sphere, budget);
+  auto [front, _] = alg.run(sphere, budget, /* seed = */ std::nullopt, /* population_size = */ 10);
 
   REQUIRE(front->empty() == false);
   CHECK(front->so_solution(0).quality_as<MOQuality>().objectives[0] <= 1e-8);

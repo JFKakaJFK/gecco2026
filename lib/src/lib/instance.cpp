@@ -288,14 +288,14 @@ std::shared_ptr<CachedInstanceBase> cached_impl(std::shared_ptr<InstanceBase> pr
 
     usize hit_count() const override final { return cache.hit_count(); };
     usize miss_count() const override final { return cache.miss_count(); };
-    usize access_count() const override final {return cache.access_count();}
-    usize entry_invalidation_count() const override final {return cache.entry_invalidation_count();}
-    usize cache_invalidation_count() const override final {return cache.cache_invalidation_count();}
-    usize evicted_count() const override final {return cache.evicted_count();}
+    usize access_count() const override final { return cache.access_count(); }
+    usize entry_invalidation_count() const override final { return cache.entry_invalidation_count(); }
+    usize cache_invalidation_count() const override final { return cache.cache_invalidation_count(); }
+    usize evicted_count() const override final { return cache.evicted_count(); }
 
-    CType hit_ratio() const override final {return cache.hit_ratio();}
-    CType miss_ratio() const override final {return cache.miss_ratio();}
-    CType utilization() const override final {return cache.utilization();}
+    CType hit_ratio() const override final { return cache.hit_ratio(); }
+    CType miss_ratio() const override final { return cache.miss_ratio(); }
+    CType utilization() const override final { return cache.utilization(); }
 
     std::shared_ptr<InstanceBase> problem;
     usize cache_size;
@@ -306,8 +306,8 @@ std::shared_ptr<CachedInstanceBase> cached_impl(std::shared_ptr<InstanceBase> pr
 }
 
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
-                                     usize cache_size,
-                                     std::string cache_policy) {
+                                           usize cache_size,
+                                           std::string cache_policy) {
   using Value = std::unique_ptr<QualityBase>;
   if (cache_policy == "fifo") {
     return cached_impl<Cache<CacheKey, Value, Policy::FIFO>>(std::move(problem), cache_size);

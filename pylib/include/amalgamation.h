@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -718,7 +717,9 @@ class Solution : public SolutionBase {
         _continuous_values(std::move(other._continuous_values)),
         _continuous_active(std::move(other._continuous_active)),
         _extensions(std::move(other._extensions)),
-        _quality(std::move(other._quality)) {};
+        _quality(other._quality->clone()) {
+    assert(_quality != nullptr);
+  };
 
   Solution& operator=(const Solution& other) {
     if (&other != this) {
@@ -742,12 +743,14 @@ class Solution : public SolutionBase {
   }
 
   Solution& operator=(Solution&& other) {
-    _discrete_values = std::move(other._discrete_values);
-    _discrete_active = std::move(other._discrete_active);
-    _continuous_values = std::move(other._continuous_values);
-    _continuous_active = std::move(other._continuous_active);
-    _extensions = std::move(other._extensions);
-    _quality = std::move(other._quality);
+    if (&other != this) {
+      _discrete_values = std::move(other._discrete_values);
+      _discrete_active = std::move(other._discrete_active);
+      _continuous_values = std::move(other._continuous_values);
+      _continuous_active = std::move(other._continuous_active);
+      _extensions = std::move(other._extensions);
+      _quality = other._quality->clone();
+    }
 
     return *this;
   }
@@ -766,8 +769,14 @@ class Solution : public SolutionBase {
   };
 
   void assign_quality(const QualityBase& quality) override final { _quality = quality.clone(); };
-  QualityBase& quality() override final { return *_quality; }              // nb::rv_policy::reference_internal
-  const QualityBase& quality() const override final { return *_quality; }  // nb::rv_policy::reference_internal
+  QualityBase& quality() override final {
+    assert(_quality != nullptr);
+    return *_quality;
+  }
+  const QualityBase& quality() const override final {
+    assert(_quality != nullptr);
+    return *_quality;
+  }
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
@@ -924,8 +933,14 @@ template <int StorageOrder>
 class SolutionHandle : public SolutionBase {
  public:
   void assign_quality(const QualityBase& quality) override { arena->quality[idx] = quality.clone(); }
-  QualityBase& quality() override final { return *arena->quality[idx]; }
-  const QualityBase& quality() const override final { return *arena->quality[idx]; }
+  QualityBase& quality() override final {
+    assert(arena->quality[idx] != nullptr);
+    return *arena->quality[idx];
+  }
+  const QualityBase& quality() const override final {
+    assert(arena->quality[idx] != nullptr);
+    return *arena->quality[idx];
+  }
 
   RefS<Vec<DType>> discrete_values() override final { return arena->discrete.row(idx); }
   CRefS<Vec<DType>> discrete_values() const override final { return arena->discrete.row(idx); }
@@ -1627,13 +1642,22 @@ class CachedInstanceBase : public InstanceBase {
  public:
   virtual usize hit_count() const = 0;
   virtual usize miss_count() const = 0;
+  virtual usize access_count() const = 0;
+  virtual usize entry_invalidation_count() const = 0;
+  virtual usize cache_invalidation_count() const = 0;
+  virtual usize evicted_count() const = 0;
+
+  virtual CType hit_ratio() const = 0;
+  virtual CType miss_ratio() const = 0;
+  /// Proportion of cache entries used w.r.t. maximum size
+  virtual CType utilization() const = 0;
   // TODO expose cache api & stats...
   virtual ~CachedInstanceBase() = default;
 };
 
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
-                                     usize cache_size = 10000,
-                                     std::string cache_policy = "lru");
+                                           usize cache_size = 10000,
+                                           std::string cache_policy = "lru");
 
 };  // namespace goblin
 
@@ -7596,14 +7620,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
-
-
 
 namespace goblin {
 
@@ -7867,9 +7888,6 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
-
-
-
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -7991,14 +8009,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8360,9 +8375,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8459,18 +8471,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -8952,6 +8960,8 @@ struct RvOptions {
   std::optional<std::string> selection_logfile = std::nullopt;
   std::optional<std::string> subset_logfile = std::nullopt;
   std::optional<std::string> sample_logfile = std::nullopt;
+
+  bool check_synched_archives = false;
 
   void validate() {
     __goblin_runtime_assert(0.0 <= p_accept && p_accept < 1.0);
@@ -9487,7 +9497,7 @@ class RvState {
 
       // archive update
       for (usize i : improved_indices[k]) {
-        archive.update(solutions[i], /* strict = */ true, /* check_synched = */ false);
+        archive.update(solutions[i], /* strict = */ true, options.check_synched_archives);
       }
     }
 
@@ -9574,7 +9584,7 @@ class RvState {
         }
 
         if (improved) {
-          archive.update(solutions[i], /* strict = */ false, /* check_synched = */ false);
+          archive.update(solutions[i], /* strict = */ false, options.check_synched_archives);
         }
       } else {
         solutions[i] = parents[i];
@@ -9705,7 +9715,7 @@ class RvState {
               indices_to_remove.push_back(eval2improve_idx[j]);
 
               if (improved) {
-                archive.update(solutions[i], /* strict = */ false, /* check_synched = */ false);
+                archive.update(solutions[i], /* strict = */ false, options.check_synched_archives);
               }
             } else {
               solutions[i] = parents[i];
@@ -9778,7 +9788,6 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -10360,8 +10369,9 @@ class Population {
       }
     }
 
-    // std::println("converged? {} >= {} && {}", no_improvement_stretch, max_nis, no_evaluations_performed);
-    return no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
+    // this condition does not make sense for continuous only problems as it is way more strict than the NIS/FI
+    // mechanisms which force convergence if no progress is made
+    return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {
@@ -11183,7 +11193,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
