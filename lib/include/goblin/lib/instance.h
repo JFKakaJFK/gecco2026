@@ -1,5 +1,4 @@
 #pragma once
-#include <memory>
 #ifndef _GOBLIN_LIB_INSTANCE_H
 #define _GOBLIN_LIB_INSTANCE_H
 
@@ -9,6 +8,7 @@
 #include <tuple>
 #include <optional>
 #include <cstddef>
+#include <memory>
 
 #include "goblin/lib/types.h"
 #include "goblin/lib/fitness.h"
