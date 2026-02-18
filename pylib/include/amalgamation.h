@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -93,9 +92,6 @@ template <typename T>
 using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
 using Active = Array<BType>;
-
-// TODO wrap cache key data members to hide details and allow changing the key type...
-using CacheKey = std::string;
 
 template <typename T>
 constexpr bool isna(const T& v) {
@@ -1482,6 +1478,21 @@ struct Budget {
 
 
 namespace goblin {
+
+class CacheKey {
+ public:
+  explicit CacheKey(const std::string& key);
+  CacheKey(std::vector<std::byte>&& key);
+
+  bool operator==(const CacheKey& other) const { return hash_value_ == other.hash_value_ && key_ == other.key_; };
+
+ private:
+  friend struct std::hash<CacheKey>;
+
+  std::vector<std::byte> key_;
+  usize hash_value_;
+};
+
 class InstanceBase {
  public:
   virtual usize num_objectives() const { return fitness().num_objectives(); };
@@ -1616,7 +1627,7 @@ class InstanceBase {
     os << "])";
   };
 
-  virtual void log(std::ostream& os, const SolutionBase& solution) {
+  virtual void log(std::ostream& os, const SolutionBase& solution) const {
     os << '"';
     log_solution(os, solution);
     os << "\",";
@@ -1629,19 +1640,124 @@ class InstanceBase {
     return ss.str();
   };
 
-  virtual CacheKey solution_cache_key(const SolutionBase& solution) const {
-    std::string repr = format_solution(solution);
-    // const auto* s = reinterpret_cast<const std::byte*>(repr.data());
-    // std::vector<std::byte> key(s, s + repr.size());
-    // return key;
-    return repr;
+  /// By returning std::nullopt, caching can be disabled on a per solution basis
+  virtual std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const {
+    return CacheKey(format_solution(solution));
+  };
+
+  u64 reevaluate_and_rebuild_archive(Rng& rng, ArchiveBase& archive) {
+    // 1. put all solutions into a solutionset
+    AoSSet solutions;
+    std::vector<usize> indices;
+    indices.reserve(archive.size());
+    for (usize i = 0; i < archive.size(); i++) {
+      solutions.add(archive[i]);
+      indices.push_back(i);
+    }
+    // 2. evaluate them
+    evaluate(rng, solutions, indices);
+    // 3. re-build the archive
+    archive.clear();
+    for (usize i = 0; i < solutions.size(); i++) {
+      archive.update(solutions[i], true);
+    }
+
+    return indices.size();
   };
 
   virtual ~InstanceBase() {};
 };
 
-class CachedInstanceBase : public InstanceBase {
+/// Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still
+/// allows accidentally not overwriting some methods, but at least defaults to the behaviour of the wrapped instance
+/// instead of the default implementations of virtual methods.
+class WrappedInstance : public InstanceBase {
  public:
+  WrappedInstance(InstanceBase& instance) : inner(instance) {};
+
+  usize num_objectives() const override { return inner.num_objectives(); };
+
+  usize num_discrete() const override { return inner.num_discrete(); }
+  CRef<Vec<DType>> discrete_domain_sizes() const override { return inner.discrete_domain_sizes(); }
+
+  usize num_continuous() const override { return inner.num_continuous(); }
+  CRef<Vec<CType>> continuous_lower_bounds() const override { return inner.continuous_lower_bounds(); }
+  CRef<Vec<CType>> continuous_upper_bounds() const override { return inner.continuous_upper_bounds(); }
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override { return inner.continuous_init_lower_bounds(); }
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override { return inner.continuous_init_upper_bounds(); }
+
+  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override {
+    return inner.evaluate(rng, solutions, indices);
+  };
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override {
+    return inner.evaluate_partial(rng, solutions, parents, subsets, indices);
+  };
+
+  bool adapt(Rng& rng) override { return inner.adapt(rng); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    return inner.gradients(rng, solutions, parents, subsets, indices, evaluations);
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    return inner.gradient_steps(rng, solutions, parents, indices, num_steps);
+  };
+
+  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override {
+    return inner.add_random(rng, solutions, count);
+  };
+
+  const FitnessBase& fitness() const override { return inner.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override { return inner.archive_fitness(); };
+
+  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                          const SolutionBase& donor,
+                                          const Subset& subset) const override {
+    return inner.inherit_discrete(offspring, donor, subset);
+  };
+
+  std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override {
+    return inner.as_continuous(solution, discrete_index);
+  };
+
+  bool target_reached(const ArchiveBase& archive) const override { return inner.target_reached(archive); };
+
+  void log_header(std::ostream& os) const override { return inner.log_header(os); };
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    return inner.log_solution(os, solution);
+  };
+
+  void log(std::ostream& os, const SolutionBase& solution) const override { return inner.log(os, solution); };
+
+  std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const override {
+    return inner.solution_cache_key(solution);
+  };
+
+  virtual ~WrappedInstance() = default;
+
+ protected:
+  InstanceBase& inner;
+};
+
+class CachedInstanceBase : public WrappedInstance {
+ public:
+  CachedInstanceBase(InstanceBase& instance) : WrappedInstance(instance) {};
+
   virtual usize hit_count() const = 0;
   virtual usize miss_count() const = 0;
   virtual usize access_count() const = 0;
@@ -5431,7 +5547,7 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  void log(std::ostream& os, const SolutionBase& solution) override final {
+  void log(std::ostream& os, const SolutionBase& solution) const override final {
     os << '"';
     log_solution(os, solution);
     os << "\",";
@@ -7178,28 +7294,12 @@ class TrackingOptions {
 };
 
 /// An instance that intercepts evaluations
-class Tracked final : public InstanceBase {
+class Tracked final : public WrappedInstance {
  public:
   Tracked() = delete;
 
-  usize num_objectives() const override final { return instance.num_objectives(); };
-
-  usize num_discrete() const override final { return instance.num_discrete(); };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
-
-  usize num_continuous() const override final { return instance.num_continuous(); };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-    return instance.continuous_init_lower_bounds();
-  };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-    return instance.continuous_init_upper_bounds();
-  };
-
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
+    wrap_eval([&](const std::span<const usize>& _indices) { inner.evaluate(rng, solutions, _indices); }, solutions,
               indices);
   };
   void evaluate_partial(Rng& rng,
@@ -7209,46 +7309,33 @@ class Tracked final : public InstanceBase {
                         const std::span<const usize>& indices) override final {
     wrap_eval(
         [&](const std::span<const usize>& _indices) {
-          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+          inner.evaluate_partial(rng, solutions, parents, subsets, _indices);
         },
         solutions, indices);
   };
 
-  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-    return instance.add_random(rng, solutions, count);
+  bool adapt(Rng& rng) override final {
+    if (inner.adapt(rng)) {
+      alg_timer.stop();
+      // TODO Should these evaluations count (to both time/evals)? They are tracking only so for now they are not
+      // counted, but with the consequence that if you track evaluations more evaluations than allowed by the budget
+      // will be performed to arguably more correctly track the algorithm performance...
+      inner.reevaluate_and_rebuild_archive(rng, archive);
+      alg_timer.start();
+      return true;
+    } else {
+      return false;
+    }
   };
-
-  const FitnessBase& fitness() const override final { return instance.fitness(); };
-  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
-
-  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
-
-  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
-                                          const SolutionBase& donor,
-                                          const Subset& subset) const override {
-    return instance.inherit_discrete(offspring, donor, subset);
-  }
-
-  void log_header(std::ostream& os) const override { instance.log_header(os); }
-
-  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
-    instance.log_solution(os, solution);
-  }
-
-  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
-
-  CacheKey solution_cache_key(const SolutionBase& solution) const override final {
-    return instance.solution_cache_key(solution);
-  }
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
                        SolutionSetBase& parents,
                        const std::vector<const Subset*>& subsets,
                        const std::span<const usize>& indices,
-                       u64& evaluations) override {
+                       u64& evaluations) override final {
     u64 evals_before = this->evaluations, _evals = evaluations;
-    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    Mat<CType> res = inner.gradients(rng, solutions, parents, subsets, indices, evaluations);
     this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
     return res;
   }
@@ -7257,9 +7344,9 @@ class Tracked final : public InstanceBase {
                                                      SolutionSetBase& solutions,
                                                      SolutionSetBase& parents,
                                                      const std::span<const usize>& indices,
-                                                     usize num_steps) override {
+                                                     usize num_steps) override final {
     u64 evals_before = evaluations;
-    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+    auto res = inner.gradient_steps(rng, solutions, parents, indices, num_steps);
 
     alg_timer.stop();
     evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
@@ -7268,7 +7355,7 @@ class Tracked final : public InstanceBase {
       archive.update(solutions[i], true);
     }
 
-    if (instance.target_reached(archive)) {
+    if (inner.target_reached(archive)) {
       status = TerminationStatus::TargetReached;
       throw TrackingException("");
     }
@@ -7360,13 +7447,14 @@ class Tracked final : public InstanceBase {
   };
 
   Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
-      : instance(instance),
+      : WrappedInstance(instance),
+        // instance(instance),
         method(method),
         budget(budget),
         config(config),
         seed(seed),
         status(TerminationStatus::Running),
-        archive(instance.archive_fitness(), config.archive_capacity),
+        archive(inner.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
         last_generation(0),
         generations_at_next_report(config.initial_generations_until_next_report),
@@ -7413,7 +7501,7 @@ class Tracked final : public InstanceBase {
 
       // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
       // evaluating one by one
-      if (instance.target_reached(archive)) {
+      if (inner.target_reached(archive)) {
         status = TerminationStatus::TargetReached;
         throw TrackingException("");
       }
@@ -7521,7 +7609,7 @@ class Tracked final : public InstanceBase {
             "continuous_active,"
         ;
         // clang-format on
-        instance.log_header(logfile);
+        inner.log_header(logfile);
         logfile << std::endl;  // here we want to flush
       }
     }
@@ -7550,13 +7638,13 @@ class Tracked final : public InstanceBase {
         log_helper(logfile, s.continuous_values(), true); logfile << ',';
         log_helper(logfile, s.continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, s);
+      inner.log(logfile, s);
       logfile << "\n";
     }
     logfile << std::flush;
   };
 
-  InstanceBase& instance;
+  // InstanceBase& instance;
   MethodBase& method;
   Budget& budget;
   TrackingOptions config;
@@ -7622,14 +7710,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
-
-
 
 namespace goblin {
 
@@ -7644,6 +7729,8 @@ struct IMSOptions {
   bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
   usize additional_clusters_per_start = 1;
   std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
+
+  bool reevaluate_solutions_after_adaption = true;
 
   std::optional<std::string> population_logfile = std::nullopt;
   std::string population_log_resolution = "archive";
@@ -7763,18 +7850,26 @@ class IMS final : public MethodBase {
       generations[p_idx]++;  // this needs to always be increased, no matter if we do
                              // a step or not
       if (running[p_idx]) {
+        // TODO not the right place, but at some point add the machinery to store good but dominated alternative
+        // solutions?
         // TODO this is batching as Marco does it, but Evi (https://arxiv.org/pdf/2402.12510v1#subsection.4.2) keeps the
         // elite archive updated with full evaluations, and local archives are fully evaluated at the end of each
         // generation -> this corresponds to adding an option to adapt to set it to the full problem (if available) and
         // to add yet another archive that only stores fully evaluated solutions here
+        bool reevaluate_solutions = false;
         if (problem.adapt(rng)) {
           // re-evaluate & re-build the archives if the problem instance changed (e.g. different mini batch)
-          reevaluate_and_rebuild_archive(rng, problem, *archive);
-          reevaluate_and_rebuild_archive(rng, problem, populations[p_idx].archive());
+          evaluations += problem.reevaluate_and_rebuild_archive(rng, *archive);
+          evaluations += problem.reevaluate_and_rebuild_archive(rng, populations[p_idx].archive());
+
+          // potentially expensive, but might be needed to avoid "faulty" acceptance decisions (if new fitness is
+          // considerably worse, chances are that small improvements are not accepted and the old, out-of-date fitness
+          // is kept...)
+          reevaluate_solutions = opts.reevaluate_solutions_after_adaption;
         }
 
         archive->reset_change_count();
-        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
+        evaluations += populations[p_idx].perform_generation(rng, should_terminate, reevaluate_solutions);
         total_generations++;
 
         if (opts.population_logfile.has_value()) {
@@ -7854,24 +7949,6 @@ class IMS final : public MethodBase {
   };
 
  private:
-  void reevaluate_and_rebuild_archive(Rng& rng, InstanceBase& problem, ArchiveBase& archive) {
-    // 1. put all solutions into a solutionset
-    AoSSet solutions;
-    std::vector<usize> indices;
-    indices.reserve(archive.size());
-    for (usize i = 0; i < archive.size(); i++) {
-      solutions.add(archive[i]);
-      indices.push_back(i);
-    }
-    // 2. evaluate them
-    problem.evaluate(rng, solutions, indices);
-    // 3. re-build the archive
-    archive.clear();
-    for (usize i = 0; i < solutions.size(); i++) {
-      archive.update(solutions[i], true);
-    }
-  };
-
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -
@@ -7892,9 +7969,6 @@ class IMS final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
-
-
-
 
 namespace goblin {
 
@@ -8017,14 +8091,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 namespace goblin {
 class DiscreteGOMEA final : public MethodBase {
@@ -8386,9 +8457,6 @@ class RvGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
 
-
-
-
 namespace goblin {
 
 class MOBinaryGOMEA final : public MethodBase {
@@ -8485,18 +8553,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -9807,7 +9871,6 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10132,7 +10195,7 @@ class Population {
   void restart() { solutions.clear(); };
 
   template <typename T>
-  u64 perform_generation(Rng& rng, T should_terminate) {
+  u64 perform_generation(Rng& rng, T should_terminate, bool reevaluate_solutions) {
     u64 evaluations = 0;
     bool is_discrete = problem.num_discrete() > 0;
     bool is_continuous = problem.num_continuous() > 0;
@@ -10141,6 +10204,7 @@ class Population {
     // ======= initialization (if necessary) =======
     if (solutions.empty()) {
       evaluations += initialize(rng);
+      reevaluate_solutions = false;  // solutions are freshly evaluated, so no need to do it twice
 
       if (should_terminate(evaluations)) {
         return evaluations;
@@ -10156,6 +10220,20 @@ class Population {
       }
       std::tie(solution_clusters, cluster_solutions, cluster_donors) = create_and_register_clusters(
           rng, *local_archive, problem.fitness(), solutions, num_clusters, donor_pool_size, donors, solution_clusters);
+    }
+
+    if (reevaluate_solutions) {
+      solutions_to_evaluate.clear();
+      solutions_to_evaluate.resize(solutions.size());
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+
+      problem.evaluate(rng, solutions, solutions_to_evaluate);
+      // ensure the parents also have the updated fitness...
+      for (usize i = 0; i < solutions.size(); i++) {
+        parents[i].assign_quality(solutions[i].quality());
+      }
+
+      evaluations += solutions_to_evaluate.size();
     }
 
     // after this, donors == parents == solutions holds
@@ -11212,7 +11290,6 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

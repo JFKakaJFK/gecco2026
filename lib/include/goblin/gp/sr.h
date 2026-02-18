@@ -168,6 +168,13 @@ class SRProblem : public GPInstanceBase {
 
   bool adapt(Rng& rng) override final {
     if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
+      // TODO refactor out into something like PyTorch's DataLoader/Sampler and allow more sophisticated sampling
+      // strategies Surprisingly (?) PyTorch does not have any fancy strategies that take the data distribution into
+      // account (https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler) I'd expect something like a
+      // "parallel greedy scattered subset selection" to perform well since each batch tries to represent the whole
+      // training data distribution (i.e. in random order, assign the furthest row to the current batch until all rows
+      // are assigned to a batch, where the number of batches is ceil(dataset_size / batch_size) - so basically
+      // stratified sampling)
       auto perm = permute(rng, X_train.rows());
       perm.resize(_batch_size.value());
 
@@ -338,7 +345,7 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  void log(std::ostream& os, const SolutionBase& solution) override final {
+  void log(std::ostream& os, const SolutionBase& solution) const override final {
     os << '"';
     log_solution(os, solution);
     os << "\",";

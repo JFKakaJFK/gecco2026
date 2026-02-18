@@ -16,6 +16,21 @@
 #include "goblin/lib/archive.h"
 
 namespace goblin {
+
+class CacheKey {
+ public:
+  explicit CacheKey(const std::string& key);
+  CacheKey(std::vector<std::byte>&& key);
+
+  bool operator==(const CacheKey& other) const { return hash_value_ == other.hash_value_ && key_ == other.key_; };
+
+ private:
+  friend struct std::hash<CacheKey>;
+
+  std::vector<std::byte> key_;
+  usize hash_value_;
+};
+
 class InstanceBase {
  public:
   virtual usize num_objectives() const { return fitness().num_objectives(); };
@@ -150,7 +165,7 @@ class InstanceBase {
     os << "])";
   };
 
-  virtual void log(std::ostream& os, const SolutionBase& solution) {
+  virtual void log(std::ostream& os, const SolutionBase& solution) const {
     os << '"';
     log_solution(os, solution);
     os << "\",";
@@ -163,19 +178,124 @@ class InstanceBase {
     return ss.str();
   };
 
-  virtual CacheKey solution_cache_key(const SolutionBase& solution) const {
-    std::string repr = format_solution(solution);
-    // const auto* s = reinterpret_cast<const std::byte*>(repr.data());
-    // std::vector<std::byte> key(s, s + repr.size());
-    // return key;
-    return repr;
+  /// By returning std::nullopt, caching can be disabled on a per solution basis
+  virtual std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const {
+    return CacheKey(format_solution(solution));
+  };
+
+  u64 reevaluate_and_rebuild_archive(Rng& rng, ArchiveBase& archive) {
+    // 1. put all solutions into a solutionset
+    AoSSet solutions;
+    std::vector<usize> indices;
+    indices.reserve(archive.size());
+    for (usize i = 0; i < archive.size(); i++) {
+      solutions.add(archive[i]);
+      indices.push_back(i);
+    }
+    // 2. evaluate them
+    evaluate(rng, solutions, indices);
+    // 3. re-build the archive
+    archive.clear();
+    for (usize i = 0; i < solutions.size(); i++) {
+      archive.update(solutions[i], true);
+    }
+
+    return indices.size();
   };
 
   virtual ~InstanceBase() {};
 };
 
-class CachedInstanceBase : public InstanceBase {
+/// Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still
+/// allows accidentally not overwriting some methods, but at least defaults to the behaviour of the wrapped instance
+/// instead of the default implementations of virtual methods.
+class WrappedInstance : public InstanceBase {
  public:
+  WrappedInstance(InstanceBase& instance) : inner(instance) {};
+
+  usize num_objectives() const override { return inner.num_objectives(); };
+
+  usize num_discrete() const override { return inner.num_discrete(); }
+  CRef<Vec<DType>> discrete_domain_sizes() const override { return inner.discrete_domain_sizes(); }
+
+  usize num_continuous() const override { return inner.num_continuous(); }
+  CRef<Vec<CType>> continuous_lower_bounds() const override { return inner.continuous_lower_bounds(); }
+  CRef<Vec<CType>> continuous_upper_bounds() const override { return inner.continuous_upper_bounds(); }
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override { return inner.continuous_init_lower_bounds(); }
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override { return inner.continuous_init_upper_bounds(); }
+
+  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override {
+    return inner.evaluate(rng, solutions, indices);
+  };
+  void evaluate_partial(Rng& rng,
+                        SolutionSetBase& solutions,
+                        SolutionSetBase& parents,
+                        const std::vector<const Subset*>& subsets,
+                        const std::span<const usize>& indices) override {
+    return inner.evaluate_partial(rng, solutions, parents, subsets, indices);
+  };
+
+  bool adapt(Rng& rng) override { return inner.adapt(rng); };
+
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override {
+    return inner.gradients(rng, solutions, parents, subsets, indices, evaluations);
+  }
+
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override {
+    return inner.gradient_steps(rng, solutions, parents, indices, num_steps);
+  };
+
+  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override {
+    return inner.add_random(rng, solutions, count);
+  };
+
+  const FitnessBase& fitness() const override { return inner.fitness(); };
+  const ArchiveFitnessBase& archive_fitness() const override { return inner.archive_fitness(); };
+
+  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                          const SolutionBase& donor,
+                                          const Subset& subset) const override {
+    return inner.inherit_discrete(offspring, donor, subset);
+  };
+
+  std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override {
+    return inner.as_continuous(solution, discrete_index);
+  };
+
+  bool target_reached(const ArchiveBase& archive) const override { return inner.target_reached(archive); };
+
+  void log_header(std::ostream& os) const override { return inner.log_header(os); };
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
+    return inner.log_solution(os, solution);
+  };
+
+  void log(std::ostream& os, const SolutionBase& solution) const override { return inner.log(os, solution); };
+
+  std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const override {
+    return inner.solution_cache_key(solution);
+  };
+
+  virtual ~WrappedInstance() = default;
+
+ protected:
+  InstanceBase& inner;
+};
+
+class CachedInstanceBase : public WrappedInstance {
+ public:
+  CachedInstanceBase(InstanceBase& instance) : WrappedInstance(instance) {};
+
   virtual usize hit_count() const = 0;
   virtual usize miss_count() const = 0;
   virtual usize access_count() const = 0;

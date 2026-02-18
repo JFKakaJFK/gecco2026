@@ -348,7 +348,7 @@ class Population {
   void restart() { solutions.clear(); };
 
   template <typename T>
-  u64 perform_generation(Rng& rng, T should_terminate) {
+  u64 perform_generation(Rng& rng, T should_terminate, bool reevaluate_solutions) {
     u64 evaluations = 0;
     bool is_discrete = problem.num_discrete() > 0;
     bool is_continuous = problem.num_continuous() > 0;
@@ -357,6 +357,7 @@ class Population {
     // ======= initialization (if necessary) =======
     if (solutions.empty()) {
       evaluations += initialize(rng);
+      reevaluate_solutions = false;  // solutions are freshly evaluated, so no need to do it twice
 
       if (should_terminate(evaluations)) {
         return evaluations;
@@ -372,6 +373,20 @@ class Population {
       }
       std::tie(solution_clusters, cluster_solutions, cluster_donors) = create_and_register_clusters(
           rng, *local_archive, problem.fitness(), solutions, num_clusters, donor_pool_size, donors, solution_clusters);
+    }
+
+    if (reevaluate_solutions) {
+      solutions_to_evaluate.clear();
+      solutions_to_evaluate.resize(solutions.size());
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+
+      problem.evaluate(rng, solutions, solutions_to_evaluate);
+      // ensure the parents also have the updated fitness...
+      for (usize i = 0; i < solutions.size(); i++) {
+        parents[i].assign_quality(solutions[i].quality());
+      }
+
+      evaluations += solutions_to_evaluate.size();
     }
 
     // after this, donors == parents == solutions holds

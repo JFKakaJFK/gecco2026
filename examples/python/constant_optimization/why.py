@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization_noise"
+RESULT_DIR = pathlib.Path("results") / "batching"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,8 +24,9 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
+    max_evaluations=int(1e6)
     # max_evaluations=int(2e6)
-    max_evaluations=int(5e6)
+    # max_evaluations=int(5e6)
     # max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
 )
@@ -65,8 +66,8 @@ def problems(rng):
         "Airfoil",
         "Bike Sharing",
         "Concrete Compressive Strength",
-        # "Dow Chemical",
-        # "Tower",
+        "Dow Chemical",
+        "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -132,21 +133,11 @@ def problems(rng):
                                 constant_representation=constant_representation,
                             )
 
-                            for run in range(REPEATS_PER_FOLD):
-                                seed = int(rng.integers(2**32))
-                                yield (
-                                    dict(
-                                        problem_name=f"{problem}{'N=' + str(kwargs.get('synthetic_problem_kwargs', {}).get('noise', 0.0)) if len(kwargs) else ''}",
-                                        fold=fold,
-                                        run=run,
-                                        template_height=height,
-                                        operator_set=operator_set,
-                                        linear_scaling=linear_scaling,
-                                        constant_representation=constant_representation,
-                                    ),
-                                    seed,
-                                    # c.cached(
-                                    c.SRProblem(
+                            for batch_size in [None, 32, 256]:
+                                for run in range(REPEATS_PER_FOLD):
+                                    seed = int(rng.integers(2**32))
+
+                                    instance = c.SRProblem(
                                         ctx,
                                         x_train=c.np.load(str(X_path.absolute())),
                                         y_train=c.np.load(str(y_path.absolute())),
@@ -168,12 +159,26 @@ def problems(rng):
                                         gradient_mode="forward",
                                         # gradient_mode="central",
                                         archive_epsilon=0.0,  # if is_synthetic else 1e-6,
-                                        batch_size=256,  # <= 64 is too noisy...
-                                    ),
-                                    # cache_size=10_000,
-                                    # ),
-                                    ctx,
-                                )
+                                        batch_size=batch_size,  # <= 64 is too noisy...
+                                    )
+                                    yield (
+                                        dict(
+                                            problem_name=f"{problem}{'N=' + str(kwargs.get('synthetic_problem_kwargs', {}).get('noise', 0.0)) if len(kwargs) else ''}",
+                                            fold=fold,
+                                            run=run,
+                                            template_height=height,
+                                            operator_set=operator_set,
+                                            linear_scaling=linear_scaling,
+                                            constant_representation=constant_representation,
+                                            batch_size=batch_size,
+                                        ),
+                                        seed,
+                                        # c.cached(
+                                        instance,
+                                        # cache_size=10_000,
+                                        # ),
+                                        ctx,
+                                    )
 
 
 def methods(info, ctx):
@@ -206,7 +211,7 @@ def methods(info, ctx):
         variants += [
             # ", $Pool_{10}$ + LM",
             # ", $Pool_{10}$ + RV (1:1)",
-            ", $Pool_{10}$ + RV (1:2)",
+            # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
             # ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
@@ -296,37 +301,41 @@ def methods(info, ctx):
                 **copt_model_kwargs,
             )
 
-            yield (
-                f'"{similarity} {copt}"',
-                c.MixedGOMEA(
-                    discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
-                    population_options=c.PopulationOptions(
-                        target_continuous_to_discrete_balance=0.5
-                        if "1:2" in copt
-                        else 1.0,
-                        forced_improvements="RV" in copt
-                        and "nfi"
-                        not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
-                        enable_mixed_forced_improvements="nmfi" not in copt,
-                        **copt_population_kwargs,
+            for reevaluate_solutions_after_adaption in [False, True]:
+                yield (
+                    f'"{similarity} {copt} {["", "Reeval"][reevaluate_solutions_after_adaption]}"',
+                    c.MixedGOMEA(
+                        discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
+                        population_options=c.PopulationOptions(
+                            target_continuous_to_discrete_balance=0.5
+                            if "1:2" in copt
+                            else 1.0,
+                            forced_improvements="RV" in copt
+                            and "nfi"
+                            not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                            enable_mixed_forced_improvements="nmfi" not in copt,
+                            **copt_population_kwargs,
+                        ),
+                        rv_options=c.RvOptions(**rv_options),
+                        continuous_model=c.FullFOS(),
+                        sampling_model=c.AMaLGaMSamplingModel(
+                            distribution_multiplier_decrease=1.0
+                            if "nSDR" in copt
+                            else 0.9,
+                            distribution_multiplier_increase=1.0
+                            if "nSDR" in copt
+                            else 1.0 / 0.9,
+                        ),
+                        # IMS options
+                        ims_options=c.IMSOptions(
+                            initial_population_size=initial_population_size,
+                            max_num_populations=max_num_populations,
+                            subgeneration_factor=subgeneration_factor,
+                            restart_stale_populations=restart_stale_populations,
+                            reevaluate_solutions_after_adaption=reevaluate_solutions_after_adaption,
+                        ),
                     ),
-                    rv_options=c.RvOptions(**rv_options),
-                    continuous_model=c.FullFOS(),
-                    sampling_model=c.AMaLGaMSamplingModel(
-                        distribution_multiplier_decrease=1.0 if "nSDR" in copt else 0.9,
-                        distribution_multiplier_increase=1.0
-                        if "nSDR" in copt
-                        else 1.0 / 0.9,
-                    ),
-                    # IMS options
-                    ims_options=c.IMSOptions(
-                        initial_population_size=initial_population_size,
-                        max_num_populations=max_num_populations,
-                        subgeneration_factor=subgeneration_factor,
-                        restart_stale_populations=restart_stale_populations,
-                    ),
-                ),
-            )
+                )
 
 
 def all_tasks():
@@ -404,6 +413,7 @@ def main():
                 y_label=f"$R^2$ {split.title()}",
                 ymin="auto",
                 ymax="auto",
+                method_query="format('Reeval={} BS={}', IF(contains(method_name, 'Reeval'), 'Yes', 'No') , batch_size::STRING)",
                 # merge folds and runs into one seaborn "unit"
                 unit_query="format('{}.{}', fold, run)",
                 # split up the plot into the following rows

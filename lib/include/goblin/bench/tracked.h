@@ -198,28 +198,12 @@ class TrackingOptions {
 };
 
 /// An instance that intercepts evaluations
-class Tracked final : public InstanceBase {
+class Tracked final : public WrappedInstance {
  public:
   Tracked() = delete;
 
-  usize num_objectives() const override final { return instance.num_objectives(); };
-
-  usize num_discrete() const override final { return instance.num_discrete(); };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
-
-  usize num_continuous() const override final { return instance.num_continuous(); };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-    return instance.continuous_init_lower_bounds();
-  };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-    return instance.continuous_init_upper_bounds();
-  };
-
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
+    wrap_eval([&](const std::span<const usize>& _indices) { inner.evaluate(rng, solutions, _indices); }, solutions,
               indices);
   };
   void evaluate_partial(Rng& rng,
@@ -229,46 +213,33 @@ class Tracked final : public InstanceBase {
                         const std::span<const usize>& indices) override final {
     wrap_eval(
         [&](const std::span<const usize>& _indices) {
-          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+          inner.evaluate_partial(rng, solutions, parents, subsets, _indices);
         },
         solutions, indices);
   };
 
-  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-    return instance.add_random(rng, solutions, count);
+  bool adapt(Rng& rng) override final {
+    if (inner.adapt(rng)) {
+      alg_timer.stop();
+      // TODO Should these evaluations count (to both time/evals)? They are tracking only so for now they are not
+      // counted, but with the consequence that if you track evaluations more evaluations than allowed by the budget
+      // will be performed to arguably more correctly track the algorithm performance...
+      inner.reevaluate_and_rebuild_archive(rng, archive);
+      alg_timer.start();
+      return true;
+    } else {
+      return false;
+    }
   };
-
-  const FitnessBase& fitness() const override final { return instance.fitness(); };
-  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
-
-  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
-
-  std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
-                                          const SolutionBase& donor,
-                                          const Subset& subset) const override {
-    return instance.inherit_discrete(offspring, donor, subset);
-  }
-
-  void log_header(std::ostream& os) const override { instance.log_header(os); }
-
-  void log_solution(std::ostream& os, const SolutionBase& solution) const override {
-    instance.log_solution(os, solution);
-  }
-
-  void log(std::ostream& os, const SolutionBase& solution) override { instance.log(os, solution); };
-
-  CacheKey solution_cache_key(const SolutionBase& solution) const override final {
-    return instance.solution_cache_key(solution);
-  }
 
   Mat<CType> gradients(Rng& rng,
                        SolutionSetBase& solutions,
                        SolutionSetBase& parents,
                        const std::vector<const Subset*>& subsets,
                        const std::span<const usize>& indices,
-                       u64& evaluations) override {
+                       u64& evaluations) override final {
     u64 evals_before = this->evaluations, _evals = evaluations;
-    Mat<CType> res = instance.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    Mat<CType> res = inner.gradients(rng, solutions, parents, subsets, indices, evaluations);
     this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
     return res;
   }
@@ -277,9 +248,9 @@ class Tracked final : public InstanceBase {
                                                      SolutionSetBase& solutions,
                                                      SolutionSetBase& parents,
                                                      const std::span<const usize>& indices,
-                                                     usize num_steps) override {
+                                                     usize num_steps) override final {
     u64 evals_before = evaluations;
-    auto res = instance.gradient_steps(rng, solutions, parents, indices, num_steps);
+    auto res = inner.gradient_steps(rng, solutions, parents, indices, num_steps);
 
     alg_timer.stop();
     evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
@@ -288,7 +259,7 @@ class Tracked final : public InstanceBase {
       archive.update(solutions[i], true);
     }
 
-    if (instance.target_reached(archive)) {
+    if (inner.target_reached(archive)) {
       status = TerminationStatus::TargetReached;
       throw TrackingException("");
     }
@@ -380,13 +351,14 @@ class Tracked final : public InstanceBase {
   };
 
   Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
-      : instance(instance),
+      : WrappedInstance(instance),
+        // instance(instance),
         method(method),
         budget(budget),
         config(config),
         seed(seed),
         status(TerminationStatus::Running),
-        archive(instance.archive_fitness(), config.archive_capacity),
+        archive(inner.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
         last_generation(0),
         generations_at_next_report(config.initial_generations_until_next_report),
@@ -433,7 +405,7 @@ class Tracked final : public InstanceBase {
 
       // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
       // evaluating one by one
-      if (instance.target_reached(archive)) {
+      if (inner.target_reached(archive)) {
         status = TerminationStatus::TargetReached;
         throw TrackingException("");
       }
@@ -541,7 +513,7 @@ class Tracked final : public InstanceBase {
             "continuous_active,"
         ;
         // clang-format on
-        instance.log_header(logfile);
+        inner.log_header(logfile);
         logfile << std::endl;  // here we want to flush
       }
     }
@@ -570,13 +542,13 @@ class Tracked final : public InstanceBase {
         log_helper(logfile, s.continuous_values(), true); logfile << ',';
         log_helper(logfile, s.continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, s);
+      inner.log(logfile, s);
       logfile << "\n";
     }
     logfile << std::flush;
   };
 
-  InstanceBase& instance;
+  // InstanceBase& instance;
   MethodBase& method;
   Budget& budget;
   TrackingOptions config;

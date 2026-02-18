@@ -45,7 +45,7 @@ struct DummyPopulation {
   void restart() {};
 
   template <typename T>
-  usize perform_generation(Rng& rng, T should_terminate) {
+  usize perform_generation(Rng& rng, T should_terminate, bool reevaluate_solutions) {
     std::println("{:>5d} | {:>3d}", population_size, num_clusters);
     generation_population_sizes.push_back(population_size);
     return population_size;

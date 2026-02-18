@@ -23,5 +23,8 @@ dependencies = [
     "tqdm>=4.67.1",
 ]
 
+# [tool.uv]
+# reinstall-package = ["pygom"]
+
 [tool.uv.sources]
 pygom = { path = "../../../" }

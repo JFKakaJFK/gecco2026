@@ -33,6 +33,8 @@ struct IMSOptions {
   usize additional_clusters_per_start = 1;
   std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
 
+  bool reevaluate_solutions_after_adaption = true;
+
   std::optional<std::string> population_logfile = std::nullopt;
   std::string population_log_resolution = "archive";
 };
@@ -151,18 +153,26 @@ class IMS final : public MethodBase {
       generations[p_idx]++;  // this needs to always be increased, no matter if we do
                              // a step or not
       if (running[p_idx]) {
+        // TODO not the right place, but at some point add the machinery to store good but dominated alternative
+        // solutions?
         // TODO this is batching as Marco does it, but Evi (https://arxiv.org/pdf/2402.12510v1#subsection.4.2) keeps the
         // elite archive updated with full evaluations, and local archives are fully evaluated at the end of each
         // generation -> this corresponds to adding an option to adapt to set it to the full problem (if available) and
         // to add yet another archive that only stores fully evaluated solutions here
+        bool reevaluate_solutions = false;
         if (problem.adapt(rng)) {
           // re-evaluate & re-build the archives if the problem instance changed (e.g. different mini batch)
-          reevaluate_and_rebuild_archive(rng, problem, *archive);
-          reevaluate_and_rebuild_archive(rng, problem, populations[p_idx].archive());
+          evaluations += problem.reevaluate_and_rebuild_archive(rng, *archive);
+          evaluations += problem.reevaluate_and_rebuild_archive(rng, populations[p_idx].archive());
+
+          // potentially expensive, but might be needed to avoid "faulty" acceptance decisions (if new fitness is
+          // considerably worse, chances are that small improvements are not accepted and the old, out-of-date fitness
+          // is kept...)
+          reevaluate_solutions = opts.reevaluate_solutions_after_adaption;
         }
 
         archive->reset_change_count();
-        evaluations += populations[p_idx].perform_generation(rng, should_terminate);
+        evaluations += populations[p_idx].perform_generation(rng, should_terminate, reevaluate_solutions);
         total_generations++;
 
         if (opts.population_logfile.has_value()) {
@@ -242,24 +252,6 @@ class IMS final : public MethodBase {
   };
 
  private:
-  void reevaluate_and_rebuild_archive(Rng& rng, InstanceBase& problem, ArchiveBase& archive) {
-    // 1. put all solutions into a solutionset
-    AoSSet solutions;
-    std::vector<usize> indices;
-    indices.reserve(archive.size());
-    for (usize i = 0; i < archive.size(); i++) {
-      solutions.add(archive[i]);
-      indices.push_back(i);
-    }
-    // 2. evaluate them
-    problem.evaluate(rng, solutions, indices);
-    // 3. re-build the archive
-    archive.clear();
-    for (usize i = 0; i < solutions.size(); i++) {
-      archive.update(solutions[i], true);
-    }
-  };
-
   C create_population;
   IMSOptions options;
   // The whole reason run is not a static method -

@@ -64,9 +64,6 @@ using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
 using Active = Array<BType>;
 
-// TODO wrap cache key data members to hide details and allow changing the key type...
-using CacheKey = std::string;
-
 template <typename T>
 constexpr bool isna(const T& v) {
   return std::isnan(v) || std::isinf(v);
