@@ -19,9 +19,11 @@ ALL_KV: tuple[KV, ...] = (
     KV.single_kernel_inplace,
 )
 
-MAIN_KV: tuple[KV, ...] = (
-    KV.shared_memory,
-    KV.block_reduce,
+MAIN_KV: tuple[KV, ...] = (KV.shared_memory, KV.block_reduce, KV.single_kernel_inplace)
+BASELINE_KV: tuple[KV, ...] = (KV.baseline, KV.restrict, KV.shared_memory)
+SINGLE_KV: tuple[KV, ...] = (
+    KV.single_kernel,
+    KV.single_kernel_fmaf,
     KV.single_kernel_inplace,
 )
 
@@ -206,7 +208,7 @@ SEARCH_SQUARE_FEYNMAN_GPU_CONFIG = ExperimentConfig(
     population_sizes=None,
     num_observations=[10**i for i in range(2, 6)],  # 100 - 100_000
     num_features=None,
-    templates=[TemplateConfig(2, 5)],
+    templates=[TemplateConfig(2, 4)],
     operator_sets=["square"],
     # Execution Parameters
     use_target=True,

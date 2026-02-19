@@ -15,10 +15,14 @@ import pygom.gp as gp
 from pygom import KernelVersion as KV
 from tqdm import tqdm
 
-from src.experiment.experiment_config import OPERATOR_SETS
+from src.experiment.experiment_config import BASELINE_KV, OPERATOR_SETS
 from src.experiment.task import Task, TaskGenerator, TaskTransform
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
+
+# Some kernels have a limit to the amount of work they can do
+BASELINE_LIMIT = 3e9  # roughly 12GB of memory required
+BLOCK_REDUCE_LIMIT = 1e6
 
 
 class LogInfo(TypedDict):
@@ -133,17 +137,16 @@ def run_one_task(task: Task, log_path: Path) -> None:
         seed=task["seed"],
         random_state=task["seed"],
         budget_kwargs={
-            # "max_evaluations": 1_000_000,  # TODO
-            "max_duration": datetime.timedelta(hours=3),
+            # "max_evaluations": 1_000_000,
+            # "max_duration": datetime.timedelta(hours=3),
         },
         tracking_kwargs={
             "logpath": log_path,
             "log_info": log_info,
             "max_generations_until_next_report": 1,
             "generation_factor": 1,
-            "initial_evaluations_until_next_report": 100,
-            "max_evaluations_until_next_report": 5000,
-            "eval_factor": 1,
+            "max_evaluations_until_next_report": 100_000,
+            "eval_factor": 100_000,
             "initial_time_until_next_report": datetime.timedelta(hours=1),
         },
     )
@@ -291,23 +294,19 @@ def run_gpu_tasks(
 
     for task in tasks:
         task_name = task_to_file_name(task)
+        kernel = task["kernel"]
 
-        # The combination of large population size, a million datapoints and these
-        # kernels requires more memory than available on the GPU
-        if (
-            task["population_size"] >= 4096
-            and task["num_observations"] >= 1e6
-            and task["kernel"]
-            in [
-                KV.baseline,
-                KV.restrict,
-                KV.shared_memory,
-            ]
-        ):
+        # Determine the amount of work, and if the kernel can perform all that work
+        work_items = task["population_size"] * task["num_observations"]
+        skip_kernel = (kernel in BASELINE_KV and work_items >= BASELINE_LIMIT) or (
+            kernel == KV.block_reduce and work_items >= BLOCK_REDUCE_LIMIT
+        )
+
+        if skip_kernel:
             print(f"skipping kernel: {task['kernel']}")
             continue
 
-        kernel_str: str = str(task["kernel"]).replace("KernelVersion.", "")
+        kernel_str: str = str(kernel).replace("KernelVersion.", "")
 
         log_path = output_directory / f"{task['dataset']}/{kernel_str}/{task_name}.csv"
 
@@ -329,8 +328,6 @@ def run_gpu_tasks(
         num_gpus = get_num_cuda_devices()
         # Determine the amount of workers
         num_workers = num_gpus if max_workers is None else min(num_gpus, max_workers)
-
-        # print(f"Number of workers: {num_workers}")
 
         queue = Queue()
         progress_counter: Synchronized = Value("i", 0)

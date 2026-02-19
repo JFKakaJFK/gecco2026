@@ -24,6 +24,18 @@ KERNEL_ORDER = [
     "single_kernel_inplace",
 ]
 
+KERNEL_FAMILY = {
+    "cpu": "cpu",
+    "baseline": "baseline",
+    "restrict": "baseline",
+    "shared_memory": "baseline",
+    "block_reduce": "block_reduce",
+    "single_kernel": "single_kernel",
+    "single_kernel_fmaf": "single_kernel",
+    "single_kernel_inplace": "single_kernel",
+}
+
+
 sns.set_theme(context="notebook", style="whitegrid")
 
 
@@ -517,6 +529,94 @@ def plot_fraction_target_reached(
         )
 
     pbar.close()
+
+
+def plot_minimally_required_population(directory: Path):
+    csv_path = directory / "grid_search_results.csv"
+
+    df = pd.read_csv(csv_path)
+    threshold = 49 / 50
+
+    group_cols = [
+        "dataset",
+        "num_observations",
+        "num_features",
+        "template",
+        "operator_set",
+        "kernel",
+    ]
+
+    result = (
+        df[df["rate"] >= threshold]
+        .sort_values("population_size")
+        .groupby(group_cols, as_index=False)
+        .first()
+        .rename(columns={"population_size": "min_population"})
+    )
+
+    # Extract clean dataset name
+    result["dataset_name"] = result["dataset"].str.extract(r"name='([^']+)'")
+    result["kernel_family"] = result["kernel"].map(KERNEL_FAMILY)
+
+    # Unique kernels actually present in the result
+    kernels = sorted(result["kernel"].unique())
+
+    # Unique families
+    families = sorted(set(KERNEL_FAMILY[k] for k in kernels))
+
+    # Assign one color per family
+    family_palette = dict(
+        zip(families, sns.color_palette("tab10", len(families)), strict=True)
+    )
+
+    # Map each kernel to its family color
+    kernel_palette = {
+        kernel: family_palette[KERNEL_FAMILY[kernel]] for kernel in kernels
+    }
+
+    sns.set_theme(style="whitegrid")
+
+    # Create faceted plot
+    g = sns.relplot(
+        data=result,
+        x="num_observations",
+        y="min_population",
+        hue="kernel",  # color = family
+        style="kernel",  # marker = specific kernel
+        palette=kernel_palette,
+        col="dataset_name",  # one subplot per dataset
+        kind="scatter",
+        markers=True,
+        dashes=False,
+        col_wrap=4,  # 4 in one row
+        height=4,
+        aspect=1,
+        s=100,
+    )
+
+    # Log scale for y-axis
+    g.set(xscale="log")
+
+    for ax in g.axes.flat:
+        ax.set_yscale("log", base=2)
+
+        # Get visible y-limits
+        ymin, ymax = ax.get_ylim()
+
+        # Compute exponent range
+        min_exp = int(np.floor(np.log2(ymin)))
+        max_exp = int(np.ceil(np.log2(ymax)))
+
+        # Generate all powers of 2 in range
+        ticks = [2**e for e in range(min_exp, max_exp + 1)]
+
+        ax.set_yticks(ticks)
+        ax.set_yticklabels([str(t) for t in ticks])
+
+    g.set_axis_labels("Number of observations", "Minimum population size (rate ≥ 0.98)")
+
+    # plt.tight_layout()
+    plt.savefig(directory / "minimum_population.svg")
 
 
 def create_plots(output_directory: Path):

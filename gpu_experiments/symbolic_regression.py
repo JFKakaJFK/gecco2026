@@ -18,7 +18,7 @@ from src.experiment.task import (
     override_tasks,
     task_factory,
 )
-from src.plot.plots import create_plots
+from src.plot.plots import create_plots, plot_minimally_required_population
 
 MIN_POPULATION = 8
 MAX_POPULATION = 65536
@@ -40,7 +40,7 @@ def grid_search_helper(
     output_directory: Path,
     required_rate: float,
     kernel_str: str,
-) -> dict[str, int] | None:
+):
     search_space: dict[str, list[int]] = config.search_space
 
     factory = task_factory(problem, config, output_directory)
@@ -58,12 +58,12 @@ def grid_search_helper(
             required_rate=required_rate,
         )
 
-        writer.writerow({**problem, **overrides, "kernel": kernel_str, "rate": rate})
-
         if rate is not None and rate >= required_rate:
-            return (overrides, rate)
+            writer.writerow(
+                {**problem, **overrides, "kernel": kernel_str, "rate": rate}
+            )
 
-    return None
+            return
 
 
 def grid_search(config: ExperimentConfig, directory: Path):
@@ -168,15 +168,18 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
 
 
 def main():
-    run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    # run_date = "2026-01-14_17_26_08"
+    # run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
     # run_experiment(cfg.TEST_EXECUTION, output_directory)
-    grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
-    grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
+    # grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
+    # grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)
+
+    plot_minimally_required_population(output_directory / "search_arith_feynman")
+    plot_minimally_required_population(output_directory / "search_trig_feynman")
 
 
 if __name__ == "__main__":
