@@ -364,7 +364,7 @@ class GASRProblem : public GPInstanceBase {
         float* d_partial = nullptr;
         float* d_result = nullptr;
 
-        KernelVersion _kernel_version = KernelVersion::BlockReduce;
+        KernelVersion _kernel_version = KernelVersion::SingleKernelInplace;
 };
 
 }
