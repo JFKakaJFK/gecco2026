@@ -3505,6 +3505,7 @@ class CompleteInit final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
@@ -3615,8 +3616,12 @@ namespace test {
 
 namespace goblin {
 
-constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
-constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
+constexpr size_t round_up(size_t value, size_t multiple) {
+    return ((value + multiple - 1) / multiple) * multiple;
+}
+constexpr size_t ceil_div(size_t a, size_t b) {
+    return (a + b - 1) / b;
+}
 
 struct KernelDim {
     size_t x = 1;
@@ -3624,17 +3629,16 @@ struct KernelDim {
     size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1)
-        : x(_x), y(_y), z(_z) {}
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) : x(_x), y(_y), z(_z) {}
 
     static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
         size_t min_redundant = max_threads;
 
-        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= WARP_SIZE) {
             // Round up division to determine number of blocks needed
             size_t blocks_needed = ceil_div(count, threads);
-            size_t redundant = blocks_needed * threads - count;
+            size_t redundant = (blocks_needed * threads) - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
@@ -3642,15 +3646,15 @@ struct KernelDim {
             }
 
             // Early exit if perfect fit is found
-            if (redundant == 0) break;
+            if (redundant == 0) {
+                break;
+            }
         }
 
         return dim;
     }
 
-    void check() const {
-        assert(x * y * z <= MAX_THREADS_PER_BLOCK);
-    }
+    void check() const { assert(x * y * z <= MAX_THREADS_PER_BLOCK); }
 
     constexpr bool operator==(const KernelDim& other) const {
         return x == other.x && y == other.y && z == other.z;
@@ -3662,10 +3666,9 @@ struct KernelConfig {
     KernelDim block;
 
     KernelConfig() = default;
-    KernelConfig(KernelDim _grid, KernelDim _block)
-        : grid(_grid), block(_block) {}
+    KernelConfig(KernelDim _grid, KernelDim _block) : grid(_grid), block(_block) {}
 
-    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
+    static KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.block = KernelDim::determine(num_datapoints);
@@ -3783,7 +3786,7 @@ struct LaunchConfig {
     }
 };
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_MISC_H */
 
@@ -3830,8 +3833,8 @@ void evaluate_kernel_shared_memory(
 __device__
 float compute_tree_output_baseline(
     float* X,
-    float* type,
-    float* value,
+    const float* type,
+    const float* value,
     size_t solution_length,
     size_t num_datapoints,
     size_t datapoint_index
@@ -3892,13 +3895,13 @@ void evaluate_kernel_wrapper(
     float* type,
     float* value,
     float* partial,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void mse_kernel_wrapper(
     float* partial,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void evaluate_mse_kernel_wrapper(
@@ -3907,7 +3910,7 @@ void evaluate_mse_kernel_wrapper(
     float* type,
     float* value,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void kernel_wrapper(
@@ -3917,7 +3920,7 @@ void kernel_wrapper(
     float* value,
     float* partial,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 float test_compute_output_kernel(
@@ -3940,7 +3943,7 @@ std::vector<float> test_evaluate_kernel(
 );
 
 std::vector<float> test_compute_mse_kernel(
-    std::vector<float> se,
+    std::vector<float> partial,
     size_t num_solutions,
     size_t num_datapoints,
     KernelVersion version
@@ -3955,7 +3958,7 @@ std::vector<float> test_evaluate_mse_kernel(
     size_t num_datapoints
 );
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3971,30 +3974,31 @@ std::vector<float> test_evaluate_mse_kernel(
 #ifndef _GOBLIN_GA_GP_HELPER_H
 #define _GOBLIN_GA_GP_HELPER_H
 
-
-// Maximum number of threads per CUDA block, currently defined as 1024,
-// which is the maximum for modern NVIDIA GPUs.
-
-
 namespace goblin {
 
 #ifdef __CUDACC__
 void check(cudaError_t err, char const* func, char const* file, int line);
 #endif
 
-template <typename T> T* allocate_on_gpu(size_t count);
+template <typename T>
+T* allocate_on_gpu(size_t count);
 
-template <typename T> void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
+template <typename T>
+void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
 
-template <typename T> T* allocate_and_copy(const T* host_data, size_t count);
+template <typename T>
+T* allocate_and_copy(const T* host_data, size_t count);
 
-template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count);
+template <typename T>
+void copy_from_device(T* host_data, T* d_ptr, size_t count);
 
-template <typename T> void free_on_gpu(T* d_ptr);
+template <typename T>
+void free_on_gpu(T* d_ptr);
 
-template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
+template <typename T>
+void zero_mem_on_gpu(T* d_ptr, size_t count);
 
-};
+};  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_HELPER_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5815,6 +5819,9 @@ class GASRProblem : public GPInstanceBase {
             _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
             _continuous_lower_bounds = -_continuous_upper_bounds;
 
+            __goblin_runtime_assert(!isna(constant_init_lower_bound));
+            __goblin_runtime_assert(!isna(constant_init_upper_bound));
+            __goblin_runtime_assert(constant_init_lower_bound < constant_init_upper_bound);
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 

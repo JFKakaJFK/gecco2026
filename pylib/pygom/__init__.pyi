@@ -1251,6 +1251,7 @@ class CompleteInit(DiscreteInitBase):
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 # #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #
 
@@ -1459,7 +1460,10 @@ def test_evaluate_kernel(
     pass
 
 def test_compute_mse_kernel(
-    se: List[float], num_solutions: int, num_datapoints: int, version: KernelVersion
+    partial: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    version: KernelVersion,
 ) -> List[float]:
     pass
 
@@ -1485,9 +1489,6 @@ def test_evaluate_mse_kernel(
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_HELPER_H
 #
-
-# Maximum number of threads per CUDA block, currently defined as 1024,
-# which is the maximum for modern NVIDIA GPUs.
 
 # #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
