@@ -11,7 +11,7 @@
 
 using namespace goblin;
 
-TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
+TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
     using namespace std::numbers;
     using namespace test;
 
@@ -126,7 +126,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_tree_output") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
+TEST_CASE("goblin::ga-gp::evaluate::evaluate") {
     using namespace test;
 
     std::vector<KernelVersion> kernel_versions = {
@@ -237,7 +237,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
+TEST_CASE("goblin::ga-gp::evaluate::evaluate_block_reduce") {
     using namespace test;
 
     struct TestCase {
@@ -355,7 +355,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
+TEST_CASE("goblin::ga-gp::evaluate::compute_mse") {
     std::vector<KernelVersion> kernel_versions = {
         KernelVersion::Baseline, KernelVersion::Restrict, KernelVersion::SharedMemory
     };
@@ -416,7 +416,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
+TEST_CASE("goblin::ga-gp::evaluate::compute_mse_block_reduce") {
     struct TestCase {
         std::vector<float> partial;
         size_t num_solutions;
@@ -479,7 +479,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
+TEST_CASE("goblin::ga-gp::evaluate::evaluate_mse_kernel") {
     using namespace test;
 
     std::vector<KernelVersion> kernel_versions = {

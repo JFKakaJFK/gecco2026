@@ -99,6 +99,7 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+            usize expression_size;
             size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
@@ -110,7 +111,7 @@ class GASRProblem : public GPInstanceBase {
             std::vector<float> node_value;
 
             for (auto i : indices) {
-                ctx.to_gpu_repr(solutions[i], node_type, node_value);
+                ctx.gpu_nodes_post_order(solutions[i], node_type, node_value, expression_size);
             }
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
