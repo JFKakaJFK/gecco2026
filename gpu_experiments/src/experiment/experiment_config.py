@@ -164,7 +164,7 @@ SEARCH_ARITH_FEYNMAN_CONFIG = ExperimentConfig(
     use_target=True,
     num_folds=50,
     num_iterations=1,
-    test_size=0.25,
+    test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space
@@ -190,7 +190,7 @@ SEARCH_TRIG_FEYNMAN_CONFIG = ExperimentConfig(
     use_target=True,
     num_folds=50,
     num_iterations=1,
-    test_size=0.25,
+    test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space
@@ -214,7 +214,7 @@ SEARCH_SQUARE_FEYNMAN_CONFIG = ExperimentConfig(
     use_target=True,
     num_folds=50,
     num_iterations=1,
-    test_size=0.25,
+    test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space
@@ -237,7 +237,7 @@ SEARCH_EXP_FEYNMAN_CONFIG = ExperimentConfig(
     use_target=True,
     num_folds=50,
     num_iterations=1,
-    test_size=0.25,
+    test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space

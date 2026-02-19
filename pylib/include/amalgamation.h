@@ -3964,6 +3964,7 @@ std::vector<float> test_evaluate_mse_kernel(
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <cstdio>
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
@@ -5881,6 +5882,7 @@ class GASRProblem : public GPInstanceBase {
 
             // Determine launch config
             const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+
             // Sanity check
             config.check();
 
@@ -6123,7 +6125,7 @@ class GASRProblem : public GPInstanceBase {
         float* d_partial = nullptr;
         float* d_result = nullptr;
 
-        KernelVersion _kernel_version = KernelVersion::BlockReduce;
+        KernelVersion _kernel_version = KernelVersion::SingleKernelInplace;
 };
 
 }

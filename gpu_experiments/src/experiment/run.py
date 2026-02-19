@@ -22,7 +22,7 @@ JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task 
 
 # Some kernels have a limit to the amount of work they can do
 BASELINE_LIMIT = 3e9  # roughly 12GB of memory required
-BLOCK_REDUCE_LIMIT = 1e6
+BLOCK_REDUCE_LIMIT = 1024**2
 
 
 class LogInfo(TypedDict):
@@ -295,9 +295,10 @@ def run_gpu_tasks(
         kernel = task["kernel"]
 
         # Determine the amount of work, and if the kernel can perform all that work
-        work_items = task["population_size"] * task["num_observations"]
-        skip_kernel = (kernel in BASELINE_KV and work_items >= BASELINE_LIMIT) or (
-            kernel == KV.block_reduce and work_items >= BLOCK_REDUCE_LIMIT
+        num_obs = task["num_observations"]
+        num_work = task["population_size"] * num_obs
+        skip_kernel = (kernel in BASELINE_KV and num_work >= BASELINE_LIMIT) or (
+            kernel == KV.block_reduce and num_obs >= BLOCK_REDUCE_LIMIT
         )
 
         if skip_kernel:

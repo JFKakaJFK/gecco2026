@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
@@ -122,6 +123,7 @@ class GASRProblem : public GPInstanceBase {
 
             // Determine launch config
             const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+
             // Sanity check
             config.check();
 
