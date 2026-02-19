@@ -32,6 +32,7 @@ TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
         { 2049, KernelDim(416) }, 
         { 2047, KernelDim(1024) },
         { 100000, KernelDim(800) },
+        {73500, KernelDim(32)},
     };
 
 
@@ -40,7 +41,9 @@ TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
 
         KernelDim result = KernelDim::determine(tc.count);
 
-        CHECK_EQ(result, tc.expected);
+        CHECK_EQ(result.x, tc.expected.x);
+        CHECK_EQ(result.y, tc.expected.y);
+        CHECK_EQ(result.z, tc.expected.z);
     }
 }
 

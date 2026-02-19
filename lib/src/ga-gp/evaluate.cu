@@ -58,7 +58,7 @@ void evaluate_kernel_baseline(
         size_t partial_index = (solution_index * num_datapoints) + datapoint_index;
 
         // Store squared error in global memory
-        partial[partial_index] = se;
+        partial[partial_index] = se; 
     }
 };
 
@@ -111,7 +111,7 @@ void evaluate_kernel_shared_memory(
     const float* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
-    size_t solution_length, 
+    size_t solution_length,
     size_t num_datapoints
 ) {
     // Calculate datapoint index
@@ -465,20 +465,20 @@ float compute_tree_output_baseline(
             float res = 0.0F;
 
             switch (op_value) {
-                case Operator::Add: res = args[0] + args[1]; break;
-                case Operator::Sub: res = args[0] - args[1]; break;
-                case Operator::Mul: res = args[0] * args[1]; break;
-                case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Add: res = args[1] + args[0]; break;
+                case Operator::Sub: res = args[1] - args[0]; break;
+                case Operator::Mul: res = args[1] * args[0]; break;
+                case Operator::Div: res = args[1] / args[0]; break;
                 case Operator::Sin: res = sinf(args[0]); break;
                 case Operator::Cos: res = cosf(args[0]); break;
                 case Operator::Exp: res = expf(args[0]); break;
                 case Operator::Log: res = logf(args[0]); break;
                 case Operator::Square: res = args[0] * args[0]; break;
                 case Operator::Sqrt: res = sqrtf(args[0]); break;
-                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Pow: res = powf(args[1], args[0]); break;
                 case Operator::Abs: res = fabsf(args[0]); break;
-                case Operator::Min: res = fminf(args[0], args[1]); break;
-                case Operator::Max: res = fmaxf(args[0], args[1]); break;
+                case Operator::Min: res = fminf(args[1], args[0]); break;
+                case Operator::Max: res = fmaxf(args[1], args[0]); break;
             }
 
             stack[sp++] = res;   
@@ -548,20 +548,20 @@ float compute_tree_output_restrict(
             float res = 0.0F;
 
             switch (op_value) {
-                case Operator::Add: res = args[0] + args[1]; break;
-                case Operator::Sub: res = args[0] - args[1]; break;
-                case Operator::Mul: res = args[0] * args[1]; break;
-                case Operator::Div: res = args[0] / args[1]; break;
+                case Operator::Add: res = args[1] + args[0]; break;
+                case Operator::Sub: res = args[1] - args[0]; break;
+                case Operator::Mul: res = args[1] * args[0]; break;
+                case Operator::Div: res = args[1] / args[0]; break;
                 case Operator::Sin: res = sinf(args[0]); break;
                 case Operator::Cos: res = cosf(args[0]); break;
                 case Operator::Exp: res = expf(args[0]); break;
                 case Operator::Log: res = logf(args[0]); break;
                 case Operator::Square: res = args[0] * args[0]; break;
                 case Operator::Sqrt: res = sqrtf(args[0]); break;
-                case Operator::Pow: res = powf(args[0], args[1]); break;
+                case Operator::Pow: res = powf(args[1], args[0]); break;
                 case Operator::Abs: res = fabsf(args[0]); break;
-                case Operator::Min: res = fminf(args[0], args[1]); break;
-                case Operator::Max: res = fmaxf(args[0], args[1]); break;
+                case Operator::Min: res = fminf(args[1], args[0]); break;
+                case Operator::Max: res = fmaxf(args[1], args[0]); break;
             }
 
             stack[sp++] = res;   
@@ -606,20 +606,32 @@ float compute_tree_output_inplace(
 
             // Apply the operator on the operands depending on op_value.
             switch (op_value) {
-                case Operator::Add: stack[sp - 1]   += stack[--sp];                       break;
-                case Operator::Sub: stack[sp - 1]    = stack[--sp] - stack[sp - 1];       break;
-                case Operator::Mul: stack[sp - 1]   *= stack[--sp];                       break;
-                case Operator::Div: stack[sp - 1]    = stack[--sp] / stack[sp - 1];       break; 
-                case Operator::Sin: stack[sp - 1]    = sinf(stack[sp - 1]);               break;
-                case Operator::Cos: stack[sp - 1]    = cosf(stack[sp - 1]);               break;
-                case Operator::Exp: stack[sp - 1]    = expf(stack[sp - 1]);               break;
-                case Operator::Log: stack[sp - 1]    = logf(stack[sp - 1]);               break;
-                case Operator::Square: stack[sp - 1] = stack[sp - 1] * stack[sp - 1];     break;
-                case Operator::Sqrt: stack[sp - 1]   = sqrtf(stack[sp - 1]);              break;
-                case Operator::Pow: stack[sp - 1]    = powf(stack[--sp], stack[sp - 1]);  break;
-                case Operator::Abs: stack[sp - 1]    = fabsf(stack[sp - 1]);              break;
-                case Operator::Min: stack[sp - 1]    = fminf(stack[--sp], stack[sp - 1]); break;
-                case Operator::Max: stack[sp - 1]    = fmaxf(stack[--sp], stack[sp - 1]); break;
+                case Operator::Add: stack[sp - 1]    += stack[--sp];                        break;
+                case Operator::Sub: stack[sp - 1]    -= stack[--sp];                        break;
+                case Operator::Mul: stack[sp - 1]    *= stack[--sp];                        break;
+                case Operator::Div: stack[sp - 1]    /= stack[--sp];                        break; 
+                case Operator::Sin: stack[sp - 1]     = sinf(stack[sp - 1]);                break;
+                case Operator::Cos: stack[sp - 1]     = cosf(stack[sp - 1]);                break;
+                case Operator::Exp: stack[sp - 1]     = expf(stack[sp - 1]);                break;
+                case Operator::Log: stack[sp - 1]     = logf(stack[sp - 1]);                break;
+                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;  
+                case Operator::Sqrt: stack[sp - 1]    = sqrtf(stack[sp - 1]);               break;
+                case Operator::Pow: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = powf(stack[sp - 1], rhs);   
+                    break;
+                }
+                case Operator::Abs: stack[sp - 1]     = fabsf(stack[sp - 1]);               break;
+                case Operator::Min: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = fminf(stack[sp - 1], rhs);  
+                    break;
+                }
+                case Operator::Max: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = fmaxf(stack[sp - 1], rhs);
+                    break;
+                }
             }
         } else {
             break;

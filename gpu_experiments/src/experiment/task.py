@@ -32,8 +32,8 @@ class Task(TypedDict):
     iteration: int
     X_path: Path
     y_path: Path
-    X_test_path: Path
-    y_test_path: Path
+    X_test_path: Path | None
+    y_test_path: Path | None
     seed: int
 
 
@@ -120,18 +120,28 @@ def create_tasks(
                 local_cache_dir=PMLB_CACHE_DIRECTORY,
             )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=config.test_size, random_state=rng.integers(2**32 - 1)
-    )
+    if config.test_size != 0:
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=config.test_size, random_state=rng.integers(2**32 - 1)
+        )
+    else:
+        X_train = X
+        X_test = None
+        y_train = y
+        y_test = None
 
-    X_test_path, y_test_path = (
-        data_directory / "X_test.npy",
-        data_directory / "y_test.npy",
-    )
+    if X_test is not None and y_test is not None:
+        X_test_path, y_test_path = (
+            data_directory / "X_test.npy",
+            data_directory / "y_test.npy",
+        )
 
-    if not dry_run:
-        np.save(X_test_path, X_test, allow_pickle=False)
-        np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
+        if not dry_run:
+            np.save(X_test_path, X_test, allow_pickle=False)
+            np.save(y_test_path, y_test.reshape(-1, 1), allow_pickle=False)
+    else:
+        X_test_path = None
+        y_test_path = None
 
     target_objectives = (
         config.get_target_objectives(problem["dataset"]) if config.use_target else None

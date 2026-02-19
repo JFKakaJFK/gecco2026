@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdio>
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
@@ -103,6 +104,7 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+            usize expression_size;
             size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
@@ -114,13 +116,14 @@ class GASRProblem : public GPInstanceBase {
             std::vector<float> node_value;
 
             for (auto i : indices) {
-                ctx.to_gpu_repr(solutions[i], node_type, node_value);
+                ctx.gpu_nodes_post_order(solutions[i], node_type, node_value, expression_size);
             }
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
             // Determine launch config
             const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+
             // Sanity check
             config.check();
 
@@ -363,7 +366,7 @@ class GASRProblem : public GPInstanceBase {
         float* d_partial = nullptr;
         float* d_result = nullptr;
 
-        KernelVersion _kernel_version = KernelVersion::BlockReduce;
+        KernelVersion _kernel_version = KernelVersion::SingleKernelInplace;
 };
 
 }

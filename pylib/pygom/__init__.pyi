@@ -1255,87 +1255,8 @@ class CompleteInit(DiscreteInitBase):
 # #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #
 
-# #include "goblin/ga-gp/misc.h"
-
-def evaluate_kernel_wrapper(
-    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
-) -> None:
-    pass
-
-def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
-    pass
-
-def evaluate_mse_kernel_wrapper(
-    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
-) -> None:
-    pass
-
-def kernel_wrapper(
-    x: float,
-    y: float,
-    type: float,
-    value: float,
-    partial: float,
-    result: float,
-    config: LaunchConfig,
-) -> None:
-    pass
-
-def test_compute_output_kernel(
-    h_x: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_datapoints: int,
-    datapoint_index: int,
-    version: KernelVersion,
-) -> float:
-    pass
-
-def test_evaluate_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_compute_mse_kernel(
-    partial: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_evaluate_mse_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-) -> List[float]:
-    pass
-
-# #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_SR_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_HELPER_H
-#
-
-# #endif
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/misc.h included by goblin/ga-gp/ga_sr.h                                   //
+#                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_MISC_H
 #
@@ -1488,6 +1409,85 @@ class LaunchConfig:
         pass
 
 # #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/evaluate.h continued                                                      //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+def evaluate_kernel_wrapper(
+    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
+) -> None:
+    pass
+
+def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
+    pass
+
+def evaluate_mse_kernel_wrapper(
+    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
+) -> None:
+    pass
+
+def kernel_wrapper(
+    x: float,
+    y: float,
+    type: float,
+    value: float,
+    partial: float,
+    result: float,
+    config: LaunchConfig,
+) -> None:
+    pass
+
+def test_compute_output_kernel(
+    h_x: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_datapoints: int,
+    datapoint_index: int,
+    version: KernelVersion,
+) -> float:
+    pass
+
+def test_evaluate_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    version: KernelVersion,
+) -> List[float]:
+    pass
+
+def test_compute_mse_kernel(
+    partial: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+    version: KernelVersion,
+) -> List[float]:
+    pass
+
+def test_evaluate_mse_kernel(
+    h_x: List[float],
+    h_y: List[float],
+    h_type: List[float],
+    h_value: List[float],
+    num_solutions: int,
+    num_datapoints: int,
+) -> List[float]:
+    pass
+
+# #endif
+# #ifndef _GOBLIN_GA_GP_SR_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_HELPER_H
+#
+
+# #endif
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/gp/context.h included by goblin/ga-gp/ga_sr.h                                   //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1508,6 +1508,7 @@ class LaunchConfig:
 
 class TemplateNode:
     children: List[TemplateNode]
+    max_num_nodes: int
 
     @staticmethod
     def full_nary(branching_factor: int, depth: int) -> TemplateNode:
@@ -1525,7 +1526,11 @@ class TemplateNode:
     def is_cycle_free(self) -> bool:
         pass
 
-    def __init__(self, children: List[TemplateNode] = List[TemplateNode]()) -> None:
+    def __init__(
+        self,
+        children: List[TemplateNode] = List[TemplateNode](),
+        max_num_nodes: int = int(),
+    ) -> None:
         """Auto-generated default constructor with named params"""
         pass
 
@@ -2175,11 +2180,6 @@ class GPContext:
         pass
 
     def to_sympy(self, solution: SolutionBase) -> List[str]:
-        pass
-
-    def to_gpu_repr(
-        self, solution: SolutionBase, node_type: List[float], node_value: List[float]
-    ) -> None:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
     # / indices

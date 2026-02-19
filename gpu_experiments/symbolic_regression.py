@@ -168,18 +168,18 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
 
 
 def main():
-    # run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-    run_date = "2026-02-01_17:02:09"
+    run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    # run_experiment(cfg.TEST_EXECUTION, output_directory)
-    # grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
+    # grid_execution(cfg.TEST_EXECUTION, output_directory)
+    grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)
 
-    plot_minimally_required_population(output_directory / "search_arith_feynman")
-    plot_minimally_required_population(output_directory / "search_trig_feynman")
+    # plot_minimally_required_population(output_directory / "search_arith_feynman")
+    # plot_minimally_required_population(output_directory / "search_trig_feynman")
 
 
 if __name__ == "__main__":

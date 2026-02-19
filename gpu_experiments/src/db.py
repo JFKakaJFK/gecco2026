@@ -24,7 +24,7 @@ def create_db(dir: pathlib.Path):
         eval_time_seconds DOUBLE,
         expressions TEXT,
         mse_train DOUBLE,
-        problem TEXT,
+        dataset TEXT,
         fold INTEGER,
         num_observations INTEGER,
         num_features INTEGER,

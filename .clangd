@@ -1,5 +1,5 @@
 CompileFlags:
-    Add: [-std=c++20]
+    Add: [-std=c++23]
 
 
     Remove:
@@ -15,6 +15,7 @@ CompileFlags:
         - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_evaluate.dir/evaluate.cpp.o.modmap
         - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_ga_sr.dir/context.cpp.o.modmap
         - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_ga_sr.dir/ga_sr.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_kernel.dir/kernel.cpp.o.modmap
         - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_misc.dir/misc.cpp.o.modmap
         - -fdeps-format=p1689r5
 
