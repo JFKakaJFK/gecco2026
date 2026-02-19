@@ -1510,6 +1510,7 @@ def test_evaluate_mse_kernel(
 
 class TemplateNode:
     children: List[TemplateNode]
+    max_num_nodes: int
 
     @staticmethod
     def full_nary(branching_factor: int, depth: int) -> TemplateNode:
@@ -1527,7 +1528,11 @@ class TemplateNode:
     def is_cycle_free(self) -> bool:
         pass
 
-    def __init__(self, children: List[TemplateNode] = List[TemplateNode]()) -> None:
+    def __init__(
+        self,
+        children: List[TemplateNode] = List[TemplateNode](),
+        max_num_nodes: int = int(),
+    ) -> None:
         """Auto-generated default constructor with named params"""
         pass
 
@@ -2177,11 +2182,6 @@ class GPContext:
         pass
 
     def to_sympy(self, solution: SolutionBase) -> List[str]:
-        pass
-
-    def to_gpu_repr(
-        self, solution: SolutionBase, node_type: List[float], node_value: List[float]
-    ) -> None:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
     # / indices
