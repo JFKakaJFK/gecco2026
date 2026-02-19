@@ -210,7 +210,6 @@ def run_cpu_tasks(
 
                 if required_rate is not None and failure_count > max_failures:
                     pool.shutdown(wait=False, cancel_futures=True)
-                    pool.terminate_workers()
 
                     progress.close()
 
@@ -218,7 +217,6 @@ def run_cpu_tasks(
 
         except KeyboardInterrupt:
             pool.shutdown(wait=False, cancel_futures=True)
-            pool.terminate_workers()
 
             progress.close()
 

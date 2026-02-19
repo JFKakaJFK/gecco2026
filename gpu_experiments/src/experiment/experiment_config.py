@@ -146,7 +146,7 @@ TEST_SEARCH_CONFIG = ExperimentConfig(
     required_rate=0.8,
 )
 
-SEARCH_ARITH_FEYNMAN_GPU_CONFIG = ExperimentConfig(
+SEARCH_ARITH_FEYNMAN_CONFIG = ExperimentConfig(
     # Problem Space
     name="search_arith_feynman",
     datasets=[
@@ -165,14 +165,14 @@ SEARCH_ARITH_FEYNMAN_GPU_CONFIG = ExperimentConfig(
     num_folds=50,
     num_iterations=1,
     test_size=0.25,
-    cpu=CPUConfig(enabled=False),
+    cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space
-    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    search_space={"population_size": [2**i for i in range(5, 16)]},  # 32 - 32768
     required_rate=49 / 50,
 )
 
-SEARCH_TRIG_FEYNMAN_GPU_CONFIG = ExperimentConfig(
+SEARCH_TRIG_FEYNMAN_CONFIG = ExperimentConfig(
     # Problem Space
     name="search_trig_feynman",
     datasets=[
@@ -191,14 +191,14 @@ SEARCH_TRIG_FEYNMAN_GPU_CONFIG = ExperimentConfig(
     num_folds=50,
     num_iterations=1,
     test_size=0.25,
-    cpu=CPUConfig(enabled=False),
+    cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=ALL_KV),
     # Search Space
-    search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
+    search_space={"population_size": [2**i for i in range(9, 16)]},  # 512 - 32768
     required_rate=49 / 50,
 )
 
-SEARCH_SQUARE_FEYNMAN_GPU_CONFIG = ExperimentConfig(
+SEARCH_SQUARE_FEYNMAN_CONFIG = ExperimentConfig(
     # Problem Space
     name="search_square_feynman",
     datasets=[
@@ -222,7 +222,7 @@ SEARCH_SQUARE_FEYNMAN_GPU_CONFIG = ExperimentConfig(
     required_rate=49 / 50,
 )
 
-SEARCH_EXP_FEYNMAN_GPU_CONFIG = ExperimentConfig(
+SEARCH_EXP_FEYNMAN_CONFIG = ExperimentConfig(
     # Problem Space
     name="search_exp_feynman",
     datasets=[
@@ -252,10 +252,10 @@ class Configs:
     TEST_SEARCH = TEST_SEARCH_CONFIG
 
     # Grid Search for Feynman Datasets
-    SEARCH_ARITH_FEYNMAN = SEARCH_ARITH_FEYNMAN_GPU_CONFIG
-    SEARCH_TRIG_FEYNMAN = SEARCH_TRIG_FEYNMAN_GPU_CONFIG
-    SEARCH_SQUARE_FEYNMAN = SEARCH_SQUARE_FEYNMAN_GPU_CONFIG
-    SEARCH_EXP_FEYNMAN = SEARCH_EXP_FEYNMAN_GPU_CONFIG
+    SEARCH_ARITH_FEYNMAN = SEARCH_ARITH_FEYNMAN_CONFIG
+    SEARCH_TRIG_FEYNMAN = SEARCH_TRIG_FEYNMAN_CONFIG
+    SEARCH_SQUARE_FEYNMAN = SEARCH_SQUARE_FEYNMAN_CONFIG
+    SEARCH_EXP_FEYNMAN = SEARCH_EXP_FEYNMAN_CONFIG
 
 
 cfg = Configs()
