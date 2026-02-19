@@ -161,117 +161,116 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
 TEST_CASE("goblin::ga-gp::misc::launch_config_determine") {
     struct TestCase {
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         KernelVersion kernel_version;
         LaunchConfig expected;
     };
 
     std::vector<TestCase> test_cases = {
-        { 1, 1, 1, KernelVersion::Baseline, LaunchConfig(
+        { 1, 1, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 32, 1, 1, KernelVersion::Baseline, LaunchConfig(
+        { 32, 1, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 1, 1, 32, KernelVersion::Baseline, LaunchConfig(
+        { 1, 32, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 32, 1, 32, KernelVersion::Baseline, LaunchConfig(
+        { 32, 32, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 1, 1, 1025, KernelVersion::Baseline, LaunchConfig(
+        { 1, 1025, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(1, 3), KernelDim(352)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 32, 1, 1025, KernelVersion::Baseline, LaunchConfig(
+        { 32, 1025, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(32, 3), KernelDim(352)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::Baseline
         ) },
-        { 2048, 1, 100000, KernelVersion::Baseline, LaunchConfig(
+        { 2048, 100000, KernelVersion::Baseline, LaunchConfig(
             KernelConfig(KernelDim(2048, 125), KernelDim(800)),
             KernelConfig(KernelDim(2), KernelDim(1024)),
             KernelVersion::Baseline
         ) },
-        { 1, 1, 1, KernelVersion::BlockReduce, LaunchConfig(
+        { 1, 1, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 32, 1, 1, KernelVersion::BlockReduce, LaunchConfig(
+        { 32, 1, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 1, 1, 32, KernelVersion::BlockReduce, LaunchConfig(
+        { 1, 32, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 32, 1, 32, KernelVersion::BlockReduce, LaunchConfig(
+        { 32, 32, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 1, 1, 1025, KernelVersion::BlockReduce, LaunchConfig(
+        { 1, 1025, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(1, 3), KernelDim(352)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 32, 1, 1025, KernelVersion::BlockReduce, LaunchConfig(
+        { 32, 1025, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(32, 3), KernelDim(352)),
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 1, 1, 4096, KernelVersion::BlockReduce, LaunchConfig(
+        { 1, 4096, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(1, 4), KernelDim(1024)),
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelVersion::BlockReduce
         ) },
-        { 2048, 1, 100000, KernelVersion::BlockReduce, LaunchConfig(
+        { 2048, 100000, KernelVersion::BlockReduce, LaunchConfig(
             KernelConfig(KernelDim(2048, 125), KernelDim(800)),
             KernelConfig(KernelDim(2048), KernelDim(128)),
             KernelVersion::BlockReduce
         ) },
-        { 1, 1, 1, KernelVersion::SingleKernel, LaunchConfig(
+        { 1, 1, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 32, 1, 1, KernelVersion::SingleKernel, LaunchConfig(
+        { 32, 1, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 1, 1, 32, KernelVersion::SingleKernel, LaunchConfig(
+        { 1, 32, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 32, 1, 32, KernelVersion::SingleKernel, LaunchConfig(
+        { 32, 32, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 1, 1, 1025, KernelVersion::SingleKernel, LaunchConfig(
+        { 1, 1025, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(1024)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 32, 1, 1025, KernelVersion::SingleKernel, LaunchConfig(
+        { 32, 1025, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(1024)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 1, 1, 4096, KernelVersion::SingleKernel, LaunchConfig(
+        { 1, 4096, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(1024)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
-        { 2048, 1, 100000, KernelVersion::SingleKernel, LaunchConfig(
+        { 2048, 100000, KernelVersion::SingleKernel, LaunchConfig(
             KernelConfig(KernelDim(2048), KernelDim(1024)),
             KernelConfig(), KernelVersion::SingleKernel
         ) },
@@ -281,7 +280,7 @@ TEST_CASE("goblin::ga-gp::misc::launch_config_determine") {
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
         INFO("Test case index: ", i);
 
-        LaunchConfig result = LaunchConfig::determine(tc.kernel_version, tc.num_solutions, tc.num_outputs, tc.num_datapoints, 0);
+        LaunchConfig result = LaunchConfig::determine(tc.kernel_version, tc.num_solutions, tc.num_datapoints, 0);
         
         INFO("EVAL");
 

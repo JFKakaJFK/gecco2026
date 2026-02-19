@@ -139,58 +139,57 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
         std::vector<float> type;
         std::vector<float> value;
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         std::vector<float> expected;
     };
 
     // Instantiation of test cases
     std::vector<TestCase> test_cases = {
-        //////////////////////////////////////////////////////////
-        /// SINGLE SOLUTION | SINGLE OUTPUT | SINGLE DATAPOINT ///
-        //////////////////////////////////////////////////////////
+        //////////////////////////////////////////
+        /// SINGLE SOLUTION | SINGLE DATAPOINT ///
+        //////////////////////////////////////////
 
         // (10 / x0) * (x1 - x0) #0
-       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {0} }, // se = (5 - 5)**2
-       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {25} }, // se = (5 - 10)**2
-       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {16} }, // se = (5 - 1)**2
+       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {0} }, // se = (5 - 5)**2
+       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {25} }, // se = (5 - 10)**2
+       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {16} }, // se = (5 - 1)**2
     
-        ////////////////////////////////////////////////////////////
-        /// SINGLE SOLUTION | SINGLE OUTPUT | MULTIPLE DATAPOINT ///
-        ////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////
+        /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
+        ////////////////////////////////////////////
         
         // x0 #3
-        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 1, 4, {1, 0, 1, 4} },
+        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 4, {1, 0, 1, 4} },
 
         // x0 + x1 #4
-        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 1, 2, {4, 0} }, // x0 + x1
+        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 2, {4, 0} }, // x0 + x1
 
         // (x1 * x2) + (10 - x0), tree outputs = {54, 68, 84, 102} #5
-        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {50, 70, 90, 110}, {I, I, O, C, I, O, O}, {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 1, 1, 4, {16, 4, 36, 64} }, 
+        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {50, 70, 90, 110}, {I, I, O, C, I, O, O}, {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 1, 4, {16, 4, 36, 64} }, 
 
-        ////////////////////////////////////////////////////////////
-        /// MULTIPLE SOLUTION | SINGLE OUTPUT | SINGLE DATAPOINT ///
-        ////////////////////////////////////////////////////////////
+        ////////////////////////////////////////////
+        /// MULTIPLE SOLUTION | SINGLE DATAPOINT ///
+        ////////////////////////////////////////////
 
         // c0 = 2, 4, 6 #6
-        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, 1, {1, 1, 9} },
+        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, {1, 1, 9} },
 
         // x0 = 1, 2, 3 #7
-        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, 1, {4, 1, 0} },
+        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, {4, 1, 0} },
 
         // x0 op x1, op = +, -, *, / #8
         // tree outputs = {6, 2, 8, 2} 
-        { {4, 2}, {6}, {I, I, O, I, I, O, I, I, O, I, I, O}, {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 4, 1, 1, {0, 16, 4, 16} }, // x0 op x1, op = +, -, *, /
+        { {4, 2}, {6}, {I, I, O, I, I, O, I, I, O, I, I, O}, {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 4, 1, {0, 16, 4, 16} }, // x0 op x1, op = +, -, *, /
 
-        //////////////////////////////////////////////////////////////
-        /// MULTIPLE SOLUTION | SINGLE OUTPUT | MULTIPLE DATAPOINT ///
-        //////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////
+        /// MULTIPLE SOLUTION | MULTIPLE DATAPOINT ///
+        //////////////////////////////////////////////
 
         // s0 = x0, s1 = x1 #9
-        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 1, 2, {1, 4, 1, 16} }, 
+        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 2, {1, 4, 1, 16} }, 
 
         // s0 = c0 + x0, s1 = x0 - c1 #10
-        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 1, 2, {1, 25, 25, 1} }, 
+        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 2, {1, 25, 25, 1} }, 
 
         // s0 = c0 + (x1 * (x2 / c1)), s1 = ((x0 * x2) - c1) / c0, s2 = x0 / ((x2 + c0) * c1) #11
         { 
@@ -206,22 +205,13 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
                 Idx(0), Idx(2), Mul, Val(-4.5), Sub, Val(5), Div, // Solution 2
                 Idx(0), Idx(2), Val(0.1), Add, Val(0.25f), Mul, Div, // Solution 3
             },
-            3, 1, 4, 
+            3, 4, 
             {
                 32.6136, 336.875, 1741.39, 5751.46, 
                 12.2500, 18.4900, 42.2500, 102.010,
                 13.7617, 54.4209, 286.390, 1004.52
             }
         },
-
-        ////////////////////////////////////////////////////////////
-        /// SINGLE SOLUTION | MULTIPLE OUTPUT | SINGLE DATAPOINT ///
-        ////////////////////////////////////////////////////////////
-
-        // [x0 + 1, 2 - x1] #12
-        { {2, 3}, {3, -1}, {I, C, O, C, I, O}, {Idx(0), Val(1), Add, Val(2), Idx(1), Sub}, 1, 2, 1, {0, 0} }, // se = [(3 - 3)**2, (-1 - -1)**2]
-        { {2, 3}, {4, 1}, {I, C, O, C, I, O}, {Idx(0), Val(1), Add, Val(2), Idx(1), Sub}, 1, 2, 1, {1, 4} }, // se = [(3 - 4)**2, (-1 - 1)**2]
-        { {2, 3}, {0, -6}, {I, C, O, C, I, O}, {Idx(0), Val(1), Add, Val(2), Idx(1), Sub}, 1, 2, 1, {9, 25} }, // se = [(3 - 0)**2, (-1 - -6)**2]
     };
 
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
@@ -229,12 +219,12 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate") {
             INFO("Version: ", to_string(version), "\tTest Case: ", i);
 
             REQUIRE_EQ(tc.type.size(), tc.value.size());
-            REQUIRE_EQ(tc.Y.size(), tc.num_outputs * tc.num_datapoints);
-            REQUIRE_EQ(tc.expected.size(), tc.num_solutions * tc.num_outputs * tc.num_datapoints);
+            REQUIRE_EQ(tc.Y.size(), tc.num_datapoints);
+            REQUIRE_EQ(tc.expected.size(), tc.num_solutions * tc.num_datapoints);
 
             std::vector<float> result = test_evaluate_kernel(
                 tc.X, tc.Y, tc.type, tc.value, 
-                tc.num_solutions, tc.num_outputs, tc.num_datapoints, version
+                tc.num_solutions, tc.num_datapoints, version
             );
 
             CHECK_EQ(result.size(), tc.expected.size());
@@ -256,7 +246,6 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
         std::vector<float> type;
         std::vector<float> value;
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         std::vector<float> expected;
     };
@@ -268,19 +257,19 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
         ////////////////////////////////////////// 
 
         // (10 / x0) * (x1 - x0)
-       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {0} }, // se = (5 - 5)**2
-       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {25} }, // se = (5 - 10)**2
-       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {16} }, // se = (5 - 1)**2
+       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {0} }, // se = (5 - 5)**2
+       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {25} }, // se = (5 - 10)**2
+       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {16} }, // se = (5 - 1)**2
     
         ////////////////////////////////////////////
         /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
         ////////////////////////////////////////////
         
         // x0
-        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 1, 4, {6} }, // result = 1 + 1 + 4 = 6
+        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 4, {6} }, // result = 1 + 1 + 4 = 6
 
         // x0 + x1
-        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 1, 2, {4} }, // result = 4 + 0 = 4
+        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 2, {4} }, // result = 4 + 0 = 4
 
         // (x1 * x2) + (10 - x0), tree outputs = {54, 68, 84, 102}
         { 
@@ -288,7 +277,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
             {50, 70, 90, 110}, 
             {I, I, O, C, I, O, O}, 
             {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 
-            1, 1, 4, {120} 
+            1, 4, {120} 
         }, // result = 16 + 4 + 36 + 64 = 120
 
         ////////////////////////////////////////////
@@ -296,10 +285,10 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
         ////////////////////////////////////////////
 
         // c0 = 2, 4, 6
-        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, 1, {1, 1, 9} },
+        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, {1, 1, 9} },
 
         // x0 = 1, 2, 3
-        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, 1, {4, 1, 0} },
+        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, {4, 1, 0} },
 
         // x0 op x1, op = +, -, *, /
         // tree outputs = {6, 2, 8, 2}
@@ -307,7 +296,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
             {4, 2}, {6}, 
             {I, I, O, I, I, O, I, I, O, I, I, O}, 
             {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 
-            4, 1, 1, {0, 16, 4, 16} 
+            4, 1, {0, 16, 4, 16} 
         }, // x0 op x1, op = +, -, *, /
 
         //////////////////////////////////////////////
@@ -315,10 +304,10 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
         //////////////////////////////////////////////
 
         // s0 = x0, s1 = x1
-        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 1, 2, {5, 17} }, // result = {1 + 4, 1 + 16} = {5, 17}
+        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 2, {5, 17} }, // result = {1 + 4, 1 + 16} = {5, 17}
 
         // s0 = c0 + x0, s1 = x0 - c1
-        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 1, 2, {26, 26} }, // result = {1 + 25, 25 + 1} = {26, 26}
+        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 2, {26, 26} }, // result = {1 + 25, 25 + 1} = {26, 26}
 
         // s0 = c0 + (x1 * (x2 / c1)), s1 = ((x0 * x2) - c1) / c0, s2 = x0 / ((x2 + c0) * c1)
         { 
@@ -334,7 +323,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
                 Idx(0), Idx(2), Mul, Val(-4.5), Sub, Val(5), Div, // Solution 2
                 Idx(0), Idx(2), Val(0.1), Add, Val(0.25f), Mul, Div, // Solution 3
             },
-            3, 1, 4, 
+            3, 4, 
             {
                 7862.31, // 32.6136 + 336.875 + 1741.39 + 5751.46
                 175.000, // 12.2500 + 18.4900 + 42.2500 + 102.010
@@ -353,7 +342,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_block_reduce") {
 
         std::vector<float> result = test_evaluate_kernel(
             tc.X, tc.Y, tc.type, tc.value, 
-            tc.num_solutions, tc.num_outputs, tc.num_datapoints, 
+            tc.num_solutions, tc.num_datapoints, 
             KernelVersion::BlockReduce
         );
 
@@ -374,7 +363,6 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
     struct TestCase {
         std::vector<float> partial;
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         std::vector<float> expected;
     };
@@ -384,28 +372,28 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
         /// SINGLE SOLUTION | SINGLE DATAPOINT ///
         ////////////////////////////////////////// 
 
-        { {5.189}, 1, 1, 1, {5.189} },
+        { {5.189}, 1, 1, {5.189} },
 
         ////////////////////////////////////////////
         /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
         ////////////////////////////////////////////
 
-        { {1, 1, 3, 3}, 1, 1, 4, {2} },
-        { {5.21, 13.62, 128.175}, 1, 1, 3, {49.0017} },
+        { {1, 1, 3, 3}, 1, 4, {2} },
+        { {5.21, 13.62, 128.175}, 1, 3, {49.0017} },
 
         ////////////////////////////////////////////
         /// MULTIPLE SOLUTION | SINGLE DATAPOINT ///
         ////////////////////////////////////////////
 
-        { {1, 2, 3}, 3, 1, 1, {1, 2, 3} },
-        { {5.21, 13.62, 128.175}, 3, 1, 1, {5.21, 13.62, 128.175} },
+        { {1, 2, 3}, 3, 1, {1, 2, 3} },
+        { {5.21, 13.62, 128.175}, 3, 1, {5.21, 13.62, 128.175} },
 
         //////////////////////////////////////////////
         /// MULTIPLE SOLUTION | MULTIPLE DATAPOINT ///
         //////////////////////////////////////////////
 
-        { {1, 2, 5, 10}, 2, 1, 2, {1.5f, 7.5} },
-        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 3, 1, 4, {2.5, 6.5, 10.5} },
+        { {1, 2, 5, 10}, 2, 2, {1.5f, 7.5} },
+        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, 3, 4, {2.5, 6.5, 10.5} },
     };
 
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
@@ -415,7 +403,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse") {
             REQUIRE_EQ(tc.expected.size(), tc.num_solutions);
 
             std::vector<float> result = test_compute_mse_kernel(
-                tc.partial, tc.num_solutions, tc.num_outputs, tc.num_datapoints, version
+                tc.partial, tc.num_solutions, tc.num_datapoints, version
             );
 
             CHECK_EQ(result.size(), tc.expected.size());
@@ -432,7 +420,6 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
     struct TestCase {
         std::vector<float> partial;
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         std::vector<float> expected;
     };
@@ -442,34 +429,34 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
         /// SINGLE SOLUTION | SINGLE DATAPOINT ///
         ////////////////////////////////////////// 
 
-        { {5.189}, 1, 1, 1, {5.189} },
+        { {5.189}, 1, 1, {5.189} },
 
         ////////////////////////////////////////////
         /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
         ////////////////////////////////////////////
 
-        { {1024, 1024, 3072, 3072}, 1, 1, 4096, {2} },
-        { {5335.04, 13946.8, 131251}, 1, 1, 3072, {49.0017} },
+        { {1024, 1024, 3072, 3072}, 1, 4096, {2} },
+        { {5335.04, 13946.8, 131251}, 1, 3072, {49.0017} },
 
         ////////////////////////////////////////////
         /// MULTIPLE SOLUTION | SINGLE DATAPOINT ///
         ////////////////////////////////////////////
 
-        { {1, 2, 3}, 3, 1, 1, {1, 2, 3} },
-        { {5.21f, 13.62f, 128.175f}, 3, 1, 1, {5.21, 13.62, 128.175} },
+        { {1, 2, 3}, 3, 1, {1, 2, 3} },
+        { {5.21f, 13.62f, 128.175f}, 3, 1, {5.21, 13.62, 128.175} },
 
         //////////////////////////////////////////////
         /// MULTIPLE SOLUTION | MULTIPLE DATAPOINT ///
         //////////////////////////////////////////////
 
-        { {1024, 2048, 5120, 10240}, 2, 1, 2048, {1.5, 7.5} },
+        { {1024, 2048, 5120, 10240}, 2, 2048, {1.5, 7.5} },
         { 
             {
             1024, 2048, 3072, 4096, 
             5120, 6144, 7168, 8192, 
             9216, 10240, 11264, 12288
             }, 
-            3, 1, 4096, {2.5, 6.5, 10.5} 
+            3, 4096, {2.5, 6.5, 10.5} 
         },
     };
 
@@ -479,7 +466,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::compute_mse_block_reduce") {
         REQUIRE_EQ(tc.expected.size(), tc.num_solutions);
 
         std::vector<float> result = test_compute_mse_kernel(
-            tc.partial, tc.num_solutions, tc.num_outputs, tc.num_datapoints,
+            tc.partial, tc.num_solutions, tc.num_datapoints,
             KernelVersion::BlockReduce
         );
 
@@ -505,7 +492,6 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
         std::vector<float> type;
         std::vector<float> value;
         size_t num_solutions;
-        size_t num_outputs;
         size_t num_datapoints;
         std::vector<float> expected;
     };
@@ -517,45 +503,45 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
         ////////////////////////////////////////// 
 
         // (10 / x0) * (x1 - x0) = 5
-       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {0} }, // se = (5 - 5)**2
-       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {25} }, // se = (5 - 10)**2
-       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, 1, {16} }, // se = (5 - 1)**2
+       { {2, 3}, {5}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {0} }, // se = (5 - 5)**2
+       { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {25} }, // se = (5 - 10)**2
+       { {2, 3}, {1}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {16} }, // se = (5 - 1)**2
     
         ////////////////////////////////////////////
         /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
         ////////////////////////////////////////////
         
         // x0, mse = (1 + 0 + 1 + 4) / 4 = 1.5 
-        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 1, 4, {1.5} }, 
+        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 4, {1.5} }, 
 
         // x0 + x1, mse = (4 + 0) / 2 = 2
-        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 1, 2, {2} },
+        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 2, {2} },
 
         // (x1 * x2) + (10 - x0), tree outputs = {54, 68, 84, 102}, mse = (16 + 4 + 36 + 64) / 4 = 30
-        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {50, 70, 90, 110}, {I, I, O, C, I, O, O}, {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 1, 1, 4, {30} }, 
+        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {50, 70, 90, 110}, {I, I, O, C, I, O, O}, {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 1, 4, {30} }, 
 
         ////////////////////////////////////////////
         /// MULTIPLE SOLUTION | SINGLE DATAPOINT ///
         ////////////////////////////////////////////
 
         // c0 = 2, 4, 6, mse = {1, 1, 9}
-        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, 1, {1, 1, 9} },
+        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, {1, 1, 9} },
 
         // x0 = 1, 2, 3, mse = {4, 1, 0}
-        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, 1, {4, 1, 0} },
+        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, {4, 1, 0} },
 
         // x0 op x1, op = +, -, *, /, tree outputs = {6, 2, 8, 2}, mse = {0, 16, 4, 16}
-        { {4, 2}, {6}, {I, I, O, I, I, O, I, I, O, I, I, O}, {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 4, 1, 1, {0, 16, 4, 16} }, // x0 op x1, op = +, -, *, /
+        { {4, 2}, {6}, {I, I, O, I, I, O, I, I, O, I, I, O}, {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 4, 1, {0, 16, 4, 16} }, // x0 op x1, op = +, -, *, /
 
         //////////////////////////////////////////////
         /// MULTIPLE SOLUTION | MULTIPLE DATAPOINT ///
         //////////////////////////////////////////////
 
         // s0 = x0, s1 = x1, mse = {(1 + 4) / 2, (1 + 16) / 2} = {2.5, 8.5}
-        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 1, 2, {2.5, 8.5} }, 
+        { {1, 2, 3, 4}, {2, 0},  {I, I}, {Idx(0), Idx(1)}, 2, 2, {2.5, 8.5} }, 
 
         // s0 = c0 + x0, s1 = x0 - c1, mse = {(1 + 25) / 2, (25 + 1) / 2} = {13, 13}
-        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 1, 2, {13, 13} }, 
+        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 2, {13, 13} }, 
 
         // s0 = c0 + (x1 * (x2 / c1)), s1 = ((x0 * x2) - c1) / c0, s2 = x0 / ((x2 + c0) * c1)
         { 
@@ -571,7 +557,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
                 Idx(0), Idx(2), Mul, Val(-4.5), Sub, Val(5), Div, // Solution 2
                 Idx(0), Idx(2), Val(0.1), Add, Val(0.25f), Mul, Div, // Solution 3
             },
-            3, 1, 4, 
+            3, 4, 
             {
                 1965.5847, // (32.6136 + 336.875 + 1741.39 + 5751.46) / 4 = 7862.3386
                 43.75, // (12.2500 + 18.490 + 42.2500 + 102.010) / 4 = 43.75
@@ -590,7 +576,7 @@ TEST_CASE("goblin::ga-gp::eval_kernel::evaluate_mse_kernel") {
             REQUIRE_EQ(tc.expected.size(), tc.num_solutions);
 
             std::vector<float> result =  test_evaluate_mse_kernel(
-                tc.X, tc.Y, tc.type, tc.value, tc.num_solutions, tc.num_outputs, tc.num_datapoints
+                tc.X, tc.Y, tc.type, tc.value, tc.num_solutions, tc.num_datapoints
             );
 
             CHECK_EQ(result.size(), tc.expected.size());

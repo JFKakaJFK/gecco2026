@@ -17,7 +17,6 @@ void evaluate_kernel_baseline(
     float* v_value, 
     float* partial,
     size_t solution_length, 
-    size_t num_outputs,
     size_t num_datapoints   
 );
 
@@ -29,7 +28,6 @@ void evaluate_kernel_restrict(
     const float* __restrict__ v_value, 
     float* __restrict__ v,
     size_t solution_length, 
-    size_t num_outputs,
     size_t num_datapoints
 );
 
@@ -152,7 +150,6 @@ std::vector<float> test_evaluate_kernel(
     std::vector<float> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
-    size_t num_outputs,
     size_t num_datapoints,
     KernelVersion version
 );
@@ -160,7 +157,6 @@ std::vector<float> test_evaluate_kernel(
 std::vector<float> test_compute_mse_kernel(
     std::vector<float> se, 
     size_t num_solutions, 
-    size_t num_outputs,
     size_t num_datapoints,
     KernelVersion version
 );
@@ -171,7 +167,6 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
-    size_t num_outputs,
     size_t num_datapoints
 );
 
