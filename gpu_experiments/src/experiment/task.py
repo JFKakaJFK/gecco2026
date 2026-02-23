@@ -97,7 +97,7 @@ def create_tasks(
     output_directory: Path,
     dry_run: bool = False,
 ) -> TaskGenerator:
-    data_directory = output_directory / "data"
+    data_directory = output_directory / problem["dataset"].name / "data"
 
     if not dry_run:
         os.makedirs(data_directory, exist_ok=True)

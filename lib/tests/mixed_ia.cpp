@@ -48,5 +48,5 @@ TEST_CASE("goblin::methods::mixed_ia") {
   std::println("Status: {}", format_as(status));
 
   REQUIRE(front->empty() == false);
-  REQUIRE(front->so_solution(0).quality().objectives[0] == VTR);
+  REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == VTR);
 }

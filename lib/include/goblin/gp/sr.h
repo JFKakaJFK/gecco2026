@@ -4,6 +4,8 @@
 
 #include <limits>
 #include <set>
+#include <cassert>
+#include <memory>
 #include <tuple>
 #include <variant>
 #include <vector>
@@ -27,6 +29,37 @@
 #include "goblin/lib/init.h"
 
 namespace goblin {
+
+class SRQuality : public MOQuality {
+ public:
+  std::unique_ptr<QualityBase> clone() const override { return std::make_unique<SRQuality>(*this); };
+
+  /// Linear scaling parameters
+  Arr2D<CType> ls_params{};
+
+  /*
+  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
+  part of what defines a solution or its accuracy - as indicated by the name, it is never
+  used to make any decisions and only tracked for analysis purposes. By making it mutable
+  it an be lazily computed only when requested.
+   */
+  /// Optional test set accuracy
+  mutable std::optional<MOQuality> test_quality = std::nullopt;
+};
+
+class SRFitness : public MOFitness {
+ public:
+  SRFitness(usize num_objectives, bool minimize = true, CType epsilon = 0.0)
+      : MOFitness(num_objectives, minimize, epsilon) {}
+
+  std::unique_ptr<QualityBase> worst() const override final {
+    const CType inf = std::numeric_limits<CType>().infinity();
+    auto q = std::make_unique<SRQuality>();
+    q->objectives = Vec<CType>::Constant(num_objectives(), inf);
+    q->constraint_value = inf;
+    return q;
+  };
+};
 
 class SRProblem : public GPInstanceBase {
   using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
@@ -59,7 +92,12 @@ class SRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt)
+            std::optional<std::vector<CType>> target_objectives = std::nullopt,
+            std::string gradient_mode = "forward",
+            CType gradient_epsilon = 1e-5,
+            CType archive_epsilon = 0.0,
+            std::optional<bool> always_inherit_continuous = std::nullopt,
+            std::optional<usize> batch_size = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -67,25 +105,20 @@ class SRProblem : public GPInstanceBase {
                        : std::get<std::vector<std::string>>(objectives)),
         X_train(X_train.cast<ScalarType>()),
         Y_train(Y_train.cast<ScalarType>()),
-        _archive_fitness(MOFitness(this->objectives.size())),
-        _fitness(MOFitness(objectives_to_optimize.value_or(this->objectives.size()))),
+        _archive_fitness(SRFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
+        _fitness(SRFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_archive_fitness) {
+        _target(_archive_fitness),
+        _gradient_mode(gradient_mode),
+        _gradient_epsilon(gradient_epsilon),
+        _always_inherit_continuous(always_inherit_continuous),
+        _batch_size(batch_size) {
     __goblin_runtime_assert(this->objectives.size() > 0);
     __goblin_runtime_assert(
         !objectives_to_optimize.has_value() ||
         (objectives_to_optimize.value() > 0 && objectives_to_optimize.value() <= this->objectives.size()));
 
     _num_continuous = this->ctx.num_continuous;
-    if (linear_scaling) {
-      _num_continuous +=
-          2 *
-          this->ctx.num_outputs;  // TODO allocate the LS coefficients separately to not mess with optimizers (not a
-                                  // problem right now, especially since they are marked as introns...) - this
-                                  // effectively is abusing the fact that the continuous values have the same type as
-                                  // the LS coefficients combined with the LS coefficients overriding the previous value
-    }
-
     _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
     _continuous_lower_bounds = -_continuous_upper_bounds;
 
@@ -133,6 +166,28 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
+  bool adapt(Rng& rng) override final {
+    if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
+      // TODO refactor out into something like PyTorch's DataLoader/Sampler and allow more sophisticated sampling
+      // strategies Surprisingly (?) PyTorch does not have any fancy strategies that take the data distribution into
+      // account (https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler) I'd expect something like a
+      // "parallel greedy scattered subset selection" to perform well since each batch tries to represent the whole
+      // training data distribution (i.e. in random order, assign the furthest row to the current batch until all rows
+      // are assigned to a batch, where the number of batches is ceil(dataset_size / batch_size) - so basically
+      // stratified sampling)
+      auto perm = permute(rng, X_train.rows());
+      perm.resize(_batch_size.value());
+
+      X_batch = X_train(perm, Eigen::placeholders::all);
+      Y_batch = Y_train(perm, Eigen::placeholders::all);
+
+      var_Y_batch = (Y_batch.rowwise() - Y_batch.colwise().mean()).square().colwise().mean();
+      return true;
+    } else {
+      return false;
+    }
+  };
+
   usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
@@ -144,23 +199,89 @@ class SRProblem : public GPInstanceBase {
   CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    // initialize the first batch if needed
+    if (_batch_size.has_value() && X_batch.size() == 0) {
+      adapt(rng);
+    }
+
     Array<ScalarType> params;
     for (auto i : indices) {
-      eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, solutions[i].quality());
+      auto& q = solutions[i].quality_as<SRQuality>();
+      q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
+      if (_batch_size.has_value()) {
+        eval_one(solutions[i], X_batch, Y_batch, var_Y_batch, params, true, q, q.ls_params);
+      } else {
+        eval_one(solutions[i], X_train, Y_train, var_Y_train, params, true, q, q.ls_params);
+      }
     }
   };
 
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
+    auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
+    assert(p != nullptr && "Quality mismatch");
   };
 
   const FitnessBase& fitness() const override final { return _fitness; };
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
-  bool always_inherit_continuous() const override final {
-    return ctx.const_repr == ConstantRepr::ERCs || ctx.const_repr == ConstantRepr::Edges;
-  };
+  virtual std::tuple<bool, bool> inherit_discrete(SolutionBase& offspring,
+                                                  const SolutionBase& donor,
+                                                  const Subset& subset) const override {
+    const bool inherit_continuous = _always_inherit_continuous.value_or(ctx.const_repr == ConstantRepr::ERCs ||
+                                                                        ctx.const_repr == ConstantRepr::Edges) &&
+                                    ctx.const_repr != ConstantRepr::None;
+
+    // the pool size is not tied to the number of discrete variables, so the full pool instead of the paired values is
+    // inherited...
+    const bool inherit_by_index = ctx.const_repr != ConstantRepr::Pool;
+
+    bool any_active_changed = false, anything_changed = false;
+    for (usize i : subset.discrete) {
+      if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
+        any_active_changed |= offspring.discrete_active()(i);
+        anything_changed = true;
+        offspring.discrete_values()(i) = donor.discrete_values()(i);
+      }
+
+      // TODO for GCS: inherit child arities + permutations
+
+      if (inherit_continuous && inherit_by_index) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        //
+        // yes, the indices here should be from the discrete subset!
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    if (inherit_continuous && !inherit_by_index) {
+      // note: arguably just inheriting all continuous variables even if the inherited discrete values might not even be
+      // constants is not the best idea - but earlier experiments on another codebase suggested that more
+      // appropriate/interpolating continuous mixing doesn't really work and here it also is more for completeness and
+      // not used by default...
+      for (usize i = 0; i < num_continuous(); i++) {
+        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
+        // useful...
+        if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
+          any_active_changed |= offspring.continuous_active()(i);
+          anything_changed = true;
+          offspring.continuous_values()(i) = donor.continuous_values()(i);
+        }
+      }
+    }
+
+    return std::make_tuple(any_active_changed, anything_changed);
+  }
+
+  // bool always_inherit_continuous() const override final {
+  //   return ;
+  // };
 
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));
@@ -176,9 +297,10 @@ class SRProblem : public GPInstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    s.quality_as<SRQuality>().objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(s.quality_as<SRQuality>().objectives.size()) >=
+                            fitness().num_objectives());
+    s.quality_as<SRQuality>().constraint_value = 0.0;
     _target.update(s, false);
   };
 
@@ -208,26 +330,41 @@ class SRProblem : public GPInstanceBase {
     fitness().log_header(os);
   };
 
-  void log(std::ostream& os, SolutionBase& solution) override final {
+  void evaluate_test(const SolutionBase& solution) const {
+    const auto& q = solution.quality_as<SRQuality>();
+    if (Y_test.size() > 0 && !q.test_quality.has_value()) {
+      Solution copy = solution;  // copy is needed since active variables are not mutable...
+
+      Array<ScalarType> params;  // TODO fit FC params...
+      auto& cq = copy.quality_as<SRQuality>();
+      eval_one(copy, X_test, Y_test, var_Y_test, params, false, cq, cq.ls_params);
+
+      q.test_quality = MOQuality();
+      q.test_quality.value().objectives = copy.quality_as<SRQuality>().objectives;
+      q.test_quality.value().constraint_value = copy.quality_as<SRQuality>().constraint_value;
+    }
+  };
+
+  void log(std::ostream& os, const SolutionBase& solution) const override final {
     os << '"';
     log_solution(os, solution);
     os << "\",";
+
+    const auto& q = solution.quality_as<SRQuality>();
     for (usize i = 0; i < objectives.size(); i++) {
-      os << solution.quality().objectives(i) << ',';
+      os << q.objectives(i) << ',';
     }
     if (Y_test.size() > 0) {
-      // TODO cache this -> solution gets optional second quality?
-      // Then again, one can just call predict using the SKlearn regressor for actual use
-      // and for all other experiments the overhead is not an issue yet
-      Quality q_test = archive_fitness().worst();
-      Array<ScalarType> params;  // TODO fit FC params...
-      eval_one(solution, X_test, Y_test, var_Y_test, params, false, q_test);
+      if (!q.test_quality.has_value()) {
+        evaluate_test(solution);
+      }
+
       for (usize i = 0; i < objectives.size(); i++) {
-        os << q_test.objectives(i) << ',';
+        os << q.test_quality.value().objectives(i) << ',';
       }
     }
 
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
@@ -237,8 +374,12 @@ class SRProblem : public GPInstanceBase {
         os << " , ";
       }
       if (linear_scaling) {
-        os << solution.continuous_values()(ctx.num_continuous + 2 * i) << " + ("
-           << solution.continuous_values()(ctx.num_continuous + 2 * i + 1) << " * (" << exprs[i] << "))";
+        const auto& q = solution.quality_as<SRQuality>();
+        if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
+          os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+        } else {
+          os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
+        }
       } else {
         os << exprs[i];
       }
@@ -259,6 +400,9 @@ class SRProblem : public GPInstanceBase {
   Arr2D<ScalarType> X_train;
   Arr2D<ScalarType> Y_train;
   Array<ScalarType> var_Y_train;
+  Arr2D<ScalarType> X_batch{};
+  Arr2D<ScalarType> Y_batch{};
+  Array<ScalarType> var_Y_batch{};
   Arr2D<ScalarType> X_test;
   Arr2D<ScalarType> Y_test;
   Array<ScalarType> var_Y_test;
@@ -271,29 +415,25 @@ class SRProblem : public GPInstanceBase {
                 const Array<ScalarType>& var_Y,
                 const Array<ScalarType>& params,
                 bool is_train,
-                Quality& quality) {
+                MOQuality& quality,
+                Arr2D<CType>& ls_params) const {
     usize expression_size;
     auto out = ctx.compute_outputs(_eval_buffer, solution, X, params, expression_size);
 
     if (!out.has_value()) {
-      solution.quality().objectives.array() = std::numeric_limits<CType>::infinity();
-      solution.quality().constraint_value = 1.0;
+      quality.objectives.array() = std::numeric_limits<CType>::infinity();
+      quality.constraint_value = 1.0;
       return;
     }
 
     Arr2D<ScalarType> Y_pred = out.value();
-
-    if (linear_scaling) {
-      Arr2D<ScalarType> Y_pred_train;
-      if (!is_train) {
-        Y_pred_train = ctx.compute_outputs(_eval_buffer, solution, X_train, params, expression_size).value();
-      }
-
-      Arr2D<ScalarType> A_ls = Arr2D<ScalarType>::Ones(Y_train.rows(), 2);
+    if (linear_scaling && is_train) {
+      Mat<ScalarType> A_ls = Mat<ScalarType>::Ones(Y_train.rows(), 2);
+      ls_params.resize(2, ctx.num_outputs);
       for (usize o = 0; o < ctx.num_outputs; o++) {
-        A_ls.col(1) = (is_train ? Y_pred : Y_pred_train).col(o);
-        solution.continuous_values()(Eigen::seqN(ctx.num_continuous + 2 * o, 2)) =
-            A_ls.matrix().colPivHouseholderQr().solve(Y_train.matrix().col(o));
+        A_ls.col(1) = Y_pred.col(o);
+        Vec<ScalarType> b = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
+        ls_params.col(o) = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
       }
     }
 
@@ -303,8 +443,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
+            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean();
           }
         } else {
@@ -314,8 +454,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
+            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean() / var_Y(o);
           }
         } else {
@@ -330,16 +470,20 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  MOFitness _archive_fitness;
-  MOFitness _fitness;
+  SRFitness _archive_fitness;
+  SRFitness _fitness;
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
-  usize _num_continuous;
-  Vec<CType> _continuous_lower_bounds;
-  Vec<CType> _continuous_upper_bounds;
-  Vec<CType> _continuous_init_lower_bounds;
-  Vec<CType> _continuous_init_upper_bounds;
-  Arr2D<ScalarType> _eval_buffer;
+  std::string _gradient_mode{};
+  CType _gradient_epsilon{};
+  std::optional<bool> _always_inherit_continuous{};
+  usize _num_continuous{};
+  std::optional<usize> _batch_size{};
+  Vec<CType> _continuous_lower_bounds{};
+  Vec<CType> _continuous_upper_bounds{};
+  Vec<CType> _continuous_init_lower_bounds{};
+  Vec<CType> _continuous_init_upper_bounds{};
+  mutable Arr2D<ScalarType> _eval_buffer{};
 };
 
 };  // namespace goblin

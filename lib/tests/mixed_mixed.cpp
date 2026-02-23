@@ -35,5 +35,5 @@ TEST_CASE("goblin::methods::mixed_mixed") {
   REQUIRE(front->empty() == false);
   std::println("{} @ {}", sphere.format_solution(front->so_solution(0)),
                sphere.fitness().format(front->so_solution(0).quality()));
-  CHECK(front->so_solution(0).quality().objectives[0] <= 1e-8);
+  CHECK(front->so_solution(0).quality_as<MOQuality>().objectives[0] <= 1e-8);
 }

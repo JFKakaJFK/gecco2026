@@ -7,8 +7,7 @@
 
 #include "goblin/bench/functions/discrete.h"
 #include "goblin/bench/problem.h"
-#include "goblin/lib/ims.h"
-#include "goblin/lib/misc.h"
+#include "goblin/methods/ims.h"
 
 using namespace std::chrono_literals;
 using namespace goblin;
@@ -16,6 +15,7 @@ using namespace goblin;
 struct DummyPopulation {
   InstanceBase& problem;
   ArchiveBase& global_archive;
+  AoSSet solutions;
   usize population_size;
   usize num_clusters;
   std::vector<usize>& generation_population_sizes;
@@ -45,7 +45,7 @@ struct DummyPopulation {
   void restart() {};
 
   template <typename T>
-  usize perform_generation(Rng& rng, T should_terminate) {
+  usize perform_generation(Rng& rng, T should_terminate, bool reevaluate_solutions) {
     std::println("{:>5d} | {:>3d}", population_size, num_clusters);
     generation_population_sizes.push_back(population_size);
     return population_size;
@@ -58,6 +58,8 @@ struct DummyPopulation {
       return global_archive;
     }
   };
+
+  const SolutionSetBase& get_solutions() const { return solutions; };
 
   bool converged() { return is_converged; }
 };

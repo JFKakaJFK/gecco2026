@@ -3,12 +3,11 @@ import pathlib
 
 import pandas as pd
 from pygom import *
-from tqdm import tqdm
-
 from src.config import Config, c
 from src.plots import plot_convergence_so, plot_scalability
 from src.postprocessing import load_results
 from src.run import run_all, run_one
+from tqdm import tqdm
 
 REPEATS = 30
 REPEATS = 100
@@ -53,33 +52,43 @@ def problems():
             ),
         )
 
-    for init in ["random", "complete"]:
-        for d in [
-            10,
-            25,
-            50,
-            100,  # 200, 400
-        ]:
-            actual_init = c.RandomInit() if init == "random" else c.CompleteInit()
-            yield (
-                f"LeadingOnes IA ({init})",
-                d,
-                c.BenchmarkInstance(
-                    c.LeadingOnes(d), target=[float(d)], init=actual_init
-                ),
-            )
-            branching_factor = 2
-            yield (
-                f"HLeadingOnes IA ({init})",
-                d,
-                c.BenchmarkInstance(
-                    c.HLeadingOnes(d, branching_factor),
-                    discrete_domain=branching_factor
-                    + 1,  # each node can be in [0, branching_factor]
-                    target=[float(d)],
-                    init=actual_init,
-                ),
-            )
+        yield (
+            "LeadingOnes IA",
+            d,
+            c.BenchmarkInstance(
+                c.LeadingOnes(d),
+                target=[float(d)],
+                init=c.RandomInit(),
+            ),
+        )
+
+    # for init in ["random", "complete"]:
+    #     for d in [
+    #         10,
+    #         25,
+    #         50,
+    #         100,  # 200, 400
+    #     ]:
+    #         actual_init = c.RandomInit() if init == "random" else c.CompleteInit()
+    #         yield (
+    #             f"LeadingOnes IA ({init})",
+    #             d,
+    #             c.BenchmarkInstance(
+    #                 c.LeadingOnes(d), target=[float(d)], init=actual_init
+    #             ),
+    #         )
+    #         branching_factor = 2
+    #         yield (
+    #             f"HLeadingOnes IA ({init})",
+    #             d,
+    #             c.BenchmarkInstance(
+    #                 c.HLeadingOnes(d, branching_factor),
+    #                 discrete_domain=branching_factor
+    #                 + 1,  # each node can be in [0, branching_factor]
+    #                 target=[float(d)],
+    #                 init=actual_init,
+    #             ),
+    #         )
 
 
 def methods():
@@ -314,7 +323,7 @@ def main():
         # max_workers=1,
     )
 
-    add_reference_results(output_directory, all_rows=True)
+    # add_reference_results(output_directory, all_rows=True)
 
     preprocess = True
     # preprocess = False
@@ -341,19 +350,19 @@ def main():
                     bbox_inches="tight",
                 )
 
-        plot_convergence_so(
-            plot_dir / f"{domain}_convergence",
-            conn,
-            y_agg="MAX",
-            ymin="0",
-            # y_var="objectives[1]::DOUBLE / dims::DOUBLE",
-            # metrics=["evaluations / dims::DOUBLE", "total_time_seconds / dims::DOUBLE"],
-            # metric_labels=[r"$\frac{Evaluations}{Dimensions}$", "Time/Dimensions [s]"],
-            modifier_query="[dims]",
-            modifier_labels=["Dimensions"],
-            # show_generation_boundaries=True,
-            nsamples=100,
-        )
+        # plot_convergence_so(
+        #     plot_dir / f"{domain}_convergence",
+        #     conn,
+        #     y_agg="MAX",
+        #     ymin="0",
+        #     # y_var="objectives[1]::DOUBLE / dims::DOUBLE",
+        #     # metrics=["evaluations / dims::DOUBLE", "total_time_seconds / dims::DOUBLE"],
+        #     # metric_labels=[r"$\frac{Evaluations}{Dimensions}$", "Time/Dimensions [s]"],
+        #     modifier_query="[dims]",
+        #     modifier_labels=["Dimensions"],
+        #     # show_generation_boundaries=True,
+        #     nsamples=100,
+        # )
 
 
 if __name__ == "__main__":

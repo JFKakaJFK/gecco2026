@@ -1,4 +1,5 @@
 #include "goblin/gp/sr.h"
+#include <stdexcept>
 
 namespace goblin {
 std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
@@ -30,7 +31,8 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
 
     u64& evaluations;
 
-    Mode mode = Mode::Forward;
+    Mode mode;
+    Scalar e;
 
     int inputs() const { return s.continuous.size(); }
     int values() const { return p->Y_train.size(); }
@@ -53,30 +55,31 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
     }
 
     int df(const InputType& x, JacobianType& fjac) const {
-      const Scalar e = 1e-6;
-
       ValueType fwd(values()), bwd(values());
       InputType perturbed = x;
+      int evals = 0;
 
       if (mode == Mode::Forward) {
         operator()(perturbed, bwd);
+        evals++;
       }
       for (isize i = 0; i < x.size(); i++) {
-        const Scalar d = e + e * std::abs(x(i));
+        const Scalar d = std::max(e, e * std::abs(x(i)));
         perturbed(i) += d;
         operator()(perturbed, fwd);
+        evals++;
         if (mode == Mode::Central) {
           perturbed(i) -= d + d;
           operator()(perturbed, bwd);
-          perturbed(i) += d;
-        } else {
-          perturbed(i) -= d;
+          evals++;
+          fjac.col(i) = (fwd - bwd).array() / (d + d);
+        } else if (mode == Mode::Forward) {
+          fjac.col(i) = (fwd - bwd).array() / d;
         }
-
-        fjac.col(i) = (fwd - bwd).array() / (d + d);
+        perturbed(i) = x(i);
       }
 
-      return mode == Mode::Forward ? 1 + x.size() : 2 * x.size();  // = number of evaluations done
+      return evals;
     }
   };
 
@@ -95,12 +98,27 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       }
     }
     if (active.continuous.front() < ctx.num_continuous) {
-      LMFunctor functor{.rng = rng, .p = this, .solution = solutions[i], .s = active, .evaluations = evaluations};
+      LMFunctor::Mode mode;
+      if (_gradient_mode == "central") {
+        mode = LMFunctor::Mode::Central;
+      } else if (_gradient_mode == "forward") {
+        mode = LMFunctor::Mode::Forward;
+      } else {
+        throw std::runtime_error("Unknown or unsupported gradient mode.");
+      }
+      LMFunctor functor{.rng = rng,
+                        .p = this,
+                        .solution = solutions[i],
+                        .s = active,
+                        .evaluations = evaluations,
+                        .mode = mode,
+                        .e = _gradient_epsilon};
 
       // Eigen::NumericalDiff<LMFunctor, Eigen::NumericalDiffMode::Central> diff(functor);
       // Eigen::LevenbergMarquardt<decltype(diff), ScalarType> lm(diff);
       Eigen::LevenbergMarquardt<LMFunctor, ScalarType> lm(functor);
-      lm.parameters.maxfev = num_steps * 2 * active.continuous.size();
+      // lm.parameters.maxfev = num_steps * 2 * active.continuous.size();
+      lm.parameters.maxfev = std::numeric_limits<int>::max();
       // gradient tolerance
       lm.parameters.gtol = 1e-8;
       // function tolerance
@@ -111,13 +129,21 @@ std::tuple<std::vector<usize>, u64> SRProblem::gradient_steps(Rng& rng,
       Vec<ScalarType> x = solutions[i].continuous_values()(active.continuous).cast<ScalarType>();
       // Status is enum containing reason for termination, > 0 is ok
       // https://libeigen.gitlab.io/eigen/docs-nightly/unsupported/LevenbergMarquardt_2LevenbergMarquardt_8h_source.html
-      /* Eigen::LevenbergMarquardtSpace::Status status = */ lm.minimize(x);
+      // /* Eigen::LevenbergMarquardtSpace::Status status = */ lm.minimize(x);
+
+      auto status = lm.minimizeInit(x);
+      assert(status != Eigen::LevenbergMarquardtSpace::ImproperInputParameters);
+      usize steps = 0;
+      do {
+        status = lm.minimizeOneStep(x);
+      } while (++steps < num_steps && status == Eigen::LevenbergMarquardtSpace::Running);
 
       solutions[i].continuous_values()(active.continuous) = x;
 
       // ensure the fitness is up-to-date
       std::vector<usize> idxs{i};
       evaluate(rng, solutions, idxs);
+      evaluations++;
       changed_indices.push_back(i);
     }
   }

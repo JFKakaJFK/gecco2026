@@ -120,7 +120,7 @@ TEST_EXECUTION_CONFIG = ExperimentConfig(
     use_target=True,
     num_folds=3,
     num_iterations=2,
-    test_size=0.25,
+    test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=(KV.block_reduce, KV.single_kernel)),
 )
