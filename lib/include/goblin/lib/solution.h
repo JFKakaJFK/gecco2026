@@ -134,7 +134,7 @@ struct Subset {
 };
 
 inline bool operator==(const Subset& lhs, const Subset& rhs) {
-  return lhs.continuous == rhs.discrete && lhs.continuous == rhs.continuous;
+  return lhs.discrete == rhs.discrete && lhs.continuous == rhs.continuous;
 }
 inline bool operator!=(const Subset& lhs, const Subset& rhs) {
   return !(lhs == rhs);

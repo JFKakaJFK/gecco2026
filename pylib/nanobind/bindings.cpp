@@ -1930,7 +1930,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       goblin::test_evaluate_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
 
   m.def("test_compute_mse_kernel",
-      goblin::test_compute_mse_kernel, nb::arg("se"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
+      goblin::test_compute_mse_kernel, nb::arg("partial"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
 
   m.def("test_evaluate_mse_kernel",
       goblin::test_evaluate_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
@@ -1951,15 +1951,17 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassTemplateNode =
       nb::class_<goblin::TemplateNode>
           (m, "TemplateNode", "")
-      .def("__init__", [](goblin::TemplateNode * self, std::vector<goblin::TemplateNode> children = std::vector<goblin::TemplateNode>())
+      .def("__init__", [](goblin::TemplateNode * self, std::vector<goblin::TemplateNode> children = std::vector<goblin::TemplateNode>(), size_t max_num_nodes = size_t())
       {
           new (self) goblin::TemplateNode();  // placement new
           auto r_ctor_ = self;
           r_ctor_->children = children;
+          r_ctor_->max_num_nodes = max_num_nodes;
       },
-      nb::arg("children") = std::vector<goblin::TemplateNode>()
+      nb::arg("children") = std::vector<goblin::TemplateNode>(), nb::arg("max_num_nodes") = size_t()
       )
       .def_rw("children", &goblin::TemplateNode::children, "")
+      .def_rw("max_num_nodes", &goblin::TemplateNode::max_num_nodes, "")
       .def_static("full_nary",
           &goblin::TemplateNode::full_nary, nb::arg("branching_factor"), nb::arg("depth"))
       .def("size",
@@ -2367,8 +2369,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           "A helper that prints the expression in a human readable format")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
-      .def("to_gpu_repr",
-          &goblin::GPContext::to_gpu_repr, nb::arg("solution"), nb::arg("node_type"), nb::arg("node_value"))
       .def_rw("const_repr", &goblin::GPContext::const_repr, "")
       .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
       .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")

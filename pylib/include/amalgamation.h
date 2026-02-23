@@ -492,7 +492,7 @@ struct Subset {
 };
 
 inline bool operator==(const Subset& lhs, const Subset& rhs) {
-  return lhs.continuous == rhs.discrete && lhs.continuous == rhs.continuous;
+  return lhs.discrete == rhs.discrete && lhs.continuous == rhs.continuous;
 }
 inline bool operator!=(const Subset& lhs, const Subset& rhs) {
   return !(lhs == rhs);
@@ -3505,6 +3505,7 @@ class CompleteInit final : public DiscreteInitBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
@@ -3615,8 +3616,12 @@ namespace test {
 
 namespace goblin {
 
-constexpr size_t round_up(size_t value, size_t multiple) { return ((value + multiple - 1) / multiple) * multiple; }
-constexpr size_t ceil_div(size_t a, size_t b) { return (a + b - 1) / b; }
+constexpr size_t round_up(size_t value, size_t multiple) {
+    return ((value + multiple - 1) / multiple) * multiple;
+}
+constexpr size_t ceil_div(size_t a, size_t b) {
+    return (a + b - 1) / b;
+}
 
 struct KernelDim {
     size_t x = 1;
@@ -3624,17 +3629,16 @@ struct KernelDim {
     size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1)
-        : x(_x), y(_y), z(_z) {}
+    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) : x(_x), y(_y), z(_z) {}
 
     static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
         KernelDim dim{WARP_SIZE};
         size_t min_redundant = max_threads;
 
-        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= 32) {
+        for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= WARP_SIZE) {
             // Round up division to determine number of blocks needed
             size_t blocks_needed = ceil_div(count, threads);
-            size_t redundant = blocks_needed * threads - count;
+            size_t redundant = (blocks_needed * threads) - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
@@ -3642,15 +3646,15 @@ struct KernelDim {
             }
 
             // Early exit if perfect fit is found
-            if (redundant == 0) break;
+            if (redundant == 0) {
+                break;
+            }
         }
 
         return dim;
     }
 
-    void check() const {
-        assert(x * y * z <= MAX_THREADS_PER_BLOCK);
-    }
+    void check() const { assert(x * y * z <= MAX_THREADS_PER_BLOCK); }
 
     constexpr bool operator==(const KernelDim& other) const {
         return x == other.x && y == other.y && z == other.z;
@@ -3662,10 +3666,9 @@ struct KernelConfig {
     KernelDim block;
 
     KernelConfig() = default;
-    KernelConfig(KernelDim _grid, KernelDim _block)
-        : grid(_grid), block(_block) {}
+    KernelConfig(KernelDim _grid, KernelDim _block) : grid(_grid), block(_block) {}
 
-    static inline KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
+    static KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
 
         config.block = KernelDim::determine(num_datapoints);
@@ -3783,7 +3786,7 @@ struct LaunchConfig {
     }
 };
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_MISC_H */
 
@@ -3830,8 +3833,8 @@ void evaluate_kernel_shared_memory(
 __device__
 float compute_tree_output_baseline(
     float* X,
-    float* type,
-    float* value,
+    const float* type,
+    const float* value,
     size_t solution_length,
     size_t num_datapoints,
     size_t datapoint_index
@@ -3892,13 +3895,13 @@ void evaluate_kernel_wrapper(
     float* type,
     float* value,
     float* partial,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void mse_kernel_wrapper(
     float* partial,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void evaluate_mse_kernel_wrapper(
@@ -3907,7 +3910,7 @@ void evaluate_mse_kernel_wrapper(
     float* type,
     float* value,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 void kernel_wrapper(
@@ -3917,7 +3920,7 @@ void kernel_wrapper(
     float* value,
     float* partial,
     float* result,
-    const LaunchConfig config
+    LaunchConfig config
 );
 
 float test_compute_output_kernel(
@@ -3940,7 +3943,7 @@ std::vector<float> test_evaluate_kernel(
 );
 
 std::vector<float> test_compute_mse_kernel(
-    std::vector<float> se,
+    std::vector<float> partial,
     size_t num_solutions,
     size_t num_datapoints,
     KernelVersion version
@@ -3955,12 +3958,13 @@ std::vector<float> test_evaluate_mse_kernel(
     size_t num_datapoints
 );
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#include <cstdio>
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
@@ -3971,30 +3975,31 @@ std::vector<float> test_evaluate_mse_kernel(
 #ifndef _GOBLIN_GA_GP_HELPER_H
 #define _GOBLIN_GA_GP_HELPER_H
 
-
-// Maximum number of threads per CUDA block, currently defined as 1024,
-// which is the maximum for modern NVIDIA GPUs.
-
-
 namespace goblin {
 
 #ifdef __CUDACC__
 void check(cudaError_t err, char const* func, char const* file, int line);
 #endif
 
-template <typename T> T* allocate_on_gpu(size_t count);
+template <typename T>
+T* allocate_on_gpu(size_t count);
 
-template <typename T> void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
+template <typename T>
+void copy_to_gpu(T* d_ptr, const T* host_data, size_t count);
 
-template <typename T> T* allocate_and_copy(const T* host_data, size_t count);
+template <typename T>
+T* allocate_and_copy(const T* host_data, size_t count);
 
-template< typename T> void copy_from_device(T* host_data, T* d_ptr, size_t count);
+template <typename T>
+void copy_from_device(T* host_data, T* d_ptr, size_t count);
 
-template <typename T> void free_on_gpu(T* d_ptr);
+template <typename T>
+void free_on_gpu(T* d_ptr);
 
-template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
+template <typename T>
+void zero_mem_on_gpu(T* d_ptr, size_t count);
 
-};
+};  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_HELPER_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4004,8 +4009,6 @@ template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
 #define _GOBLIN_GP_CONTEXT_H
 
 #include <string>
-#include <iterator>
-#include <ranges>
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4028,6 +4031,7 @@ template <typename T> void zero_mem_on_gpu(T* d_ptr, size_t count);
 namespace goblin {
 struct TemplateNode {
   std::vector<TemplateNode> children;
+  size_t max_num_nodes;
 
   static TemplateNode full_nary(usize branching_factor, usize depth) {
     TemplateNode root;
@@ -4037,6 +4041,10 @@ struct TemplateNode {
         root.children.push_back(full_nary(branching_factor, depth - 1));
       }
     }
+
+    // Calculate maximum number of nodes in the template
+    root.max_num_nodes = calc_max_num_nodes(depth, branching_factor);
+
     return root;
   };
 
@@ -4101,6 +4109,20 @@ struct TemplateNode {
     path.erase(current);
     return true;
   };
+
+  static size_t calc_max_num_nodes(size_t branching_factor, size_t depth) {
+    if (branching_factor == 0) return depth == 0 ? 1 : 0;
+    if (branching_factor == 1) return depth + 1;
+
+    auto ipow = [](size_t base, size_t exp) {
+      size_t result = 1;
+      for (size_t i = 0; i < exp; ++i)
+        result *= base;
+      return result;
+    };
+
+    return (ipow(branching_factor, depth + 1) - 1) / (branching_factor - 1);
+  }
 };
 
 struct Template {
@@ -5365,79 +5387,136 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<float>& node_type, std::vector<float>& node_value) const {
-    // TODO implement multi-output (multiple trees per solution) parsing
-
+  template <typename S>
+  void gpu_nodes_post_order(
+    S& solution,
+    std::vector<float>& node_type,
+    std::vector<float>& node_value,
+    usize& size,
+    bool discount_size = false
+  ) const {
     // initially we haven't visited anything, so we set everything to be inactive
-    solution.discrete_active().array() = false;
-    solution.continuous_active().array() = false;
+    if constexpr (!std::is_const<S>()) {
+      solution.discrete_active().array() = false;
+      solution.continuous_active().array() = false;
+    }
 
-    std::vector<usize> stack;
+    Array<u32> visited = Array<u32>::Zero(num_discrete);
+
+    std::vector<usize> call_stack;
+    call_stack.reserve(max_expression_size);
+
+    // (node, call_stack_idx, is_post_order)
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
+    node_stack.reserve(max_expression_size);
+
+    size = 0;
 
     // Vectors to hold temporary type and value data
     std::vector<float> temp_type;
     std::vector<float> temp_value;
+    temp_type.reserve(max_expression_size);
+    temp_value.reserve(max_expression_size);
 
-    // Push root node on stack
-    stack.push_back(output_roots[0]);
+    // TODO implement multi-output and subexpressions
+    node_stack.emplace_back(output_roots[0], 0, false);
 
-    while (!stack.empty()) {
+    // While there are still nodes to visit
+    while(!node_stack.empty()) {
+      // Hit the max size, but still have more nodes to process
+      if (size + temp_type.size() == max_expression_size) {
+        return;
+      }
+
       // Pop the top node from the stack
-      usize node = stack.back();
-      stack.pop_back();
-
-      // Get the type and value for the current node
-      DType domain_value = domain2value(node, solution.discrete_values()(node));
-      usize v_idx = value_idx[domain_value];
-      enum ValueKind type = value_kind[domain_value];
+      auto [idx, call_stack_idx, is_post_order] = node_stack.back();
+      usize node_stack_idx = node_stack.size() - 1;
 
       // Mark current node as active
-      solution.discrete_active()(node) = true;
+      if constexpr (!std::is_const<S>()) {
+        solution.discrete_active()(idx) = true;
+      }
 
-      temp_type.push_back(static_cast<float>(type));
+      // Get the type and value for the current node
+      DType value = domain2value(idx, solution.discrete_values()(idx));
+      usize v_idx = value_idx[value];
+      enum ValueKind type = value_kind[value];
 
-     if (type == ValueKind::Input) {
-        // Push the index of the input feature, will be used to access the input matrix on GPU
-        temp_value.push_back(v_idx);
-      } else if (type == ValueKind::Parameter) {
-        // Push the index of the parameter, will be used to access the parameter array on GPU
-        temp_value.push_back(v_idx);
-      } else if (type == ValueKind::Constant) {
-        usize ci = const_repr == ConstantRepr::Pool ? v_idx : node;
-        // Mark node as active
-        solution.continuous_active()(ci) = true;
-        // Push the constant value, will be used directly in the evaluation on GPU
-        temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
-      } else if (type == ValueKind::Arg) {
-        // TODO implement arg handling
-        continue;
-      } else if (type == ValueKind::Subtree) {
-        // TODO implement subtree handling
-        continue;
-      } else if (type == ValueKind::Operator) {
-        // Push the operator index, will be used to apply the operator on GPU
-        temp_value.push_back(static_cast<float>(v_idx));
+      bool update_tree = false;
 
-        // Push the children of the current node onto the stack
-        usize arity = std::min(children[node].size(), operators[v_idx]->max_arity());
-        for (usize j = arity; j > 0; j--) {
-          stack.push_back(children[node][j - 1]);
+      // only look at the node if this is the first time we see it - in the post-order visit all
+      // we have to do is add it to the temp_type and temp_value
+      if (!is_post_order) {
+        if (discount_size) {
+          visited(idx) = 1;
+        }
+
+        if (type == ValueKind::Operator) {
+          std::get<2>(node_stack[node_stack_idx]) = true;
+
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+
+          for (usize i = arity; i > 0;) {
+            node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
+          }
+        } else if (value_min_arity[value] > 0) {
+          throw std::runtime_error("Encountered unhandled non-leaf node.");
+        } else {
+          if constexpr (!std::is_const<S>()) {
+            if (value_kind[value] == ValueKind::Constant) {
+              solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+            }
+          }
+
+          update_tree = true;
+          node_stack.pop_back();
+        }
+      } else {
+        update_tree = true;
+
+        node_stack.pop_back();
+      }
+
+      if (update_tree) {
+        if (const_repr == ConstantRepr::Edges) {
+          if constexpr (!std::is_const<S>()) {
+            solution.continuous_active()(idx) = true;
+          }
+        }
+
+        temp_type.push_back(static_cast<float>(type));
+
+        if (type == ValueKind::Input) {
+          // Push the index of the input feature, will be used to access the input matrix on GPU
+          temp_value.push_back(v_idx);
+        } else if (type == ValueKind::Parameter) {
+          // Push the index of the parameter, will be used to access the parameter array on GPU
+          temp_value.push_back(v_idx);
+        } else if (type == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          // Push the constant value, will be used directly in the evaluation on GPU
+          temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
+        } else if (type == ValueKind::Operator) {
+          // Push the operator index, will be used to apply the operator on GPU
+          temp_value.push_back(static_cast<float>(v_idx));
         }
       }
     }
 
-    // Reverse the vectors to allow forward iteration on the GPU
-    std::reverse(temp_type.begin(), temp_type.end());
-    std::reverse(temp_value.begin(), temp_value.end());
+    size += temp_type.size();
 
-    // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
-    // TODO investigate coalesced memory access
+    // Pad vectors with placeholder values such that the data is at constant intervals in memory
+    // are at constant intervals in memory
     temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
     node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
     node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
+
+    if (discount_size) {
+      size = visited.sum();
+    }
   }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -5741,6 +5820,9 @@ class GASRProblem : public GPInstanceBase {
             _continuous_upper_bounds = Vec<CType>::Constant(_num_continuous, std::numeric_limits<CType>::max());
             _continuous_lower_bounds = -_continuous_upper_bounds;
 
+            __goblin_runtime_assert(!isna(constant_init_lower_bound));
+            __goblin_runtime_assert(!isna(constant_init_upper_bound));
+            __goblin_runtime_assert(constant_init_lower_bound < constant_init_upper_bound);
             _continuous_init_lower_bounds = Vec<CType>::Constant(_num_continuous, constant_init_lower_bound);
             _continuous_init_upper_bounds = Vec<CType>::Constant(_num_continuous, constant_init_upper_bound);
 
@@ -5781,6 +5863,7 @@ class GASRProblem : public GPInstanceBase {
 
 
         void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+            usize expression_size;
             size_t num_solutions = indices.size();
 
             if (num_solutions == 0) {
@@ -5792,13 +5875,14 @@ class GASRProblem : public GPInstanceBase {
             std::vector<float> node_value;
 
             for (auto i : indices) {
-                ctx.to_gpu_repr(solutions[i], node_type, node_value);
+                ctx.gpu_nodes_post_order(solutions[i], node_type, node_value, expression_size);
             }
 
             __goblin_runtime_assert(node_type.size() == node_value.size());
 
             // Determine launch config
             const LaunchConfig config = LaunchConfig::determine(_kernel_version, num_solutions, _num_datapoints, _solution_length);
+
             // Sanity check
             config.check();
 
@@ -6041,7 +6125,7 @@ class GASRProblem : public GPInstanceBase {
         float* d_partial = nullptr;
         float* d_result = nullptr;
 
-        KernelVersion _kernel_version = KernelVersion::BlockReduce;
+        KernelVersion _kernel_version = KernelVersion::SingleKernelInplace;
 };
 
 }

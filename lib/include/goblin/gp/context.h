@@ -2,22 +2,17 @@
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
+#include <algorithm>
 #include <format>
-#include <functional>
 #include <iostream>
 #include <limits>
 #include <optional>
-#include <print>
-#include <set>
 #include <string>
 #include <vector>
 #include <type_traits>
 #include <span>
 #include <stdexcept>
-#include <iterator>
-#include <ranges>
 
-#include "goblin/ga-gp/types.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
 #include "goblin/lib/assert.h"
@@ -657,79 +652,136 @@ class GPContext {
     return outputs;
   }
 
-  void to_gpu_repr(SolutionBase& solution, std::vector<float>& node_type, std::vector<float>& node_value) const {
-    // TODO implement multi-output (multiple trees per solution) parsing
-
+  template <typename S>
+  void gpu_nodes_post_order(
+    S& solution, 
+    std::vector<float>& node_type,
+    std::vector<float>& node_value, 
+    usize& size,
+    bool discount_size = false
+  ) const {
     // initially we haven't visited anything, so we set everything to be inactive
-    solution.discrete_active().array() = false;
-    solution.continuous_active().array() = false;
+    if constexpr (!std::is_const<S>()) {
+      solution.discrete_active().array() = false;
+      solution.continuous_active().array() = false;
+    }
 
-    std::vector<usize> stack;
+    Array<u32> visited = Array<u32>::Zero(num_discrete);
+
+    std::vector<usize> call_stack;
+    call_stack.reserve(max_expression_size);
+
+    // (node, call_stack_idx, is_post_order)
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
+    node_stack.reserve(max_expression_size);
+
+    size = 0;
 
     // Vectors to hold temporary type and value data
     std::vector<float> temp_type;
     std::vector<float> temp_value;
+    temp_type.reserve(max_expression_size);
+    temp_value.reserve(max_expression_size);
 
-    // Push root node on stack
-    stack.push_back(output_roots[0]);
+    // TODO implement multi-output and subexpressions
+    node_stack.emplace_back(output_roots[0], 0, false);
+      
+    // While there are still nodes to visit
+    while(!node_stack.empty()) {
+      // Hit the max size, but still have more nodes to process
+      if (size + temp_type.size() == max_expression_size) {
+        return;
+      }
 
-    while (!stack.empty()) {
       // Pop the top node from the stack
-      usize node = stack.back();
-      stack.pop_back();
-
-      // Get the type and value for the current node
-      DType domain_value = domain2value(node, solution.discrete_values()(node));
-      usize v_idx = value_idx[domain_value];
-      enum ValueKind type = value_kind[domain_value];
+      auto [idx, call_stack_idx, is_post_order] = node_stack.back();
+      usize node_stack_idx = node_stack.size() - 1;
 
       // Mark current node as active
-      solution.discrete_active()(node) = true;
+      if constexpr (!std::is_const<S>()) {
+        solution.discrete_active()(idx) = true;
+      }
 
-      temp_type.push_back(static_cast<float>(type));  
+      // Get the type and value for the current node
+      DType value = domain2value(idx, solution.discrete_values()(idx));
+      usize v_idx = value_idx[value];
+      enum ValueKind type = value_kind[value];
 
-     if (type == ValueKind::Input) {
-        // Push the index of the input feature, will be used to access the input matrix on GPU
-        temp_value.push_back(v_idx);
-      } else if (type == ValueKind::Parameter) {
-        // Push the index of the parameter, will be used to access the parameter array on GPU
-        temp_value.push_back(v_idx);
-      } else if (type == ValueKind::Constant) {
-        usize ci = const_repr == ConstantRepr::Pool ? v_idx : node;
-        // Mark node as active
-        solution.continuous_active()(ci) = true;
-        // Push the constant value, will be used directly in the evaluation on GPU
-        temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
-      } else if (type == ValueKind::Arg) {
-        // TODO implement arg handling
-        continue;
-      } else if (type == ValueKind::Subtree) {
-        // TODO implement subtree handling
-        continue;
-      } else if (type == ValueKind::Operator) {
-        // Push the operator index, will be used to apply the operator on GPU
-        temp_value.push_back(static_cast<float>(v_idx));
+      bool update_tree = false;
 
-        // Push the children of the current node onto the stack
-        usize arity = std::min(children[node].size(), operators[v_idx]->max_arity());
-        for (usize j = arity; j > 0; j--) {
-          stack.push_back(children[node][j - 1]);
+      // only look at the node if this is the first time we see it - in the post-order visit all
+      // we have to do is add it to the temp_type and temp_value
+      if (!is_post_order) {
+        if (discount_size) {
+          visited(idx) = 1;
+        }
+
+        if (type == ValueKind::Operator) {
+          std::get<2>(node_stack[node_stack_idx]) = true;
+
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+
+          for (usize i = arity; i > 0;) {
+            node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
+          }
+        } else if (value_min_arity[value] > 0) {
+          throw std::runtime_error("Encountered unhandled non-leaf node.");
+        } else {
+          if constexpr (!std::is_const<S>()) {
+            if (value_kind[value] == ValueKind::Constant) {
+              solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+            }
+          }
+
+          update_tree = true;
+          node_stack.pop_back();
+        }
+      } else {
+        update_tree = true;
+
+        node_stack.pop_back();
+      }
+
+      if (update_tree) {
+        if (const_repr == ConstantRepr::Edges) {
+          if constexpr (!std::is_const<S>()) {
+            solution.continuous_active()(idx) = true;
+          }
+        }
+
+        temp_type.push_back(static_cast<float>(type));
+
+        if (type == ValueKind::Input) {
+          // Push the index of the input feature, will be used to access the input matrix on GPU
+          temp_value.push_back(v_idx);
+        } else if (type == ValueKind::Parameter) {
+          // Push the index of the parameter, will be used to access the parameter array on GPU
+          temp_value.push_back(v_idx);
+        } else if (type == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          // Push the constant value, will be used directly in the evaluation on GPU
+          temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
+        } else if (type == ValueKind::Operator) {
+          // Push the operator index, will be used to apply the operator on GPU
+          temp_value.push_back(static_cast<float>(v_idx));
         }
       }
-    } 
+    }
 
-    // Reverse the vectors to allow forward iteration on the GPU
-    std::reverse(temp_type.begin(), temp_type.end());
-    std::reverse(temp_value.begin(), temp_value.end());
+    size += temp_type.size();
 
-    // Pad vectors with placeholder values such that the solutions are at constant intervals in memory
-    // TODO investigate coalesced memory access
+    // Pad vectors with placeholder values such that the data is at constant intervals in memory
+    // are at constant intervals in memory
     temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors
     node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
     node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
+
+    if (discount_size) {
+      size = visited.sum();
+    } 
   }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter

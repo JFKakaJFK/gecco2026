@@ -1,0 +1,24 @@
+CompileFlags:
+    Add: [-std=c++23]
+
+
+    Remove:
+        # nvcc flags
+        - -forward-unknown-to-host-compiler
+        - -arch=native
+        - -Xcompiler=-fPIC
+
+        # GCC C++20 modules flags
+        - -fmodules-ts
+        - -fmodule-mapper=lib/src/CMakeFiles/lib.dir/gp/sr.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_context.dir/context.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_evaluate.dir/evaluate.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_ga_sr.dir/context.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_ga_sr.dir/ga_sr.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_kernel.dir/kernel.cpp.o.modmap
+        - -fmodule-mapper=lib/tests/CMakeFiles/lib_test_misc.dir/misc.cpp.o.modmap
+        - -fdeps-format=p1689r5
+
+    Diagnostics:
+        ClangTidy:
+            Add: ["readability-*"]

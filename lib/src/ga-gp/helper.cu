@@ -1,5 +1,6 @@
+#include <iostream>
+
 #include "goblin/ga-gp/helper.h"
-#include "goblin/ga-gp/types.h"
 
 namespace goblin {
 

@@ -16,33 +16,32 @@ target_link_libraries(${test_target} PRIVATE ${deps})
 
 set(
     LIB_TEST_SOURCES
-    archive
-    fitness
-    solution
-    default_gradients
-    problem
     amalgam
-    so_gomea
-    mo_binary
-    tracked
-    ims
+    archive_objectives
+    archive
+    ctx_gpu_repr
+    ctx_introns
+    ctx_subfunction
+    default_gradients
     entropy
-    mixed
-    mo_mixed
-    mixed_rv
+    evaluate
+    fitness
+    ga_sr
+    gp_operators
+    ims
+    misc
     mixed_ia
     mixed_mixed
-    gp_operators
-    sr
+    mixed_rv
+    mixed
+    mo_binary
+    mo_mixed
+    problem
+    so_gomea
+    solution
     sr_gradient_step
-    archive_objectives
-    evaluate
-    ctx_subfunction
-    ctx_introns
-    context
-    misc
-    ga_sr
-    kernel
+    sr
+    tracked
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
@@ -55,7 +54,6 @@ endforeach()
 target_compile_options(lib_test_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_sr PRIVATE -O2 -g)
 target_compile_options(lib_test_ga_sr PRIVATE -O2 -g)
-target_compile_options(lib_test_kernel PRIVATE -O2 -g)
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)
