@@ -197,7 +197,6 @@ def problems(rng):
                                     )
 
                                     for device in ["CPU", "GPU"]:
-
                                         # for multiple different functions, branch here
                                         # for device in ["CPU"]:
                                         # and then in the plotting code use the method query to append e.g. device to the method name -> comparison plots are in the same plt.Axes object
@@ -318,9 +317,14 @@ def methods(rng, info):
                         for intron_strategy in [
                             # "none",
                             # "any_active", # weighting tends to always be better...
-                            "weighted_any_active",
+                            # "weighted_any_active",
                             # "all_active",  # definitely bad, as expected
-                            # "mark_only",
+                            "mark_only",
+                            # nothing intron related, just flags for custom similarity metrics based on the template structure
+                            # "root_proximity",  # node relatedness ~ average distance to the tree root (i.e. the closer to the root, the more similar) / not a great idea, but not unreasonable; after all, the root is where tings become active (but of course later on other subsets matter more...)
+                            "node_proximity",  # node relatedness ~ number of edges to first common ancestor
+                            # "node_w_any",  # should we mix learning with a prior?
+                            # "random",
                         ]:
                             if linkage_normalization and intron_strategy != "none":
                                 continue

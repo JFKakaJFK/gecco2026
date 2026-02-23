@@ -8,6 +8,7 @@ set(deps
     Eigen3::Eigen
     OpenRAND::OpenRAND
     gomea_library
+    Cache
 )
 
 set(test_target ${PROJECT_NAME}_test_main)
@@ -17,8 +18,8 @@ target_link_libraries(${test_target} PRIVATE ${deps})
 set(
     LIB_TEST_SOURCES
     amalgam
-    archive_objectives
     archive
+    archive_objectives
     ctx_gpu_repr
     ctx_introns
     ctx_subfunction
@@ -37,10 +38,12 @@ set(
     mo_binary
     mo_mixed
     problem
-    so_gomea
+    quality
     solution
-    sr_gradient_step
+    solution_extension
+    so_gomea
     sr
+    sr_gradient_step
     tracked
 )
 

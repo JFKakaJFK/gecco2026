@@ -22,13 +22,21 @@ file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*
 # else()
 add_library(${PROJECT_NAME}
     ${HEADER_LIST}
-    lib/instance.cpp
     gp/sr.cpp
+    lib/archive.cpp
+    lib/archive_adaptive.cpp
+    lib/archive_unbounded.cpp
+    lib/entropy.cpp
+    lib/fitness.cpp
+    lib/instance.cpp
+    lib/solution.cpp
+    
     methods/amalgam.cpp
     methods/mo_gomea.cpp
     ga-gp/evaluate.cu
     ga-gp/helper.cu
 )
+
 # endif()
 # disable any warnings in the amalgam code
 # also there is a memory bug in initializePopulationsAndFitnessValues() amalgam.cpp:1915...
@@ -52,6 +60,7 @@ target_link_libraries(${PROJECT_NAME}
         Eigen3::Eigen
         OpenRAND::OpenRAND
         gomea_library
+        Cache
 )
 
 # users will need at least C++23

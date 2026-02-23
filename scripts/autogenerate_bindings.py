@@ -137,16 +137,14 @@ def configure_litgen() -> litgen.LitgenOptions:
     # configure your options here
     options = litgen.LitgenOptions()
 
-    options.bind_library = litgen.BindLibraryType.nanobind
+    # options.bind_library = litgen.BindLibraryType.nanobind
+    options.use_nanobind()
 
     # the root namespace, no submodule will be generated for this
     options.namespaces_root = ["goblin"]
 
     # some replacements to clean up the definitions made in goblin/lib/types.h
     options.type_replacements = type_replacements()
-    options.type_replacements.add_last_replacement(
-        r"MOFitness.Quality", r'"MOFitness.Quality"'
-    )
 
     # options.class_exclude_by_name__regex = "Instance|Problem"
     # options.class_template_options.add_specialization(
@@ -161,6 +159,73 @@ def configure_litgen() -> litgen.LitgenOptions:
     # for the non-existent default constructor are generated
     options.class_override_virtual_methods_in_python__regex = "Base$"
     options.member_exclude_by_name__regex = "^_private|^request_debug_report$|^log_"
+
+    # For reasons (I do not understand) the 'quality' Solution(Base) members get bound as
+    #
+    # ```
+    # ...
+    # .def("quality",
+    #     [](goblin::Solution & self) { return self.quality(); })
+    # .def("quality",
+    #     [](goblin::Solution & self) { return self.quality(); })
+    # ...
+    # ```
+    #
+    # instead of (an overload without lambdas and explicit reference return value policy)
+    #
+    # ```
+    # ...
+    # .def("quality", nb::overload_cast<>(&goblin::Solution::quality, nb::const_),
+    #     nb::rv_policy::reference_internal)
+    # .def("quality", nb::overload_cast<>(&goblin::Solution::quality),
+    #     nb::rv_policy::reference_internal)
+    # ...
+    # ```
+    #
+    # causing:
+    #
+    # ```
+    # goblin/pylib/nanobind/bindings.cpp:1436:52: error:
+    # allocating an object of abstract class type 'QualityBase'
+    #  1436 |           [](goblin::SolutionBase & self) { return self.quality(); },
+    #       |                                                    ^
+    # goblin/lib/fitness.h:28:39: note:
+    # unimplemented pure virtual method 'clone' in 'QualityBase'
+    #    28 |  virtual std::unique_ptr<QualityBase> clone() const = 0;
+    #       |                                       ^
+    # goblin/pylib/nanobind/bindings.cpp:1440:52: error:
+    # allocating an object of abstract class type 'QualityBase'
+    #  1440 |           [](goblin::SolutionBase & self) { return self.quality(); },
+    #       |                                                    ^
+    # goblin/pylib/nanobind/bindings.cpp:1492:48: error:
+    # allocating an object of abstract class type 'QualityBase'
+    #  1492 |           [](goblin::Solution & self) { return self.quality(); },
+    #       |                                                ^
+    # goblin/pylib/nanobind/bindings.cpp:1496:48: error:
+    # allocating an object of abstract class type 'QualityBase'
+    #  1496 |           [](goblin::Solution & self) { return self.quality(); },
+    #       |                                                ^
+    # 4 errors generated.
+    # ```
+    #
+    # So the fix (for now) is to explicitly NOT generate bindings
+    # and manually add bindings returning qualities as references
+    options.member_exclude_by_name_and_class__regex = {
+        "Solution": r"quality",
+        "SolutionBase": r"quality",
+    }
+    for cls in ["goblin::SolutionBase", "goblin::Solution"]:
+        options.custom_bindings.add_custom_bindings_to_class(
+            qualified_class=cls,
+            stub_code="""
+                def quality(self) -> QualityBase:
+                    ...
+            """,
+            pydef_code=f"""
+                LG_CLASS.def("quality", nb::overload_cast<>(&{cls}::quality, nb::const_), nb::rv_policy::reference_internal);
+                LG_CLASS.def("quality", nb::overload_cast<>(&{cls}::quality), nb::rv_policy::reference_internal);
+            """,
+        )
 
     # These functions are excluded
     # - format_as: messes with the bindings and not needed on the Python side

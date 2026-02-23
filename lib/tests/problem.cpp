@@ -30,9 +30,9 @@ TEST_CASE("goblin::bench::problem") {
   std::vector<usize> idxs{0};
 
   sphere.evaluate(rng, s, idxs);
-  CHECK(s[0].quality().objectives == Vec<double>::Zero(1));
+  CHECK(s[0].quality_as<MOQuality>().objectives == Vec<double>::Zero(1));
 
   s[0].continuous_values() = Vec<double>::Constant(2, 2.0);
   sphere.evaluate(rng, s, idxs);
-  CHECK(s[0].quality().objectives == Vec<double>::Constant(1, 8.0));
+  CHECK(s[0].quality_as<MOQuality>().objectives == Vec<double>::Constant(1, 8.0));
 }

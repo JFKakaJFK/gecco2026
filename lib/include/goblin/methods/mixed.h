@@ -21,11 +21,11 @@
 #include <sstream>
 
 #include "goblin/lib/algorithms/subset_selection.h"
-#include "goblin/lib/ims.h"
 #include "goblin/lib/instance.h"
 #include "goblin/lib/linkage_model.h"
 #include "goblin/lib/method.h"
 #include "goblin/bench/tracked.h"
+#include "goblin/methods/ims.h"
 #include "goblin/methods/continuous.h"
 
 #ifndef NDEBUG
@@ -269,10 +269,26 @@ create_and_register_clusters(Rng& rng,
   return std::make_tuple(solution_clusters, cluster_solutions, cluster_donors);
 };
 
+struct FosStats {
+  std::vector<CType> solution_activation_rate;  // whats the proportion of solutions where initially at least one of the
+                                                // variables in the subset is active?
+  std::vector<CType>
+      variables_activation_rate;  // conditioned on solutions with at least one active variables in the subset, whats
+                                  // the proportion of variables in the subset that are active on average?
+  std::vector<u64> usage_count;   // how often was the FOS used? (without FI, - should be the population size)
+  std::vector<u64> evaluation_count;  // how often was an evaluation needed? (i.e. active parts were modified)
+  std::vector<u64> acceptance_count;  // how often was the change accepted? (after evaluation)
+  std::vector<CType> cumulative_fitness_difference;  // how big were the accepted improvements?
+  std::vector<u64> finite_acceptance_count;  // how many improvements had a finite fitness difference to their parent?
+                                             // (inf/nan mess up the average...)
+  Mat<CType> similarity;
+};
+
 struct PopulationOptions {
   double donor_pool_size_multiplier = 2.0;
   std::optional<usize> max_nis = std::nullopt;
   bool forced_improvements = true;
+  bool enable_mixed_forced_improvements = true;
   double target_continuous_to_discrete_balance = 1.0;
   bool sequential_gom = false;  // performs GOM sequentially per solution, incompatible with other mechanisms
   bool strict_elite_acceptance =
@@ -280,6 +296,10 @@ struct PopulationOptions {
 
   double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
                                          // of all subset variables being identical between the solution and donor
+  std::optional<std::string> subset_logfile = std::nullopt;
+  u64 generation = 0;
+  u64 initial_generations_until_next_fos_log = 5;  // > 0, subset stats are logged every
+  u64 fos_log_factor = 2;                          // 1 is linear, 2 is exponential log spacing
 
   // Coefficient mutation as per https://doi.org/10.1145/3520304.3534036
   double continuous_mutation_probability = 0.0;
@@ -328,7 +348,7 @@ class Population {
   void restart() { solutions.clear(); };
 
   template <typename T>
-  u64 perform_generation(Rng& rng, T should_terminate) {
+  u64 perform_generation(Rng& rng, T should_terminate, bool reevaluate_solutions) {
     u64 evaluations = 0;
     bool is_discrete = problem.num_discrete() > 0;
     bool is_continuous = problem.num_continuous() > 0;
@@ -337,6 +357,7 @@ class Population {
     // ======= initialization (if necessary) =======
     if (solutions.empty()) {
       evaluations += initialize(rng);
+      reevaluate_solutions = false;  // solutions are freshly evaluated, so no need to do it twice
 
       if (should_terminate(evaluations)) {
         return evaluations;
@@ -352,6 +373,20 @@ class Population {
       }
       std::tie(solution_clusters, cluster_solutions, cluster_donors) = create_and_register_clusters(
           rng, *local_archive, problem.fitness(), solutions, num_clusters, donor_pool_size, donors, solution_clusters);
+    }
+
+    if (reevaluate_solutions) {
+      solutions_to_evaluate.clear();
+      solutions_to_evaluate.resize(solutions.size());
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+
+      problem.evaluate(rng, solutions, solutions_to_evaluate);
+      // ensure the parents also have the updated fitness...
+      for (usize i = 0; i < solutions.size(); i++) {
+        parents[i].assign_quality(solutions[i].quality());
+      }
+
+      evaluations += solutions_to_evaluate.size();
     }
 
     // after this, donors == parents == solutions holds
@@ -375,16 +410,7 @@ class Population {
 
     usize max_discrete_subset_count = 0;
     if (is_discrete) {
-      // learn per cluster linkage models
-      if (cluster_FOS.empty() || !discrete_model->is_static()) {
-        cluster_FOS.clear();
-        for (usize k = 0; k < num_clusters; k++) {
-          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
-        }
-      }
-      for (usize k = 0; k < num_clusters; k++) {
-        max_discrete_subset_count = std::max(max_discrete_subset_count, cluster_FOS[k].size());
-      }
+      max_discrete_subset_count = learn_discrete_linkage(rng);
 
       solution_changed.clear();
       solution_changed.resize(size, false);
@@ -441,7 +467,7 @@ class Population {
               }
 
               std::tie(evaluation_needed, anything_changed) =
-                  solutions[i].inherit(donors[donor_idx], *subsets[i], problem.always_inherit_continuous());
+                  problem.inherit_discrete(solutions[i], donors[donor_idx], *subsets[i]);
 
               if (evaluation_needed) {
                 solutions_to_evaluate[0] = i;
@@ -466,9 +492,9 @@ class Population {
     } else {
       usize subset_idx = 0;
       std::uniform_real_distribution<double> U(0.0, 1.0);
-      bool can_do_discrete_step;
+      bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
-        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
+        // std::println("LOOP");
         bool do_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
@@ -486,30 +512,42 @@ class Population {
           double p_discrete = 0.5 * actual_evaluation_balance / options.target_continuous_to_discrete_balance;
 
           do_discrete_step = U(rng) < p_discrete;
+
+          // std::println("p(RV) = {} ({}/{})", 1.0 - p_discrete, continuous_evaluations, discrete_evaluations);
         }
 
         u64 evals = 0;
         // we first do the continuous step - it might not do anything (not enough active variables or already
         // converged), so we still want to be able to do a discrete step instead
         if (is_continuous && rv_state.options.enabled && !do_discrete_step && !rv_state.converged()) {
+          // std::println("RV STEP");
           // RV-GOMEA uses the elite in the population (~= local archive) for forced improvements + adaptive variance
           // scalling (AVS) evals = rv_state.perform_generation(rng, global_archive, problem, solutions, parents,
           // solution_clusters, cluster_solutions);
           evals = rv_state.perform_generation(rng, *local_archive, problem, solutions, parents, solution_clusters,
                                               cluster_solutions);
           __assert_invariants();
+          if (evals < 1) {
+            // std::println("RV STEP SKIPPED !!!!");
+          }
           evaluations += evals;
           continuous_evaluations += evals;
         }
 
         if (do_discrete_step || (can_do_discrete_step && evals == 0)) {
+          // std::println("GP STEP");
           evals = discrete_gom_step(rng, subset_idx++);
           __assert_invariants();
           evaluations += evals;
           discrete_evaluations += evals;
+
+          if (evals < 1) {
+            // std::println("GP STEP SKIPPED !!!!");
+          }
         }
 
         if (is_continuous && options.continuous_mutation_probability > 0.0) {
+          // std::println("MUT STEP");
           evaluations += continuous_mutation_step(rng);
           __assert_invariants();
         }
@@ -517,16 +555,26 @@ class Population {
         if (should_terminate(evaluations).has_value()) {
           return evaluations;
         }
+
+        can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
+    }
+
+    // std::println(">>> GOM END - {} evals", evaluations);
+
+    if (!fos_stats.empty()) {
+      log_subset_statistics();
     }
 
     if (is_continuous && options.gradient_step_frequency > 0 &&
         iterations_since_last_gradient_step++ % options.gradient_step_frequency == 0) {
+      // std::println("GRADIENT STEP");
       evaluations += gradient_step(rng);
       __assert_invariants();
     }
 
     if (options.forced_improvements && is_discrete) {
+      // std::println("FI STEP");
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
       __assert_invariants();
 
@@ -554,6 +602,9 @@ class Population {
     }
     no_evaluations_performed = evaluations == 0;
 
+    generation++;
+    // std::println(">>> GEN END - {} evals", evaluations);
+
     return evaluations;
   };
 
@@ -568,7 +619,9 @@ class Population {
       }
     }
 
-    return no_improvement_stretch >= max_nis && no_evaluations_performed;
+    // this condition does not make sense for continuous only problems as it is way more strict than the NIS/FI
+    // mechanisms which force convergence if no progress is made
+    return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {
@@ -614,9 +667,113 @@ class Population {
 
   /// For single objective optimization, this just is a roundabout way
   /// to return the elite to check if an IMS population should stop
-  const ArchiveBase& archive() const { return *local_archive; };
+  ArchiveBase& archive() const { return *local_archive; };
+
+  const SolutionSetBase& get_solutions() const { return solutions; };
 
  private:
+  void log_subset_statistics() {
+    generations_until_next_fos_log =
+        options.initial_generations_until_next_fos_log > 0 ? options.initial_generations_until_next_fos_log : 1;
+    options.initial_generations_until_next_fos_log *= options.fos_log_factor;
+
+    AoSSet s;
+    s.add(local_archive->so_solution(0));  // solution does not matter, but there should only be a single one...
+    assert(fos_stats.size() == num_clusters);
+    for (usize k = 0; k < num_clusters; k++) {
+      const auto& stats = fos_stats[k];
+      std::vector<CType> evaluation_rates(cluster_FOS[k].size());
+      std::vector<CType> acceptance_rates(cluster_FOS[k].size());
+      std::vector<CType> avg_improvements(cluster_FOS[k].size());
+      std::stringstream os;
+      os << "\"[";
+      for (usize i = 0; i < cluster_FOS[k].size(); i++) {
+        evaluation_rates[i] = stats.usage_count[i] > 0 ? static_cast<CType>(stats.evaluation_count[i]) /
+                                                             static_cast<CType>(stats.usage_count[i])
+                                                       : 0.0;
+        acceptance_rates[i] = stats.evaluation_count[i] > 0 ? static_cast<CType>(stats.acceptance_count[i]) /
+                                                                  static_cast<CType>(stats.evaluation_count[i])
+                                                            : 0.0;
+        avg_improvements[i] =
+            stats.finite_acceptance_count[i] > 0
+                ? stats.cumulative_fitness_difference[i] / static_cast<CType>(stats.finite_acceptance_count[i])
+                : 0.0;
+        if (i > 0) {
+          os << ',';
+        }
+        log_helper(os, cluster_FOS[k][i].discrete, /* escape = */ false);
+      }
+      os << "]\"";
+      debug_log(problem, options.subset_logfile.value(),
+                "population_size,cluster,similarity,subsets,usage_count,evaluation_rate,acceptance_rate,avg_"
+                "improvement,solution_activation_rate,variables_activation_rate,",
+                std::format("{},{},{},{},{},{},{},{},{},{},", size, k, log_helper(stats.similarity), os.str(),
+                            log_helper(stats.usage_count), log_helper(evaluation_rates), log_helper(acceptance_rates),
+                            log_helper(avg_improvements), log_helper(stats.solution_activation_rate),
+                            log_helper(stats.variables_activation_rate)),
+                s);
+      fos_stats.clear();
+    }
+  };
+  usize learn_discrete_linkage(Rng& rng) {
+    // learn per cluster linkage models
+    if (cluster_FOS.empty() || !discrete_model->is_static()) {
+      cluster_FOS.clear();
+
+      if (options.subset_logfile.has_value() && generation == generations_until_next_fos_log) {
+        Mat<CType> sim(0, 0);
+        if (auto p = dynamic_cast<LinkageTreeFOS*>(discrete_model.get()); p != nullptr) {
+          p->register_similarity_callback([&sim](const auto& s) { sim = s; });
+        }
+
+        fos_stats.clear();
+        fos_stats.resize(num_clusters);
+        for (usize k = 0; k < num_clusters; k++) {
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
+
+          fos_stats[k].similarity = sim;
+          fos_stats[k].usage_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].evaluation_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].acceptance_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].cumulative_fitness_difference.resize(cluster_FOS[k].size(), 0.0);
+          fos_stats[k].finite_acceptance_count.resize(cluster_FOS[k].size(), 0);
+          fos_stats[k].solution_activation_rate.resize(cluster_FOS[k].size(), 0.0);
+          fos_stats[k].variables_activation_rate.resize(cluster_FOS[k].size(), 0.0);
+          for (usize i = 0; i < cluster_solutions[k].size(); i++) {
+            const RefS<Active> s_a = solutions[cluster_solutions[k][i]].discrete_active();
+            for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
+              Array<BType> subset_active = s_a(cluster_FOS[k][fos_idx].discrete);
+              if (subset_active.any()) {
+                fos_stats[k].variables_activation_rate[fos_idx] +=
+                    subset_active.template cast<CType>().sum() /
+                    static_cast<CType>(cluster_FOS[k][fos_idx].discrete.size());
+                fos_stats[k].solution_activation_rate[fos_idx] += 1.0;
+              }
+            }
+          }
+          for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
+            fos_stats[k].variables_activation_rate[fos_idx] /= fos_stats[k].solution_activation_rate[fos_idx];
+            fos_stats[k].solution_activation_rate[fos_idx] /= static_cast<CType>(cluster_solutions[k].size());
+          }
+        }
+
+        if (auto p = dynamic_cast<LinkageTreeFOS*>(discrete_model.get()); p != nullptr) {
+          p->unregister_similarity_callback();
+        }
+      } else {
+        for (usize k = 0; k < num_clusters; k++) {
+          cluster_FOS.push_back(discrete_model->subsets(rng, problem, solutions, cluster_solutions[k], std::nullopt));
+        }
+      }
+    }
+
+    usize max_discrete_subset_count = 0;
+    for (usize k = 0; k < num_clusters; k++) {
+      max_discrete_subset_count = std::max(max_discrete_subset_count, cluster_FOS[k].size());
+    }
+    return max_discrete_subset_count;
+  };
+
   void check_gom_backups(std::string_view info) {
     assert(solutions.size() == parents.size());
     for (usize i = 0; i < solutions.size(); i++) {
@@ -653,7 +810,7 @@ class Population {
         std::println("Continuous Active: ({})", cactive_ok);
         std::println("  Solution: {}", s_cactive);
         std::println("  Parent:   {}", p_cactive);
-        std::println("Quality: ({})", quality_ok);
+        std::println("  Quality: ({})", quality_ok);
         std::println("  Solution: {}", s_quality);
         std::println("  Parent:   {}", p_quality);
         std::abort();
@@ -672,7 +829,7 @@ class Population {
     problem.evaluate(rng, copy, indices);
 
     for (auto i : indices) {
-      auto expected = copy[i].quality(), actual = set[i].quality();
+      auto expected = copy[i].template quality_as<MOQuality>(), actual = set[i].template quality_as<MOQuality>();
       bool definitely_different =
           (expected.objectives.array().isFinite() != actual.objectives.array().isFinite()).any();
       if (expected.objectives.array().isFinite().all()) {
@@ -760,6 +917,9 @@ class Population {
     discrete_evaluations = 0.0;
     continuous_evaluations = 0.0;
 
+    generation = 0;
+    generations_until_next_fos_log = 0;
+
     return solutions_to_evaluate.size();
   };
 
@@ -776,6 +936,8 @@ class Population {
       std::iota(donor_pool.begin(), donor_pool.end(), 0);
     }
 
+    bool record_fos_stats = !fos_stats.empty();
+
     solutions_to_evaluate.clear();
 
     // TODO parallel?
@@ -786,6 +948,10 @@ class Population {
       // due to filtering/max_subset_size, some clusters might have more
       // subsets...
       if (fos_idx < cluster_FOS[k].size()) {
+        if (record_fos_stats) {
+          assert(fos_idx < fos_stats[k].usage_count.size());
+          fos_stats[k].usage_count[fos_idx]++;
+        }
         subsets[i] = &cluster_FOS[k][fos_idx];
         assert(subsets[i]->discrete.size() > 0);
 
@@ -805,11 +971,15 @@ class Population {
             continue;
           }
 
-          std::tie(evaluation_needed, anything_changed) = solutions[i].inherit(
-              donors[cluster_donors[k][donor_idx]], *subsets[i], problem.always_inherit_continuous());
+          std::tie(evaluation_needed, anything_changed) =
+              problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);
+
+            if (record_fos_stats) {
+              fos_stats[k].evaluation_count[fos_idx]++;
+            }
           } else if (anything_changed) {  // no acceptance, parent has to be updated now
             parents[i] = solutions[i];
           }
@@ -831,11 +1001,20 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS terms are handled better
         solutions[i] = parents[i];
+
       } else {
+        if (record_fos_stats) {
+          auto fos_idx = subset_orders(i, subset_idx);
+
+          assert(fos_idx < cluster_FOS[k].size());
+          fos_stats[k].acceptance_count[fos_idx]++;
+          CType dist = problem.fitness().distance(solutions[i].quality(), parents[i].quality(), objective);
+          if (!isna(dist)) {
+            fos_stats[k].finite_acceptance_count[fos_idx]++;
+            fos_stats[k].cumulative_fitness_difference[fos_idx] += dist;
+          }
+        }
         solution_changed[i] = true;
         parents[i] = solutions[i];
       }
@@ -862,32 +1041,79 @@ class Population {
     std::vector<usize> eval2improve_idx;
     eval2improve_idx.reserve(solutions_to_improve.size());
 
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    // RV must be enabled and there need to be continuous values that aren't already inherited...
+    bool enable_rv_steps =
+        options.enable_mixed_forced_improvements && rv_state.options.enabled && problem.num_continuous() > 0;
+    CType alpha = 0.5;
+    Subset rv_full;
+    if (enable_rv_steps) {
+      for (usize i = 0; i < problem.num_continuous(); i++) {
+        rv_full.continuous.push_back(i);
+      }
+    }
+
     usize subset_idx = 0;
-    while (!solutions_to_improve.empty() && subset_idx < max_discrete_subset_count) {
+    usize rv_fi_tries = 0;
+    while (
+        // not all solutions improved
+        !solutions_to_improve.empty() &&
+        (
+            // discrete FI not done
+            subset_idx < max_discrete_subset_count ||
+            // continuous FI enabled and not done
+            (enable_rv_steps && rv_fi_tries < rv_state.options.num_forced_improvement_tries))) {
       eval2improve_idx.clear();
       solutions_to_evaluate.clear();
+
+      double p_rv = enable_rv_steps
+                        ? (static_cast<double>(rv_state.options.num_forced_improvement_tries - rv_fi_tries) /
+                           static_cast<double>(max_discrete_subset_count - subset_idx +
+                                               rv_state.options.num_forced_improvement_tries - rv_fi_tries))
+                        : 0.0;
+
+      bool is_rv_step = U(rng) < p_rv;
 
       // TODO parallel?
       for (usize j = 0; j < solutions_to_improve.size(); j++) {
         auto i = solutions_to_improve[j];
         auto k = solution_clusters[i];
 
-        auto fos_idx = subset_orders(i, subset_idx);
+        // clang-format off
+        const auto& donor = k < problem.fitness().num_objectives()
+            ? global_archive.so_solution(k)
+            : global_archive.random_solution(rng);
+        // clang-format on
 
-        // due to filtering/max_subset_size, some clusters might have more
-        // subsets...
-        if (fos_idx < cluster_FOS[k].size()) {
-          subsets[i] = &cluster_FOS[k][fos_idx];
+        if (is_rv_step) {
+          // there must be overlap in the active constants...
+          if ((solutions[i].continuous_active() && donor.continuous_active()).any()) {
+            subsets[i] = &rv_full;
 
-          auto [evaluation_needed, anything_changed] =
-              solutions[i].inherit(k < problem.fitness().num_objectives() ? global_archive.so_solution(k)
-                                                                          : global_archive.random_solution(rng),
-                                   *subsets[i], problem.always_inherit_continuous());
-          if (evaluation_needed) {  // parent will be updated during acceptance
-            eval2improve_idx.push_back(j);
+            for (usize l = 0; l < problem.num_continuous(); l++) {
+              if (solutions[i].continuous_active()(l) && donor.continuous_active()(l)) {
+                solutions[i].continuous_values()(l) =
+                    alpha * parents[i].continuous_values()(l) + (CType(1.0) - alpha) * donor.continuous_values()(l);
+              }
+            }
             solutions_to_evaluate.push_back(i);
-          } else if (anything_changed) {  // no acceptance, so we need to update the parent
-            parents[i] = solutions[i];
+            eval2improve_idx.push_back(j);
+          }
+        } else {
+          auto fos_idx = subset_orders(i, subset_idx);
+
+          // due to filtering/max_subset_size, some clusters might have more
+          // subsets...
+          if (fos_idx < cluster_FOS[k].size()) {
+            subsets[i] = &cluster_FOS[k][fos_idx];
+
+            auto [evaluation_needed, anything_changed] = problem.inherit_discrete(solutions[i], donor, *subsets[i]);
+            if (evaluation_needed) {  // parent will be updated during acceptance
+              eval2improve_idx.push_back(j);
+              solutions_to_evaluate.push_back(i);
+            } else if (anything_changed) {  // no acceptance, so we need to update the parent
+              parents[i] = solutions[i];
+            }
           }
         }
       }
@@ -913,10 +1139,6 @@ class Population {
 
           if (!accept_and_update_archive(i, objective,
                                          /* strict */ true)) {
-            // solutions[i].reject(parents[i], problem.always_inherit_continuous(),
-            //                     std::nullopt);  // *subsets[i]); // TODO do the more granular update once the LS
-            //                     terms
-            //                                     // are handled better
             solutions[i] = parents[i];
           } else {
             solution_changed[i] = true;
@@ -936,7 +1158,12 @@ class Population {
         }
       }
 
-      subset_idx++;
+      if (is_rv_step) {
+        alpha *= 0.5;
+        rv_fi_tries++;
+      } else {
+        subset_idx++;
+      }
 
       if (should_terminate(evaluations).has_value()) {
         return evaluations;
@@ -1016,13 +1243,8 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(
-        //     parents[i], problem.always_inherit_continuous(),
-        //     std::nullopt);  //  *subsets[i]); // TODO do the more granular update once the LS terms are handled
-        //     better
         solutions[i] = parents[i];
       } else {
-        // solution_changed[i] = true;
         parents[i] = solutions[i];
       }
     }
@@ -1072,7 +1294,6 @@ class Population {
 
       if (!accept_and_update_archive(i, objective,
                                      /* strict */ false)) {
-        // solutions[i].reject(parents[i], problem.always_inherit_continuous(), std::nullopt);
         solutions[i] = parents[i];
       } else {
         // solution_changed[i] = true;
@@ -1129,6 +1350,10 @@ class Population {
   Mat<usize> subset_orders;            // per solution subset permutations
   std::vector<const Subset*> subsets;  // pointers because 1. we want to avoid copies and 2. the view
                                        // should be nullable
+  std::vector<FosStats> fos_stats;
+
+  u64 generation;
+  u64 generations_until_next_fos_log;
 };
 
 class MixedGOMEA : public MethodBase {
@@ -1184,6 +1409,13 @@ class MixedGOMEA : public MethodBase {
       return std::nullopt;
     }
     return std::visit([](const auto& r) { return r.current_generation(); }, ims_runner.value());
+  };
+
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    if (!ims_runner.has_value()) {
+      return std::nullopt;
+    }
+    return std::visit([](const auto& r) { return r.current_population(); }, ims_runner.value());
   };
 
  private:

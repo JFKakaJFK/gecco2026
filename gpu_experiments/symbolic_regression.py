@@ -172,8 +172,8 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    # grid_execution(cfg.TEST_EXECUTION, output_directory)
-    grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
+    grid_execution(cfg.TEST_EXECUTION, output_directory)
+    # grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)

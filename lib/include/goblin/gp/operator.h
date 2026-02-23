@@ -80,6 +80,28 @@ class OperatorBase {
   virtual ~OperatorBase() = default;
 };
 
+class OpIdentity : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 1; };
+  usize max_arity() const override final { return 1; };
+
+  bool is_commutative() const override final { return false; };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0); };
+
+  bool has_gradient() const override final { return true; };
+  void apply_grad(Ref<Array<CType>> out,
+                  Ref<Array<CType>> d_out,
+                  CRef<Arr2D<CType>> args,
+                  CRef<Arr2D<CType>> d_args) const override final {
+    apply(out, args);
+
+    d_out = d_args.col(0);
+  };
+
+  std::string format(const std::span<const std::string>& args) const override final { return args[0]; };
+};
+
 class OpAdd : public OperatorBase {
  public:
   usize min_arity() const override final { return 2; };

@@ -1,5 +1,4 @@
 #pragma once
-#include <cstdio>
 #ifndef _GOBLIN_GA_GP_SR_H
 #define _GOBLIN_GA_GP_SR_H
 
@@ -10,6 +9,7 @@
 #include "goblin/gp/context.h"
 #include "goblin/gp/init.h"
 #include "goblin/gp/instance.h"
+#include "goblin/gp/sr.h"
 #include "goblin/lib/assert.h"
 #include "goblin/lib/archive.h"
 #include "goblin/lib/init.h"
@@ -32,6 +32,8 @@ inline int ulp_diff(float a, float b) {
 namespace goblin {
 
 class GASRProblem : public GPInstanceBase {
+    using ScalarType = CType;
+
     public: 
         GASRProblem(
             GPContext ctx,
@@ -45,12 +47,15 @@ class GASRProblem : public GPInstanceBase {
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
-            std::optional<std::vector<CType>> target_objectives = std::nullopt
+            std::optional<std::vector<CType>> target_objectives = std::nullopt,
+            CType archive_epsilon = 0.0
         ) : ctx(ctx),
             linear_scaling(linear_scaling),
-            objective("mse"),
-            _archive_fitness(MOFitness(1)),
-            _fitness(MOFitness(1)),
+            objectives(std::holds_alternative<std::string>(objectives)
+                       ? std::vector<std::string>{std::get<std::string>(objectives)}
+                       : std::get<std::vector<std::string>>(objectives)),
+            _archive_fitness(SRFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
+            _fitness(SRFitness(objectives_to_optimize.value_or(this->objectives.size()))),
             _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
             _target(_archive_fitness),
             _num_datapoints(X_train.rows()),
@@ -148,8 +153,10 @@ class GASRProblem : public GPInstanceBase {
 
             size_t k = 0;
             for (auto i : indices) {
-                solutions[i].quality().constraint_value = 0.0;
-                solutions[i].quality().objectives(0) = result[k++];
+                auto& quality = solutions[i].quality_as<SRQuality>();
+
+                quality.constraint_value  = 0.0;
+                quality.objectives(0) = result[k++];
             }
 
 #ifndef NDEBUG
@@ -184,7 +191,7 @@ class GASRProblem : public GPInstanceBase {
 
                 size_t k = 0;
                 for (auto i : indices) {
-                    float expected = solutions[i].quality().objectives(0);
+                    float expected = solutions[i].quality_as<SRQuality>().objectives(0);
                     float actual = result[k++];
 
                     int ulps = ulp_diff(expected, actual);
@@ -215,9 +222,9 @@ class GASRProblem : public GPInstanceBase {
                 archive_fitness().worst(),
                 num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
                 num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-            s.quality().objectives = target_objectives;
-            __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-            s.quality().constraint_value = 0.0;
+            s.quality_as<SRQuality>().objectives = target_objectives;
+            __goblin_runtime_assert(static_cast<usize>(s.quality_as<SRQuality>().objectives.size()) >= fitness().num_objectives());
+            s.quality_as<SRQuality>().constraint_value = 0.0;
             _target.update(s, false);
         };
 
@@ -227,28 +234,32 @@ class GASRProblem : public GPInstanceBase {
 
         bool target_reached(const ArchiveBase& archive) const override final {
             if (!_target.empty()) {
-            return archive.covers(_target);
+                return archive.covers(_target);
             } else {
-            return false;
+                return false;
             }
         };
 
         void log_header(std::ostream& os) const override final {
             os << "expressions,";
-            os << "mse_train,";
+            for (auto& o : objectives) {
+                os << o << "_train,";
+            }
 
             fitness().log_header(os);
         };
 
-        void log(std::ostream& os, SolutionBase& solution) override final {
+        void log(std::ostream& os, const SolutionBase& solution) const override final {
             os << '"';
             log_solution(os, solution);
             os << "\",";
-            for (usize i = 0; i < 1; i++) {
-                os << solution.quality().objectives(i) << ',';
+
+            const auto& q = solution.quality_as<SRQuality>();
+            for (usize i = 0; i < objectives.size(); i++) {
+                os << q.objectives(i) << ',';
             }
-        
-            fitness().log(os, solution.quality());
+
+            archive_fitness().log(os, solution.quality());
         };
 
         void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
@@ -258,8 +269,12 @@ class GASRProblem : public GPInstanceBase {
                     os << " , ";
                 }
                 if (linear_scaling) {
-                    os << solution.continuous_values()(ctx.num_continuous + 2 * i) << " + ("
-                    << solution.continuous_values()(ctx.num_continuous + 2 * i + 1) << " * (" << exprs[i] << "))";
+                    const auto& q = solution.quality_as<SRQuality>();
+                    if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
+                        os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+                    } else {
+                        os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
+                    }
                 } else {
                     os << exprs[i];
                 }
@@ -268,8 +283,7 @@ class GASRProblem : public GPInstanceBase {
 
         GPContext ctx;
         bool linear_scaling;
-        std::string objective;
-
+        std::vector<std::string> objectives;
 
     private:
         void _copy_data_to_gpu(Arr2D<CType> X, Arr2D<CType> Y) {
@@ -342,8 +356,8 @@ class GASRProblem : public GPInstanceBase {
             _num_results_allocated = 0;
         }
 
-        MOFitness _archive_fitness;
-        MOFitness _fitness;
+        SRFitness _archive_fitness;
+        SRFitness _fitness;
         std::shared_ptr<InitBase> _init;
         UnboundedArchive _target;
         usize _num_continuous;

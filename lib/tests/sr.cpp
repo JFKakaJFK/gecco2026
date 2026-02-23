@@ -43,12 +43,17 @@ TEST_CASE("goblin::gp::sr") {
       bool linear_scaling = ls > 0;
       SRProblem srp(ctx, X, Y, X_test, Y_test, obj, /* objectives_to_optimize = */ std::nullopt, linear_scaling);
 
+      auto f = dynamic_cast<const SRFitness*>(&srp.archive_fitness());
+      assert(f != nullptr && "Fitness mismatch");
+
       Rng rng = seeded_rng(42);
 
       AoSSet sset;
 
       Solution s(srp.archive_fitness().worst(), Vec<DType>::Zero(srp.num_discrete()),
                  Vec<CType>::Zero(srp.num_continuous()));
+      auto p = dynamic_cast<SRQuality*>(&s.quality());
+      assert(p != nullptr && "Quality mismatch");
       sset.add(s);
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -79,9 +84,9 @@ TEST_CASE("goblin::gp::sr") {
       std::vector<usize> indices{0};
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+      REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
       if (srp.num_objectives() > 1) {
-        REQUIRE(sset[0].quality().objectives(1) == 6.0);
+        REQUIRE(sset[0].quality_as<MOQuality>().objectives(1) == 6.0);
       }
 
       sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
@@ -106,7 +111,7 @@ TEST_CASE("goblin::gp::sr") {
 
       srp.evaluate(rng, sset, indices);
 
-      REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+      REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
 
       // ls (x0 + x1 + 42.0 -> scaled to x0 + x1)
       std::vector<CType> ls_intercepts = {42.0, 0.0};
@@ -138,66 +143,80 @@ TEST_CASE("goblin::gp::sr") {
       if (linear_scaling) {
         srp.evaluate(rng, sset, indices);
 
-        REQUIRE(sset[0].quality().objectives(0) == doctest::Approx(0.0));
+        REQUIRE(sset[0].quality_as<MOQuality>().objectives(0) == doctest::Approx(0.0));
       }
     }
   }
 
   std::vector<std::string> constant_reps = {"ercs", "pool", "edges", "none"};
   for (auto& crep : constant_reps) {
-    GPContext pctx(
-        /* num_inputs = */ X.cols(), tmplate, operators,
-        /* num_parameters = */ 0, crep);
+    for (usize ic = 0; ic <= 2; ic++) {
+      std::optional<bool> always_inherit_continuous = ic < 2 ? std::make_optional(ic > 0) : std::nullopt;
+      GPContext pctx(
+          /* num_inputs = */ X.cols(), tmplate, operators,
+          /* num_parameters = */ 0, crep);
 
-    CType vtr =
-        crep == "edges" ? 1e-6 : 1e-8;  // edges is less numerically stable, but this is just to speed up the test...
-    SRProblem srp(pctx, X, Y, X_test, Y_test, {"nmse"}, /* objectives_to_optimize = */ std::nullopt,
-                  /* linear_scaling = */ true);
-    srp.register_target({vtr});
+      CType vtr =
+          crep == "edges" ? 1e-6 : 1e-8;  // edges is less numerically stable, but this is just to speed up the test...
+      SRProblem srp(pctx, X, Y, X_test, Y_test, {"nmse"}, /* objectives_to_optimize = */ std::nullopt,
+                    /* linear_scaling = */ true,
+                    /* init = */ std::nullopt,
+                    /* constant_init_lower_bound = */ -1.0,
+                    /* constant_init_upper_bound = */ 1.0,
+                    /* target_objectives = */ std::nullopt,
+                    /* gradient_mode = */ "forward",
+                    /* gradient_epsilon = */ 1e-5,
+                    /* archive_epsilon = */ 0.0, always_inherit_continuous);
+      srp.register_target({vtr});
 
-    Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
+      Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
 
-    std::vector<std::unique_ptr<LinkageModelBase>> models;
-    for (usize i : srp.ctx.subtree_roots) {
-      models.push_back(std::make_unique<LinkageTreeFOS>(
-          /* metric = */ "mi",
-          /* intron_strategy = */ "any_active",
-          /* merge_continuous = */ true,
-          /* num_continuous_bins = */ std::nullopt,
-          /* filter_parent_threshold = */ 1e-6,
-          /* filter_children_threshold = */ 1.0 - 1e-6,
-          /* filter_root = */ true,
-          /* max_subset_size = */ std::nullopt,
-          /* normalize_initial_linkage_bias = */ true,
-          /* subset = */ Subset{.discrete = ctx.nodes[i]}));
+      std::vector<std::unique_ptr<LinkageModelBase>> models;
+      for (usize i : srp.ctx.subtree_roots) {
+        models.push_back(std::make_unique<LinkageTreeFOS>(
+            /* metric = */ "mi",
+            /* intron_strategy = */ "any_active",
+            /* merge_continuous = */ true,
+            /* num_continuous_bins = */ std::nullopt,
+            /* filter_parent_threshold = */ 1e-6,
+            /* filter_children_threshold = */ 1.0 - 1e-6,
+            /* filter_root = */ true,
+            /* max_subset_size = */ std::nullopt,
+            /* normalize_initial_linkage_bias = */ true,
+            /* subset = */ Subset{.discrete = ctx.nodes[i]}));
+      }
+      for (usize i : srp.ctx.output_roots) {
+        models.push_back(std::make_unique<LinkageTreeFOS>(
+            /* metric = */ "mi",
+            /* intron_strategy = */ "any_active",
+            /* merge_continuous = */ true,
+            /* num_continuous_bins = */ std::nullopt,
+            /* filter_parent_threshold = */ 1e-6,
+            /* filter_children_threshold = */ 1.0 - 1e-6,
+            /* filter_root = */ true,
+            /* max_subset_size = */ std::nullopt,
+            /* normalize_initial_linkage_bias = */ true,
+            /* subset = */ Subset{.discrete = ctx.nodes[i]}));
+      }
+
+      auto gomea = MixedGOMEA(
+          PopulationOptions{
+              // .subset_logfile = "fos_stats.csv"
+          },
+          RvOptions{.enabled = false},
+          IMSOptions(
+              /* initial_population_size = */ 256,
+              /* max_num_populations = */ 1),
+          std::make_shared<CombinedFOS>(models));
+
+      // auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+      auto [front, status] = gomea.run(srp, budget, /* seed = */ 42);
+
+      std::println("Status {}: {}", format_as(status), srp.format_solution(front->so_solution(0)));
+
+      REQUIRE(front->empty() == false);
+      // ls values are re-computed, so there can be slight differences here, hence 10x
+      REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives(0) <= vtr * 10.0);
     }
-    for (usize i : srp.ctx.output_roots) {
-      models.push_back(std::make_unique<LinkageTreeFOS>(
-          /* metric = */ "mi",
-          /* intron_strategy = */ "any_active",
-          /* merge_continuous = */ true,
-          /* num_continuous_bins = */ std::nullopt,
-          /* filter_parent_threshold = */ 1e-6,
-          /* filter_children_threshold = */ 1.0 - 1e-6,
-          /* filter_root = */ true,
-          /* max_subset_size = */ std::nullopt,
-          /* normalize_initial_linkage_bias = */ true,
-          /* subset = */ Subset{.discrete = ctx.nodes[i]}));
-    }
-
-    auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled = false},
-                            IMSOptions(
-                                /* initial_population_size = */ 256,
-                                /* max_num_populations = */ 1),
-                            std::make_shared<CombinedFOS>(models));
-
-    // auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
-    auto [front, status] = gomea.run(srp, budget, /* seed = */ 42);
-
-    std::println("Status {}: {}", format_as(status), srp.format_solution(front->so_solution(0)));
-
-    REQUIRE(front->empty() == false);
-    // ls values are re-computed, so there can be slight differences here, hence 10x
-    REQUIRE(front->so_solution(0).quality().objectives(0) <= vtr * 10.0);
   }
 }

@@ -2,6 +2,7 @@
 
 #include "goblin/bench/tracked.h"
 #include "goblin/ga-gp/ga_sr.h"
+#include "goblin/gp/sr.h"
 #include "goblin/methods/mixed.h"
 
 using namespace goblin;
@@ -50,8 +51,8 @@ TEST_CASE("goblin::ga-gp::ga_sr") {
     std::vector<usize> indices{0, 1};
     gasrp.evaluate(rng, sset, indices);
 
-    CHECK_EQ(sset[0].quality().objectives(0), doctest::Approx(0.0));
-    CHECK_NE(sset[1].quality().objectives(0), doctest::Approx(0.0));
+    CHECK_EQ(sset[0].quality_as<SRQuality>().objectives(0), doctest::Approx(0.0));
+    CHECK_NE(sset[1].quality_as<SRQuality>().objectives(0), doctest::Approx(0.0));
 
     sset.clear();
 

@@ -9,12 +9,13 @@ from pygom import default_termination_callback
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 
-MAX_EVALUATIONS = int(1e6)
+MAX_EVALUATIONS = int(5e5)  # int(1e6)
 NUM_RUNS = 30
 MAX_NUM_ROWS = 1000
 PLMB_CACHE_DIR = "../pmlb/datasets"
 
 RESULT_DIR = "../raw"
+RESULT_DIR = "../results"
 
 # black_box from https://arxiv.org/abs/2505.03977v1
 DATASETS = [
@@ -34,10 +35,10 @@ DATASETS = [
 
 
 def all_runs():
-    for ds in DATASETS[:5]:  # TODO
+    for ds in DATASETS:  # [:5]:  # TODO
         X, y = fetch_data(ds, return_X_y=True, local_cache_dir=PLMB_CACHE_DIR)
-        if X.shape[0] > MAX_NUM_ROWS:  # TODO
-            continue
+        # if X.shape[0] > MAX_NUM_ROWS:  # TODO
+        #     continue
 
         X, y = X[:MAX_NUM_ROWS], y[:MAX_NUM_ROWS]
 
@@ -58,29 +59,7 @@ termination_callback = None  # comment this to make Ctrl+C work while the algori
 # TODO currently the overhead of the python callback is considerable - check that less often
 params = {
     # the default, compares to the original version
-    # "Mixed": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="mi",
-    #         intron_strategy="none",
-    #         filter_root=True,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=True,
-    #     ),
-    # ),
-    "Mixed (RV)": lambda ls, max_evals: dict(
-        constant_representation="pool",
+    "Mixed (MI)": lambda ls, max_evals: dict(
         linear_scaling=ls,
         budget_kwargs=dict(
             max_evaluations=max_evals, termination_callback=termination_callback
@@ -90,13 +69,7 @@ params = {
             max_num_populations=1,
             restart_stale_populations=True,
         ),
-        rv_kwargs=dict(
-            enabled=True,
-            enable_partial_ams=False,
-            p_accept=0.0,
-            max_nis=20,
-        ),
-        sampling_model="AMaLGaMSamplingModel",
+        rv_kwargs=dict(enabled=False),
         population_kwargs=dict(),
         discrete_model_kwargs=dict(
             metric="mi",
@@ -107,8 +80,24 @@ params = {
             normalize_initial_linkage_bias=True,
         ),
     ),
-    # # with intron awareness, compares to GP-RV (which already has intron awareness)
-    # "Mixed IA LN": lambda ls, max_evals: dict(
+    "Mixed (Node)": lambda ls, max_evals: dict(
+        linear_scaling=ls,
+        budget_kwargs=dict(
+            max_evaluations=max_evals, termination_callback=termination_callback
+        ),
+        ims_kwargs=dict(
+            initial_population_size=1024,
+            max_num_populations=1,
+            restart_stale_populations=True,
+        ),
+        rv_kwargs=dict(enabled=False),
+        population_kwargs=dict(),
+        discrete_model_kwargs=dict(
+            metric="node_proximity",
+        ),
+    ),
+    # "Mixed (RV)": lambda ls, max_evals: dict(
+    #     constant_representation="pool",
     #     linear_scaling=ls,
     #     budget_kwargs=dict(
     #         max_evaluations=max_evals, termination_callback=termination_callback
@@ -118,171 +107,21 @@ params = {
     #         max_num_populations=1,
     #         restart_stale_populations=True,
     #     ),
-    #     rv_kwargs=dict(enabled=False),
+    #     rv_kwargs=dict(
+    #         enabled=True,
+    #         enable_partial_ams=False,
+    #         p_accept=0.0,
+    #         max_nis=20,
+    #     ),
+    #     sampling_model="AMaLGaMSamplingModel",
     #     population_kwargs=dict(),
     #     discrete_model_kwargs=dict(
     #         metric="mi",
-    #         intron_strategy="any_active",
+    #         intron_strategy="none",
     #         filter_root=True,
     #         merge_continuous=False,
     #         num_continuous_bins=25,
     #         normalize_initial_linkage_bias=True,
-    #     ),
-    # ),
-    # "Mixed IA": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="mi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # "Mixed IA (F)": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="mi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # "Mixed IA (F, NMI)": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="nmi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # gradient, recursive init
-    # "Mixed IA (F, NMI, LM)": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(gradient_step_frequency=1),
-    #     discrete_model_kwargs=dict(
-    #         metric="nmi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # "Mixed IA (F, NMI, RC)": lambda ls, max_evals: dict(
-    #     linear_scaling=ls,
-    #     init="RecursiveCompleteInit",
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(
-    #         initial_population_size=1024,
-    #         max_num_populations=1,
-    #         restart_stale_populations=True,
-    #     ),
-    #     rv_kwargs=dict(enabled=False),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="nmi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # with quite a few differences, just to see if some of the newer additions help
-    # "Mixed++": lambda ls, max_evals: dict(
-    #     init="RecursiveCompleteInit",
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-    #     rv_kwargs=dict(enabled=True),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="nmi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
-    #     ),
-    # ),
-    # "Mixed++": lambda ls, max_evals: dict(
-    #     init="RecursiveCompleteInit",
-    #     linear_scaling=ls,
-    #     budget_kwargs=dict(
-    #         max_evaluations=max_evals, termination_callback=termination_callback
-    #     ),
-    #     ims_kwargs=dict(initial_population_size=1024, max_num_populations=1),
-    #     rv_kwargs=dict(enabled=True),
-    #     population_kwargs=dict(),
-    #     discrete_model_kwargs=dict(
-    #         metric="nmi",
-    #         intron_strategy="any_active",
-    #         filter_root=True,
-    #         filter_parent_threshold=1e-6,
-    #         filter_children_threshold=1.0 - 1e-6,
-    #         merge_continuous=False,
-    #         num_continuous_bins=25,
-    #         normalize_initial_linkage_bias=False,
     #     ),
     # ),
 }
@@ -310,9 +149,12 @@ def run_one(
     expr = est.model
     try:
         r2_train = r2_score(y_train, est.predict(X_train))
-        r2_test = r2_score(y_test, est.predict(X_test))
     except Exception:
         r2_train = np.nan
+
+    try:
+        r2_test = r2_score(y_test, est.predict(X_test))
+    except Exception:
         r2_test = np.nan
 
     return (

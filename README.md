@@ -143,6 +143,7 @@ conda create -n goblin python=3.12 \
     conda-forge::lld \
     conda-forge::ninja \
     conda-forge::cmake \
+    conda-forge::valgrind \
     conda-forge::ccache \
     conda-forge::libxslt \
     --solver=libmamba

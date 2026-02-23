@@ -198,28 +198,12 @@ class TrackingOptions {
 };
 
 /// An instance that intercepts evaluations
-class Tracked final : public InstanceBase {
+class Tracked final : public WrappedInstance {
  public:
   Tracked() = delete;
 
-  usize num_objectives() const override final { return instance.num_objectives(); };
-
-  usize num_discrete() const override final { return instance.num_discrete(); };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return instance.discrete_domain_sizes(); };
-
-  usize num_continuous() const override final { return instance.num_continuous(); };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return instance.continuous_lower_bounds(); };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return instance.continuous_upper_bounds(); };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-    return instance.continuous_init_lower_bounds();
-  };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-    return instance.continuous_init_upper_bounds();
-  };
-
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    wrap_eval([&](const std::span<const usize>& _indices) { instance.evaluate(rng, solutions, _indices); }, solutions,
+    wrap_eval([&](const std::span<const usize>& _indices) { inner.evaluate(rng, solutions, _indices); }, solutions,
               indices);
   };
   void evaluate_partial(Rng& rng,
@@ -229,19 +213,60 @@ class Tracked final : public InstanceBase {
                         const std::span<const usize>& indices) override final {
     wrap_eval(
         [&](const std::span<const usize>& _indices) {
-          instance.evaluate_partial(rng, solutions, parents, subsets, _indices);
+          inner.evaluate_partial(rng, solutions, parents, subsets, _indices);
         },
         solutions, indices);
   };
 
-  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-    return instance.add_random(rng, solutions, count);
+  bool adapt(Rng& rng) override final {
+    if (inner.adapt(rng)) {
+      alg_timer.stop();
+      // TODO Should these evaluations count (to both time/evals)? They are tracking only so for now they are not
+      // counted, but with the consequence that if you track evaluations more evaluations than allowed by the budget
+      // will be performed to arguably more correctly track the algorithm performance...
+      inner.reevaluate_and_rebuild_archive(rng, archive);
+      alg_timer.start();
+      return true;
+    } else {
+      return false;
+    }
   };
 
-  const FitnessBase& fitness() const override final { return instance.fitness(); };
-  const ArchiveFitnessBase& archive_fitness() const override final { return instance.archive_fitness(); };
+  Mat<CType> gradients(Rng& rng,
+                       SolutionSetBase& solutions,
+                       SolutionSetBase& parents,
+                       const std::vector<const Subset*>& subsets,
+                       const std::span<const usize>& indices,
+                       u64& evaluations) override final {
+    u64 evals_before = this->evaluations, _evals = evaluations;
+    Mat<CType> res = inner.gradients(rng, solutions, parents, subsets, indices, evaluations);
+    this->evaluations = std::max(this->evaluations, evals_before + evaluations - _evals);
+    return res;
+  }
 
-  bool target_reached(const ArchiveBase& archive) const override final { return instance.target_reached(archive); };
+  std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                     SolutionSetBase& solutions,
+                                                     SolutionSetBase& parents,
+                                                     const std::span<const usize>& indices,
+                                                     usize num_steps) override final {
+    u64 evals_before = evaluations;
+    auto res = inner.gradient_steps(rng, solutions, parents, indices, num_steps);
+
+    alg_timer.stop();
+    evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
+
+    for (usize i : /* changed_indices */ std::get<0>(res)) {
+      archive.update(solutions[i], true);
+    }
+
+    if (inner.target_reached(archive)) {
+      status = TerminationStatus::TargetReached;
+      throw TrackingException("");
+    }
+
+    alg_timer.start();
+    return res;
+  }
 
   /// This can be used by the algorithm to log when debugging to log an
   /// `ArchiveBase`/`SolutionSetBase`-like type. Both the passed headers and
@@ -249,7 +274,7 @@ class Tracked final : public InstanceBase {
   /// end (possibly escaping other ',' occurrences with '"').
   template <typename P>
   void request_debug_report(std::filesystem::path debug_logpath,
-                            P& solutions,
+                            const P& solutions,
                             std::string_view debug_headers,
                             std::string_view debug_values) {
     // close the actual logfile to open up the debug logpath next
@@ -326,13 +351,14 @@ class Tracked final : public InstanceBase {
   };
 
   Tracked(InstanceBase& instance, MethodBase& method, Budget& budget, TrackingOptions config, usize seed)
-      : instance(instance),
+      : WrappedInstance(instance),
+        // instance(instance),
         method(method),
         budget(budget),
         config(config),
         seed(seed),
         status(TerminationStatus::Running),
-        archive(instance.archive_fitness(), config.archive_capacity),
+        archive(inner.archive_fitness(), config.archive_capacity),
         generation(std::nullopt),
         last_generation(0),
         generations_at_next_report(config.initial_generations_until_next_report),
@@ -379,7 +405,7 @@ class Tracked final : public InstanceBase {
 
       // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
       // evaluating one by one
-      if (instance.target_reached(archive)) {
+      if (inner.target_reached(archive)) {
         status = TerminationStatus::TargetReached;
         throw TrackingException("");
       }
@@ -445,11 +471,8 @@ class Tracked final : public InstanceBase {
     return report_needed;
   };
 
-  // A can annoyingly not be const since in the SR case an evaluation on the
-  // test set might be necessary - shouldn't change the solution, but is not
-  // const on paper
   template <typename A>
-  void report(A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
+  void report(const A& solutions, std::string_view debug_headers = "", std::string_view debug_values = "") {
     namespace fs = std::filesystem;
     typedef std::chrono::duration<double> Seconds;
 
@@ -472,57 +495,60 @@ class Tracked final : public InstanceBase {
 
       if (fs::is_empty(config.logpath)) {
         // clang-format off
-                    logfile <<
-                        "status,"
-                        "evaluations,"
-                        "generation,"
-                        "total_time_seconds,"
-                        "alg_time_seconds,"
-                        "eval_time_seconds,"
-                        << config.log_info_headers
-                        << debug_headers <<
-                        "seed,"
-                        "discrete,"
-                        "discrete_active,"
-                        "continuous,"
-                        "continuous_active,"
-                    ;
+        logfile <<
+            "status,"
+            "evaluations,"
+            "generation,"
+            "total_time_seconds,"
+            "alg_time_seconds,"
+            "eval_time_seconds,"
+            "current_population_size,"
+            "current_population_generation,"
+            << config.log_info_headers
+            << debug_headers <<
+            "seed,"
+            "discrete,"
+            "discrete_active,"
+            "continuous,"
+            "continuous_active,"
+        ;
         // clang-format on
-        instance.log_header(logfile);
+        inner.log_header(logfile);
         logfile << std::endl;  // here we want to flush
       }
     }
 
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "";
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    auto pop_info = method.current_population();
+    if (pop_info.has_value()) {
+      auto [p_size, p_gen] = pop_info.value();
+      pop_size = std::to_string(p_size);
+      pop_gen = std::to_string(p_gen);
+    }
     Seconds alg_time = alg_timer.elapsed();
     Seconds eval_time = eval_timer.elapsed();
     Seconds total_time = alg_time + eval_time;
 
-    auto common = std::format("{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                              alg_time.count(), eval_time.count(), config.log_info_values, debug_values, seed);
+    auto common =
+        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
+                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
-      SolutionBase* s;
-      if constexpr (std::is_base_of_v<ArchiveBase, A>) {
-        s = &solutions.unsafe_at(i);  // "unsafe" mutable access is needed since there might be a "test" evaluation, and
-                                      // evaluations require mutable solutions
-      } else {
-        s = &solutions[i];
-      }
+      const auto& s = solutions[i];
       // clang-format off
-                logfile << common;
-                log_helper(logfile,   s->discrete_values(), true); logfile << ',';
-                log_helper(logfile,   s->discrete_active(), true); logfile << ',';
-                log_helper(logfile, s->continuous_values(), true); logfile << ',';
-                log_helper(logfile, s->continuous_active(), true); logfile << ',';
+        logfile << common;
+        log_helper(logfile,   s.discrete_values(), true); logfile << ',';
+        log_helper(logfile,   s.discrete_active(), true); logfile << ',';
+        log_helper(logfile, s.continuous_values(), true); logfile << ',';
+        log_helper(logfile, s.continuous_active(), true); logfile << ',';
       // clang-format on
-      instance.log(logfile, *s);
+      inner.log(logfile, s);
       logfile << "\n";
     }
     logfile << std::flush;
   };
 
-  InstanceBase& instance;
+  // InstanceBase& instance;
   MethodBase& method;
   Budget& budget;
   TrackingOptions config;
@@ -553,9 +579,9 @@ class Tracked final : public InstanceBase {
 /// other purposes controlled by the algorithm, not the tracking
 inline void debug_log(InstanceBase& problem,
                       std::string_view path,
-                      std::string_view headers,
-                      std::string_view values,
-                      std::optional<std::reference_wrapper<SolutionSetBase>> population = std::nullopt) {
+                      std::string_view headers = "",
+                      std::string_view values = "",
+                      std::optional<std::reference_wrapper<const SolutionSetBase>> population = std::nullopt) {
   if (auto ti = dynamic_cast<Tracked*>(&problem); ti != nullptr) {
     if (population.has_value()) {
       ti->request_debug_report(path, population.value().get(), headers, values);

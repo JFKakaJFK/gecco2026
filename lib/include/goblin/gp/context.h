@@ -9,6 +9,7 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <queue>
 #include <type_traits>
 #include <span>
 #include <stdexcept>
@@ -49,7 +50,7 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            usize max_expression_size = 50)
+            std::optional<usize> max_expression_size = std::nullopt)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -61,7 +62,7 @@ class GPContext {
         num_discrete(expression_template.size()),
         num_continuous(const_repr == ConstantRepr::Pool ? constant_pool_size
                                                         : (const_repr == ConstantRepr::None ? 0 : num_discrete)),
-        max_expression_size(max_expression_size),
+        max_expression_size(max_expression_size.value_or(num_discrete)),
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         operators(std::move(operators)) {
@@ -151,12 +152,13 @@ class GPContext {
         output_roots[i - nsubtrees] = tree_root;
       }
 
-      std::vector<std::tuple<const TemplateNode*, usize>> node_stack{std::make_tuple(
+      std::queue<std::tuple<const TemplateNode*, usize>> node_queue;
+      node_queue.emplace(
           (is_subtree ? &expression_template.subexpressions[i] : &expression_template.outputs[i - nsubtrees]),
-          tree_root)};
-      while (!node_stack.empty()) {
-        auto [nptr, idx] = node_stack.back();
-        node_stack.pop_back();
+          tree_root);
+      while (!node_queue.empty()) {
+        auto [nptr, idx] = node_queue.front();
+        node_queue.pop();
 
         // structure lookup tables
 
@@ -184,7 +186,7 @@ class GPContext {
           usize c_idx = index++;
           _parent[c_idx] = idx;
           children[idx].push_back(c_idx);
-          node_stack.emplace_back(&c, c_idx);
+          node_queue.emplace(&c, c_idx);
         }
 
         // domain <-> value mapping
@@ -652,6 +654,133 @@ class GPContext {
     return outputs;
   }
 
+  // Matrix of size `num_discrete x num_discrete`, where the entry i,j
+  // corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)
+  // if both are from the same tree, otherwise 0
+  Mat<CType> normalized_root_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      CType di = static_cast<CType>(depth[i]);
+      if (di > norm) {
+        norm = di;
+      }
+    }
+    norm += 1.0;
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) =
+            root[i] == root[j] ? (static_cast<CType>(depth[i]) + static_cast<CType>(depth[j])) * 0.5 : norm;
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return norm > 0.0 ? 1.0 - proximity.array() / norm : proximity;
+  };
+
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_node_proximity() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    CType norm = 0.0;  // = max distance + 1
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+
+          if (norm < proximity(i, j)) {
+            norm = proximity(i, j);
+          }
+        } else {
+          // use -1 as sentinel for disconnected values
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+    norm += 1.0;  // norm = max_distance + 1
+
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) = proximity(i, j) < 0.0 ? 0.0 : 1.0 - proximity(i, j) / norm;
+
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return proximity;
+  };
+
+  // Normalized node proximity [1.0: same node, 0.0: no connection]
+  Mat<CType> normalized_wVIG() const {
+    Mat<CType> proximity(num_discrete, num_discrete);
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        if (root[i] == root[j]) {
+          proximity(i, j) = 0.0;
+          usize ni = i, nj = j;
+          // while the lowest common ancestor was not found, replace the deeper node with its parent until the paths
+          // meet at the closest common ancestor
+          while (ni != nj) {
+            if (depth[ni] > depth[nj]) {
+              assert(parent(ni).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              ni = parent(ni).value();
+            } else {
+              assert(depth[nj] > 0 &&
+                     "Both are not the same, so at least one must have a non-zero depth since i and j are in the same "
+                     "tree");
+              assert(parent(nj).has_value() && "Since depth > 0, either the depth or parent lookup tables are wrong.");
+              nj = parent(nj).value();
+            }
+            proximity(i, j) += 1.0;
+          }
+        } else {
+          // use -1 as sentinel for disconnected values
+          proximity(i, j) = -1.0;
+        }
+      }
+    }
+
+    for (usize i = 0; i < num_discrete; i++) {
+      for (usize j = 0; j <= i; j++) {
+        proximity(i, j) = proximity(i, j) <= 0.0 ? 0.0 : 1.0 / proximity(i, j);
+
+        proximity(j, i) = proximity(i, j);
+      }
+    }
+
+    return proximity;
+  };
+
+  Mat<CType> subtree_co_occurrences() const {
+    Mat<CType> proximity = Mat<CType>::Zero(num_discrete, num_discrete);
+
+    for (usize n = 0; n < num_discrete; n++) {
+      const auto& ns = nodes[n];
+      for (usize i = 0; i < ns.size(); i++) {
+        for (usize j = 0; j <= i; j++) {
+          proximity(ns[i], ns[j]) += 1;
+          proximity(ns[j], ns[i]) += 1;
+        }
+      }
+    }
+
+    return proximity;
+  };
   template <typename S>
   void gpu_nodes_post_order(
     S& solution, 

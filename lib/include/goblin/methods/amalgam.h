@@ -104,7 +104,8 @@ class AMaLGaM final : public MethodBase {
             throw std::runtime_error("");
           }
 
-          return std::make_tuple(s[0].quality().objectives(0), s[0].quality().constraint_value);
+          auto& q = s[0].quality_as<MOQuality>();
+          return std::make_tuple(q.objectives(0), q.constraint_value);
         };
     try {
       alg.run(fn, bounds);

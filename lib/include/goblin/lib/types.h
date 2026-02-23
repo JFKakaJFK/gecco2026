@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <span>
 #include <vector>
+#include <string>
 
 namespace goblin {
 
@@ -22,9 +23,15 @@ using f64 = double;
 
 // currently the python conversion between nanobind/numpy is broken - discrete
 // values + active don't translate?
-using BType = u8;  // avoid implicit bitset types
+using BType = u8;  // not using bool avoids implicit bitset types
 using DType = u16;
 using CType = f64;
+
+// Is this a good idea?
+// template <typename T>
+// using Box = std::unique_ptr<T>;
+// template <typename T>
+// using Rc = std::shared_ptr<T>;
 
 template <typename T>
 using Vec = Eigen::VectorX<T>;

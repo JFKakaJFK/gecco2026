@@ -67,7 +67,7 @@ struct Budget {
   std::optional<TerminationStatus> constexpr exhausted(usize generations,
                                                        usize evaluations,
                                                        std::chrono::nanoseconds elapsed) const {
-    if (max_generations.has_value() && generations >= max_generations.value()) {
+    if (max_generations.has_value() && generations > max_generations.value()) {
       return std::make_optional(TerminationStatus::GenerationLimitReached);
     }
     if (max_evaluations.has_value() && evaluations >= max_evaluations.value()) {

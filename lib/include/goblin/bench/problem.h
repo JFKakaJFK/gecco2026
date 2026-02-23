@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <variant>
+#include <stdexcept>
 
 #include "goblin/bench/functions.h"
 #include "goblin/lib/archive.h"
@@ -30,6 +31,28 @@ class MOFunctionBase {
   virtual ~MOFunctionBase() {};
 };
 
+class PyFunctionBase : MOFunctionBase {
+ public:
+  virtual usize num_objectives() const override = 0;
+  virtual usize num_discrete() const override = 0;
+  virtual usize num_continuous() const override = 0;
+
+  virtual std::tuple<Vec<CType>, CType> eval(SolutionBase& solution) = 0;
+
+  void evaluate(SolutionBase& solution) override {
+    solution.discrete_active().fill(true);
+    solution.continuous_active().fill(true);
+    auto [objectives, cv] = eval(solution);
+    solution.quality_as<MOQuality>().objectives = objectives;
+    solution.quality_as<MOQuality>().constraint_value = cv;
+  };
+  void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override {
+    evaluate(solution);
+  };
+
+  virtual ~PyFunctionBase() {};
+};
+
 class Objectives final : public MOFunctionBase {
  public:
   Objectives(std::vector<std::shared_ptr<ObjectiveBase>> objectives) : objectives(std::move(objectives)) {
@@ -48,27 +71,27 @@ class Objectives final : public MOFunctionBase {
   void evaluate(SolutionBase& solution) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate(solution.discrete_values(), solution.continuous_values(),
                                               solution.discrete_active(), solution.continuous_active());
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 
   void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) override final {
     solution.discrete_active().fill(false);
     solution.continuous_active().fill(false);
-    solution.quality().constraint_value = 0.0;
+    const auto& pq = parent.quality_as<MOQuality>();
+    solution.quality_as<MOQuality>().constraint_value = 0.0;
     for (usize i = 0; i < num_objectives(); i++) {
       auto [ov, cv] = objectives[i]->evaluate_partial(
           solution.discrete_values(), solution.continuous_values(), solution.discrete_active(),
           solution.continuous_active(), parent.discrete_values(), parent.continuous_values(), parent.discrete_active(),
-          parent.continuous_active(), parent.quality().objectives(i), parent.quality().constraint_value,
-          subset.discrete, subset.continuous);
-      solution.quality().objectives(i) = ov;
-      solution.quality().constraint_value += std::max(CType(0.0), cv);
+          parent.continuous_active(), pq.objectives(i), pq.constraint_value, subset.discrete, subset.continuous);
+      solution.quality_as<MOQuality>().objectives(i) = ov;
+      solution.quality_as<MOQuality>().constraint_value += std::max(CType(0.0), cv);
     }
   };
 
@@ -179,9 +202,10 @@ class BenchmarkInstance final : public InstanceBase {
         archive_fitness().worst(),
         num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
         num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality().objectives.size()) >= fitness().num_objectives());
-    s.quality().constraint_value = 0.0;
+    auto& q = s.quality_as<MOQuality>();
+    q.objectives = target_objectives;
+    __goblin_runtime_assert(static_cast<usize>(q.objectives.size()) >= fitness().num_objectives());
+    q.constraint_value = 0.0;
     _target.update(s, false);
   };
 
