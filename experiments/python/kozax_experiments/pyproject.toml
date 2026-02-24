@@ -1,5 +1,5 @@
 [project]
-name = "paper_experiments"
+name = "kozax_experiments"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -13,7 +13,6 @@ dependencies = [
     "numpy>=1.21.6",
     "pandas>=1.1.5",
     "pmlb@git+https://github.com/EpistasisLab/pmlb.git@master",
-    "pygom",
     "pyyaml>=6.0.1",
     "rliable>=1.2.0",
     "scikit-learn>=1.0.2",
@@ -21,10 +20,8 @@ dependencies = [
     "seaborn>=0.12.2",
     "sympy>=1.10.1",
     "tqdm>=4.67.1",
+    "ucimlrepo",
 ]
-
-[tool.uv.sources]
-pygom = { path = "../../../" }
 
 [dependency-groups]
 dev = [

@@ -1,5 +1,5 @@
 [project]
-name = "paper_experiments"
+name = "evogp_experiments"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -11,7 +11,6 @@ dependencies = [
     "numpy>=1.21.6",
     "pandas>=1.1.5",
     "pmlb@git+https://github.com/EpistasisLab/pmlb.git@master",
-    "pygom",
     "pyyaml>=6.0.1",
     "rliable>=1.2.0",
     "scikit-learn>=1.0.2",
@@ -22,18 +21,18 @@ dependencies = [
     "torchvision",
     "torchaudio",
     "tqdm>=4.67.1",
+    "ucimlrepo",
 ]
 
 [[tool.uv.index]]
-name = "pytorch-cu129"
-url = "https://download.pytorch.org/whl/cu129"
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
 explicit = true
 
 [tool.uv.sources]
-pygom = { path = "../../../" }
-torch = { index = "pytorch-cu129", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
-torchvision = { index = "pytorch-cu129", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
-torchaudio = { index = "pytorch-cu129", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+torch = { index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+torchvision = { index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+torchaudio = { index = "pytorch-cu118", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
 
 [dependency-groups]
 dev = [
