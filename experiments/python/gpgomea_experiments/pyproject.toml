@@ -1,5 +1,5 @@
 [project]
-name = "gpu_experiments"
+name = "gpgomea_experiments"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -18,10 +18,11 @@ dependencies = [
     "seaborn>=0.12.2",
     "sympy>=1.10.1",
     "tqdm>=4.67.1",
+    "ucimlrepo",
 ]
 
 [tool.uv.sources]
-pygom = { path = "../" }
+pygom = { path = "../../../" }
 
 [dependency-groups]
 dev = [

@@ -164,7 +164,8 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
         dry_run=dry_run,
     )
 
-    create_db(output_directory)
+    if not dry_run:
+        create_db(output_directory)
 
 
 def main():
@@ -172,7 +173,18 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    grid_execution(cfg.TEST_EXECUTION, output_directory)
+    # CPU Experiments
+    # grid_execution(cfg.DAILY_DEMAND_CPU, output_directory)
+    # grid_execution(cfg.AUTO_MPG_CPU, output_directory)
+    # grid_execution(cfg.CALIFORNIA_CPU, output_directory)
+    # grid_execution(cfg.FEYNMAN_CPU, output_directory)
+
+    # GPU Experiments
+    # grid_execution(cfg.DAILY_DEMAND_GPU, output_directory)
+    # grid_execution(cfg.AUTO_MPG_GPU, output_directory)
+    # grid_execution(cfg.CALIFORNIA_GPU, output_directory)
+    grid_execution(cfg.FEYNMAN_GPU, output_directory)
+
     # grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
     # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-DatasetType = Literal["synthetic", "pmlb"]
+DatasetType = Literal["pmlb", "sklearn", "synthetic", "uci"]
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,7 @@ DATASETS: dict[str, DatasetConfig] = {
     ############################################################
     ### Feynman Equations (https://arxiv.org/pdf/1905.11481) ###
     ############################################################
+    "feynman_I_9_18": FeynmanDatasetConfig(name="feynman_I_9_18", features=9),
     ############################
     ### Arithmetic Equations ###
     ############################
@@ -88,4 +89,28 @@ DATASETS: dict[str, DatasetConfig] = {
     #############################
     # E = n * k_b * T * ln(V2/V1)
     "feynman_I_44_4": FeynmanDatasetConfig(name="feynman_I_44_4", features=5),
+    ##############################################################################
+    ### UCI Machine Learning Repository (https://archive.ics.uci.edu/datasets) ###
+    ##############################################################################
+    "daily_demand": DatasetConfig(
+        name="409",
+        dataset_type="uci",
+        observations=60,
+        features=12,
+    ),
+    "auto_mpg": DatasetConfig(
+        name="9",
+        dataset_type="uci",
+        observations=398,
+        features=7,
+    ),
+    ################################################################################
+    ### SciKit-Learn (https://scikit-learn.org/stable/api/sklearn.datasets.html) ###
+    ################################################################################
+    "california": DatasetConfig(
+        name="california_housing",
+        dataset_type="sklearn",
+        observations=20640,
+        features=8,
+    ),
 }

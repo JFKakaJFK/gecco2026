@@ -7,7 +7,9 @@ from typing import TypedDict
 import numpy as np
 import pmlb
 import sympy as sym
+import ucimlrepo
 from pygom import KernelVersion
+from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import KFold, train_test_split
 
 from src.experiment.dataset_config import DatasetConfig
@@ -106,6 +108,14 @@ def create_tasks(
     dataset: DatasetConfig = problem["dataset"]
 
     match dataset.dataset_type:
+        case "pmlb":
+            X, y = pmlb.fetch_data(
+                dataset.name,
+                return_X_y=True,
+                local_cache_dir=PMLB_CACHE_DIRECTORY,
+            )
+        case "sklearn":
+            X, y = fetch_california_housing(return_X_y=True)
         case "synthetic":
             X, y = synthetic_problem(
                 dataset.name,
@@ -113,12 +123,11 @@ def create_tasks(
                 noise=0.0,
                 seed=rng.integers(2**32 - 1),
             )
-        case "pmlb":
-            X, y = pmlb.fetch_data(
-                dataset.name,
-                return_X_y=True,
-                local_cache_dir=PMLB_CACHE_DIRECTORY,
-            )
+        case "uci":
+            d = ucimlrepo.fetch_ucirepo(id=int(dataset.name))
+
+            X = d.data.features.to_numpy()
+            y = d.data.targets.to_numpy()
 
     if config.test_size != 0:
         X_train, X_test, y_train, y_test = train_test_split(
