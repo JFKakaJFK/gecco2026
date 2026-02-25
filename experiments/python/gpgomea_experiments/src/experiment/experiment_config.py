@@ -249,7 +249,7 @@ DAILY_DEMAND_CPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="daily_demand",
     datasets=[DATASETS["daily_demand"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[60],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -257,7 +257,7 @@ DAILY_DEMAND_CPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False, kernels=(KV.single_kernel_inplace,)),
@@ -267,7 +267,7 @@ AUTO_MPG_CPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="auto_mpg",
     datasets=[DATASETS["auto_mpg"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[398],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -275,7 +275,7 @@ AUTO_MPG_CPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
@@ -285,7 +285,7 @@ CALIFORNIA_CPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="california_housing",
     datasets=[DATASETS["california"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[20640],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -293,7 +293,7 @@ CALIFORNIA_CPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
@@ -303,7 +303,7 @@ FEYNMAN_CPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="feynman",
     datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[100_000],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -311,7 +311,7 @@ FEYNMAN_CPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
@@ -321,7 +321,7 @@ DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="daily_demand",
     datasets=[DATASETS["daily_demand"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[60],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -329,7 +329,7 @@ DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
@@ -339,7 +339,7 @@ AUTO_MPG_GPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="auto_mpg",
     datasets=[DATASETS["auto_mpg"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[398],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -347,7 +347,7 @@ AUTO_MPG_GPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
@@ -357,7 +357,7 @@ CALIFORNIA_GPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="california_housing",
     datasets=[DATASETS["california"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[20640],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -365,7 +365,7 @@ CALIFORNIA_GPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
@@ -375,7 +375,7 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
     # Problem Space
     name="feynman",
     datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[10**i for i in range(2, 6)],  # 100 - 100_000
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[100_000],
     num_features=None,
     templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
@@ -383,7 +383,7 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
     # Execution Parameters
     use_target=False,
     num_folds=30,
-    num_iterations=3,
+    num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
