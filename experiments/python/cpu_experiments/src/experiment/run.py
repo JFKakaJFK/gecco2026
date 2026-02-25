@@ -110,6 +110,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
         ims_kwargs={
             "initial_population_size": task["population_size"],
             "max_num_populations": 1,
+            "restart_stale_populations": True,
         },
         rv_kwargs={"enabled": False},
         discrete_model_kwargs={
@@ -124,16 +125,17 @@ def run_one_task(task: Task, log_path: Path) -> None:
         random_state=task["seed"],
         budget_kwargs={
             # "max_evaluations": 1_000_000,
-            "max_duration": datetime.timedelta(hours=3),
+            "max_duration": datetime.timedelta(hours=1),
         },
         tracking_kwargs={
             "logpath": log_path,
             "log_info": log_info,
-            "max_generations_until_next_report": 1,
-            "generation_factor": 1,
-            "max_evaluations_until_next_report": 100_000,
-            "eval_factor": 100_000,
-            "initial_time_until_next_report": datetime.timedelta(hours=1),
+            "report_intermediate_results": False,
+            # "max_generations_until_next_report": 1,
+            # "generation_factor": 1,
+            # "max_evaluations_until_next_report": 100_000,
+            # "eval_factor": 100_000,
+            # "initial_time_until_next_report": datetime.timedelta(hours=1),
         },
     )
 
