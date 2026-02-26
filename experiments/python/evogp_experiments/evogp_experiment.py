@@ -1,64 +1,48 @@
-import torch
-from evogp.algorithm import (
-    DefaultCrossover,
-    DefaultMutation,
-    DefaultSelection,
-    GeneticProgramming,
-)
-from evogp.pipeline import StandardPipeline
-from evogp.problem import SymbolicRegression
-from evogp.tree import Forest, GenerateDescriptor
+import os
+from datetime import datetime
+from itertools import chain
+from pathlib import Path
 
-XOR_INPUTS = torch.tensor(
-    [
-        [0, 0, 0],
-        [0, 0, 1],
-        [0, 1, 0],
-        [0, 1, 1],
-        [1, 0, 0],
-        [1, 0, 1],
-        [1, 1, 0],
-        [1, 1, 1],
-    ],
-    dtype=torch.float,
-    device="cuda",
+from src.experiment_config import ExperimentConfig, cfg
+from src.problem import generate_problems
+from src.run import run_gpu_tasks
+from src.task import (
+    task_factory,
 )
 
-XOR_OUTPUTS = torch.tensor(
-    [[0], [1], [1], [0], [1], [0], [0], [1]],
-    dtype=torch.float,
-    device="cuda",
-)
 
-problem = SymbolicRegression(datapoints=XOR_INPUTS, labels=XOR_OUTPUTS)
+def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = False):
+    output_directory = directory / config.name
 
-# create decriptor for generating new trees
-descriptor = GenerateDescriptor(
-    max_tree_len=32,
-    input_len=problem.problem_dim,
-    output_len=problem.solution_dim,
-    using_funcs=["+", "-", "*", "/"],
-    max_layer_cnt=4,
-    const_samples=[-1, 0, 1],
-)
+    if not dry_run:
+        os.makedirs(output_directory, exist_ok=True)
 
-# create the algorithm
-algorithm = GeneticProgramming(
-    initial_forest=Forest.random_generate(pop_size=5000, descriptor=descriptor),
-    crossover=DefaultCrossover(),
-    mutation=DefaultMutation(
-        mutation_rate=0.2, descriptor=descriptor.update(max_layer_cnt=3)
-    ),
-    selection=DefaultSelection(survival_rate=0.3, elite_rate=0.01),
-)
+    batches = []
 
-pipeline = StandardPipeline(
-    algorithm,
-    problem,
-    generation_limit=100,
-)
+    # Loop over problems
+    for problem in generate_problems(config):
+        factory = task_factory(problem, config, output_directory, dry_run=dry_run)
 
-best = pipeline.run()
+        batches.append(factory())
 
-pred_res = best.forward(XOR_INPUTS)
-print(pred_res)
+    run_gpu_tasks(
+        chain.from_iterable(batches),
+        output_directory,
+        dry_run=dry_run,
+    )
+
+
+def main():
+    run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+    # run_date = "2026-02-01_17:02:09"
+    output_directory = Path("results") / run_date
+
+    # CPU Experiments
+    grid_execution(cfg.DAILY_DEMAND, output_directory, dry_run=True)
+    grid_execution(cfg.AUTO_MPG, output_directory, dry_run=True)
+    grid_execution(cfg.CALIFORNIA, output_directory, dry_run=True)
+    grid_execution(cfg.FEYNMAN, output_directory, dry_run=True)
+
+
+if __name__ == "__main__":
+    main()
