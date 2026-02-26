@@ -209,7 +209,11 @@ examples/python/playground/plots/symbolic_regression_convergence/
 gpu_experiments/
 
 # Experiment results
-experiments/python/evogp_experiments/pmlb_cache
-experiments/python/evogp_experiments/results
-experiments/python/gpgomea_experiments/pmlb_cache
-experiments/python/gpgomea_experiments/results
+experiments/python/evogp/pmlb_cache
+experiments/python/evogp/results
+experiments/python/gp-gomea/pmlb_cache
+experiments/python/gp-gomea/results
+experiments/python/kozax/pmlb_cache
+experiments/python/kozax/results
+experiments/python/pyoperon/pmlb_cache
+experiments/python/pyoperon/results
