@@ -25,7 +25,7 @@ OPERATOR_SETS: dict[str, str] = {
     "trig": "+,-,*,/,sin,cos",
     "square": "+,-,*,/,square,sqrt",
     "exp": "+,-,*,/,exp,log",
-    "paper": "+,-,*,/,sin,cos,square,sqrt,exp,log,pow",
+    "paper": "+,-,*,/,sin,cos,sqrt,exp,log,pow",
     "all": "+,-,*,/,sin,cos,square,sqrt,exp,log,pow,abs,min,max",
 }
 
