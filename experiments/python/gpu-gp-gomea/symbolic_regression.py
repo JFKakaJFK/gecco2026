@@ -173,25 +173,11 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    # CPU Experiments
-    grid_execution(cfg.DAILY_DEMAND_CPU, output_directory, dry_run=True)
-    grid_execution(cfg.AUTO_MPG_CPU, output_directory, dry_run=True)
-    grid_execution(cfg.CALIFORNIA_CPU, output_directory, dry_run=True)
-    grid_execution(cfg.FEYNMAN_CPU, output_directory, dry_run=True)
-
     # GPU Experiments
-    # grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
-
-    # grid_search(cfg.SEARCH_ARITH_FEYNMAN, output_directory)
-    # grid_search(cfg.SEARCH_TRIG_FEYNMAN, output_directory)
-    # grid_search(cfg.SEARCH_SQUARE_FEYNMAN, output_directory)
-    # grid_search(cfg.SEARCH_EXP_FEYNMAN, output_directory)
-
-    # plot_minimally_required_population(output_directory / "search_arith_feynman")
-    # plot_minimally_required_population(output_directory / "search_trig_feynman")
+    grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":

@@ -324,7 +324,7 @@ DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[60],
     num_features=None,
-    templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
@@ -342,7 +342,7 @@ AUTO_MPG_GPU_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[398],
     num_features=None,
-    templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
@@ -360,7 +360,7 @@ CALIFORNIA_GPU_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[20640],
     num_features=None,
-    templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
@@ -378,7 +378,7 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[100_000],
     num_features=None,
-    templates=[TemplateConfig(2, 4), TemplateConfig(2, 5), TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
@@ -391,21 +391,7 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
 
 
 class Configs:
-    # Test experiment
-    TEST_EXECUTION = TEST_EXECUTION_CONFIG
-    TEST_SEARCH = TEST_SEARCH_CONFIG
-
-    # Grid Search for Feynman Datasets
-    SEARCH_ARITH_FEYNMAN = SEARCH_ARITH_FEYNMAN_CONFIG
-    SEARCH_TRIG_FEYNMAN = SEARCH_TRIG_FEYNMAN_CONFIG
-    SEARCH_SQUARE_FEYNMAN = SEARCH_SQUARE_FEYNMAN_CONFIG
-    SEARCH_EXP_FEYNMAN = SEARCH_EXP_FEYNMAN_CONFIG
-
     # Paper experiments
-    DAILY_DEMAND_CPU = DAILY_DEMAND_CPU_CONFIG
-    AUTO_MPG_CPU = AUTO_MPG_CPU_CONFIG
-    CALIFORNIA_CPU = CALIFORNIA_CPU_CONFIG
-    FEYNMAN_CPU = FEYNMAN_CPU_CONFIG
 
     DAILY_DEMAND_GPU = DAILY_DEMAND_GPU_CONFIG
     AUTO_MPG_GPU = AUTO_MPG_GPU_CONFIG
