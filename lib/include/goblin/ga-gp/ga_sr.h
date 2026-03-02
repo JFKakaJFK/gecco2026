@@ -137,9 +137,6 @@ class GASRProblem : public GPInstanceBase {
 
             // Allocate memory for results on device
             _allocate_results_on_gpu(config);
-            
-            // Copy solution data to GPU
-            _copy_solutions_to_gpu(node_type, node_value);
 
             kernel_wrapper(
                 d_X, d_Y, d_type, d_value,
