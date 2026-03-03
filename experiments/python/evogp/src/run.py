@@ -161,17 +161,18 @@ def run_gpu_tasks(
 
     results_path = output_directory / "results.csv"
     fieldnames: list[str] = [
+        "total_time_seconds",
+        "expression",
+        "mse",
         "dataset",
-        "population_size",
+        "fold",
         "num_observations",
         "num_features",
-        "depth",
+        "population_size",
         "operator_set",
-        "fold",
+        "template_depth",
         "iteration",
         "seed",
-        "mse",
-        "tree",
     ]
 
     jobs: JobQueue = []
