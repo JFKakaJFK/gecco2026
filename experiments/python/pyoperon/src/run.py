@@ -1,7 +1,8 @@
-from concurrent.futures import ProcessPoolExecutor, as_completed
 import csv
 import os
+import time
 from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Never
 
@@ -9,7 +10,6 @@ import numpy as np
 from pyoperon.sklearn import SymbolicRegressor
 from tqdm import tqdm
 
-from src.experiment_config import OPERATOR_SETS
 from src.task import Task, TaskGenerator
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task]]]
@@ -52,27 +52,32 @@ def run_one_task(task: Task) -> dict:
         generations=1_000_000_000,
         max_evaluations=1_000_000_000,
         tournament_size=20,
+        model_selection_criterion="mean_squared_error",
         max_time=3600,  # assumed to be seconds
         random_state=task["seed"],
     )
 
+    start_time = time.perf_counter()
     reg.fit(X_train, y_train)
+    elapsed_time = time.perf_counter() - start_time
+
     best = min(reg.pareto_front_, key=lambda s: s["objective_values"][0])
     mse = best["objective_values"][0]
     tree = reg.get_model_string(best["tree"], 12)
 
     return {
+        "total_time_seconds": elapsed_time,
+        "expression": f"'{tree}'",
+        "mse": float(mse),
         "dataset": task["dataset"],
-        "population_size": task["population_size"],
+        "fold": task["fold"],
         "num_observations": task["num_observations"],
         "num_features": task["num_features"],
-        "depth": task["depth"],
+        "population_size": task["population_size"],
         "operator_set": task["operator_set"],
-        "fold": task["fold"],
+        "template_depth": task["depth"],
         "iteration": task["iteration"],
         "seed": task["seed"],
-        "mse": float(mse),
-        "tree": f"'{tree}'",
     }
 
 
@@ -87,17 +92,18 @@ def run_cpu_tasks(
 
     results_path = output_directory / "results.csv"
     fieldnames: list[str] = [
+        "total_time_seconds",
+        "expression",
+        "mse",
         "dataset",
-        "population_size",
+        "fold",
         "num_observations",
         "num_features",
-        "depth",
+        "population_size",
         "operator_set",
-        "fold",
+        "template_depth",
         "iteration",
         "seed",
-        "mse",
-        "tree",
     ]
 
     jobs: JobQueue = []
@@ -115,16 +121,18 @@ def run_cpu_tasks(
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
 
-        with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        with (
+            ProcessPoolExecutor(max_workers=max_workers) as pool,
+            tqdm(total=n_jobs, leave=False, ascii=True) as progress,
+        ):
             futures = {pool.submit(fn, *args, **kwargs) for fn, args, kwargs in jobs}
-
-            progress = tqdm(total=n_jobs, leave=False, ascii=True)
 
             try:
                 for f in as_completed(futures):
                     try:
                         result = f.result()
                         writer.writerow(result)
+                        csvfile.flush()
 
                     except Exception as e:
                         print(e)
