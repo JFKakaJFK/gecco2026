@@ -1,6 +1,7 @@
 import csv
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from multiprocessing import Process, Queue
 from pathlib import Path
@@ -100,22 +101,28 @@ def run_one_task(task: Task) -> dict:
         is_show_details=False,
     )
 
+    start_time = time.perf_counter()
+
     best = pipeline.run()
+
+    elapsed_time = time.perf_counter() - start_time
+
     mse = -pipeline.best_fitness.item()
     tree = best.to_sympy_expr()
 
     return {
+        "total_time_seconds": elapsed_time,
+        "expression": f"'{tree}'",
+        "mse": float(mse),
         "dataset": task["dataset"],
-        "population_size": task["population_size"],
+        "fold": task["fold"],
         "num_observations": task["num_observations"],
         "num_features": task["num_features"],
-        "depth": task["depth"],
+        "population_size": task["population_size"],
         "operator_set": task["operator_set"],
-        "fold": task["fold"],
+        "template_depth": task["depth"],
         "iteration": task["iteration"],
         "seed": task["seed"],
-        "mse": float(mse),
-        "tree": f"'{tree}'",
     }
 
 
@@ -140,7 +147,7 @@ def gpu_worker(
             result_queue.put(result)
 
         except Exception as e:
-            print(f"[GPU {device_id}] Job failed: {e}")
+            result_queue.put({"error": str(e), "device": device_id})
 
 
 def run_gpu_tasks(
@@ -215,7 +222,12 @@ def run_gpu_tasks(
 
                 while completed < n_jobs:
                     result = result_queue.get()
-                    writer.writerow(result)
+
+                    if "error" in result:
+                        print(f"Job failed: {result}")
+                    else:
+                        writer.writerow(result)
+
                     csvfile.flush()
 
                     completed += 1

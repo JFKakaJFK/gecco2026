@@ -1,3 +1,4 @@
+import multiprocessing as mp
 import os
 from datetime import datetime
 from itertools import chain
@@ -45,4 +46,5 @@ def main():
 
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn", force=True)
     main()
