@@ -77,7 +77,7 @@ def run_one_task(task: Task) -> dict:
         using_funcs=OPERATOR_SETS[task["operator_set"]].split(","),
         max_layer_cnt=task["depth"],
         const_range=const_range,
-        sample_cnt=10_000,
+        sample_cnt=task["max_tree_len"],
     )
 
     algorithm = GeneticProgramming(
