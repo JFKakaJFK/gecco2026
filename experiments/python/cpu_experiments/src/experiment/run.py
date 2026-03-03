@@ -114,9 +114,10 @@ def run_one_task(task: Task, log_path: Path) -> None:
         },
         rv_kwargs={"enabled": False},
         discrete_model_kwargs={
+            "metric": "node_proximity",
             "merge_continuous": False,
             "num_continuous_bins": 25,
-            "normalize_initial_linkage_bias": True,
+            "normalize_initial_linkage_bias": False,
         },
         outputs=[(task["branching_factor"], task["depth"])],
         operators=OPERATOR_SETS[task["operator_set"]],
