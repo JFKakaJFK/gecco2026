@@ -3632,6 +3632,7 @@ class TrackingOptions:
         max_evaluations_until_archive_adaption: int = 100000,
         consider_evaluation_time: bool = True,
         report_intermediate_results: bool = True,
+        report_on_archive_change: bool = False,
         initial_evaluations_until_next_report: int = 10,
         eval_factor: int = 2,
         max_evaluations_until_next_report: int = 1000000,
@@ -3658,6 +3659,7 @@ class TrackingOptions:
     max_evaluations_until_archive_adaption: int
     consider_evaluation_time: bool
     report_intermediate_results: bool
+    report_on_archive_change: bool
 
     initial_evaluations_until_next_report: int
     eval_factor: int  # 1 is linear, >= 2 is exponential spacing

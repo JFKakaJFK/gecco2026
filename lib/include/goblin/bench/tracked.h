@@ -137,6 +137,8 @@ class TrackingOptions {
                   u64 max_evaluations_until_archive_adaption = 100000,
                   bool consider_evaluation_time = true,
                   bool report_intermediate_results = true,
+                  /// Report every time the elitist archive gets updated (for when algorithm behaviour is more interesting than the results)
+                  bool report_on_archive_change = false,
                   u64 initial_evaluations_until_next_report = 10,
                   u64 eval_factor = 2,
                   u64 max_evaluations_until_next_report = 1000000,
@@ -150,6 +152,7 @@ class TrackingOptions {
         max_evaluations_until_archive_adaption(max_evaluations_until_archive_adaption),
         consider_evaluation_time(consider_evaluation_time),
         report_intermediate_results(report_intermediate_results),
+        report_on_archive_change(report_on_archive_change),
         initial_evaluations_until_next_report(initial_evaluations_until_next_report),
         eval_factor(eval_factor),
         max_evaluations_until_next_report(max_evaluations_until_next_report),
@@ -173,6 +176,7 @@ class TrackingOptions {
   u64 max_evaluations_until_archive_adaption;
   bool consider_evaluation_time;
   bool report_intermediate_results;
+  bool report_on_archive_change;
 
   u64 initial_evaluations_until_next_report;
   u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
@@ -255,8 +259,13 @@ class Tracked final : public WrappedInstance {
     alg_timer.stop();
     evaluations = std::max(evaluations, evals_before + /* evaluations */ std::get<1>(res));
 
+    bool archive_changed = false;
     for (usize i : /* changed_indices */ std::get<0>(res)) {
-      archive.update(solutions[i], true);
+      archive_changed |= archive.update(solutions[i], true);
+    }
+    // there is not enough information about the behaviour of gradient_steps for more granular reports
+    if(archive_changed && config.report_on_archive_change){
+        report(archive);
     }
 
     if (inner.target_reached(archive)) {
@@ -399,9 +408,13 @@ class Tracked final : public WrappedInstance {
 
     // update the internal archive, and possibly stop if the target was reached
     for (usize i = 0; i < evaluations_performed; i++) {
-      archive.update(solutions[indices[i]], true);
+      bool archive_changed = archive.update(solutions[indices[i]], true);
       evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
                       // evaluations performed were considered...
+
+      if(archive_changed && config.report_on_archive_change){
+          report(archive);
+      }
 
       // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms
       // evaluating one by one

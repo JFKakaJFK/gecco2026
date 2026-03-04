@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "batching"
+RESULT_DIR = pathlib.Path("results") / "constant_optimization"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,8 +24,8 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
-    max_evaluations=int(1e6)
-    # max_evaluations=int(2e6)
+    # max_evaluations=int(1e6)
+    max_evaluations=int(2e6)
     # max_evaluations=int(5e6)
     # max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
@@ -67,7 +67,7 @@ def problems(rng):
         "Bike Sharing",
         "Concrete Compressive Strength",
         "Dow Chemical",
-        "Tower",
+        # "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -133,7 +133,10 @@ def problems(rng):
                                 constant_representation=constant_representation,
                             )
 
-                            for batch_size in [None, 32, 256]:
+                            for batch_size in [  #
+                                # None, 32,
+                                256
+                            ]:
                                 for run in range(REPEATS_PER_FOLD):
                                     seed = int(rng.integers(2**32))
 
@@ -203,26 +206,26 @@ def methods(info, ctx):
         variants += [
             ", ERCs",
             # ", ERCs + Mut",
-            # ", ERCs + LM",
+            ", ERCs + LM",
             # ", ERCs + LM (mut)",
             # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
             # ", $Pool_{10}$ + LM",
-            # ", $Pool_{10}$ + RV (1:1)",
+            ", $Pool_{10}$ + RV (1:1)",
             # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
-            # ", $Pool_{10}$ + RV (iu)",
+            ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
             # ", $Pool_{10}$ + RV (me,ce)",
             # ", $Pool_{10}$ + RV (iu,me,ce)",
-            # ", $Pool_{10}$ + RV (nSDR)",
+            ", $Pool_{10}$ + RV (nSDR)",
             # ", $Pool_{10}$ + RV (nrvfi)",
             # ", $Pool_{10}$ + RV (nrvfi,nmfi)",
             # ", $Pool_{10}$ + RV (nrvfi,nfi)",
             # ", $Pool_{10}$ + LM (mut)",
-            # ", $Pool_{10}$ + RV (nfa)",
+            ", $Pool_{10}$ + RV (nfa)",
         ]
 
     for similarity in [  #
@@ -301,7 +304,10 @@ def methods(info, ctx):
                 **copt_model_kwargs,
             )
 
-            for reevaluate_solutions_after_adaption in [False, True]:
+            for reevaluate_solutions_after_adaption in [  #
+                # False,
+                True
+            ]:
                 yield (
                     f'"{similarity} {copt} {["", "Reeval"][reevaluate_solutions_after_adaption]}"',
                     c.MixedGOMEA(
@@ -387,13 +393,13 @@ def main():
     # status()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
-    # run_tasks(
-    #     LOG_DIR,
-    #     all_tasks(),
-    #     # clean=True,
-    #     # limit=1,
-    #     # max_workers=1,  # server has 44 physical cores
-    # )
+    run_tasks(
+        LOG_DIR,
+        all_tasks(),
+        # clean=True,
+        # limit=1,
+        # max_workers=1,  # server has 44 physical cores
+    )
 
     with load_results(
         LOG_DIR,
@@ -413,7 +419,7 @@ def main():
                 y_label=f"$R^2$ {split.title()}",
                 ymin="auto",
                 ymax="auto",
-                method_query="format('Reeval={} BS={}', IF(contains(method_name, 'Reeval'), 'Yes', 'No') , batch_size::STRING)",
+                # method_query="format('Reeval={} BS={}', IF(contains(method_name, 'Reeval'), 'Yes', 'No') , batch_size::STRING)",
                 # merge folds and runs into one seaborn "unit"
                 unit_query="format('{}.{}', fold, run)",
                 # split up the plot into the following rows
