@@ -8,6 +8,8 @@ from typing import Never
 
 import numpy as np
 from pyoperon.sklearn import SymbolicRegressor
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
 from src.task import Task, TaskGenerator
@@ -56,6 +58,16 @@ def run_one_task(task: Task) -> dict:
         max_time=3600,  # assumed to be seconds
         random_state=task["seed"],
     )
+
+    imputer = IterativeImputer(
+        max_iter=10,
+        random_state=task["seed"],
+        sample_posterior=True,
+    )
+    if np.isnan(X_train).any():
+        X_train = imputer.fit_transform(X_train)
+    else:
+        imputer.fit(X_train)
 
     start_time = time.perf_counter()
     reg.fit(X_train, y_train)
