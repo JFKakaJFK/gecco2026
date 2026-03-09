@@ -12,6 +12,7 @@ class Problem(TypedDict):
     num_features: int
     template: TemplateConfig
     operator_set: str
+    max_duration: int
 
 
 def format_problem(problem: Problem) -> str:
@@ -60,6 +61,7 @@ def generate_problems(config: ExperimentConfig) -> ProblemGenerator:
                                 "num_features": feat,
                                 "template": tmpl,
                                 "operator_set": op_set,
+                                "max_duration": config.max_duration,
                             }
 
                             yield problem

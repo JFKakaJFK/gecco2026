@@ -89,6 +89,7 @@ class ExperimentConfig:
     test_size: float
     cpu: CPUConfig
     gpu: GPUConfig
+    max_duration: int | None
 
     # Search Space
     search_space: dict[str, list[int]] = field(default_factory=dict)
@@ -124,6 +125,7 @@ TEST_EXECUTION_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=True, kernels=(KV.block_reduce, KV.single_kernel)),
+    max_duration=1,
 )
 
 TEST_SEARCH_CONFIG = ExperimentConfig(
@@ -145,6 +147,7 @@ TEST_SEARCH_CONFIG = ExperimentConfig(
     # Search Space
     search_space={"population_size": [8, 16, 32, 64, 128, 256, 512, 1024, 2048]},
     required_rate=0.8,
+    max_duration=None,
 )
 
 SEARCH_ARITH_FEYNMAN_CONFIG = ExperimentConfig(
@@ -171,6 +174,7 @@ SEARCH_ARITH_FEYNMAN_CONFIG = ExperimentConfig(
     # Search Space
     search_space={"population_size": [2**i for i in range(5, 16)]},  # 32 - 32768
     required_rate=49 / 50,
+    max_duration=None,
 )
 
 SEARCH_TRIG_FEYNMAN_CONFIG = ExperimentConfig(
@@ -197,6 +201,7 @@ SEARCH_TRIG_FEYNMAN_CONFIG = ExperimentConfig(
     # Search Space
     search_space={"population_size": [2**i for i in range(9, 16)]},  # 512 - 32768
     required_rate=49 / 50,
+    max_duration=None,
 )
 
 SEARCH_SQUARE_FEYNMAN_CONFIG = ExperimentConfig(
@@ -218,6 +223,7 @@ SEARCH_SQUARE_FEYNMAN_CONFIG = ExperimentConfig(
     # Search Space
     search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
     required_rate=49 / 50,
+    max_duration=None,
 )
 
 SEARCH_EXP_FEYNMAN_CONFIG = ExperimentConfig(
@@ -239,6 +245,7 @@ SEARCH_EXP_FEYNMAN_CONFIG = ExperimentConfig(
     # Search Space
     search_space={"population_size": [2**i for i in range(3, 17)]},  # 8 - 65536
     required_rate=49 / 50,
+    max_duration=None,
 )
 
 #####################
@@ -261,6 +268,7 @@ DAILY_DEMAND_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False, kernels=(KV.single_kernel_inplace,)),
+    max_duration=1,
 )
 
 AUTO_MPG_CPU_CONFIG = ExperimentConfig(
@@ -279,6 +287,7 @@ AUTO_MPG_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
+    max_duration=1,
 )
 
 CALIFORNIA_CPU_CONFIG = ExperimentConfig(
@@ -297,6 +306,7 @@ CALIFORNIA_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
+    max_duration=1,
 )
 
 FEYNMAN_CPU_CONFIG = ExperimentConfig(
@@ -315,6 +325,7 @@ FEYNMAN_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
+    max_duration=1,
 )
 
 DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
@@ -333,6 +344,7 @@ DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=1,
 )
 
 AUTO_MPG_GPU_CONFIG = ExperimentConfig(
@@ -351,6 +363,7 @@ AUTO_MPG_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=1,
 )
 
 CALIFORNIA_GPU_CONFIG = ExperimentConfig(
@@ -369,6 +382,7 @@ CALIFORNIA_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=1,
 )
 
 FEYNMAN_GPU_CONFIG = ExperimentConfig(
@@ -387,16 +401,37 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=1,
+)
+
+
+FEYNMAN_EXACT_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="feynman",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[2**i for i in range(7, 20)],  # 128 - 1048576
+    num_observations=[100_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 5), TemplateConfig(2, 6), TemplateConfig(2, 7)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=3,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=10,
 )
 
 
 class Configs:
     # Paper experiments
-
     DAILY_DEMAND_GPU = DAILY_DEMAND_GPU_CONFIG
     AUTO_MPG_GPU = AUTO_MPG_GPU_CONFIG
     CALIFORNIA_GPU = CALIFORNIA_GPU_CONFIG
     FEYNMAN_GPU = FEYNMAN_GPU_CONFIG
+    FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
 
 
 cfg = Configs()
