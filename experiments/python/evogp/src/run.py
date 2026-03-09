@@ -76,7 +76,7 @@ def run_one_task(task: Task) -> dict:
         input_len=problem.problem_dim,
         output_len=problem.solution_dim,
         using_funcs=OPERATOR_SETS[task["operator_set"]].split(","),
-        max_layer_cnt=task["depth"],
+        max_layer_cnt=task["depth"] + 1,  # different definition compared to GP-GOMEA
         const_range=const_range,
         sample_cnt=task["max_tree_len"],
     )
