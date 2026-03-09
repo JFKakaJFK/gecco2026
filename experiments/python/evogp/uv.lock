@@ -416,7 +416,7 @@ wheels = [
 [[package]]
 name = "evogp"
 version = "0.1.0"
-source = { git = "https://github.com/JRPost11/evogp.git#533d72f47fea2ed79b18b673743932bdf42721d0" }
+source = { git = "https://github.com/JRPost11/evogp.git?rev=19b597130df6b53e3b6cbc0e66ad2d30374f1b69#19b597130df6b53e3b6cbc0e66ad2d30374f1b69" }
 dependencies = [
     { name = "networkx", version = "3.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "networkx", version = "3.6.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
@@ -464,7 +464,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "duckdb", specifier = ">=1.3.2" },
-    { name = "evogp", git = "https://github.com/JRPost11/evogp.git" },
+    { name = "evogp", git = "https://github.com/JRPost11/evogp.git?rev=19b597130df6b53e3b6cbc0e66ad2d30374f1b69" },
     { name = "matplotlib", specifier = ">=3.5.3" },
     { name = "numpy", specifier = ">=1.21.6" },
     { name = "pandas", specifier = ">=1.1.5" },
