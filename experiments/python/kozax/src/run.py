@@ -1,15 +1,24 @@
 import csv
 import os
+import re
 import subprocess
+import time
 from collections.abc import Callable
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Never
+from typing import Never, Tuple
 
+import jax
+import jax.numpy as jnp
+import jax.random as jr
 import numpy as np
+import sympy as sym
+from kozax.fitness_functions.base_fitness_function import BaseFitnessFunction
+from kozax.genetic_programming import GeneticProgramming
 from tqdm import tqdm
 
 from src.experiment_config import OPERATOR_SETS
+from src.problem import Problem
 from src.task import Task, TaskGenerator
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task]]]
@@ -25,32 +34,46 @@ def get_num_cuda_devices() -> int:
         raise Exception(f"No CUDA devices could be detected: {e}") from e
 
 
+def lambdify_expression(e):
+    """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
+    e = str(e)
+
+    symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
+    expr = sym.sympify(e, locals=symbols)
+    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
+
+    def fn(X: np.ndarray):
+        try:
+            return f(*[X[:, int(s[1:])] for s in symbols.keys()])
+        except Exception as e:
+            print(e)
+            return np.repeat(float("nan"), X.shape[0])
+
+    return fn
+
+
+class FitnessFunction(BaseFitnessFunction):
+    def __call__(self, candidate, data, tree_evaluator):
+        X, Y = data
+        predictions = jax.vmap(tree_evaluator, in_axes=[None, 0])(candidate, X)
+        return jnp.mean(jnp.square(predictions - Y))
+
+
+def best_solution(strategy):
+    pareto_fitness, pareto_solutions = strategy.pareto_front
+
+    valid = pareto_fitness < strategy.max_fitness
+    fitness = jnp.where(valid, pareto_fitness, jnp.inf)
+
+    best_idx = int(jnp.argmin(fitness))
+
+    best_fitness = float(pareto_fitness[best_idx])
+    best_tree = strategy.expression_to_string(pareto_solutions[best_idx])
+
+    return best_fitness, str(best_tree)
+
+
 def run_one_task(task: Task) -> dict:
-    import jax
-    import jax.numpy as jnp
-    import jax.random as jr
-    from kozax.fitness_functions.base_fitness_function import BaseFitnessFunction
-    from kozax.genetic_programming import GeneticProgramming
-
-    class FitnessFunction(BaseFitnessFunction):
-        def __call__(self, candidate, data, tree_evaluator):
-            X, Y = data
-            predictions = jax.vmap(tree_evaluator, in_axes=[None, 0])(candidate, X)
-            return jnp.mean(jnp.square(predictions - Y))
-
-    def best_solution(strategy):
-        pareto_fitness, pareto_solutions = strategy.pareto_front
-
-        valid = pareto_fitness < strategy.max_fitness
-        fitness = jnp.where(valid, pareto_fitness, jnp.inf)
-
-        best_idx = int(jnp.argmin(fitness))
-
-        best_fitness = float(pareto_fitness[best_idx])
-        best_tree = strategy.expression_to_string(pareto_solutions[best_idx])
-
-        return best_fitness, best_tree
-
     X_train = np.load(task["X_path"].absolute())
     y_train = np.load(task["y_path"].absolute())
 
@@ -67,11 +90,10 @@ def run_one_task(task: Task) -> dict:
     X = X_train[:obs, :feat]
     y = y_train[:obs]
 
-    # temp = float(np.nanmax(np.abs(y_train)))
-    # const_range = (-temp, temp)
-
     if task["population_size"] is None:
         raise ValueError("Population size cannot be None")
+
+    key = jr.PRNGKey(task["seed"])
 
     fitness_function = FitnessFunction()
 
@@ -92,39 +114,64 @@ def run_one_task(task: Task) -> dict:
     variable_list = [[f"x{i}" for i in range(task["num_features"])]]
 
     strategy = GeneticProgramming(
-        num_generations=10,
+        num_generations=1_000_000_000,
         population_size=task["population_size"],
         fitness_function=fitness_function,
         operator_list=operator_set,
         variable_list=variable_list,
-        max_init_depth=task["depth"],
-        max_nodes=task["max_nodes"],
-        device_type="cpu",
+        max_init_depth=task["template"].depth,
+        max_nodes=task["template"].max_nodes,
+        device_type="gpu",
         tournament_size=20,
         crossover_probability_factors=0.9,
         mutation_probability_factors=0.1,
     )
 
-    key = jr.PRNGKey(task["seed"])
+    key, init_key = jr.split(key)
 
-    strategy.fit(key, (X, y), verbose=False)
+    start_time = time.perf_counter()
 
-    mse, tree = best_solution(strategy)
+    # Warm up JIT functions with actual data shapes
+    dummy_population = strategy.initialize_population(init_key)
+    strategy._warm_up_jit_functions(dummy_population, (X, y))
 
-    del strategy
+    population = dummy_population
+
+    while True:
+        key, eval_key, sample_key = jr.split(key, 3)
+
+        if time.perf_counter() - start_time >= task["max_duration"]:
+            break
+
+        fitness, population = strategy.evaluate_population(population, (X, y), eval_key)
+
+        if time.perf_counter() - start_time >= task["max_duration"]:
+            break
+
+        population = strategy.evolve_population(population, fitness, sample_key)
+
+    elapsed_time = time.perf_counter() - start_time
+
+    old_mse, expr = best_solution(strategy)
+
+    y_pred = lambdify_expression(expr)(X)
+    mse = np.mean((y_pred - y.flatten()) ** 2)
 
     return {
+        "total_time_seconds": elapsed_time,
+        "expression": f"'{expr}'",
+        "mse": float(mse),
+        "evaluations": strategy.evaluation_count,
         "dataset": task["dataset"],
-        "population_size": task["population_size"],
+        "fold": task["fold"],
         "num_observations": task["num_observations"],
         "num_features": task["num_features"],
-        "depth": task["depth"],
+        "population_size": task["population_size"],
         "operator_set": task["operator_set"],
-        "fold": task["fold"],
+        "template_depth": task["depth"],
         "iteration": task["iteration"],
         "seed": task["seed"],
-        "mse": float(mse),
-        "tree": f"'{tree}'",
+        "old_mse": old_mse,
     }
 
 
@@ -149,7 +196,7 @@ def gpu_worker(
             result_queue.put(result)
 
         except Exception as e:
-            print(f"[GPU {device_id}] Job failed: {e}")
+            result_queue.put({"error": str(e), "device": device_id})
 
 
 def run_gpu_tasks(
@@ -163,17 +210,20 @@ def run_gpu_tasks(
 
     results_path = output_directory / "results.csv"
     fieldnames: list[str] = [
+        "total_time_seconds",
+        "expression",
+        "mse",
+        "evaluations",
         "dataset",
-        "population_size",
+        "fold",
         "num_observations",
         "num_features",
-        "depth",
+        "population_size",
         "operator_set",
-        "fold",
+        "template_depth",
         "iteration",
         "seed",
-        "mse",
-        "tree",
+        "old_mse",
     ]
 
     jobs: JobQueue = []
@@ -224,7 +274,12 @@ def run_gpu_tasks(
 
                 while completed < n_jobs:
                     result = result_queue.get()
-                    writer.writerow(result)
+
+                    if "error" in result:
+                        print(f"Job failed: {result}")
+                    else:
+                        writer.writerow(result)
+
                     csvfile.flush()
 
                     completed += 1
