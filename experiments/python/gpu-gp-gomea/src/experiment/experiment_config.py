@@ -344,7 +344,7 @@ DAILY_DEMAND_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=1,
+    max_duration=10,
 )
 
 AUTO_MPG_GPU_CONFIG = ExperimentConfig(
@@ -363,7 +363,7 @@ AUTO_MPG_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=1,
+    max_duration=10,
 )
 
 CALIFORNIA_GPU_CONFIG = ExperimentConfig(
@@ -382,7 +382,7 @@ CALIFORNIA_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=1,
+    max_duration=10,
 )
 
 FEYNMAN_GPU_CONFIG = ExperimentConfig(
@@ -401,7 +401,7 @@ FEYNMAN_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=1,
+    max_duration=10,
 )
 
 
