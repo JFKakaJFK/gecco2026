@@ -80,17 +80,17 @@ DAILY_DEMAND_CONFIG = ExperimentConfig(
     # Problem Space
     name="daily_demand",
     datasets=[DATASETS["daily_demand"]],
-    population_sizes=[2**i for i in range(7, 8)],  # 128 - 65536
+    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[60],
     num_features=None,
     templates=[TemplateConfig(2, 4, 31)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
-    num_folds=5,
+    num_folds=30,
     num_iterations=1,
     test_size=0,
-    max_duration=10,
+    max_duration=600,
 )
 
 AUTO_MPG_CONFIG = ExperimentConfig(

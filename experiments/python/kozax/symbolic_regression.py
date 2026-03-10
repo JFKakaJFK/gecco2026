@@ -37,10 +37,10 @@ def main():
     output_directory = Path("results") / run_date
 
     # CPU Experiments
-    grid_execution(cfg.DAILY_DEMAND, output_directory, dry_run=False)
-    # grid_execution(cfg.AUTO_MPG, output_directory, dry_run=True)
-    # grid_execution(cfg.CALIFORNIA, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN, output_directory, dry_run=True)
+    grid_execution(cfg.DAILY_DEMAND, output_directory, dry_run=True)
+    grid_execution(cfg.AUTO_MPG, output_directory, dry_run=True)
+    grid_execution(cfg.CALIFORNIA, output_directory, dry_run=True)
+    grid_execution(cfg.FEYNMAN, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":
