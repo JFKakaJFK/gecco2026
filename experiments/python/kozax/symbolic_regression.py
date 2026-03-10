@@ -25,9 +25,7 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
         batches.append(factory())
 
     run_gpu_tasks(
-        chain.from_iterable(batches),
-        output_directory,
-        dry_run=dry_run,
+        chain.from_iterable(batches), output_directory, dry_run=dry_run, max_workers=1
     )
 
 

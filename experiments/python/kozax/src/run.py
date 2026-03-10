@@ -48,6 +48,8 @@ def lambdify_expression(e):
 
 
 def run_one_task(task: Task) -> dict:
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(0)
+
     import jax
 
     jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
@@ -57,6 +59,8 @@ def run_one_task(task: Task) -> dict:
         "jax_persistent_cache_enable_xla_caches",
         "xla_gpu_per_fusion_autotune_cache_dir",
     )
+
+    print("devices:", jax.devices())
 
     import jax.numpy as jnp
     import jax.random as jr
