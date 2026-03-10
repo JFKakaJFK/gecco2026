@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 import subprocess
 import time
 from collections.abc import Callable
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Never
 
 import numpy as np
+import sympy as sym
 import torch
 from evogp.algorithm import (
     CombinedMutation,
@@ -31,6 +33,24 @@ JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task]
 
 torch.random.manual_seed(42)
 torch.cuda.manual_seed(42)
+
+
+def lambdify_expression(e):
+    """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
+    e = str(e)
+
+    symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
+    expr = sym.sympify(e, locals=symbols)
+    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
+
+    def fn(X: np.ndarray):
+        try:
+            return f(*[X[:, int(s[1:])] for s in symbols.keys()])
+        except Exception as e:
+            print(e)
+            return np.repeat(float("nan"), X.shape[0])
+
+    return fn
 
 
 # Cursed, but works
@@ -97,7 +117,7 @@ def run_one_task(task: Task) -> dict:
         algorithm,
         problem,
         generation_limit=1_000_000_000,  # is not optional, so set very large
-        time_limit=60,  # in seconds
+        time_limit=10,  # in seconds
         is_show_details=False,
     )
 
@@ -107,13 +127,17 @@ def run_one_task(task: Task) -> dict:
 
     elapsed_time = time.perf_counter() - start_time
 
-    mse = -pipeline.best_fitness.item()
-    tree = best.to_sympy_expr()
+    expr = str(best.to_sympy_expr())
+    old_mse = -pipeline.best_fitness.item()
+
+    y_pred = lambdify_expression(expr)(X_train)
+    mse = np.mean((y_pred - y_train.flatten()) ** 2)
 
     return {
         "total_time_seconds": elapsed_time,
-        "expression": f"'{tree}'",
+        "expression": f"'{expr}'",
         "mse": float(mse),
+        "evaluations": pipeline.evaluation_count,
         "dataset": task["dataset"],
         "fold": task["fold"],
         "num_observations": task["num_observations"],
@@ -123,6 +147,7 @@ def run_one_task(task: Task) -> dict:
         "template_depth": task["depth"],
         "iteration": task["iteration"],
         "seed": task["seed"],
+        "old_mse": old_mse,
     }
 
 
@@ -164,6 +189,7 @@ def run_gpu_tasks(
         "total_time_seconds",
         "expression",
         "mse",
+        "evaluations",
         "dataset",
         "fold",
         "num_observations",
@@ -173,6 +199,7 @@ def run_gpu_tasks(
         "template_depth",
         "iteration",
         "seed",
+        "old_mse",
     ]
 
     jobs: JobQueue = []

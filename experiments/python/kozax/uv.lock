@@ -803,15 +803,45 @@ wheels = [
 name = "kozax"
 version = "0.0.11"
 source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version < '3.11'",
+]
 dependencies = [
     { name = "jax", version = "0.6.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "jax", version = "0.9.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "optax" },
-    { name = "sympy" },
+    { name = "optax", marker = "python_full_version < '3.11'" },
+    { name = "sympy", marker = "python_full_version < '3.11'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/b9/ea/a7d98b81dac243ec3419f2180e9ea8a2ea978b56b9220592ed81a3b755f8/kozax-0.0.11.tar.gz", hash = "sha256:ac01b40975c462439e42b7a74e17838bd58769384bcd9bce6251046bcf7adfc0", size = 31728, upload-time = "2025-10-14T08:53:40.484Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0f/80/af39180b278f04cd255da2e18dee492f8ee89ab7f764fb3836c78431465b/kozax-0.0.11-py3-none-any.whl", hash = "sha256:c92666b546f8a167fc74c3763b6f181d0c231ac39094091fa3c95703f38c78b2", size = 49843, upload-time = "2025-10-14T08:53:37.428Z" },
+]
+
+[[package]]
+name = "kozax"
+version = "0.0.13"
+source = { registry = "https://pypi.org/simple" }
+resolution-markers = [
+    "python_full_version >= '3.14' and sys_platform == 'win32'",
+    "python_full_version >= '3.14' and sys_platform == 'emscripten'",
+    "python_full_version >= '3.14' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'win32'",
+    "python_full_version == '3.12.*' and sys_platform == 'win32'",
+    "python_full_version == '3.11.*' and sys_platform == 'win32'",
+    "python_full_version == '3.13.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.12.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.11.*' and sys_platform == 'emscripten'",
+    "python_full_version == '3.13.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.12.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+    "python_full_version == '3.11.*' and sys_platform != 'emscripten' and sys_platform != 'win32'",
+]
+dependencies = [
+    { name = "jax", version = "0.9.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "optax", marker = "python_full_version >= '3.11'" },
+    { name = "sympy", marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a5/04/39fc0f1052cadf83f1bb6fb722a18634eec358ac845171b99925683197c1/kozax-0.0.13.tar.gz", hash = "sha256:6624468fbb2db1d0166dc15f7f376d5581d53738d42f5b433b9670d641f463bb", size = 31824, upload-time = "2026-02-24T09:33:51.844Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d1/03/ef14cfd111351c3598016e3d7a19e01d8f7923956c2c091d1b73b1b22092/kozax-0.0.13-py3-none-any.whl", hash = "sha256:d326f8a88131cd2c732c8fd7550e65f02e7b5a7b312e55b753ef5b5e97913e7c", size = 50086, upload-time = "2026-02-24T09:33:48.26Z" },
 ]
 
 [[package]]
@@ -824,7 +854,8 @@ dependencies = [
     { name = "jax", version = "0.9.0.1", source = { registry = "https://pypi.org/simple" }, extra = ["cuda13"], marker = "python_full_version >= '3.11'" },
     { name = "jaxtyping", version = "0.3.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "jaxtyping", version = "0.3.9", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "kozax" },
+    { name = "kozax", version = "0.0.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "kozax", version = "0.0.13", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "matplotlib" },
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },

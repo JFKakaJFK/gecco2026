@@ -1,15 +1,16 @@
+import csv
 import os
 from datetime import datetime
 from itertools import chain
 from multiprocessing import set_start_method
 from pathlib import Path
 
+import jax
+
 from src.experiment_config import ExperimentConfig, cfg
 from src.problem import generate_problems
 from src.run import run_gpu_tasks
-from src.task import (
-    task_factory,
-)
+from src.task import task_factory
 
 
 def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = False):
@@ -48,4 +49,12 @@ def main():
 
 
 if __name__ == "__main__":
+    # jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
+    # jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
+    # jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
+    # jax.config.update(
+    #     "jax_persistent_cache_enable_xla_caches",
+    #     "xla_gpu_per_fusion_autotune_cache_dir",
+    # )
+
     main()

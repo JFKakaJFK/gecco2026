@@ -32,6 +32,7 @@ class Task(TypedDict):
     X_path: Path
     y_path: Path
     seed: int
+    max_duration: int
 
 
 TaskGenerator = Generator[Task]
@@ -181,6 +182,7 @@ def create_tasks(
                 "X_path": X_path,
                 "y_path": y_path,
                 "seed": seed,
+                "max_duration": problem["max_duration"],
             }
 
             yield task

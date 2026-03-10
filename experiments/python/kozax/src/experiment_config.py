@@ -52,6 +52,7 @@ class ExperimentConfig:
     num_folds: int
     num_iterations: int
     test_size: float
+    max_duration: int
 
     # Search Space
     search_space: dict[str, list[int]] = field(default_factory=dict)
@@ -82,13 +83,14 @@ DAILY_DEMAND_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 8)],  # 128 - 65536
     num_observations=[60],
     num_features=None,
-    templates=[TemplateConfig(2, 4, 31), TemplateConfig(2, 6, 127)],
+    templates=[TemplateConfig(2, 4, 31)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
-    num_folds=2,
+    num_folds=5,
     num_iterations=1,
     test_size=0,
+    max_duration=10,
 )
 
 AUTO_MPG_CONFIG = ExperimentConfig(
@@ -98,13 +100,14 @@ AUTO_MPG_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[398],
     num_features=None,
-    templates=[TemplateConfig(2, 4, 31), TemplateConfig(2, 6, 127)],
+    templates=[TemplateConfig(2, 4, 31)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
     num_folds=30,
     num_iterations=1,
     test_size=0,
+    max_duration=600,
 )
 
 CALIFORNIA_CONFIG = ExperimentConfig(
@@ -114,13 +117,14 @@ CALIFORNIA_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[20640],
     num_features=None,
-    templates=[TemplateConfig(2, 4, 31), TemplateConfig(2, 6, 127)],
+    templates=[TemplateConfig(2, 4, 31)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
     num_folds=30,
     num_iterations=1,
     test_size=0,
+    max_duration=600,
 )
 
 FEYNMAN_CONFIG = ExperimentConfig(
@@ -130,13 +134,14 @@ FEYNMAN_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[100_000],
     num_features=None,
-    templates=[TemplateConfig(2, 4, 31), TemplateConfig(2, 6, 127)],
+    templates=[TemplateConfig(2, 4, 31)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
     num_folds=30,
     num_iterations=1,
     test_size=0,
+    max_duration=600,
 )
 
 
