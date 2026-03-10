@@ -117,7 +117,7 @@ def run_one_task(task: Task) -> dict:
         algorithm,
         problem,
         generation_limit=1_000_000_000,  # is not optional, so set very large
-        time_limit=10,  # in seconds
+        time_limit=600,  # in seconds
         is_show_details=False,
     )
 
