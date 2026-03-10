@@ -137,6 +137,8 @@ def run_one_task(task: Task) -> dict:
         mutation_probability_factors=0.1,
     )
 
+    evaluation_count = 0
+
     key, init_key = jr.split(key)
 
     start_time = time.perf_counter()
@@ -158,6 +160,7 @@ def run_one_task(task: Task) -> dict:
         if time.perf_counter() - start_time >= task["max_duration"]:
             break
 
+        evaluation_count += strategy.population_size
         population = strategy.evolve_population(population, fitness, sample_key)
 
     elapsed_time = time.perf_counter() - start_time
@@ -171,7 +174,7 @@ def run_one_task(task: Task) -> dict:
         "total_time_seconds": elapsed_time,
         "expression": f"'{expr}'",
         "mse": float(mse),
-        "evaluations": strategy.evaluation_count,
+        "evaluations": evaluation_count,
         "dataset": task["dataset"],
         "fold": task["fold"],
         "num_observations": task["num_observations"],
