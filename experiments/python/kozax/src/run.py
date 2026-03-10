@@ -292,6 +292,7 @@ def run_gpu_tasks(
                         print(f"Job failed: {result}")
                     else:
                         writer.writerow(result)
+                        csvfile.flush()
 
                     csvfile.flush()
 
@@ -307,3 +308,4 @@ def run_gpu_tasks(
             ):
                 result = fn(*args, **kwargs)
                 writer.writerow(result)
+                csvfile.flush()
