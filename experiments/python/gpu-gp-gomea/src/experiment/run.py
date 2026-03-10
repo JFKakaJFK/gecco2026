@@ -182,8 +182,6 @@ def run_one_task(task: Task, log_path: Path) -> None:
 
     df = pd.read_csv(log_path)
 
-    print(f"Replace {df.loc[df.index[-1], 'mse_train']} with {actual_mse}")
-
     df.loc[df.index[-1], "mse"] = actual_mse
     df.to_csv(log_path, index=False)
 
