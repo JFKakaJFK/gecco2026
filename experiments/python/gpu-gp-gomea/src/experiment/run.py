@@ -2,6 +2,7 @@ import csv
 import datetime
 import math
 import os
+import re
 import subprocess
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -11,7 +12,9 @@ from pathlib import Path
 from typing import Never, TypedDict
 
 import numpy as np
+import pandas as pd
 import pygom.gp as gp
+import sympy as sym
 from pygom import KernelVersion as KV
 from tqdm import tqdm
 
@@ -95,6 +98,24 @@ def determine_task_success(csv_path: Path) -> bool:
     return last_row is not None and last_row.get("status") == "TargetReached"
 
 
+def lambdify_expression(e):
+    """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
+    e = str(e)
+
+    symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
+    expr = sym.sympify(e, locals=symbols)
+    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
+
+    def fn(X: np.ndarray):
+        try:
+            return f(*[X[:, int(s[1:])] for s in symbols.keys()])
+        except Exception as e:
+            print(e)
+            return np.repeat(float("nan"), X.shape[0])
+
+    return fn
+
+
 def run_one_task(task: Task, log_path: Path) -> None:
     X_train = np.load(task["X_path"].absolute())
     y_train = np.load(task["y_path"].absolute())
@@ -155,6 +176,16 @@ def run_one_task(task: Task, log_path: Path) -> None:
     )
 
     est.fit(X, y)
+
+    y_pred = lambdify_expression(est.model)(X)
+    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
+
+    df = pd.read_csv(log_path)
+
+    print(f"Replace {df.loc[df.index[-1], 'mse_train']} with {actual_mse}")
+
+    df.loc[df.index[-1], "mse"] = actual_mse
+    df.to_csv(log_path, index=False)
 
 
 def run_cpu_tasks(
