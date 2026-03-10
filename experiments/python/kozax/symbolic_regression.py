@@ -30,6 +30,8 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
 
 
 def main():
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(0)
+
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date

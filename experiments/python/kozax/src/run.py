@@ -10,8 +10,6 @@ from typing import Never
 
 import numpy as np
 import sympy as sym
-from kozax.fitness_functions.base_fitness_function import BaseFitnessFunction
-from kozax.genetic_programming import GeneticProgramming
 from tqdm import tqdm
 
 from src.task import Task, TaskGenerator
@@ -64,6 +62,8 @@ def run_one_task(task: Task) -> dict:
 
     import jax.numpy as jnp
     import jax.random as jr
+    from kozax.fitness_functions.base_fitness_function import BaseFitnessFunction
+    from kozax.genetic_programming import GeneticProgramming
 
     class FitnessFunction(BaseFitnessFunction):
         def __call__(self, candidate, data, tree_evaluator):
