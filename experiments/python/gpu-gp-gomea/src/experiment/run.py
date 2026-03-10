@@ -177,10 +177,11 @@ def run_one_task(task: Task, log_path: Path) -> None:
 
     est.fit(X, y)
 
-    y_pred = lambdify_expression(est.model)(X)
-    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
-
     df = pd.read_csv(log_path)
+    expr = df.loc[df.index[-1], "expressions"]
+
+    y_pred = lambdify_expression(expr)(X)
+    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
 
     df.loc[df.index[-1], "mse"] = actual_mse
     df.to_csv(log_path, index=False)
