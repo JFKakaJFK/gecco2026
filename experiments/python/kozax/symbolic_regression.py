@@ -1,11 +1,8 @@
-import csv
+import multiprocessing as mp
 import os
 from datetime import datetime
 from itertools import chain
-from multiprocessing import set_start_method
 from pathlib import Path
-
-import jax
 
 from src.experiment_config import ExperimentConfig, cfg
 from src.problem import generate_problems
@@ -35,8 +32,6 @@ def grid_execution(config: ExperimentConfig, directory: Path, dry_run: bool = Fa
 
 
 def main():
-    set_start_method("spawn", force=True)
-
     run_date = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
@@ -49,12 +44,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
-    # jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
-    # jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
-    # jax.config.update(
-    #     "jax_persistent_cache_enable_xla_caches",
-    #     "xla_gpu_per_fusion_autotune_cache_dir",
-    # )
+    mp.set_start_method("spawn", force=True)
 
     main()

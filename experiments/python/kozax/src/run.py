@@ -6,19 +6,14 @@ import time
 from collections.abc import Callable
 from multiprocessing import Process, Queue
 from pathlib import Path
-from typing import Never, Tuple
+from typing import Never
 
-import jax
-import jax.numpy as jnp
-import jax.random as jr
 import numpy as np
 import sympy as sym
 from kozax.fitness_functions.base_fitness_function import BaseFitnessFunction
 from kozax.genetic_programming import GeneticProgramming
 from tqdm import tqdm
 
-from src.experiment_config import OPERATOR_SETS
-from src.problem import Problem
 from src.task import Task, TaskGenerator
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task]]]
@@ -52,28 +47,39 @@ def lambdify_expression(e):
     return fn
 
 
-class FitnessFunction(BaseFitnessFunction):
-    def __call__(self, candidate, data, tree_evaluator):
-        X, Y = data
-        predictions = jax.vmap(tree_evaluator, in_axes=[None, 0])(candidate, X)
-        return jnp.mean(jnp.square(predictions - Y))
-
-
-def best_solution(strategy):
-    pareto_fitness, pareto_solutions = strategy.pareto_front
-
-    valid = pareto_fitness < strategy.max_fitness
-    fitness = jnp.where(valid, pareto_fitness, jnp.inf)
-
-    best_idx = int(jnp.argmin(fitness))
-
-    best_fitness = float(pareto_fitness[best_idx])
-    best_tree = strategy.expression_to_string(pareto_solutions[best_idx])
-
-    return best_fitness, str(best_tree)
-
-
 def run_one_task(task: Task) -> dict:
+    import jax
+
+    jax.config.update("jax_compilation_cache_dir", "/tmp/jax_cache")
+    jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
+    jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
+    jax.config.update(
+        "jax_persistent_cache_enable_xla_caches",
+        "xla_gpu_per_fusion_autotune_cache_dir",
+    )
+
+    import jax.numpy as jnp
+    import jax.random as jr
+
+    class FitnessFunction(BaseFitnessFunction):
+        def __call__(self, candidate, data, tree_evaluator):
+            X, Y = data
+            predictions = jax.vmap(tree_evaluator, in_axes=[None, 0])(candidate, X)
+            return jnp.mean(jnp.square(predictions - Y))
+
+    def best_solution(strategy):
+        pareto_fitness, pareto_solutions = strategy.pareto_front
+
+        valid = pareto_fitness < strategy.max_fitness
+        fitness = jnp.where(valid, pareto_fitness, jnp.inf)
+
+        best_idx = int(jnp.argmin(fitness))
+
+        best_fitness = float(pareto_fitness[best_idx])
+        best_tree = strategy.expression_to_string(pareto_solutions[best_idx])
+
+        return best_fitness, str(best_tree)
+
     X_train = np.load(task["X_path"].absolute())
     y_train = np.load(task["y_path"].absolute())
 
