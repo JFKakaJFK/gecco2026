@@ -1,5 +1,6 @@
 import csv
 import os
+import re
 import time
 from collections.abc import Callable
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -7,6 +8,7 @@ from pathlib import Path
 from typing import Never
 
 import numpy as np
+import sympy as sym
 from pyoperon.sklearn import SymbolicRegressor
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
@@ -15,6 +17,24 @@ from tqdm import tqdm
 from src.task import Task, TaskGenerator
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task]]]
+
+
+def lambdify_expression(e):
+    """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
+    e = str(e)
+
+    symbols = {x: sym.Symbol(x) for x in re.findall(r"([Xx]\d+)", e)}
+    expr = sym.sympify(e, locals=symbols)
+    f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])
+
+    def fn(X: np.ndarray):
+        try:
+            return f(*[X[:, int(s[1:])] for s in symbols.keys()])
+        except Exception as e:
+            print(e)
+            return np.repeat(float("nan"), X.shape[0])
+
+    return fn
 
 
 def run_one_task(task: Task) -> dict:
@@ -74,13 +94,19 @@ def run_one_task(task: Task) -> dict:
     elapsed_time = time.perf_counter() - start_time
 
     best = min(reg.pareto_front_, key=lambda s: s["objective_values"][0])
-    mse = best["objective_values"][0]
-    tree = reg.get_model_string(best["tree"], 12)
+    old_mse = best["objective_values"][0]
+    expr = reg.get_model_string(
+        best["tree"], 12, [f"x{i}" for i in range(task["num_features"])]
+    )
+
+    y_pred = lambdify_expression(expr)(X_train)
+    mse = np.mean((y_pred - y_train) ** 2)
 
     return {
         "total_time_seconds": elapsed_time,
-        "expression": f"'{tree}'",
+        "expression": f"'{expr}'",
         "mse": float(mse),
+        "old_mse": float(old_mse),
         "dataset": task["dataset"],
         "fold": task["fold"],
         "num_observations": task["num_observations"],
@@ -107,6 +133,7 @@ def run_cpu_tasks(
         "total_time_seconds",
         "expression",
         "mse",
+        "old_mse",
         "dataset",
         "fold",
         "num_observations",
