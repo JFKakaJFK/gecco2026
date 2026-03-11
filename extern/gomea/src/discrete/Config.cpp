@@ -1,6 +1,6 @@
 #include "gomea/src/discrete/Config.hpp"
 
-#include "gomea/src/fitness/benchmarks-discrete.hpp"
+// #include "gomea/src/fitness/benchmarks-discrete.hpp"
 
 namespace gomea {
 namespace discrete {
@@ -179,6 +179,7 @@ bool Config::parseCommandLine(int argc, char** argv) {
       throw std::invalid_argument("Invalid FOS index.");
   }
 
+  /*
   if (!usePartialEvaluations) {
     switch (problem_index) {
       case 0:
@@ -208,6 +209,7 @@ bool Config::parseCommandLine(int argc, char** argv) {
         throw std::invalid_argument("Invalid problem index.");
     }
   }
+   */
 
   return 1;
 }

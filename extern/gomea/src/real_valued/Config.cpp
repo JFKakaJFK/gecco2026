@@ -1,6 +1,6 @@
 #include "gomea/src/real_valued/Config.hpp"
 
-#include "gomea/src/fitness/benchmarks-rv.hpp"
+// #include "gomea/src/fitness/benchmarks-rv.hpp"
 
 namespace gomea {
 namespace realvalued {
@@ -191,6 +191,7 @@ void Config::parseParameters(int argc, char** argv, int* index) {
   noError = noError && sscanf(argv[*index + 12], "%lf", &fitness_variance_tolerance);
   noError = noError && sscanf(argv[*index + 13], "%lf", &maximum_number_of_seconds);
 
+  /*
   // Initialize fitness function
   if (black_box_evaluations) {
     switch (problem_index) {
@@ -224,6 +225,7 @@ void Config::parseParameters(int argc, char** argv, int* index) {
         throw std::invalid_argument("Invalid problem index.");
     }
   }
+   */
 
   // Initialize linkage model
   initializeFOSFromIndex(FOSIndex);

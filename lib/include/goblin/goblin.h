@@ -43,6 +43,7 @@
 #include "goblin/methods/library.h"
 #include "goblin/methods/mo_binary.h"
 #include "goblin/methods/mixed.h"
+#include "goblin/methods/simple_ga.h"
 
 // clang-format on
 

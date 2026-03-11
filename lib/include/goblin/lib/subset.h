@@ -87,6 +87,9 @@ struct Subset {
   };
 
   Subset merge(const Subset& other) const {
+    assert(std::is_sorted(discrete) && std::is_sorted(other.discrete) && "Discrete indices are not sorted!");
+    assert(std::is_sorted(continuous) && std::is_sorted(other.continuous) && "Continuous indices are not sorted!");
+
     Subset s;
     usize this_i = 0, other_i = 0, idx;
     while (this_i < discrete.size() || other_i < other.discrete.size()) {

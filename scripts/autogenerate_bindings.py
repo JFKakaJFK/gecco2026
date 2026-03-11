@@ -213,6 +213,7 @@ def configure_litgen() -> litgen.LitgenOptions:
     options.member_exclude_by_name_and_class__regex = {
         "Solution": r"quality",
         "SolutionBase": r"quality",
+        "PSOState": r"quality",
     }
     for cls in ["goblin::SolutionBase", "goblin::Solution"]:
         options.custom_bindings.add_custom_bindings_to_class(
@@ -224,6 +225,18 @@ def configure_litgen() -> litgen.LitgenOptions:
             pydef_code=f"""
                 LG_CLASS.def("quality", nb::overload_cast<>(&{cls}::quality, nb::const_), nb::rv_policy::reference_internal);
                 LG_CLASS.def("quality", nb::overload_cast<>(&{cls}::quality), nb::rv_policy::reference_internal);
+            """,
+        )
+    for cls in ["goblin::classic::PSOState"]:
+        options.custom_bindings.add_custom_bindings_to_class(
+            qualified_class=cls,
+            stub_code="""
+                def previous_best_quality(self) -> QualityBase:
+                    ...
+            """,
+            pydef_code=f"""
+                LG_CLASS.def("previous_best_quality", nb::overload_cast<>(&{cls}::previous_best_quality, nb::const_), nb::rv_policy::reference_internal);
+                LG_CLASS.def("previous_best_quality", nb::overload_cast<>(&{cls}::previous_best_quality), nb::rv_policy::reference_internal);
             """,
         )
 

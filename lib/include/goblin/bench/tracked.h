@@ -137,7 +137,8 @@ class TrackingOptions {
                   u64 max_evaluations_until_archive_adaption = 100000,
                   bool consider_evaluation_time = true,
                   bool report_intermediate_results = true,
-                  /// Report every time the elitist archive gets updated (for when algorithm behaviour is more interesting than the results)
+                  /// Report every time the elitist archive gets updated (for when algorithm behaviour is more
+                  /// interesting than the results)
                   bool report_on_archive_change = false,
                   u64 initial_evaluations_until_next_report = 10,
                   u64 eval_factor = 2,
@@ -264,8 +265,8 @@ class Tracked final : public WrappedInstance {
       archive_changed |= archive.update(solutions[i], true);
     }
     // there is not enough information about the behaviour of gradient_steps for more granular reports
-    if(archive_changed && config.report_on_archive_change){
-        report(archive);
+    if (archive_changed && config.report_on_archive_change) {
+      report(archive);
     }
 
     if (inner.target_reached(archive)) {
@@ -412,8 +413,8 @@ class Tracked final : public WrappedInstance {
       evaluations++;  // update the evaluations one at time to be "truthful" in case of an early return before all
                       // evaluations performed were considered...
 
-      if(archive_changed && config.report_on_archive_change){
-          report(archive);
+      if (archive_changed && config.report_on_archive_change) {
+        report(archive);
       }
 
       // the vtr is checked for each solution to level the playing field between batched algorithms and algorithms

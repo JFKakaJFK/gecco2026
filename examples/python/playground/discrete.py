@@ -3,11 +3,12 @@ import pathlib
 
 import pandas as pd
 from pygom import *
+from tqdm import tqdm
+
 from src.config import Config, c
 from src.plots import plot_convergence_so, plot_scalability
 from src.postprocessing import load_results
 from src.run import run_all, run_one
-from tqdm import tqdm
 
 REPEATS = 30
 REPEATS = 100
@@ -105,6 +106,34 @@ def methods():
     #     '"Library (GIGA, U)"',
     #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
     # )
+
+    # for sn, selection in [
+    #     ("Truncation", c.classic.TruncationSelection()),
+    #     ("T4", c.classic.TournamentSelection(4)),
+    # ]:
+    #     for cx, crossover in [
+    #         ("UX", c.classic.UniformCrossover(0.5)),
+    #         ("1PT", c.classic.NPointCrossover(1)),
+    #         ("2PT", c.classic.NPointCrossover(2)),
+    #     ]:
+    #         yield (
+    #             f'"SimpleGA(SS, S={sn},C={cx})"',
+    #             c.classic.SimpleGA(
+    #                 population_size=100,
+    #                 crossover_strategy=crossover,
+    #                 selection_strategy=selection,
+    #             ),
+    #         )
+    #         if sn != "Truncation":
+    #             yield (
+    #                 f'"SimpleGA(G, S={sn},C={cx})"',
+    #                 c.classic.SimpleGA(
+    #                     population_size=100,
+    #                     crossover_strategy=crossover,
+    #                     selection_strategy=selection,
+    #                     steady_state=False,
+    #                 ),
+    #             )
 
     for metric in [  #
         "mi",

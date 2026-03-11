@@ -29,6 +29,7 @@ ci: clean tidy iwyu fmt configure build test bindings # docs pydocs
 
 reconfigure: clean configure
 
+# -DCMAKE_CXX_FLAGS="-ftime-report"
 # type ?= Release
 type ?= Debug
 configure:
