@@ -150,7 +150,7 @@ class Rotated final : public ObjectiveBase {
 
     usize block_size = rotation_block_size.value_or(fn->num_continuous());
 
-    Mat<CType> tmp(block_size, block_size);
+    Mat<CType> tmp = Mat<CType>::Identity(block_size, block_size);
 
     block_rotation_matrix = Mat<CType>::Identity(block_size, block_size);
 
@@ -164,7 +164,7 @@ class Rotated final : public ObjectiveBase {
         tmp(j, i) = sin_theta;
         tmp(j, j) = cos_theta;
 
-        block_rotation_matrix.noalias() = block_rotation_matrix * tmp;
+        block_rotation_matrix *= tmp;
 
         // tmp.setIdentity();
         tmp(i, i) = CType(1.0);
@@ -181,8 +181,7 @@ class Rotated final : public ObjectiveBase {
 
     usize block_size = rotation_block_size.value_or(fn->num_continuous());
 
-    Mat<CType> tmp(block_size, block_size);
-
+    Mat<CType> tmp = Mat<CType>::Identity(block_size, block_size);
     block_rotation_matrix = Mat<CType>::Identity(block_size, block_size);
 
     std::uniform_real_distribution<CType> angle(0.0, 360.0);
@@ -197,7 +196,7 @@ class Rotated final : public ObjectiveBase {
         tmp(j, i) = sin_theta;
         tmp(j, j) = cos_theta;
 
-        block_rotation_matrix.noalias() = block_rotation_matrix * tmp;
+        block_rotation_matrix *= tmp;
 
         // tmp.setIdentity();
         tmp(i, i) = CType(1.0);
@@ -245,19 +244,20 @@ class Rotated final : public ObjectiveBase {
  private:
   template <typename V>
   Vec<CType> rotated(V v) {
+    const isize block_size = block_rotation_matrix.rows();
     Vec<CType> r(v.size());
-    Vec<CType> tmp = Vec<CType>::Zero(block_rotation_matrix.rows());
-    for (isize i = 0; i < v.size(); i += block_rotation_matrix.rows()) {
-      isize l = std::min(v.size(), block_rotation_matrix.rows());
-      tmp.setZero();
-      tmp(Eigen::seqN(0, l)) = v(Eigen::seqN(i, l));
-      r(Eigen::seqN(i, l)) = (block_rotation_matrix * tmp)(Eigen::seqN(0, l));
+    Vec<CType> tmp = Vec<CType>::Zero(block_size);
+    for (isize i = 0; i < v.size(); i += block_size) {
+      for (isize j = 0; j < block_size; j++) {
+        tmp(j) = i + j < v.size() ? v(i + j) : 0.0;
+      }
+      r(Eigen::seqN(i, block_size)) = block_rotation_matrix * tmp;
     }
     return r;
   };
 
-  std::shared_ptr<ObjectiveBase> fn;
-  Mat<CType> block_rotation_matrix;
+  std::shared_ptr<ObjectiveBase> fn{};
+  Mat<CType> block_rotation_matrix{};
 };
 
 class Sum final : public ObjectiveBase {

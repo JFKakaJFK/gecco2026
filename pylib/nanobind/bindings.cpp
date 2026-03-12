@@ -3856,20 +3856,20 @@ void py_init_module_pygoblin(nb::module_& m) {
             .def(
                 "__init__",
                 [](goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729,
-                   double cognitive = 1.494, double social = 1.494, bool generational = false,
+                   double cognitive = 1.494, double social = 1.494,
                    const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>>& topology =
                        std::nullopt) {
                   auto ctor_wrapper = [](goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729,
-                                         double cognitive = 1.494, double social = 1.494, bool generational = false,
+                                         double cognitive = 1.494, double social = 1.494,
                                          std::shared_ptr<goblin::classic::PSOTopologyBase> topology =
                                              std::make_shared<goblin::classic::RingTopology>()) -> void {
-                    new (self) goblin::classic::PSO(population_size, inertia, cognitive, social, generational,
-                                                    topology);  // placement new
+                    new (self)
+                        goblin::classic::PSO(population_size, inertia, cognitive, social, topology);  // placement new
                   };
                   auto ctor_wrapper_adapt_mutable_param_with_default_value =
                       [&ctor_wrapper](
                           goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729,
-                          double cognitive = 1.494, double social = 1.494, bool generational = false,
+                          double cognitive = 1.494, double social = 1.494,
                           const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>>& topology =
                               std::nullopt) {
                         const std::shared_ptr<goblin::classic::PSOTopologyBase>& topology_or_default =
@@ -3880,15 +3880,14 @@ void py_init_module_pygoblin(nb::module_& m) {
                             return std::make_shared<goblin::classic::RingTopology>();
                         }();
 
-                        ctor_wrapper(self, population_size, inertia, cognitive, social, generational,
-                                     topology_or_default);
+                        ctor_wrapper(self, population_size, inertia, cognitive, social, topology_or_default);
                       };
 
                   ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, inertia, cognitive, social,
-                                                                      generational, topology);
+                                                                      topology);
                 },
                 nb::arg("population_size") = 25, nb::arg("inertia") = 0.729, nb::arg("cognitive") = 1.494,
-                nb::arg("social") = 1.494, nb::arg("generational") = false, nb::arg("topology").none() = nb::none(),
+                nb::arg("social") = 1.494, nb::arg("topology").none() = nb::none(),
                 "Python bindings defaults:\n    If topology is None, then its default value will be: "
                 "std.make_shared<classic.RingTopology>()")
             .def("step", &goblin::classic::PSO::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
@@ -3919,7 +3918,7 @@ void py_init_module_pygoblin(nb::module_& m) {
         nb::class_<goblin::classic::ES, goblin::MethodBase>(pyNsclassic, "ES", "")
             .def(nb::init<usize, usize, usize, bool, std::string, double, std::optional<double>, std::optional<double>,
                           double>(),
-                 nb::arg("population_size") = 15, nb::arg("num_parents") = 1, nb::arg("num_offspring") = 100,
+                 nb::arg("population_size") = 8, nb::arg("num_parents") = 1, nb::arg("num_offspring") = 50,
                  nb::arg("steady_state") = true, nb::arg("strategy") = "single", nb::arg("epsilon") = 1e-6,
                  nb::arg("tau").none() = nb::none(), nb::arg("tau_i").none() = nb::none(), nb::arg("beta") = 0.0873)
             .def("step", &goblin::classic::ES::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),

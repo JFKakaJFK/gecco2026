@@ -4872,7 +4872,6 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
             inertia: float = 0.729,
             cognitive: float = 1.494,
             social: float = 1.494,
-            generational: bool = False,
             topology: Optional[PSOTopologyBase] = None,
         ) -> None:
             """Python bindings defaults:
@@ -4928,9 +4927,9 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
     class ES(MethodBase):
         def __init__(
             self,
-            population_size: int = 15,
+            population_size: int = 8,
             num_parents: int = 1,
-            num_offspring: int = 100,
+            num_offspring: int = 50,
             steady_state: bool = True,
             strategy: str = "single",
             epsilon: float = 1e-6,

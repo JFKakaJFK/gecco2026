@@ -9,7 +9,7 @@ from src.run import run_all
 
 REPEATS = 30
 
-budget = c.Budget(max_evaluations=int(1e5))
+budget = c.Budget(max_evaluations=int(1e6))
 
 VTR = 1e-10
 
@@ -107,15 +107,35 @@ def problems():
 
     for d in [2, 4, 8]:
         yield (
-            "Rosenbrock",
+            "Ellipsoid",
             d,
             c.BenchmarkInstance(
-                c.Rosenbrock(d),
+                c.Ellipsoid(d),
                 target=[VTR],
                 continuous_init_lower_bound=init_lb,
                 continuous_init_upper_bound=init_ub,
             ),
         )
+        yield (
+            "Rot. Ellipsoid",
+            d,
+            c.BenchmarkInstance(
+                c.Rotated(c.Ellipsoid(d), -45.0),
+                target=[VTR],
+                continuous_init_lower_bound=init_lb,
+                continuous_init_upper_bound=init_ub,
+            ),
+        )
+        # yield (
+        #     "Rosenbrock",
+        #     d,
+        #     c.BenchmarkInstance(
+        #         c.Rosenbrock(d),
+        #         target=[VTR],
+        #         continuous_init_lower_bound=init_lb,
+        #         continuous_init_upper_bound=init_ub,
+        #     ),
+        # )
 
     for d in [
         4,
@@ -181,16 +201,16 @@ def methods():
             max_num_populations=max_num_populations,
         ),
     )
-    # yield (
-    #     '"RV-GOMEA (Full)"',
-    #     c.RvGOMEA(
-    #         base_population_size=initial_population_size,
-    #         max_number_of_populations=max_num_populations,
-    #         max_nis=max_nis,
-    #         selection_during_gom=False,
-    #         update_elitist_during_gom=False,
-    #     ),
-    # )
+    yield (
+        '"RV-GOMEA (Full)"',
+        c.RvGOMEA(
+            base_population_size=initial_population_size,
+            max_number_of_populations=max_num_populations,
+            max_nis=max_nis,
+            selection_during_gom=False,
+            update_elitist_during_gom=False,
+        ),
+    )
     # yield (
     #     '"RV-GOMEA (LT)"',
     #     c.RvGOMEA(
@@ -239,10 +259,8 @@ def methods():
         # "directed",
     ]:
         yield (
-            f'"ES({v})"',
-            c.classic.ES(
-                strategy=v,
-            ),
+            f'"ES({v}, 1:7)"',
+            c.classic.ES(strategy=v),
         )
 
     yield (
