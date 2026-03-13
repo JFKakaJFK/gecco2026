@@ -81,7 +81,7 @@ def create_db(dir: pathlib.Path):
             eval_time_seconds,
             expressions,
             mse,
-            mse_train,
+            mse_train AS old_mse,
             dataset,
             fold,
             num_observations,
