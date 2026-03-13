@@ -97,7 +97,7 @@ AUTO_MPG_CONFIG = ExperimentConfig(
     # Problem Space
     name="auto_mpg",
     datasets=[DATASETS["auto_mpg"]],
-    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
+    population_sizes=[2**i for i in range(7, 15)],  # 128 - 16384
     num_observations=[398],
     num_features=None,
     templates=[TemplateConfig(2, 4, 31)],
