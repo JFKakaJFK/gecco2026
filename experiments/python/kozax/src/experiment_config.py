@@ -80,7 +80,7 @@ DAILY_DEMAND_CONFIG = ExperimentConfig(
     # Problem Space
     name="daily_demand",
     datasets=[DATASETS["daily_demand"]],
-    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
+    population_sizes=[2**i for i in range(7, 15)],  # 128 - 16384
     num_observations=[60],
     num_features=None,
     templates=[TemplateConfig(2, 4, 31)],
@@ -114,7 +114,7 @@ CALIFORNIA_CONFIG = ExperimentConfig(
     # Problem Space
     name="california_housing",
     datasets=[DATASETS["california"]],
-    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
+    population_sizes=[2**i for i in range(7, 15)],  # 128 - 16384
     num_observations=[20640],
     num_features=None,
     templates=[TemplateConfig(2, 4, 31)],
@@ -131,7 +131,7 @@ FEYNMAN_CONFIG = ExperimentConfig(
     # Problem Space
     name="feynman",
     datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
+    population_sizes=[2**i for i in range(7, 15)],  # 128 - 16384
     num_observations=[100_000],
     num_features=None,
     templates=[TemplateConfig(2, 4, 31)],
