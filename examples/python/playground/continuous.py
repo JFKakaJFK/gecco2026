@@ -78,7 +78,7 @@ def problems():
         5,
         10,
         20,
-        40,
+        # 40,
         # 80,
     ]:
         # display name, instance info, actual instance
@@ -265,7 +265,7 @@ def methods():
 
     yield (
         '"DE"',
-        c.classic.DifferentialEvolution(
+        c.classic.DE(
             population_size=25,
             strategy=c.classic.Rand1Bin(base="best", scale="dither"),
         ),

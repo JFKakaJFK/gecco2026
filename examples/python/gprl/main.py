@@ -253,18 +253,22 @@ class PolicyEvaluator:
 
 if __name__ == "__main__":
     # env = "Acrobot-v1"
-    env = "CartPole-v1"
+    # env = "CartPole-v1"
     # env = "Pendulum-v1"
     # env = "MountainCar-v0"
     # env = "MountainCarContinuous-v0"
 
-    # env = "LunarLander-v3"
+    env = "LunarLander-v3"
 
     # env = "mo-mountaincarcontinuous-v0"
     # env = "mo-lunar-lander-continuous-v3"
 
     ea = GPAlgorithm(
-        pygom.classic.SimpleGA(),
+        pygom.classic.StandardGP(
+            population_size=256,
+            selection_strategy=pygom.classic.TournamentSelection(tournament_size=8),
+        ),
+        # pygom.classic.SimpleGA(),
         # MixedGOMEA(
         #     population_options=PopulationOptions(
         #         forced_improvements=True,
@@ -274,13 +278,13 @@ if __name__ == "__main__":
         #     ims_options=IMSOptions(
         #         initial_population_size=128,
         #         max_num_populations=8,
-        #         restart_stale_populations=True,
+        #         # restart_stale_populations=True,
         #     ),
         #     rv_options=RvOptions(enabled=False),
-        # )
+        # ),
     )
 
-    budget = Budget(max_time_seconds=300)  # 00)
+    budget = Budget(max_time_seconds=30)  # 300)  # 00)
 
     with PolicyEvaluator(env, ea, seed=None) as evaluator:
         archive, _ = evaluator.run(
@@ -309,3 +313,5 @@ if __name__ == "__main__":
                 ],
                 archive[i].quality().objectives,
             )
+
+    # TODO get everything from logs, plot curves...

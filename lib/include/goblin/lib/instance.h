@@ -203,7 +203,9 @@ class InstanceBase {
     return indices.size();
   };
 
-  virtual ~InstanceBase() {};
+  virtual const InstanceBase& unwrap() const { return *this; }
+
+  virtual ~InstanceBase() = default;
 };
 
 /// Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still
@@ -285,6 +287,8 @@ class WrappedInstance : public InstanceBase {
   std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const override {
     return inner.solution_cache_key(solution);
   };
+
+  const InstanceBase& unwrap() const override { return inner.unwrap(); }
 
   virtual ~WrappedInstance() = default;
 

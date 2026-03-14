@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -489,8 +490,10 @@ struct Subset {
   };
 
   Subset merge(const Subset& other) const {
-    assert(std::is_sorted(discrete) && std::is_sorted(other.discrete) && "Discrete indices are not sorted!");
-    assert(std::is_sorted(continuous) && std::is_sorted(other.continuous) && "Continuous indices are not sorted!");
+    assert(std::is_sorted(discrete.begin(), discrete.end()) &&
+           std::is_sorted(other.discrete.begin(), other.discrete.end()) && "Discrete indices are not sorted!");
+    assert(std::is_sorted(continuous.begin(), continuous.end()) &&
+           std::is_sorted(other.continuous.begin(), other.continuous.end()) && "Continuous indices are not sorted!");
 
     Subset s;
     usize this_i = 0, other_i = 0, idx;
@@ -1668,7 +1671,9 @@ class InstanceBase {
     return indices.size();
   };
 
-  virtual ~InstanceBase() {};
+  virtual const InstanceBase& unwrap() const { return *this; }
+
+  virtual ~InstanceBase() = default;
 };
 
 /// Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still
@@ -1750,6 +1755,8 @@ class WrappedInstance : public InstanceBase {
   std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const override {
     return inner.solution_cache_key(solution);
   };
+
+  const InstanceBase& unwrap() const override { return inner.unwrap(); }
 
   virtual ~WrappedInstance() = default;
 
@@ -4579,6 +4586,96 @@ class GPContext {
     }
 
     return proximity;
+  };
+
+  template <typename F>
+  void visit_tree(const SolutionBase& solution, usize root, F&& visit) const {
+    std::queue<usize> q;
+    q.emplace(root);
+    while (!q.empty()) {
+      usize current = q.front();
+      q.pop();
+
+      visit(current);
+
+      // lookup the value of the current node
+      DType value = domain2value(current, solution.discrete_values()(current));
+      usize v_idx = value_idx[value];
+
+      usize nc = std::min(value_max_arity[v_idx], children[current].size());
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[current][i]);
+      }
+    }
+  };
+
+  bool copy_tree(const SolutionBase& source, usize source_node, SolutionBase& target, usize target_node) const {
+    std::vector<std::tuple<usize, DType>> backup;
+    std::queue<std::tuple<usize, usize>> q;
+    q.emplace(source_node, target_node);
+
+    bool successful = true;
+    while (!q.empty()) {
+      auto [from, to] = q.front();
+      q.pop();
+
+      // lookup the value of the current node
+      DType value = domain2value(from, source.discrete_values()(from));
+      usize v_idx = value_idx[value];
+
+      // same node value must be permissible at target location
+      auto v = value2domain(to, value);
+      if (!v.has_value()) {
+        successful = false;
+        break;
+      }
+      backup.emplace_back(to, target.discrete_values()(to));
+      target.discrete_values()(to) = v.value();
+
+      usize nc = std::min(value_max_arity[v_idx], children[from].size());
+      // target must at least have the same number of children
+      if (children[to].size() < nc) {
+        successful = false;
+        break;
+      }
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[from][i], children[to][i]);
+      }
+    }
+    // revert changes
+    if (!successful) {
+      for (auto [n, v] : backup) {
+        target.discrete_values()(n) = v;
+      }
+    }
+    return successful;
+  };
+
+  std::vector<usize> active_nodes(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize root : subtree_roots) {
+      if (solution.discrete_active()(root)) {
+        visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+      }
+    }
+    for (usize root : output_roots) {
+      visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+    }
+    return active;
+  };
+
+  std::vector<usize> active_constant_indices(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize n : active_nodes(solution)) {
+      // lookup the value of the current node
+      DType value = domain2value(n, solution.discrete_values()(n));
+      if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? value_idx[value] : n;
+        active.push_back(ci);
+      }
+    }
+
+    return active;
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -7885,11 +7982,14 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
+
+
 
 namespace goblin {
 
@@ -8145,6 +8245,9 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
+
+
+
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8266,11 +8369,13 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8359,6 +8464,9 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
+
+
+
 
 namespace goblin {
 
@@ -8456,14 +8564,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9773,6 +9885,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11195,10 +11308,12 @@ class MixedGOMEA : public MethodBase {
 #endif /* _GOBLIN_MIXED_GOMEA_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/methods/simple_ga.h included by goblin.h                                        //
+//                       goblin/methods/classic/common.h included by goblin.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_SIMPLE_GA_H
-#define _GOBLIN_SIMPLE_GA_H
+#ifndef _GOBLIN_CLASSIC_COMMON_H
+#define _GOBLIN_CLASSIC_COMMON_H
+
+
 
 namespace goblin {
 namespace classic {
@@ -11309,309 +11424,85 @@ class TruncationSelection : public SelectionStrategyBase {
   };
 };
 
-/// Strategy used to generate the crossover masks to exchange information between two parents
-class DiscreteCrossoverStrategyBase {
- public:
-  virtual void crossover_masks(Rng& rng,
-                               const SolutionBase& parent1,
-                               const SolutionBase& parent2,
-                               Subset& mask1,
-                               Subset& mask2) const = 0;
-  virtual ~DiscreteCrossoverStrategyBase() = default;
-};
+class EABase: public MethodBase {
+    u64 generation{};
 
-class UniformCrossover : public DiscreteCrossoverStrategyBase {
-  double p_crossover{};
+    protected:
+    usize population_size{};
 
- public:
-  UniformCrossover(double p_crossover = 0.5) : p_crossover(p_crossover) {
-    if (p_crossover <= 0.0 || 1.0 <= p_crossover) {
-      throw std::runtime_error("Crossover probability must be in (0,1) to perform variation, not copying!");
-    }
-  };
+    public:
+    EABase() = delete;
+    EABase(usize population_size): population_size(population_size){};
 
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    for (usize i = 0; i < parent1.num_discrete(); i++) {
-      if (U(rng) < p_crossover) {
-        mask1.discrete.push_back(i);
-        mask2.discrete.push_back(i);
+    virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
+
+    std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
+                                                                    const Budget& budget,
+                                                                    std::optional<u64> seed,
+                                                                    std::optional<usize> population_size) override {
+      usize n = population_size.value_or(this->population_size);
+
+      generation = 0;
+      u64 evaluations = n;
+      std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
+
+      Rng rng = seeded_rng(seed);
+
+      // create & evaluate initial population
+      AoSSet population;
+      problem.add_random(rng, population, n);
+
+      std::vector<usize> solutions_to_evaluate(n);
+      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+      problem.evaluate(rng, population, solutions_to_evaluate);
+
+      auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
+      for (usize i = 0; i < n; i++) {
+        archive->update(population[i], false);
       }
-    }
-  };
-};
 
-class NPointCrossover : public DiscreteCrossoverStrategyBase {
-  usize num_points{};
-
- public:
-  NPointCrossover(usize num_points = 1) : num_points(num_points) {
-    if (num_points < 1) {
-      throw std::runtime_error("At least one crossover point is needed to perform variation, not copying!");
-    }
-  };
-
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
-    // here the two endpoints are excluded to ensure not all values come from the same parent
-    auto points = permute(rng, parent1.num_discrete() - 1);
-    if (num_points < parent1.num_discrete()) {
-      points.resize(num_points);
-    }
-    std::sort(points.begin(), points.end());
-
-    // swap the indices between every other set of points
-    for (usize i = 0; i < points.size(); i += 2) {
-      // + 1 since the first real crossover point is between index 0 and 1, not before index 0
-      usize start = points[i] + 1;
-      usize end = i + 1 < points.size() ? points[i + 1] + 1 : parent1.num_discrete();
-      for (usize j = start; j < end; j++) {
-        mask1.discrete.push_back(j);
-        mask2.discrete.push_back(j);
-      }
-    }
-  };
-};
-
-class SimpleGA : public MethodBase {
- private:
-  // options
-  std::shared_ptr<SelectionStrategyBase> selection_strategy;
-  std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy;
-  usize population_size{};
-  double p_mutation{};
-  bool steady_state{};
-
-  // run state
-  u64 generation{};
-
-  // temporary buffers
-  mutable AoSSet offspring;
-  mutable AoSSet parents;
-  mutable std::vector<usize> solutions_to_evaluate;
-  mutable std::vector<Subset> subsets;
-  mutable std::vector<const Subset*> subset_refs;
-
- public:
-  SimpleGA(usize population_size = 100,
-           double p_mutation = 0.1,
-           std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy = std::make_shared<UniformCrossover>(),
-           bool steady_state =
-               true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
-           std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
-      : selection_strategy(selection_strategy),
-        crossover_strategy(crossover_strategy),
-        population_size(population_size),
-        p_mutation(p_mutation),
-        steady_state(steady_state) {
-    if (population_size % 2 != 0) {
-      throw std::runtime_error("Population size must be even!");
-    }
-    if (p_mutation >= 1.0) {
-      throw std::runtime_error("A mutation rate of 100% performs random search!");
-    }
-    if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
-      // generational: need to select population_size parents -> no selection pressure with truncation selection
-      throw std::runtime_error("Truncation selection is not compatible with a generational replacement scheme!");
-    }
-  };
-
-  /// Mutates each discrete decision variable with p_mutation and returns the set of changed indices
-  Subset mutate(Rng& rng, InstanceBase& problem, SolutionBase& solution, bool& any_active_changed) const {
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-
-    Subset changed_indices;
-    if (p_mutation > 0.0) {
-      for (usize j = 0; j < problem.num_discrete(); j++) {
-        std::uniform_int_distribution<DType> D(0, problem.discrete_domain_sizes()(j) - 1);
-        if (U(rng) < p_mutation) {
-          auto v = solution.discrete_values()(j);
-          while (solution.discrete_values()(j) == v) {
-            v = D(rng);
-          }
-          solution.discrete_values()(j) = v;
-          any_active_changed |= solution.discrete_active()(j);
-
-          changed_indices.discrete.push_back(j);
+      auto status = TerminationStatus::Running;
+      while (true) {
+        // check termination criterion
+        auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
+        if (s.has_value()) {
+          status = s.value();
+          break;
         }
-      }
-    }
+        if (problem.target_reached(*archive)) {
+          status = TerminationStatus::TargetReached;
+          break;
+        }
 
-    return changed_indices;
-  };
+        evaluations += step(rng, problem, population, *archive);
 
-  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const {
-    if (problem.num_discrete() < 1) {
-      return 0;
-    }
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    usize n = population.size();
-    if (n % 2 != 0) {
-      throw std::runtime_error("Population size must be even!");
-    }
-
-    // house keeping
-    offspring.clear();
-    parents.clear();
-    solutions_to_evaluate.clear();
-    solutions_to_evaluate.reserve(n);
-
-    // The problem interface supports partial evaluations and provides information
-    // on which decision variables are active (or not) in case the problem can have
-    // conditionally inactive variables.
-    // To take full advantage of such problem settings, partial evaluations are performed
-    // and only on offspring solutions where the active variables changed.
-    // The crossover masks/subset of changed variables between offspring and parent need
-    // to be passed to the evaluation call to support this.
-    subsets.resize(n);
-    subset_refs.resize(n);
-    for (usize i = 0; i < n; i++) {
-      subsets[i].discrete.reserve(problem.num_discrete());
-      subset_refs[i] = &subsets[i];
-    }
-
-    // parent selection (if generational)
-    std::vector<usize> parent_indices;
-    if (!steady_state) {
-      // generational selection from P
-      parent_indices = selection_strategy->select(rng, problem.fitness(), population, n);
-    } else {
-      // steady state: every solution gets offspring
-      parent_indices = permute(rng, population.size());
-    }
-
-    // variation
-    for (usize i = 0, idx1, idx2; i < n; i += 2) {
-      idx1 = i;
-      idx2 = i + 1;
-
-      // get the parents
-      const auto& parent1 = population[parent_indices[i]];
-      const auto& parent2 = population[parent_indices[i + 1]];
-
-      // add the offspring to the population (and a copy of the parent to support partial evaluations)
-      offspring.add(parent1);
-      parents.add(parent1);
-
-      offspring.add(parent2);
-      parents.add(parent2);
-
-      // get the crossover masks
-      auto& mask1 = subsets[i];
-      auto& mask2 = subsets[i + 1];
-      mask1.discrete.clear();
-      mask2.discrete.clear();
-
-      crossover_strategy->crossover_masks(rng, parent1, parent2, mask1, mask2);
-
-      // crossover
-      auto o1_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx1], parent2, mask1));
-      auto o2_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx2], parent1, mask2));
-
-      // mutation
-      auto mutated_indices1 = mutate(rng, problem, offspring[idx1], o1_needs_evaluation);
-      auto mutated_indices2 = mutate(rng, problem, offspring[idx2], o2_needs_evaluation);
-
-      if (o1_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx1);
-        mask1 = mask1.merge(mutated_indices1);
-      }
-      if (o2_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx2);
-        mask2 = mask2.merge(mutated_indices2);
-      }
-    }
-
-    // evaluation
-    problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
-
-    // archive update
-    for (usize i : solutions_to_evaluate) {
-      archive.update(offspring[i], false);
-    }
-
-    // offspring selection (if steady-state)
-    if (steady_state) {
-      // steady state selection from P + O
-      for (usize i = 0; i < n; i++) {
-        offspring.add(population[i]);
-      }
-      auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
-      population.clear();
-      for (auto i : selection) {
-        population.add(offspring[i]);
-      }
-    } else {
-      population.clear();
-      for (usize i = 0; i < n; i++) {
-        population.add(offspring[i]);
-      }
-    }
-
-    return solutions_to_evaluate.size();
-  };
-
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) override final {
-    usize n = population_size.value_or(this->population_size);
-    if (n % 2 != 0) {
-      throw std::runtime_error("Population size must be even!");
-    }
-
-    generation = 0;
-    u64 evaluations = n;
-    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
-
-    Rng rng = seeded_rng(seed);
-
-    // create & evaluate initial population
-    AoSSet population;
-    problem.add_random(rng, population, n);
-
-    solutions_to_evaluate.resize(n);
-    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-    problem.evaluate(rng, population, solutions_to_evaluate);
-
-    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-    for (usize i = 0; i < n; i++) {
-      archive->update(population[i], false);
-    }
-
-    auto status = TerminationStatus::Running;
-    while (true) {
-      // check termination criterion
-      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-      if (s.has_value()) {
-        status = s.value();
-        break;
-      }
-      if (problem.target_reached(*archive)) {
-        status = TerminationStatus::TargetReached;
-        break;
+        generation++;
       }
 
-      evaluations += step(rng, problem, population, *archive);
+      return std::make_tuple(archive, status);
+    };
 
-      generation++;
-    }
-
-    return std::make_tuple(archive, status);
-  };
-
-  std::optional<u64> current_generation() const override final { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override final {
-    return std::make_tuple(population_size, generation);
-  };
+    std::optional<u64> current_generation() const override { return generation; };
+    std::optional<std::tuple<usize, u64>> current_population() const override {
+      return std::make_tuple(population_size, generation);
+    };
 };
+
+};
+};
+
+#endif /* _GOBLIN_CLASSIC_COMMON_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/classic/de.h included by goblin.h                                       //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_CLASSIC_DE_H
+#define _GOBLIN_CLASSIC_DE_H
+
+
+
+namespace goblin {
+namespace classic {
 
 class DEStrategyBase {
  public:
@@ -11723,7 +11614,7 @@ class Rand1Bin : public DEStrategyBase {
           F_actual = dF(rng);
         }
         if (r0_strategy == R0Strategy::CurrentToBest) {
-          trial(j) = trial(j) + F_actual * (x_r0(j) - trial(j)) + F * (x_r1(j) - x_r2(j));
+          trial(j) = trial(j) + F_actual * ((x_r0(j) - trial(j)) + (x_r1(j) - x_r2(j)));
         } else {
           trial(j) = x_r0(j) + F_actual * (x_r1(j) - x_r2(j));
         }
@@ -11739,14 +11630,10 @@ class Rand1Bin : public DEStrategyBase {
   };
 };
 
-class DifferentialEvolution : public MethodBase {
+class DE : public EABase {
  private:
   // options
   std::shared_ptr<DEStrategyBase> strategy;
-  usize population_size{};
-
-  // run state
-  u64 generation{};
 
   // temporary buffers
   mutable AoSSet offspring;
@@ -11755,15 +11642,15 @@ class DifferentialEvolution : public MethodBase {
   mutable std::vector<const Subset*> subset_refs;
 
  public:
-  DifferentialEvolution(usize population_size = 100,
+  DE(usize population_size = 100,
                         std::shared_ptr<DEStrategyBase> strategy = std::make_shared<Rand1Bin>())
-      : strategy(strategy), population_size(population_size) {
+      : EABase(population_size), strategy(strategy) {
     if (population_size < 4) {
       throw std::runtime_error("DE requires a population size >= 4!");
     }
   };
 
-  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const {
+  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
     if (problem.num_continuous() < 1) {
       return 0;
     }
@@ -11817,316 +11704,22 @@ class DifferentialEvolution : public MethodBase {
 
     return solutions_to_evaluate.size();
   };
-
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) override final {
-    usize n = population_size.value_or(this->population_size);
-
-    generation = 0;
-    u64 evaluations = n;
-    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
-
-    Rng rng = seeded_rng(seed);
-
-    // create & evaluate initial population
-    AoSSet population;
-    problem.add_random(rng, population, n);
-
-    solutions_to_evaluate.resize(n);
-    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-    problem.evaluate(rng, population, solutions_to_evaluate);
-
-    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-    for (usize i = 0; i < n; i++) {
-      archive->update(population[i], false);
-    }
-
-    auto status = TerminationStatus::Running;
-    while (true) {
-      // check termination criterion
-      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-      if (s.has_value()) {
-        status = s.value();
-        break;
-      }
-      if (problem.target_reached(*archive)) {
-        status = TerminationStatus::TargetReached;
-        break;
-      }
-
-      evaluations += step(rng, problem, population, *archive);
-
-      generation++;
-    }
-
-    return std::make_tuple(archive, status);
-  };
-
-  std::optional<u64> current_generation() const override final { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override final {
-    return std::make_tuple(population_size, generation);
-  };
 };
 
-class PSOTopologyBase {
- public:
-  virtual std::vector<usize> neighbours(Rng& rng, const SolutionSetBase& population, usize idx) const = 0;
-  virtual ~PSOTopologyBase() = default;
+};
 };
 
-class RingTopology : public PSOTopologyBase {
-  usize num_neighbours{};
+#endif /* _GOBLIN_CLASSIC_DE_H */
 
- public:
-  /// Considers a population of size N as ring where the ends wrap (nodes 0 and N-1 are neighbours). The number of
-  /// neighbours determines the (symmetric) reach of each node around the ring, where `num_neighbours >= floor(N-1) / 2`
-  /// corresponds to a fully connected star topology.
-  RingTopology(usize num_neighbours = 2) : num_neighbours(num_neighbours) {
-    if (num_neighbours < 1) {
-      throw std::runtime_error("The neighbourhood must extend to at least 1 neighbour in each direction.");
-    }
-  };
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/classic/es.h included by goblin.h                                       //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_ES_H
+#define _GOBLIN_ES_H
 
-  std::vector<usize> neighbours(Rng& rng, const SolutionSetBase& population, usize idx) const {
-    const usize N = population.size();
-    const usize n = std::min(2 * num_neighbours + 1, N);
-    std::vector<usize> nbs;
-    if (n >= N) {
-      nbs.resize(N);
-      std::iota(nbs.begin(), nbs.end(), 0);
-      return nbs;
-    }
 
-    nbs.reserve(n);
-    isize i = static_cast<isize>(idx) - num_neighbours;
-    while (nbs.size() < n) {
-      if (i < 0) {
-        i += N;
-      } else if (i >= N) {
-        i -= N;
-      }
-      nbs.push_back(i);
-      i++;
-    }
-
-    return nbs;
-  };
-};
-
-class PSOState : public SolutionExtension<PSOState> {
-  std::unique_ptr<QualityBase> _previous_best_quality{};
-
- public:
-  Vec<CType> velocity{};
-  Vec<CType> previous_best{};
-
-  const QualityBase& previous_best_quality() const { return *_previous_best_quality; }
-  QualityBase& previous_best_quality() { return *_previous_best_quality; }
-
-  void assign_previous_best_quality(const QualityBase& quality) { _previous_best_quality = quality.clone(); }
-
-  PSOState() = default;
-  ~PSOState() = default;
-  PSOState(const PSOState& other)
-      : velocity(other.velocity),
-        previous_best(other.previous_best),
-        _previous_best_quality(other._previous_best_quality->clone()) {};
-  PSOState(PSOState&& other)
-      : velocity(std::move(other.velocity)),
-        previous_best(std::move(other.previous_best)),
-        _previous_best_quality(std::move(other._previous_best_quality)) {};
-  PSOState& operator=(const PSOState& other) {
-    if (&other != this) {
-      velocity = other.velocity;
-      previous_best = other.previous_best;
-      _previous_best_quality = other._previous_best_quality->clone();
-    }
-    return *this;
-  }
-  PSOState& operator=(PSOState&& other) {
-    if (&other != this) {
-      velocity = std::move(other.velocity);
-      previous_best = std::move(other.previous_best);
-      _previous_best_quality = std::move(other._previous_best_quality);
-    }
-    return *this;
-  }
-
-  std::unique_ptr<SolutionExtensionBase> clone() const override final { return std::make_unique<PSOState>(*this); };
-};
-
-class PSO : public MethodBase {
- private:
-  // options
-  std::shared_ptr<PSOTopologyBase> topology;
-  usize population_size{};
-  double inertia{};
-  double cognitive{};
-  double social{};
-
-  // run state
-  u64 generation{};
-
-  // temporary buffers
-  mutable std::vector<usize>
-      solutions_to_evaluate;  // mutable because the buffer does not contain persistent state, and there is little point
-                              // in re-allocating the memory each iteration
-
- public:
-  PSO(usize population_size = 25,
-      double inertia = 0.729,
-      double cognitive = 1.494,
-      double social = 1.494,
-      std::shared_ptr<PSOTopologyBase> topology = std::make_shared<RingTopology>())
-      : topology(topology), population_size(population_size), inertia(inertia), cognitive(cognitive), social(social) {
-    if (population_size < 2) {
-      throw std::runtime_error("PSO requires a population size >= 2!");
-    }
-  };
-
-  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const {
-    if (problem.num_continuous() < 1) {
-      return 0;
-    }
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    const usize n = population.size();
-    const usize D = problem.num_continuous();
-    if (n < 2) {
-      throw std::runtime_error("PSO requires a population size >= 2!");
-    }
-
-    // housekeeping
-    solutions_to_evaluate.clear();
-    solutions_to_evaluate.reserve(n);
-
-    // update the previous best value
-    for (usize i = 0; i < n; i++) {
-      // initialize if not set
-      if (!population[i].has_extension(PSOState::type_key())) {
-        PSOState ext;
-        ext.velocity.resize(D);
-        for (usize j = 0; j < D; j++) {
-          ext.velocity(j) = 0.0;
-        };
-        ext.previous_best = population[i].continuous_values();
-        ext.assign_previous_best_quality(population[i].quality());
-        population[i].get_or_insert_extension(ext);
-      } else {
-        auto& ext = population[i].extension<PSOState>();
-        if (problem.fitness().cmp(population[i].quality(), ext.previous_best_quality(), std::nullopt) !=
-            Ordering::Worse) {
-          ext.assign_previous_best_quality(population[i].quality());
-          ext.previous_best = population[i].continuous_values();
-        }
-      }
-    }
-
-    // update the positions of each particle
-    Vec<CType> r0 = Vec<CType>::Zero(D);
-    Vec<CType> r1 = Vec<CType>::Zero(D);
-    for (usize i = 0; i < n; i++) {
-      auto& ext = population[i].extension<PSOState>();
-
-      // social update
-      auto neighbours = topology->neighbours(rng, population, i);
-      if (neighbours.size() < 1) {
-        throw std::runtime_error("Invalid, empty neighbourhood");
-      }
-      usize best_nb_idx = 0;
-      for (usize j = 1; j < neighbours.size(); j++) {
-        if (problem.fitness().cmp(population[neighbours[j]].extension<PSOState>().previous_best_quality(),
-                                  population[neighbours[best_nb_idx]].extension<PSOState>().previous_best_quality(),
-                                  std::nullopt) != Ordering::Worse) {
-          best_nb_idx = j;
-        }
-      }
-
-      // velocity update
-      auto x = population[i].continuous_values();
-      const auto pb = ext.previous_best;
-      const auto gb = population[neighbours[best_nb_idx]].extension<PSOState>().previous_best;
-
-      for (usize j = 0; j < D; j++) {
-        r0(j) = U(rng);
-        r1(j) = U(rng);
-      }
-
-      ext.velocity = inertia * ext.velocity + cognitive * r0.cwiseProduct(pb - x) + social * r1.cwiseProduct(gb - x);
-
-      // position update
-      x += ext.velocity;
-
-      // clamp to boundaries
-      const auto lb = problem.continuous_lower_bounds();
-      const auto ub = problem.continuous_upper_bounds();
-      x = x.cwiseMax(lb).cwiseMin(ub);
-
-      solutions_to_evaluate.push_back(i);
-    }
-
-    // evaluation (no partial evaluations since the velocity updates all variables at once)
-    problem.evaluate(rng, population, solutions_to_evaluate);
-
-    for (usize i : solutions_to_evaluate) {
-      archive.update(population[i], false);
-    }
-
-    return solutions_to_evaluate.size();
-  };
-
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) override final {
-    usize n = population_size.value_or(this->population_size);
-
-    generation = 0;
-    u64 evaluations = n;
-    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
-
-    Rng rng = seeded_rng(seed);
-
-    // create & evaluate initial population
-    AoSSet population;
-    problem.add_random(rng, population, n);
-
-    solutions_to_evaluate.resize(n);
-    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-    problem.evaluate(rng, population, solutions_to_evaluate);
-
-    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-    for (usize i = 0; i < n; i++) {
-      archive->update(population[i], false);
-    }
-
-    auto status = TerminationStatus::Running;
-    while (true) {
-      // check termination criterion
-      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-      if (s.has_value()) {
-        status = s.value();
-        break;
-      }
-      if (problem.target_reached(*archive)) {
-        status = TerminationStatus::TargetReached;
-        break;
-      }
-
-      evaluations += step(rng, problem, population, *archive);
-
-      generation++;
-    }
-
-    return std::make_tuple(archive, status);
-  };
-
-  std::optional<u64> current_generation() const override final { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override final {
-    return std::make_tuple(population_size, generation);
-  };
-};
+namespace goblin {
+namespace classic {
 
 enum class ESStrategy : u8 {
   /// Single variance for all variables
@@ -12149,10 +11742,9 @@ class ESStrategyParameters : public SolutionExtension<ESStrategyParameters> {
   };
 };
 
-class ES : public MethodBase {
+class ES : public EABase {
  private:
   // options
-  usize population_size{};
   usize num_parents{};
   usize num_offspring{};
   double epsilon{};
@@ -12161,9 +11753,6 @@ class ES : public MethodBase {
   double beta{};
   bool steady_state{};
   ESStrategy strategy{};
-
-  // run state
-  u64 generation{};
 
   // temporary buffers
   mutable AoSSet offspring;
@@ -12360,7 +11949,7 @@ class ES : public MethodBase {
      std::optional<double> tau_i = std::nullopt,
      double beta = 0.0873  // ~ 5degrees
      )
-      : population_size(population_size),
+      : EABase(population_size),
         num_parents(num_parents),
         num_offspring(num_offspring),
         epsilon(epsilon),
@@ -12395,7 +11984,7 @@ class ES : public MethodBase {
     }
   };
 
-  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const {
+  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
     if (problem.num_continuous() < 1) {
       return 0;
     }
@@ -12456,118 +12045,684 @@ class ES : public MethodBase {
 
     return solutions_to_evaluate.size();
   };
+};
 
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) override final {
-    usize n = population_size.value_or(this->population_size);
+};  // namespace classic
+}  // namespace goblin
 
-    generation = 0;
-    u64 evaluations = n;
-    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
+#endif /* _GOBLIN_ES_H */
 
-    Rng rng = seeded_rng(seed);
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/classic/pso.h included by goblin.h                                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_CLASSIC_PSO_H
+#define _GOBLIN_CLASSIC_PSO_H
 
-    // create & evaluate initial population
-    AoSSet population;
-    problem.add_random(rng, population, n);
 
-    solutions_to_evaluate.resize(n);
-    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-    problem.evaluate(rng, population, solutions_to_evaluate);
 
-    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-    for (usize i = 0; i < n; i++) {
-      archive->update(population[i], false);
+namespace goblin {
+namespace classic {
+
+class PSOTopologyBase {
+ public:
+  virtual std::vector<usize> neighbours(Rng& rng, const SolutionSetBase& population, usize idx) const = 0;
+  virtual ~PSOTopologyBase() = default;
+};
+
+class RingTopology : public PSOTopologyBase {
+  usize num_neighbours{};
+
+ public:
+  /// Considers a population of size N as ring where the ends wrap (nodes 0 and N-1 are neighbours). The number of
+  /// neighbours determines the (symmetric) reach of each node around the ring, where `num_neighbours >= floor(N-1) / 2`
+  /// corresponds to a fully connected star topology.
+  RingTopology(usize num_neighbours = 2) : num_neighbours(num_neighbours) {
+    if (num_neighbours < 1) {
+      throw std::runtime_error("The neighbourhood must extend to at least 1 neighbour in each direction.");
     }
-
-    auto status = TerminationStatus::Running;
-    while (true) {
-      // check termination criterion
-      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-      if (s.has_value()) {
-        status = s.value();
-        break;
-      }
-      if (problem.target_reached(*archive)) {
-        status = TerminationStatus::TargetReached;
-        break;
-      }
-
-      evaluations += step(rng, problem, population, *archive);
-
-      generation++;
-    }
-
-    return std::make_tuple(archive, status);
   };
 
-  std::optional<u64> current_generation() const override final { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override final {
-    return std::make_tuple(population_size, generation);
+  std::vector<usize> neighbours(Rng& rng, const SolutionSetBase& population, usize idx) const {
+    const usize N = population.size();
+    const usize n = std::min(2 * num_neighbours + 1, N);
+    std::vector<usize> nbs;
+    if (n >= N) {
+      nbs.resize(N);
+      std::iota(nbs.begin(), nbs.end(), 0);
+      return nbs;
+    }
+
+    nbs.reserve(n);
+    isize i = static_cast<isize>(idx) - num_neighbours;
+    while (nbs.size() < n) {
+      if (i < 0) {
+        i += N;
+      } else if (i >= N) {
+        i -= N;
+      }
+      nbs.push_back(i);
+      i++;
+    }
+
+    return nbs;
+  };
+};
+
+class PSOState : public SolutionExtension<PSOState> {
+  std::unique_ptr<QualityBase> _previous_best_quality{};
+
+ public:
+  Vec<CType> velocity{};
+  Vec<CType> previous_best{};
+
+  const QualityBase& previous_best_quality() const { return *_previous_best_quality; }
+  QualityBase& previous_best_quality() { return *_previous_best_quality; }
+
+  void assign_previous_best_quality(const QualityBase& quality) { _previous_best_quality = quality.clone(); }
+
+  PSOState() = default;
+  ~PSOState() = default;
+  PSOState(const PSOState& other)
+      : velocity(other.velocity),
+        previous_best(other.previous_best),
+        _previous_best_quality(other._previous_best_quality->clone()) {};
+  PSOState(PSOState&& other)
+      : velocity(std::move(other.velocity)),
+        previous_best(std::move(other.previous_best)),
+        _previous_best_quality(std::move(other._previous_best_quality)) {};
+  PSOState& operator=(const PSOState& other) {
+    if (&other != this) {
+      velocity = other.velocity;
+      previous_best = other.previous_best;
+      _previous_best_quality = other._previous_best_quality->clone();
+    }
+    return *this;
+  }
+  PSOState& operator=(PSOState&& other) {
+    if (&other != this) {
+      velocity = std::move(other.velocity);
+      previous_best = std::move(other.previous_best);
+      _previous_best_quality = std::move(other._previous_best_quality);
+    }
+    return *this;
+  }
+
+  std::unique_ptr<SolutionExtensionBase> clone() const override final { return std::make_unique<PSOState>(*this); };
+};
+
+class PSO : public EABase {
+ private:
+  // options
+  std::shared_ptr<PSOTopologyBase> topology;
+  double inertia{};
+  double cognitive{};
+  double social{};
+
+  // temporary buffers
+  mutable std::vector<usize>
+      solutions_to_evaluate;  // mutable because the buffer does not contain persistent state, and there is little point
+                              // in re-allocating the memory each iteration
+
+ public:
+  PSO(usize population_size = 25,
+      double inertia = 0.729,
+      double cognitive = 1.494,
+      double social = 1.494,
+      std::shared_ptr<PSOTopologyBase> topology = std::make_shared<RingTopology>())
+      : EABase(population_size), topology(topology), inertia(inertia), cognitive(cognitive), social(social) {
+    if (population_size < 2) {
+      throw std::runtime_error("PSO requires a population size >= 2!");
+    }
+  };
+
+  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
+    if (problem.num_continuous() < 1) {
+      return 0;
+    }
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    const usize n = population.size();
+    const usize D = problem.num_continuous();
+    if (n < 2) {
+      throw std::runtime_error("PSO requires a population size >= 2!");
+    }
+
+    // housekeeping
+    solutions_to_evaluate.clear();
+    solutions_to_evaluate.reserve(n);
+
+    // update the previous best value
+    for (usize i = 0; i < n; i++) {
+      // initialize if not set
+      if (!population[i].has_extension(PSOState::type_key())) {
+        PSOState ext;
+        ext.velocity.resize(D);
+        for (usize j = 0; j < D; j++) {
+          ext.velocity(j) = 0.0;
+        };
+        ext.previous_best = population[i].continuous_values();
+        ext.assign_previous_best_quality(population[i].quality());
+        population[i].get_or_insert_extension(ext);
+      } else {
+        auto& ext = population[i].extension<PSOState>();
+        if (problem.fitness().cmp(population[i].quality(), ext.previous_best_quality(), std::nullopt) !=
+            Ordering::Worse) {
+          ext.assign_previous_best_quality(population[i].quality());
+          ext.previous_best = population[i].continuous_values();
+        }
+      }
+    }
+
+    // update the positions of each particle
+    Vec<CType> r0 = Vec<CType>::Zero(D);
+    Vec<CType> r1 = Vec<CType>::Zero(D);
+    for (usize i = 0; i < n; i++) {
+      auto& ext = population[i].extension<PSOState>();
+
+      // social update
+      auto neighbours = topology->neighbours(rng, population, i);
+      if (neighbours.size() < 1) {
+        throw std::runtime_error("Invalid, empty neighbourhood");
+      }
+      usize best_nb_idx = 0;
+      for (usize j = 1; j < neighbours.size(); j++) {
+        if (problem.fitness().cmp(population[neighbours[j]].extension<PSOState>().previous_best_quality(),
+                                  population[neighbours[best_nb_idx]].extension<PSOState>().previous_best_quality(),
+                                  std::nullopt) != Ordering::Worse) {
+          best_nb_idx = j;
+        }
+      }
+
+      // velocity update
+      auto x = population[i].continuous_values();
+      const auto pb = ext.previous_best;
+      const auto gb = population[neighbours[best_nb_idx]].extension<PSOState>().previous_best;
+
+      for (usize j = 0; j < D; j++) {
+        r0(j) = U(rng);
+        r1(j) = U(rng);
+      }
+
+      ext.velocity = inertia * ext.velocity + cognitive * r0.cwiseProduct(pb - x) + social * r1.cwiseProduct(gb - x);
+
+      // position update
+      x += ext.velocity;
+
+      // clamp to boundaries
+      const auto lb = problem.continuous_lower_bounds();
+      const auto ub = problem.continuous_upper_bounds();
+      x = x.cwiseMax(lb).cwiseMin(ub);
+
+      solutions_to_evaluate.push_back(i);
+    }
+
+    // evaluation (no partial evaluations since the velocity updates all variables at once)
+    problem.evaluate(rng, population, solutions_to_evaluate);
+
+    for (usize i : solutions_to_evaluate) {
+      archive.update(population[i], false);
+    }
+
+    return solutions_to_evaluate.size();
+  };
+};
+
+};
+};
+
+#endif /* _GOBLIN_CLASSIC_PSO_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/classic/simple_ga.h included by goblin.h                                //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_SIMPLE_GA_H
+#define _GOBLIN_SIMPLE_GA_H
+
+
+namespace goblin {
+namespace classic {
+/// Strategy used to generate the crossover masks to exchange information between two parents
+class DiscreteCrossoverStrategyBase {
+ public:
+  virtual void crossover_masks(Rng& rng,
+                               const SolutionBase& parent1,
+                               const SolutionBase& parent2,
+                               Subset& mask1,
+                               Subset& mask2) const = 0;
+  virtual ~DiscreteCrossoverStrategyBase() = default;
+};
+
+class UniformCrossover : public DiscreteCrossoverStrategyBase {
+  double p_crossover{};
+
+ public:
+  UniformCrossover(double p_crossover = 0.5) : p_crossover(p_crossover) {
+    if (p_crossover <= 0.0 || 1.0 <= p_crossover) {
+      throw std::runtime_error("Crossover probability must be in (0,1) to perform variation, not copying!");
+    }
+  };
+
+  void crossover_masks(Rng& rng,
+                       const SolutionBase& parent1,
+                       const SolutionBase& parent2,
+                       Subset& mask1,
+                       Subset& mask2) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    for (usize i = 0; i < parent1.num_discrete(); i++) {
+      if (U(rng) < p_crossover) {
+        mask1.discrete.push_back(i);
+        mask2.discrete.push_back(i);
+      }
+    }
+  };
+};
+
+class NPointCrossover : public DiscreteCrossoverStrategyBase {
+  usize num_points{};
+
+ public:
+  NPointCrossover(usize num_points = 1) : num_points(num_points) {
+    if (num_points < 1) {
+      throw std::runtime_error("At least one crossover point is needed to perform variation, not copying!");
+    }
+  };
+
+  void crossover_masks(Rng& rng,
+                       const SolutionBase& parent1,
+                       const SolutionBase& parent2,
+                       Subset& mask1,
+                       Subset& mask2) const override final {
+    // here the two endpoints are excluded to ensure not all values come from the same parent
+    auto points = permute(rng, parent1.num_discrete() - 1);
+    if (num_points < parent1.num_discrete()) {
+      points.resize(num_points);
+    }
+    std::sort(points.begin(), points.end());
+
+    // swap the indices between every other set of points
+    for (usize i = 0; i < points.size(); i += 2) {
+      // + 1 since the first real crossover point is between index 0 and 1, not before index 0
+      usize start = points[i] + 1;
+      usize end = i + 1 < points.size() ? points[i + 1] + 1 : parent1.num_discrete();
+      for (usize j = start; j < end; j++) {
+        mask1.discrete.push_back(j);
+        mask2.discrete.push_back(j);
+      }
+    }
+  };
+};
+
+
+class SimpleGA : public EABase {
+ private:
+  // options
+  std::shared_ptr<SelectionStrategyBase> selection_strategy;
+  std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy;
+  double p_mutation{};
+  bool steady_state{};
+
+  // temporary buffers
+  mutable AoSSet offspring;
+  mutable AoSSet parents;
+  mutable std::vector<usize> solutions_to_evaluate;
+  mutable std::vector<Subset> subsets;
+  mutable std::vector<const Subset*> subset_refs;
+
+ public:
+  SimpleGA(usize population_size = 100,
+           double p_mutation = 0.1,
+           std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy = std::make_shared<UniformCrossover>(),
+           bool steady_state =
+               true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
+           std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
+      : EABase(population_size), selection_strategy(selection_strategy),
+        crossover_strategy(crossover_strategy),
+        p_mutation(p_mutation),
+        steady_state(steady_state) {
+    if (population_size % 2 != 0) {
+      throw std::runtime_error("Population size must be even!");
+    }
+    if (p_mutation >= 1.0) {
+      throw std::runtime_error("A mutation rate of 100% performs random search!");
+    }
+    if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
+      // generational: need to select population_size parents -> no selection pressure with truncation selection
+      throw std::runtime_error("Truncation selection is not compatible with a generational replacement scheme!");
+    }
+  };
+
+  /// Mutates each discrete decision variable with p_mutation and returns the set of changed indices
+  Subset mutate(Rng& rng, InstanceBase& problem, SolutionBase& solution, bool& any_active_changed) const {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+
+    Subset changed_indices;
+    if (p_mutation > 0.0) {
+      for (usize j = 0; j < problem.num_discrete(); j++) {
+        std::uniform_int_distribution<DType> D(0, problem.discrete_domain_sizes()(j) - 1);
+        if (U(rng) < p_mutation) {
+          auto v = solution.discrete_values()(j);
+          while (solution.discrete_values()(j) == v) {
+            v = D(rng);
+          }
+          solution.discrete_values()(j) = v;
+          any_active_changed |= solution.discrete_active()(j);
+
+          changed_indices.discrete.push_back(j);
+        }
+      }
+    }
+
+    return changed_indices;
+  };
+
+  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
+    if (problem.num_discrete() < 1) {
+      return 0;
+    }
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    usize n = population.size();
+    if (n % 2 != 0) {
+      throw std::runtime_error("Population size must be even!");
+    }
+
+    // house keeping
+    offspring.clear();
+    parents.clear();
+    solutions_to_evaluate.clear();
+    solutions_to_evaluate.reserve(n);
+
+    // The problem interface supports partial evaluations and provides information
+    // on which decision variables are active (or not) in case the problem can have
+    // conditionally inactive variables.
+    // To take full advantage of such problem settings, partial evaluations are performed
+    // and only on offspring solutions where the active variables changed.
+    // The crossover masks/subset of changed variables between offspring and parent need
+    // to be passed to the evaluation call to support this.
+    subsets.resize(n);
+    subset_refs.resize(n);
+    for (usize i = 0; i < n; i++) {
+      subsets[i].discrete.reserve(problem.num_discrete());
+      subset_refs[i] = &subsets[i];
+    }
+
+    // parent selection (if generational)
+    std::vector<usize> parent_indices;
+    if (!steady_state) {
+      // generational selection from P
+      parent_indices = selection_strategy->select(rng, problem.fitness(), population, n);
+    } else {
+      // steady state: every solution gets offspring
+      parent_indices = permute(rng, population.size());
+    }
+
+    // variation
+    for (usize i = 0, idx1, idx2; i < n; i += 2) {
+      idx1 = i;
+      idx2 = i + 1;
+
+      // get the parents
+      const auto& parent1 = population[parent_indices[idx1]];
+      const auto& parent2 = population[parent_indices[idx2]];
+
+      // add the offspring to the population (and a copy of the parent to support partial evaluations)
+      offspring.add(parent1);
+      parents.add(parent1);
+
+      offspring.add(parent2);
+      parents.add(parent2);
+
+      // get the crossover masks
+      auto& mask1 = subsets[idx1];
+      auto& mask2 = subsets[idx2];
+      mask1.discrete.clear();
+      mask2.discrete.clear();
+
+      crossover_strategy->crossover_masks(rng, parent1, parent2, mask1, mask2);
+
+      // crossover
+      auto o1_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx1], parent2, mask1));
+      auto o2_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx2], parent1, mask2));
+
+      // mutation
+      auto mutated_indices1 = mutate(rng, problem, offspring[idx1], o1_needs_evaluation);
+      auto mutated_indices2 = mutate(rng, problem, offspring[idx2], o2_needs_evaluation);
+
+      if (o1_needs_evaluation) {
+        solutions_to_evaluate.push_back(idx1);
+        mask1 = mask1.merge(mutated_indices1);
+      }
+      if (o2_needs_evaluation) {
+        solutions_to_evaluate.push_back(idx2);
+        mask2 = mask2.merge(mutated_indices2);
+      }
+    }
+
+    // evaluation
+    problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
+
+    // archive update
+    for (usize i : solutions_to_evaluate) {
+      archive.update(offspring[i], false);
+    }
+
+    // offspring selection (if steady-state)
+    if (steady_state) {
+      // steady state selection from P + O
+      for (usize i = 0; i < n; i++) {
+        offspring.add(population[i]);
+      }
+      auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
+      population.clear();
+      for (auto i : selection) {
+        population.add(offspring[i]);
+      }
+    } else {
+      population.clear();
+      for (usize i = 0; i < n; i++) {
+        population.add(offspring[i]);
+      }
+    }
+
+    return solutions_to_evaluate.size();
   };
 };
 
 };  // namespace classic
-
-// TODO GP
-//  - either use same GPContext
-//  - or make an intermediary -> behaviour is what counts, so linearized postfix as common denominator?
-
-/*
-
-class GPCrossoverBase {
-  virtual void crossover virtual ~GPCrossoverBase() = default;
-};
-
-class GPMutationBase {
-  virtual ~GPMutationBase() = default;
-};
-
-class StandardGP : public MethodBase {
- private:
-  std::shared_ptr<SelectionStrategyBase> selection_strategy;
-  std::shared_ptr<GPCrossoverBase> crossover;
-  std::shared_ptr<GPMutationBase> mutation;
-
-  usize population_size{};
-
-  double p_crossover {}
-  double p_mutation{};
-
-  u64 generation{};
-
- public:
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) {
-     std::uniform_real_distribution<double> U(0.0, 1.0);
-
-    usize n = population_size.value_or(this->population_size);
-
-    Rng rng = seeded_rng(seed);
-
-    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-
-    AoSSet population;
-    AoSSet offspring;
-    AoSSet parents;
-    problem.add_random(rng, population, n);
-
-    return std::make_tuple(archive, status);
-  };
-  std::optional<u64> current_generation() const override final { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override final {
-    return std::make_tuple(population_size, generation);
-  };
-};
-
- */
 }  // namespace goblin
 
 #endif /* _GOBLIN_SIMPLE_GA_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/classic/standard_gp.h included by goblin.h                              //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_STANDARD_GP_H
+#define _GOBLIN_STANDARD_GP_H
+
+
+namespace goblin {
+namespace classic {
+
+class GPVariationOperatorBase {
+ public:
+  virtual void apply(Rng& rng,
+                     const InstanceBase& problem,
+                     const GPContext& ctx,
+                     const SolutionSetBase& population,
+                     SolutionBase& offspring) const = 0;
+  virtual ~GPVariationOperatorBase() = default;
+};
+
+class Chained : public GPVariationOperatorBase {
+  std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>> operators;
+
+ public:
+  Chained() = delete;
+  Chained(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>&& operators)
+      : operators(std::move(operators)) {};
+
+  void apply(Rng& rng,
+             const InstanceBase& problem,
+             const GPContext& ctx,
+             const SolutionSetBase& population,
+             SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    for (auto& [op, probability] : operators) {
+      if (U(rng) < probability) {
+        op->apply(rng, problem, ctx, population, offspring);
+      }
+    }
+  };
+};
+
+class SubtreeCrossover : public GPVariationOperatorBase {
+ public:
+  void apply(Rng& rng,
+             const InstanceBase& problem,
+             const GPContext& ctx,
+             const SolutionSetBase& population,
+             SolutionBase& offspring) const override final {
+    // get donor
+    const auto& donor = population[std::uniform_int_distribution<usize>(0, population.size() - 1)(rng)];
+    auto donor_nodes = ctx.active_nodes(donor);
+
+    // get random node
+    auto nodes = ctx.active_nodes(offspring);
+    usize node_idx = nodes[std::uniform_int_distribution<usize>(0, nodes.size() - 1)(rng)];
+
+    // replace with random donor subtree
+    std::shuffle(donor_nodes.begin(), donor_nodes.end(), rng);
+    for (usize i : donor_nodes) {
+      // this can fail due to tree shape constraints (max_depth/size)
+      if (ctx.copy_tree(donor, i, offspring, node_idx)) {
+        break;
+      }
+    }
+  }
+};
+
+/// Replaces random subtree with a random subtree
+class SubtreeMutation : public GPVariationOperatorBase {
+ public:
+  void apply(Rng& rng,
+             const InstanceBase& problem,
+             const GPContext& ctx,
+             const SolutionSetBase& population,
+             SolutionBase& offspring) const override final {
+    // get random node index
+    auto nodes = ctx.active_nodes(offspring);
+    std::shuffle(nodes.begin(), nodes.end(), rng);
+
+    // get random tree
+    AoSSet s;
+    problem.add_random(rng, s, 1);
+
+    ctx.copy_tree(s[0], nodes[0], offspring, nodes[0]);
+  };
+};
+
+/// Randomly mutates constants
+class ConstantMutation : public GPVariationOperatorBase {
+  double probability{};
+  CType temperature{};
+
+ public:
+  ConstantMutation(double probability = 0.25, CType temperature = 0.25)
+      : probability(probability), temperature(temperature) {};
+
+  void apply(Rng& rng,
+             const InstanceBase& problem,
+             const GPContext& ctx,
+             const SolutionSetBase& population,
+             SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<CType> N(0.0, 1.0);
+
+    // get random node index
+    auto indices = ctx.active_constant_indices(offspring);
+
+    for (usize ci : indices) {
+      if (U(rng) < probability) {
+        offspring.continuous_values()(ci) += N(rng) * offspring.continuous_values()(ci) * temperature;
+      }
+    }
+  };
+};
+
+class StandardGP : public EABase {
+ private:
+  // options
+  std::shared_ptr<SelectionStrategyBase> selection_strategy;
+  std::shared_ptr<GPVariationOperatorBase> variation_operator;
+  bool steady_state{};
+
+  // temporary buffers
+  mutable AoSSet offspring;
+  mutable std::vector<usize> solutions_to_evaluate;
+
+ public:
+  StandardGP(usize population_size = 32,
+             bool steady_state = true,  // steady_state vs generational: select from P + O or just from O after
+                                        // generating more offspring?
+             std::shared_ptr<GPVariationOperatorBase> variation_operator = std::shared_ptr<GPVariationOperatorBase>(),
+             std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(2))
+      : EABase(population_size), selection_strategy(selection_strategy),
+        variation_operator(variation_operator != nullptr ? variation_operator : std::make_shared<Chained>(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>{
+            std::make_tuple(std::make_shared<SubtreeCrossover>(), 1.0),
+            std::make_tuple(std::make_shared<SubtreeMutation>(), 0.25),
+            std::make_tuple(std::make_shared<ConstantMutation>(), 0.25)})),
+        steady_state(steady_state) {
+    if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
+      // generational: need to select population_size solutions from population_size offspring -> no selection pressure
+      // with truncation selection
+      throw std::runtime_error("Truncation selection is not compatible with a generational replacement scheme!");
+    }
+  };
+
+  u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
+    if (auto p = dynamic_cast<const GPInstanceBase*>(&problem.unwrap()); p != nullptr) {
+      const auto& ctx = p->context();
+      const usize n = population.size();
+
+      // variation
+      offspring.clear();
+      solutions_to_evaluate.clear();
+      solutions_to_evaluate.reserve(n);
+      for (usize i = 0; i < n; i++) {
+        offspring.add(population[i]);
+        variation_operator->apply(rng, problem, ctx, population, offspring[i]);
+        solutions_to_evaluate.push_back(i);
+      }
+
+      // evaluation & archive update
+      problem.evaluate(rng, offspring, solutions_to_evaluate);
+      for (usize i : solutions_to_evaluate) {
+        archive.update(offspring[i], false);
+      }
+
+      if (steady_state) {
+        // steady state selection from P + O
+        for (usize i = 0; i < n; i++) {
+          offspring.add(population[i]);
+        }
+      }
+
+      auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
+      population.clear();
+      for (auto i : selection) {
+        population.add(offspring[i]);
+      }
+
+      return solutions_to_evaluate.size();
+    } else {
+      throw std::runtime_error("Not a GP problem!");
+    }
+  };
+};
+
+};  // namespace classic
+}  // namespace goblin
+
+#endif /* _GOBLIN_STANDARD_GP_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

@@ -7,7 +7,6 @@
 #include <iostream>
 #include <limits>
 #include <optional>
-#include <print>
 #include <set>
 #include <string>
 #include <vector>
@@ -802,6 +801,96 @@ class GPContext {
     }
 
     return proximity;
+  };
+
+  template <typename F>
+  void visit_tree(const SolutionBase& solution, usize root, F&& visit) const {
+    std::queue<usize> q;
+    q.emplace(root);
+    while (!q.empty()) {
+      usize current = q.front();
+      q.pop();
+
+      visit(current);
+
+      // lookup the value of the current node
+      DType value = domain2value(current, solution.discrete_values()(current));
+      usize v_idx = value_idx[value];
+
+      usize nc = std::min(value_max_arity[v_idx], children[current].size());
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[current][i]);
+      }
+    }
+  };
+
+  bool copy_tree(const SolutionBase& source, usize source_node, SolutionBase& target, usize target_node) const {
+    std::vector<std::tuple<usize, DType>> backup;
+    std::queue<std::tuple<usize, usize>> q;
+    q.emplace(source_node, target_node);
+
+    bool successful = true;
+    while (!q.empty()) {
+      auto [from, to] = q.front();
+      q.pop();
+
+      // lookup the value of the current node
+      DType value = domain2value(from, source.discrete_values()(from));
+      usize v_idx = value_idx[value];
+
+      // same node value must be permissible at target location
+      auto v = value2domain(to, value);
+      if (!v.has_value()) {
+        successful = false;
+        break;
+      }
+      backup.emplace_back(to, target.discrete_values()(to));
+      target.discrete_values()(to) = v.value();
+
+      usize nc = std::min(value_max_arity[v_idx], children[from].size());
+      // target must at least have the same number of children
+      if (children[to].size() < nc) {
+        successful = false;
+        break;
+      }
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[from][i], children[to][i]);
+      }
+    }
+    // revert changes
+    if (!successful) {
+      for (auto [n, v] : backup) {
+        target.discrete_values()(n) = v;
+      }
+    }
+    return successful;
+  };
+
+  std::vector<usize> active_nodes(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize root : subtree_roots) {
+      if (solution.discrete_active()(root)) {
+        visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+      }
+    }
+    for (usize root : output_roots) {
+      visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+    }
+    return active;
+  };
+
+  std::vector<usize> active_constant_indices(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize n : active_nodes(solution)) {
+      // lookup the value of the current node
+      DType value = domain2value(n, solution.discrete_values()(n));
+      if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? value_idx[value] : n;
+        active.push_back(ci);
+      }
+    }
+
+    return active;
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
