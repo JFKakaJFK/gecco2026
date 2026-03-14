@@ -4,7 +4,6 @@
 
 #include "goblin/methods/classic/common.h"
 
-
 namespace goblin {
 namespace classic {
 
@@ -146,8 +145,7 @@ class DE : public EABase {
   mutable std::vector<const Subset*> subset_refs;
 
  public:
-  DE(usize population_size = 100,
-                        std::shared_ptr<DEStrategyBase> strategy = std::make_shared<Rand1Bin>())
+  DE(usize population_size = 100, std::shared_ptr<DEStrategyBase> strategy = std::make_shared<Rand1Bin>())
       : EABase(population_size), strategy(strategy) {
     if (population_size < 4) {
       throw std::runtime_error("DE requires a population size >= 4!");
@@ -210,7 +208,7 @@ class DE : public EABase {
   };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_DE_H */

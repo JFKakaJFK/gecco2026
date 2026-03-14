@@ -130,11 +130,15 @@ class StandardGP : public EABase {
                                         // generating more offspring?
              std::shared_ptr<GPVariationOperatorBase> variation_operator = std::shared_ptr<GPVariationOperatorBase>(),
              std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(2))
-      : EABase(population_size), selection_strategy(selection_strategy),
-        variation_operator(variation_operator != nullptr ? variation_operator : std::make_shared<Chained>(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>{
-            std::make_tuple(std::make_shared<SubtreeCrossover>(), 1.0),
-            std::make_tuple(std::make_shared<SubtreeMutation>(), 0.25),
-            std::make_tuple(std::make_shared<ConstantMutation>(), 0.25)})),
+      : EABase(population_size),
+        selection_strategy(selection_strategy),
+        variation_operator(
+            variation_operator != nullptr
+                ? variation_operator
+                : std::make_shared<Chained>(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>{
+                      std::make_tuple(std::make_shared<SubtreeCrossover>(), 1.0),
+                      std::make_tuple(std::make_shared<SubtreeMutation>(), 0.25),
+                      std::make_tuple(std::make_shared<ConstantMutation>(), 0.25)})),
         steady_state(steady_state) {
     if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
       // generational: need to select population_size solutions from population_size offspring -> no selection pressure

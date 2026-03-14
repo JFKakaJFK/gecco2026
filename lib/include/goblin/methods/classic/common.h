@@ -127,71 +127,71 @@ class TruncationSelection : public SelectionStrategyBase {
   };
 };
 
-class EABase: public MethodBase {
-    u64 generation{};
+class EABase : public MethodBase {
+  u64 generation{};
 
-    protected:
-    usize population_size{};
+ protected:
+  usize population_size{};
 
-    public:
-    EABase() = delete;
-    EABase(usize population_size): population_size(population_size){};
+ public:
+  EABase() = delete;
+  EABase(usize population_size) : population_size(population_size) {};
 
-    virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
+  virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
 
-    std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                    const Budget& budget,
-                                                                    std::optional<u64> seed,
-                                                                    std::optional<usize> population_size) override {
-      usize n = population_size.value_or(this->population_size);
+  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
+                                                                  const Budget& budget,
+                                                                  std::optional<u64> seed,
+                                                                  std::optional<usize> population_size) override {
+    usize n = population_size.value_or(this->population_size);
 
-      generation = 0;
-      u64 evaluations = n;
-      std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
+    generation = 0;
+    u64 evaluations = n;
+    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
 
-      Rng rng = seeded_rng(seed);
+    Rng rng = seeded_rng(seed);
 
-      // create & evaluate initial population
-      AoSSet population;
-      problem.add_random(rng, population, n);
+    // create & evaluate initial population
+    AoSSet population;
+    problem.add_random(rng, population, n);
 
-      std::vector<usize> solutions_to_evaluate(n);
-      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-      problem.evaluate(rng, population, solutions_to_evaluate);
+    std::vector<usize> solutions_to_evaluate(n);
+    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+    problem.evaluate(rng, population, solutions_to_evaluate);
 
-      auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-      for (usize i = 0; i < n; i++) {
-        archive->update(population[i], false);
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
+    for (usize i = 0; i < n; i++) {
+      archive->update(population[i], false);
+    }
+
+    auto status = TerminationStatus::Running;
+    while (true) {
+      // check termination criterion
+      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
+      if (s.has_value()) {
+        status = s.value();
+        break;
+      }
+      if (problem.target_reached(*archive)) {
+        status = TerminationStatus::TargetReached;
+        break;
       }
 
-      auto status = TerminationStatus::Running;
-      while (true) {
-        // check termination criterion
-        auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-        if (s.has_value()) {
-          status = s.value();
-          break;
-        }
-        if (problem.target_reached(*archive)) {
-          status = TerminationStatus::TargetReached;
-          break;
-        }
+      evaluations += step(rng, problem, population, *archive);
 
-        evaluations += step(rng, problem, population, *archive);
+      generation++;
+    }
 
-        generation++;
-      }
+    return std::make_tuple(archive, status);
+  };
 
-      return std::make_tuple(archive, status);
-    };
-
-    std::optional<u64> current_generation() const override { return generation; };
-    std::optional<std::tuple<usize, u64>> current_population() const override {
-      return std::make_tuple(population_size, generation);
-    };
+  std::optional<u64> current_generation() const override { return generation; };
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    return std::make_tuple(population_size, generation);
+  };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_COMMON_H */

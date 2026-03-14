@@ -77,7 +77,6 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
   };
 };
 
-
 class SimpleGA : public EABase {
  private:
   // options
@@ -100,7 +99,8 @@ class SimpleGA : public EABase {
            bool steady_state =
                true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
            std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
-      : EABase(population_size), selection_strategy(selection_strategy),
+      : EABase(population_size),
+        selection_strategy(selection_strategy),
         crossover_strategy(crossover_strategy),
         p_mutation(p_mutation),
         steady_state(steady_state) {

@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -7982,14 +7981,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
-
-
 
 namespace goblin {
 
@@ -8245,9 +8241,6 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
-
-
-
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8369,13 +8362,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8464,9 +8455,6 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
-
-
-
 
 namespace goblin {
 
@@ -8564,18 +8552,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -9885,7 +9869,6 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11313,8 +11296,6 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
-
-
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11424,72 +11405,72 @@ class TruncationSelection : public SelectionStrategyBase {
   };
 };
 
-class EABase: public MethodBase {
-    u64 generation{};
+class EABase : public MethodBase {
+  u64 generation{};
 
-    protected:
-    usize population_size{};
+ protected:
+  usize population_size{};
 
-    public:
-    EABase() = delete;
-    EABase(usize population_size): population_size(population_size){};
+ public:
+  EABase() = delete;
+  EABase(usize population_size) : population_size(population_size) {};
 
-    virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
+  virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
 
-    std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                    const Budget& budget,
-                                                                    std::optional<u64> seed,
-                                                                    std::optional<usize> population_size) override {
-      usize n = population_size.value_or(this->population_size);
+  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
+                                                                  const Budget& budget,
+                                                                  std::optional<u64> seed,
+                                                                  std::optional<usize> population_size) override {
+    usize n = population_size.value_or(this->population_size);
 
-      generation = 0;
-      u64 evaluations = n;
-      std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
+    generation = 0;
+    u64 evaluations = n;
+    std::chrono::high_resolution_clock::time_point t_start = std::chrono::high_resolution_clock::now();
 
-      Rng rng = seeded_rng(seed);
+    Rng rng = seeded_rng(seed);
 
-      // create & evaluate initial population
-      AoSSet population;
-      problem.add_random(rng, population, n);
+    // create & evaluate initial population
+    AoSSet population;
+    problem.add_random(rng, population, n);
 
-      std::vector<usize> solutions_to_evaluate(n);
-      std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
-      problem.evaluate(rng, population, solutions_to_evaluate);
+    std::vector<usize> solutions_to_evaluate(n);
+    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+    problem.evaluate(rng, population, solutions_to_evaluate);
 
-      auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
-      for (usize i = 0; i < n; i++) {
-        archive->update(population[i], false);
+    auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
+    for (usize i = 0; i < n; i++) {
+      archive->update(population[i], false);
+    }
+
+    auto status = TerminationStatus::Running;
+    while (true) {
+      // check termination criterion
+      auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
+      if (s.has_value()) {
+        status = s.value();
+        break;
+      }
+      if (problem.target_reached(*archive)) {
+        status = TerminationStatus::TargetReached;
+        break;
       }
 
-      auto status = TerminationStatus::Running;
-      while (true) {
-        // check termination criterion
-        auto s = budget.exhausted(generation, evaluations, std::chrono::high_resolution_clock::now() - t_start);
-        if (s.has_value()) {
-          status = s.value();
-          break;
-        }
-        if (problem.target_reached(*archive)) {
-          status = TerminationStatus::TargetReached;
-          break;
-        }
+      evaluations += step(rng, problem, population, *archive);
 
-        evaluations += step(rng, problem, population, *archive);
+      generation++;
+    }
 
-        generation++;
-      }
+    return std::make_tuple(archive, status);
+  };
 
-      return std::make_tuple(archive, status);
-    };
-
-    std::optional<u64> current_generation() const override { return generation; };
-    std::optional<std::tuple<usize, u64>> current_population() const override {
-      return std::make_tuple(population_size, generation);
-    };
+  std::optional<u64> current_generation() const override { return generation; };
+  std::optional<std::tuple<usize, u64>> current_population() const override {
+    return std::make_tuple(population_size, generation);
+  };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_COMMON_H */
 
@@ -11498,8 +11479,6 @@ class EABase: public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
-
-
 
 namespace goblin {
 namespace classic {
@@ -11642,8 +11621,7 @@ class DE : public EABase {
   mutable std::vector<const Subset*> subset_refs;
 
  public:
-  DE(usize population_size = 100,
-                        std::shared_ptr<DEStrategyBase> strategy = std::make_shared<Rand1Bin>())
+  DE(usize population_size = 100, std::shared_ptr<DEStrategyBase> strategy = std::make_shared<Rand1Bin>())
       : EABase(population_size), strategy(strategy) {
     if (population_size < 4) {
       throw std::runtime_error("DE requires a population size >= 4!");
@@ -11706,8 +11684,8 @@ class DE : public EABase {
   };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_DE_H */
 
@@ -11716,7 +11694,6 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
-
 
 namespace goblin {
 namespace classic {
@@ -12058,8 +12035,6 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
-
-
 namespace goblin {
 namespace classic {
 
@@ -12266,8 +12241,8 @@ class PSO : public EABase {
   };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_PSO_H */
 
@@ -12276,7 +12251,6 @@ class PSO : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
-
 
 namespace goblin {
 namespace classic {
@@ -12351,7 +12325,6 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
   };
 };
 
-
 class SimpleGA : public EABase {
  private:
   // options
@@ -12374,7 +12347,8 @@ class SimpleGA : public EABase {
            bool steady_state =
                true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
            std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
-      : EABase(population_size), selection_strategy(selection_strategy),
+      : EABase(population_size),
+        selection_strategy(selection_strategy),
         crossover_strategy(crossover_strategy),
         p_mutation(p_mutation),
         steady_state(steady_state) {
@@ -12537,7 +12511,6 @@ class SimpleGA : public EABase {
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
 
-
 namespace goblin {
 namespace classic {
 
@@ -12664,11 +12637,15 @@ class StandardGP : public EABase {
                                         // generating more offspring?
              std::shared_ptr<GPVariationOperatorBase> variation_operator = std::shared_ptr<GPVariationOperatorBase>(),
              std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(2))
-      : EABase(population_size), selection_strategy(selection_strategy),
-        variation_operator(variation_operator != nullptr ? variation_operator : std::make_shared<Chained>(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>{
-            std::make_tuple(std::make_shared<SubtreeCrossover>(), 1.0),
-            std::make_tuple(std::make_shared<SubtreeMutation>(), 0.25),
-            std::make_tuple(std::make_shared<ConstantMutation>(), 0.25)})),
+      : EABase(population_size),
+        selection_strategy(selection_strategy),
+        variation_operator(
+            variation_operator != nullptr
+                ? variation_operator
+                : std::make_shared<Chained>(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>{
+                      std::make_tuple(std::make_shared<SubtreeCrossover>(), 1.0),
+                      std::make_tuple(std::make_shared<SubtreeMutation>(), 0.25),
+                      std::make_tuple(std::make_shared<ConstantMutation>(), 0.25)})),
         steady_state(steady_state) {
     if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
       // generational: need to select population_size solutions from population_size offspring -> no selection pressure
@@ -12722,7 +12699,6 @@ class StandardGP : public EABase {
 }  // namespace goblin
 
 #endif /* _GOBLIN_STANDARD_GP_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

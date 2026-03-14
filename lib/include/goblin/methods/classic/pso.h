@@ -4,7 +4,6 @@
 
 #include "goblin/methods/classic/common.h"
 
-
 namespace goblin {
 namespace classic {
 
@@ -211,7 +210,7 @@ class PSO : public EABase {
   };
 };
 
-};
-};
+};  // namespace classic
+};  // namespace goblin
 
 #endif /* _GOBLIN_CLASSIC_PSO_H */
