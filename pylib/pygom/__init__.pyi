@@ -1759,6 +1759,7 @@ def test_evaluate_mse_kernel(
     h_value: List[float],
     num_solutions: int,
     num_datapoints: int,
+    version: KernelVersion,
 ) -> List[float]:
     pass
 

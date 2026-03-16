@@ -2541,7 +2541,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       goblin::test_compute_mse_kernel, nb::arg("partial"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
 
   m.def("test_evaluate_mse_kernel",
-      goblin::test_evaluate_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"));
+      goblin::test_evaluate_mse_kernel, nb::arg("h_x"), nb::arg("h_y"), nb::arg("h_type"), nb::arg("h_value"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("version"));
   // #endif
   // #ifndef _GOBLIN_GA_GP_SR_H
   //
