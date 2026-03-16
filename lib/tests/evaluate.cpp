@@ -576,7 +576,8 @@ TEST_CASE("goblin::ga-gp::evaluate::evaluate_mse_kernel") {
             REQUIRE_EQ(tc.expected.size(), tc.num_solutions);
 
             std::vector<float> result =  test_evaluate_mse_kernel(
-                tc.X, tc.Y, tc.type, tc.value, tc.num_solutions, tc.num_datapoints
+                tc.X, tc.Y, tc.type, tc.value, 
+                tc.num_solutions, tc.num_datapoints, version
             );
 
             CHECK_EQ(result.size(), tc.expected.size());

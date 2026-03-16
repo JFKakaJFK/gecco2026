@@ -1,3 +1,5 @@
+#include <cassert>
+#include <cmath>
 #include <vector>
 
 #include "cub/cub.cuh"
@@ -1060,7 +1062,8 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
-    size_t num_datapoints
+    size_t num_datapoints,
+    KernelVersion version
 ) {
     size_t solution_length = h_type.size() / num_solutions;
 
@@ -1072,7 +1075,7 @@ std::vector<float> test_evaluate_mse_kernel(
 
     float* d_result = allocate_on_gpu<float>(num_solutions);    
 
-    LaunchConfig config = LaunchConfig::determine(KernelVersion::SingleKernel, num_solutions, num_datapoints, solution_length);
+    LaunchConfig config = LaunchConfig::determine(version, num_solutions, num_datapoints, solution_length);
 
     evaluate_mse_kernel_wrapper(d_X, d_Y, d_type, d_value, d_result, config);
 
