@@ -257,7 +257,7 @@ class OpDiv : public OperatorBase {
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
-    ss << '(' << args[0] << '/';
+    ss << '(' << args[0] << " / ";
     if (args.size() > 2) {
       ss << '(';
       for (usize i = 1; i < args.size(); i++) {

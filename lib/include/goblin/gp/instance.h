@@ -55,10 +55,8 @@ class PyGPInstance : public GPInstanceBase {
     ub = Vec<CType>::Constant(ctx.num_continuous, std::numeric_limits<CType>::infinity());
   };
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
-  usize num_continuous() const override final { return ctx.num_continuous; };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return lb; }
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return ub; }
 

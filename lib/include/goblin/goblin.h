@@ -50,6 +50,8 @@
 #include "goblin/methods/classic/simple_ga.h"
 #include "goblin/methods/classic/standard_gp.h"
 
+#include "goblin/examples/voronoi.h"
+
 // clang-format on
 
 #endif /* _GOBLIN_H */

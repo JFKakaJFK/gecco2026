@@ -188,10 +188,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
-  usize num_continuous() const override final { return _num_continuous; };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
 

@@ -778,16 +778,16 @@ class CacheKey:
         pass
 
 class InstanceBase:
-    def num_objectives(self) -> int:  # overridable
+    def num_objectives(self) -> int:
         pass
 
-    def num_discrete(self) -> int:  # overridable (pure virtual)
+    def num_discrete(self) -> int:
         pass
 
     def discrete_domain_sizes(self) -> CRef[Vec[int]]:  # overridable (pure virtual)
         pass
 
-    def num_continuous(self) -> int:  # overridable (pure virtual)
+    def num_continuous(self) -> int:
         pass
 
     def continuous_lower_bounds(self) -> CRef[Vec[float]]:  # overridable (pure virtual)
@@ -942,16 +942,7 @@ class WrappedInstance(InstanceBase):
     def __init__(self, instance: InstanceBase) -> None:
         pass
 
-    def num_objectives(self) -> int:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
     def discrete_domain_sizes(self) -> CRef[Vec[int]]:
-        pass
-
-    def num_continuous(self) -> int:
         pass
 
     def continuous_lower_bounds(self) -> CRef[Vec[float]]:
@@ -1410,6 +1401,7 @@ class MethodBase:
         population_size: Optional[int],
     ) -> Tuple[ArchiveBase, TerminationStatus]:
         pass
+    # TODO scipy.optimize compatible .minimize function
 
     def current_generation(self) -> Optional[int]:  # overridable
         """/ Evaluations used and time elapsed can be collected without knowing about
@@ -2352,13 +2344,7 @@ class PyGPInstance(GPInstanceBase):
     ) -> None:
         pass
 
-    def num_discrete(self) -> int:
-        pass
-
     def discrete_domain_sizes(self) -> CRef[Vec[int]]:
-        pass
-
-    def num_continuous(self) -> int:
         pass
 
     def continuous_lower_bounds(self) -> CRef[Vec[float]]:
@@ -2549,13 +2535,7 @@ class SRProblem(GPInstanceBase):
     def adapt(self, rng: Rng) -> bool:
         pass
 
-    def num_discrete(self) -> int:
-        pass
-
     def discrete_domain_sizes(self) -> CRef[Vec[int]]:
-        pass
-
-    def num_continuous(self) -> int:
         pass
 
     def continuous_lower_bounds(self) -> CRef[Vec[float]]:
@@ -3629,16 +3609,7 @@ class BenchmarkInstance(InstanceBase):
     def register_target_archive_size(self, target_archive_size: int) -> None:
         pass
 
-    def num_objectives(self) -> int:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
     def discrete_domain_sizes(self) -> CRef[Vec[int]]:
-        pass
-
-    def num_continuous(self) -> int:
         pass
 
     def continuous_lower_bounds(self) -> CRef[Vec[float]]:
@@ -4608,6 +4579,73 @@ class MixedGOMEA(MethodBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/examples/voronoi.h included by goblin.h                                         //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_EXAMPLES_VORONOI_H
+#
+
+# struct KDTree {
+#     struct Node {
+#         usize idx{};
+#         std::unique_ptr<Node> left{};
+#         std::unique_ptr<Node> right{};
+#     };
+# };
+
+class VoronoiImageReconstruction(InstanceBase):
+    def __init__(
+        self,
+        target_image: Mat[int],
+        width: int,
+        height: int,
+        min_num_cells: int = 10,
+        max_num_cells: int = 100,
+        init: Optional[AnyInit] = None,
+        complexity_objective: bool = False,
+        use_oklab: bool = False,
+    ) -> None:
+        pass
+
+    def discrete_domain_sizes(self) -> CRef[Vec[int]]:
+        pass
+
+    def continuous_lower_bounds(self) -> CRef[Vec[float]]:
+        pass
+
+    def continuous_upper_bounds(self) -> CRef[Vec[float]]:
+        pass
+
+    def continuous_init_lower_bounds(self) -> CRef[Vec[float]]:
+        pass
+
+    def continuous_init_upper_bounds(self) -> CRef[Vec[float]]:
+        pass
+
+    def image_data(
+        self, solution: SolutionBase, scale: float = 1.0
+    ) -> Tuple[Mat[int], int, int]:
+        pass
+
+    def evaluate(
+        self, rng: Rng, solutions: SolutionSetBase, indices: std.span[int]
+    ) -> None:
+        pass
+
+    def add_random(self, rng: Rng, solutions: SolutionSetBase, count: int) -> None:
+        pass
+
+    def fitness(self) -> FitnessBase:
+        pass
+
+    def archive_fitness(self) -> ArchiveFitnessBase:
+        pass
+
+    def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin.h continued                                                                     //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -4858,16 +4896,39 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         ) -> int:
             pass
 
-    class DiscreteCrossoverStrategyBase:
+    class DiscreteCrossoverBase:
         """/ Strategy used to generate the crossover masks to exchange information between two parents"""
 
         def crossover_masks(  # overridable (pure virtual)
-            self,
-            rng: Rng,
-            parent1: SolutionBase,
-            parent2: SolutionBase,
-            mask1: Subset,
-            mask2: Subset,
+            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
+        ) -> Tuple[Subset, Subset]:
+            pass
+
+        def __init__(self) -> None:
+            """Autogenerated default constructor"""
+            pass
+
+    class UniformCrossover(classic.DiscreteCrossoverBase):
+        def __init__(self, p_crossover: float = 0.5) -> None:
+            pass
+
+        def crossover_masks(
+            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
+        ) -> Tuple[Subset, Subset]:
+            pass
+
+    class NPointCrossover(classic.DiscreteCrossoverBase):
+        def __init__(self, num_points: int = 1) -> None:
+            pass
+
+        def crossover_masks(
+            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
+        ) -> Tuple[Subset, Subset]:
+            pass
+
+    class DiscreteMutationBase:
+        def mutate(  # overridable (pure virtual)
+            self, rng: Rng, problem: InstanceBase, offspring: SolutionBase
         ) -> None:
             pass
 
@@ -4875,31 +4936,43 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
             """Autogenerated default constructor"""
             pass
 
-    class UniformCrossover(classic.DiscreteCrossoverStrategyBase):
-        def __init__(self, p_crossover: float = 0.5) -> None:
+    class RandomMutation(classic.DiscreteMutationBase):
+        def __init__(self, p_mutation: Optional[float] = None) -> None:
             pass
 
-        def crossover_masks(
-            self,
-            rng: Rng,
-            parent1: SolutionBase,
-            parent2: SolutionBase,
-            mask1: Subset,
-            mask2: Subset,
+        def mutate(
+            self, rng: Rng, problem: InstanceBase, offspring: SolutionBase
         ) -> None:
             pass
 
-    class NPointCrossover(classic.DiscreteCrossoverStrategyBase):
-        def __init__(self, num_points: int = 1) -> None:
+    class LocalizedMutation(classic.DiscreteMutationBase):
+        """/ A mutation operator that assumes an ordinal relationship for discrete variables"""
+
+        def __init__(
+            self,
+            p_mutation: Optional[float] = None,
+            strength: float = 0.05,
+            wrap: bool = False,
+        ) -> None:
             pass
 
-        def crossover_masks(
+        def mutate(
+            self, rng: Rng, problem: InstanceBase, offspring: SolutionBase
+        ) -> None:
+            pass
+
+    class MergeSplitMutation(classic.DiscreteMutationBase):
+        def __init__(
             self,
-            rng: Rng,
-            parent1: SolutionBase,
-            parent2: SolutionBase,
-            mask1: Subset,
-            mask2: Subset,
+            min_num_cells: int,
+            p_mutation: Optional[float] = None,
+            p_merge: float = 0.5,
+            splitting_noise: float = 0.05,
+        ) -> None:
+            pass
+
+        def mutate(
+            self, rng: Rng, problem: InstanceBase, offspring: SolutionBase
         ) -> None:
             pass
 
@@ -4907,26 +4980,29 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         def __init__(
             self,
             population_size: int = 100,
-            p_mutation: float = 0.1,
-            crossover_strategy: Optional[DiscreteCrossoverStrategyBase] = None,
+            crossover: Optional[DiscreteCrossoverBase] = None,
+            mutation: Optional[DiscreteMutationBase] = None,
             steady_state: bool = True,
-            selection_strategy: Optional[SelectionStrategyBase] = None,
+            selection: Optional[SelectionStrategyBase] = None,
         ) -> None:
             """Python bindings defaults:
             If any of the params below is None, then its default value below will be used:
-                * crossover_strategy: std.make_shared<classic.UniformCrossover>()
-                * selection_strategy: std.make_shared<classic.TournamentSelection>(4)
+                * crossover: std.make_shared<classic.UniformCrossover>()
+                * mutation: std.make_shared<classic.RandomMutation>()
+                * selection: std.make_shared<classic.TournamentSelection>(4)
             """
             pass
 
-        def mutate(
+        def create_offspring(
             self,
             rng: Rng,
             problem: InstanceBase,
-            solution: SolutionBase,
-            any_active_changed: bool,
-        ) -> Subset:
-            """/ Mutates each discrete decision variable with p_mutation and returns the set of changed indices"""
+            parent: SolutionBase,
+            donor: SolutionBase,
+            crossover_mask: Subset,
+            offspring: SolutionBase,
+            changed_indices: List[int],
+        ) -> bool:
             pass
 
         def step(

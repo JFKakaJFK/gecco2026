@@ -33,12 +33,12 @@ class CacheKey {
 
 class InstanceBase {
  public:
-  virtual usize num_objectives() const { return fitness().num_objectives(); };
+  usize num_objectives() const { return fitness().num_objectives(); };
 
-  virtual usize num_discrete() const = 0;
+  usize num_discrete() const { return discrete_domain_sizes().size(); };
   virtual CRef<Vec<DType>> discrete_domain_sizes() const = 0;
 
-  virtual usize num_continuous() const = 0;
+  usize num_continuous() const { return continuous_lower_bounds().size(); };
   virtual CRef<Vec<CType>> continuous_lower_bounds() const = 0;
   virtual CRef<Vec<CType>> continuous_upper_bounds() const = 0;
 
@@ -215,12 +215,8 @@ class WrappedInstance : public InstanceBase {
  public:
   WrappedInstance(InstanceBase& instance) : inner(instance) {};
 
-  usize num_objectives() const override { return inner.num_objectives(); };
-
-  usize num_discrete() const override { return inner.num_discrete(); }
   CRef<Vec<DType>> discrete_domain_sizes() const override { return inner.discrete_domain_sizes(); }
 
-  usize num_continuous() const override { return inner.num_continuous(); }
   CRef<Vec<CType>> continuous_lower_bounds() const override { return inner.continuous_lower_bounds(); }
   CRef<Vec<CType>> continuous_upper_bounds() const override { return inner.continuous_upper_bounds(); }
 

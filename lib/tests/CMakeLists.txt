@@ -37,6 +37,7 @@ set(
     gp_operators
     sr
     sr_stats
+    sr_precision
     sr_gradient_step
     archive_objectives
     ctx_subfunction

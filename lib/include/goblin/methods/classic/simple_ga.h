@@ -2,22 +2,23 @@
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
 
+#include <cmath>
+#include <print>
+
 #include "goblin/methods/classic/common.h"
 
 namespace goblin {
 namespace classic {
 /// Strategy used to generate the crossover masks to exchange information between two parents
-class DiscreteCrossoverStrategyBase {
+class DiscreteCrossoverBase {
  public:
-  virtual void crossover_masks(Rng& rng,
-                               const SolutionBase& parent1,
-                               const SolutionBase& parent2,
-                               Subset& mask1,
-                               Subset& mask2) const = 0;
-  virtual ~DiscreteCrossoverStrategyBase() = default;
+  virtual std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                                     const SolutionBase& parent1,
+                                                     const SolutionBase& parent2) const = 0;
+  virtual ~DiscreteCrossoverBase() = default;
 };
 
-class UniformCrossover : public DiscreteCrossoverStrategyBase {
+class UniformCrossover : public DiscreteCrossoverBase {
   double p_crossover{};
 
  public:
@@ -27,11 +28,10 @@ class UniformCrossover : public DiscreteCrossoverStrategyBase {
     }
   };
 
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
+  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                             const SolutionBase& parent1,
+                                             const SolutionBase& parent2) const override final {
+    Subset mask1, mask2;
     std::uniform_real_distribution<double> U(0.0, 1.0);
     for (usize i = 0; i < parent1.num_discrete(); i++) {
       if (U(rng) < p_crossover) {
@@ -39,10 +39,11 @@ class UniformCrossover : public DiscreteCrossoverStrategyBase {
         mask2.discrete.push_back(i);
       }
     }
+    return std::make_tuple(mask1, mask2);
   };
 };
 
-class NPointCrossover : public DiscreteCrossoverStrategyBase {
+class NPointCrossover : public DiscreteCrossoverBase {
   usize num_points{};
 
  public:
@@ -52,11 +53,10 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
     }
   };
 
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
+  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                             const SolutionBase& parent1,
+                                             const SolutionBase& parent2) const override final {
+    Subset mask1, mask2;
     // here the two endpoints are excluded to ensure not all values come from the same parent
     auto points = permute(rng, parent1.num_discrete() - 1);
     if (num_points < parent1.num_discrete()) {
@@ -74,15 +74,184 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
         mask2.discrete.push_back(j);
       }
     }
+    return std::make_tuple(mask1, mask2);
   };
 };
+
+class DiscreteMutationBase {
+ public:
+  virtual void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const = 0;
+  virtual ~DiscreteMutationBase() = default;
+};
+
+class RandomMutation : public DiscreteMutationBase {
+  std::optional<double> p_mutation;
+
+ public:
+  RandomMutation(std::optional<double> p_mutation = std::nullopt) : p_mutation(p_mutation) {
+    if (p_mutation.value_or(0.0) >= 1.0) {
+      throw std::runtime_error("A mutation rate of 100% performs random search!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+
+    const usize l = problem.num_discrete();
+    const double p_mut = p_mutation.value_or(1.0 / static_cast<double>(l));
+
+    if (p_mut > 0.0) {
+      for (usize i = 0; i < l; i++) {
+        const usize d_i = problem.discrete_domain_sizes()(i);
+        std::uniform_int_distribution<usize> D(0, d_i - 1);
+        if (U(rng) < p_mut && d_i > 1) {
+          usize v = D(rng);
+          if (offspring.discrete_values()(i) == v) {
+            v = (v + 1) % d_i;
+          }
+          offspring.discrete_values()(i) = v;
+        }
+      }
+    }
+  }
+};
+
+/// A mutation operator that assumes an ordinal relationship for discrete variables
+class LocalizedMutation : public DiscreteMutationBase {
+  std::optional<double> p_mutation;
+  double strength;
+  bool wrap;
+
+ public:
+  LocalizedMutation(std::optional<double> p_mutation = std::nullopt, double strength = 0.05, bool wrap = false)
+      : p_mutation(p_mutation), strength(strength), wrap(wrap) {
+    if (p_mutation.value_or(0.0) >= 1.0) {
+      throw std::runtime_error("A mutation rate of 100% performs random search!");
+    }
+
+    if (strength <= 0.0) {
+      throw std::runtime_error("The mutation strength must be positive!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<double> N(0.0, 1.0);
+
+    const usize l = problem.num_discrete();
+    const double p_mut = p_mutation.value_or(1.0 / static_cast<double>(l));
+
+    if (p_mut > 0.0) {
+      for (usize i = 0; i < l; i++) {
+        const usize d_i = problem.discrete_domain_sizes()(i);
+        if (U(rng) < p_mut && d_i > 1) {
+          double v = static_cast<double>(offspring.discrete_values()(i));
+          v += N(rng) * strength * static_cast<double>(d_i);
+          if(wrap){
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+                v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+                v = std::fmod(v, d_i);
+            }
+          } else {
+              v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
+          }
+
+          offspring.discrete_values()(i) = static_cast<DType>(v);
+        }
+      }
+    }
+  }
+};
+
+class MergeSplitMutation : public classic::DiscreteMutationBase {
+  double p_merge;
+  double noise;
+  usize min_num_cells;
+
+ public:
+  MergeSplitMutation(usize min_num_cells, std::optional<double> p_mutation = std::nullopt, double p_merge = 0.5, double splitting_noise = 0.05) : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
+    if (p_merge < 0.0 || 1.0 < p_merge) {
+      throw std::runtime_error("The probability of merging must be in [0, 1]!");
+    }
+
+    if (splitting_noise <= 0.0) {
+      throw std::runtime_error("The splitting noise must be positive!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+      const usize VARS_PER_CELL = 6;
+    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
+
+    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
+    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
+
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<double> N(0.0, 1.0);
+
+    bool merge = U(rng) < p_merge;
+
+    // loop until we find another active/inactive cell for merging/splitting into
+    usize start = random_cell;
+    while(merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)){
+        random_cell++;
+        if(random_cell >= num_cells){
+            random_cell = min_num_cells;
+        }
+        if(random_cell == start){
+            break;
+        }
+    }
+    usize offset = cell * VARS_PER_CELL;
+    usize offset_random = random_cell * VARS_PER_CELL;
+
+    auto x = offspring.discrete_values();
+    if(merge){
+        // disable the other cell
+        x(offset_random) = false;
+        // and linearly combine the cell information with random weights
+        double w = U(rng);
+        for(usize i = 1; i < VARS_PER_CELL; i++){
+            x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
+        }
+    } else /* split */ {
+        // enable the other cell
+        x(offset_random) = true;
+
+        // add noise to both cell values
+        double v;
+        for(usize i = 1; i < VARS_PER_CELL; i++){
+            const usize d_i = problem.discrete_domain_sizes()(offset + i);
+
+            // get value, add noise & map back into the domain for the other cell
+            v = static_cast<double>(x(offset + i));
+            v += N(rng) * noise * static_cast<double>(d_i);
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+            }
+            v = std::fmod(v, d_i);
+            x(offset_random + i) = static_cast<DType>(v);
+
+            // get value, add noise & map back into the domain for this cell
+            v = static_cast<double>(x(offset + i));
+            v += N(rng) * noise * static_cast<double>(d_i);
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+            }
+            v = std::fmod(v, d_i);
+            x(offset + i) = static_cast<DType>(v);
+        }
+    }
+  }
+};
+
 
 class SimpleGA : public EABase {
  private:
   // options
   std::shared_ptr<SelectionStrategyBase> selection_strategy;
-  std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy;
-  double p_mutation{};
+  std::shared_ptr<DiscreteCrossoverBase> crossover_strategy;
+  std::shared_ptr<DiscreteMutationBase> mutation_strategy;
   bool steady_state{};
 
   // temporary buffers
@@ -94,21 +263,27 @@ class SimpleGA : public EABase {
 
  public:
   SimpleGA(usize population_size = 100,
-           double p_mutation = 0.1,
-           std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy = std::make_shared<UniformCrossover>(),
+           std::shared_ptr<DiscreteCrossoverBase> crossover = std::make_shared<UniformCrossover>(),
+           std::shared_ptr<DiscreteMutationBase> mutation = std::make_shared<RandomMutation>(),
            bool steady_state =
                true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
-           std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
+           std::shared_ptr<SelectionStrategyBase> selection = std::make_shared<TournamentSelection>(4))
       : EABase(population_size),
-        selection_strategy(selection_strategy),
-        crossover_strategy(crossover_strategy),
-        p_mutation(p_mutation),
+        selection_strategy(selection),
+        crossover_strategy(crossover),
+        mutation_strategy(mutation),
         steady_state(steady_state) {
+    if (!selection) {
+      throw std::runtime_error("No selection provided!");
+    }
+    if (!crossover) {
+      throw std::runtime_error("No crossover provided!");
+    }
+    if (!mutation) {
+      throw std::runtime_error("No mutation provided!");
+    }
     if (population_size % 2 != 0) {
       throw std::runtime_error("Population size must be even!");
-    }
-    if (p_mutation >= 1.0) {
-      throw std::runtime_error("A mutation rate of 100% performs random search!");
     }
     if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
       // generational: need to select population_size parents -> no selection pressure with truncation selection
@@ -116,28 +291,32 @@ class SimpleGA : public EABase {
     }
   };
 
-  /// Mutates each discrete decision variable with p_mutation and returns the set of changed indices
-  Subset mutate(Rng& rng, InstanceBase& problem, SolutionBase& solution, bool& any_active_changed) const {
-    std::uniform_real_distribution<double> U(0.0, 1.0);
+  bool create_offspring(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& parent,
+                        const SolutionBase& donor,
+                        const Subset& crossover_mask,
+                        SolutionBase& offspring,
+                        std::vector<usize>& changed_indices) const {
+    // perform crossover with mask
+    problem.inherit_discrete(offspring, donor, crossover_mask);
 
-    Subset changed_indices;
-    if (p_mutation > 0.0) {
-      for (usize j = 0; j < problem.num_discrete(); j++) {
-        std::uniform_int_distribution<DType> D(0, problem.discrete_domain_sizes()(j) - 1);
-        if (U(rng) < p_mutation) {
-          auto v = solution.discrete_values()(j);
-          while (solution.discrete_values()(j) == v) {
-            v = D(rng);
-          }
-          solution.discrete_values()(j) = v;
-          any_active_changed |= solution.discrete_active()(j);
+    // apply mutation
+    mutation_strategy->mutate(rng, problem, offspring);
 
-          changed_indices.discrete.push_back(j);
+    // check what changed to support exploiting partial evaluations & knowledge about inactive variables
+    bool needs_evaluation = false;
+    changed_indices.clear();
+    for (usize i = 0; i < problem.num_discrete(); i++) {
+      if (parent.discrete_values()(i) != offspring.discrete_values()(i)) {
+        changed_indices.push_back(i);
+        if (parent.discrete_active()(i)) {
+          needs_evaluation = true;
         }
       }
     }
 
-    return changed_indices;
+    return needs_evaluation;
   };
 
   u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
@@ -145,16 +324,10 @@ class SimpleGA : public EABase {
       return 0;
     }
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    usize n = population.size();
+    const usize n = population.size();
     if (n % 2 != 0) {
       throw std::runtime_error("Population size must be even!");
     }
-
-    // house keeping
-    offspring.clear();
-    parents.clear();
-    solutions_to_evaluate.clear();
-    solutions_to_evaluate.reserve(n);
 
     // The problem interface supports partial evaluations and provides information
     // on which decision variables are active (or not) in case the problem can have
@@ -163,89 +336,58 @@ class SimpleGA : public EABase {
     // and only on offspring solutions where the active variables changed.
     // The crossover masks/subset of changed variables between offspring and parent need
     // to be passed to the evaluation call to support this.
-    subsets.resize(n);
-    subset_refs.resize(n);
-    for (usize i = 0; i < n; i++) {
-      subsets[i].discrete.reserve(problem.num_discrete());
-      subset_refs[i] = &subsets[i];
-    }
-
-    // parent selection (if generational)
-    std::vector<usize> parent_indices;
-    if (!steady_state) {
-      // generational selection from P
-      parent_indices = selection_strategy->select(rng, problem.fitness(), population, n);
-    } else {
-      // steady state: every solution gets offspring
-      parent_indices = permute(rng, population.size());
-    }
 
     // variation
-    for (usize i = 0, idx1, idx2; i < n; i += 2) {
-      idx1 = i;
-      idx2 = i + 1;
+    subsets.resize(n);
+    subset_refs.resize(n);
+    offspring.clear();
+    parents.clear();
+    solutions_to_evaluate.clear();
+    solutions_to_evaluate.reserve(n);
+    std::vector<usize> parent_indices = permute(rng, n);
+    for (usize i = 0; i < n; i += 2) {
+      // get and copy parents
+      const auto& parent1 = population[parent_indices[i]];
+      const auto& parent2 = population[parent_indices[i + 1]];
 
-      // get the parents
-      const auto& parent1 = population[parent_indices[idx1]];
-      const auto& parent2 = population[parent_indices[idx2]];
+      auto [mask1, mask2] = crossover_strategy->crossover_masks(rng, parent1, parent2);
 
       // add the offspring to the population (and a copy of the parent to support partial evaluations)
       offspring.add(parent1);
       parents.add(parent1);
-
       offspring.add(parent2);
       parents.add(parent2);
 
-      // get the crossover masks
-      auto& mask1 = subsets[idx1];
-      auto& mask2 = subsets[idx2];
-      mask1.discrete.clear();
-      mask2.discrete.clear();
-
-      crossover_strategy->crossover_masks(rng, parent1, parent2, mask1, mask2);
-
-      // crossover
-      auto o1_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx1], parent2, mask1));
-      auto o2_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx2], parent1, mask2));
-
-      // mutation
-      auto mutated_indices1 = mutate(rng, problem, offspring[idx1], o1_needs_evaluation);
-      auto mutated_indices2 = mutate(rng, problem, offspring[idx2], o2_needs_evaluation);
-
-      if (o1_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx1);
-        mask1 = mask1.merge(mutated_indices1);
+      if (create_offspring(rng, problem, parents[i], parent2, mask1, offspring[i], subsets[i].discrete)) {
+        solutions_to_evaluate.push_back(i);
       }
-      if (o2_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx2);
-        mask2 = mask2.merge(mutated_indices2);
+
+      if (create_offspring(rng, problem, parents[i + 1], parent1, mask2, offspring[i + 1], subsets[i + 1].discrete)) {
+        solutions_to_evaluate.push_back(i + 1);
       }
     }
 
-    // evaluation
+    // evaluation & archive update
+    for (usize i : solutions_to_evaluate) {
+      subset_refs[i] = &subsets[i];
+    }
     problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
-
-    // archive update
     for (usize i : solutions_to_evaluate) {
       archive.update(offspring[i], false);
     }
 
-    // offspring selection (if steady-state)
+    // add offspring to selection pool (if steady-state)
     if (steady_state) {
-      // steady state selection from P + O
       for (usize i = 0; i < n; i++) {
         offspring.add(population[i]);
       }
-      auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
-      population.clear();
-      for (auto i : selection) {
-        population.add(offspring[i]);
-      }
-    } else {
-      population.clear();
-      for (usize i = 0; i < n; i++) {
-        population.add(offspring[i]);
-      }
+    }
+
+    // selection
+    auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
+    population.clear();
+    for (auto i : selection) {
+      population.add(offspring[i]);
     }
 
     return solutions_to_evaluate.size();

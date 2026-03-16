@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -1500,12 +1501,12 @@ class CacheKey {
 
 class InstanceBase {
  public:
-  virtual usize num_objectives() const { return fitness().num_objectives(); };
+  usize num_objectives() const { return fitness().num_objectives(); };
 
-  virtual usize num_discrete() const = 0;
+  usize num_discrete() const { return discrete_domain_sizes().size(); };
   virtual CRef<Vec<DType>> discrete_domain_sizes() const = 0;
 
-  virtual usize num_continuous() const = 0;
+  usize num_continuous() const { return continuous_lower_bounds().size(); };
   virtual CRef<Vec<CType>> continuous_lower_bounds() const = 0;
   virtual CRef<Vec<CType>> continuous_upper_bounds() const = 0;
 
@@ -1682,12 +1683,8 @@ class WrappedInstance : public InstanceBase {
  public:
   WrappedInstance(InstanceBase& instance) : inner(instance) {};
 
-  usize num_objectives() const override { return inner.num_objectives(); };
-
-  usize num_discrete() const override { return inner.num_discrete(); }
   CRef<Vec<DType>> discrete_domain_sizes() const override { return inner.discrete_domain_sizes(); }
 
-  usize num_continuous() const override { return inner.num_continuous(); }
   CRef<Vec<CType>> continuous_lower_bounds() const override { return inner.continuous_lower_bounds(); }
   CRef<Vec<CType>> continuous_upper_bounds() const override { return inner.continuous_upper_bounds(); }
 
@@ -2926,6 +2923,8 @@ class MethodBase {
                                                                           std::optional<u64> seed,
                                                                           std::optional<usize> population_size) = 0;
 
+  // TODO scipy.optimize compatible .minimize function
+
   /// Evaluations used and time elapsed can be collected without knowing about
   /// method details, but not the generation/iteraction. This method provides a
   /// hook for tracking the progress over generations
@@ -3516,7 +3515,7 @@ class OpDiv : public OperatorBase {
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
-    ss << '(' << args[0] << '/';
+    ss << '(' << args[0] << " / ";
     if (args.size() > 2) {
       ss << '(';
       for (usize i = 1; i < args.size(); i++) {
@@ -4783,10 +4782,8 @@ class PyGPInstance : public GPInstanceBase {
     ub = Vec<CType>::Constant(ctx.num_continuous, std::numeric_limits<CType>::infinity());
   };
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
-  usize num_continuous() const override final { return ctx.num_continuous; };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return lb; }
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return ub; }
 
@@ -5647,10 +5644,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
-  usize num_continuous() const override final { return _num_continuous; };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
 
@@ -7270,12 +7265,8 @@ class BenchmarkInstance final : public InstanceBase {
     _target_archive_size = target_archive_size;
   };
 
-  usize num_objectives() const override final { return _objectives->num_objectives(); };
-
-  usize num_discrete() const override final { return _objectives->num_discrete(); };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
 
-  usize num_continuous() const override final { return _objectives->num_continuous(); };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
 
@@ -7981,11 +7972,14 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
+
+
 
 namespace goblin {
 
@@ -8241,6 +8235,9 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
+
+
+
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8362,11 +8359,13 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8455,6 +8454,9 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
+
+
+
 
 namespace goblin {
 
@@ -8552,14 +8554,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9869,6 +9875,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11296,6 +11303,8 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
+
+
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11479,6 +11488,7 @@ class EABase : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
+
 
 namespace goblin {
 namespace classic {
@@ -11694,6 +11704,7 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
+
 
 namespace goblin {
 namespace classic {
@@ -12035,6 +12046,7 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -12252,20 +12264,20 @@ class PSO : public EABase {
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
 
+
+
 namespace goblin {
 namespace classic {
 /// Strategy used to generate the crossover masks to exchange information between two parents
-class DiscreteCrossoverStrategyBase {
+class DiscreteCrossoverBase {
  public:
-  virtual void crossover_masks(Rng& rng,
-                               const SolutionBase& parent1,
-                               const SolutionBase& parent2,
-                               Subset& mask1,
-                               Subset& mask2) const = 0;
-  virtual ~DiscreteCrossoverStrategyBase() = default;
+  virtual std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                                     const SolutionBase& parent1,
+                                                     const SolutionBase& parent2) const = 0;
+  virtual ~DiscreteCrossoverBase() = default;
 };
 
-class UniformCrossover : public DiscreteCrossoverStrategyBase {
+class UniformCrossover : public DiscreteCrossoverBase {
   double p_crossover{};
 
  public:
@@ -12275,11 +12287,10 @@ class UniformCrossover : public DiscreteCrossoverStrategyBase {
     }
   };
 
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
+  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                             const SolutionBase& parent1,
+                                             const SolutionBase& parent2) const override final {
+    Subset mask1, mask2;
     std::uniform_real_distribution<double> U(0.0, 1.0);
     for (usize i = 0; i < parent1.num_discrete(); i++) {
       if (U(rng) < p_crossover) {
@@ -12287,10 +12298,11 @@ class UniformCrossover : public DiscreteCrossoverStrategyBase {
         mask2.discrete.push_back(i);
       }
     }
+    return std::make_tuple(mask1, mask2);
   };
 };
 
-class NPointCrossover : public DiscreteCrossoverStrategyBase {
+class NPointCrossover : public DiscreteCrossoverBase {
   usize num_points{};
 
  public:
@@ -12300,11 +12312,10 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
     }
   };
 
-  void crossover_masks(Rng& rng,
-                       const SolutionBase& parent1,
-                       const SolutionBase& parent2,
-                       Subset& mask1,
-                       Subset& mask2) const override final {
+  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
+                                             const SolutionBase& parent1,
+                                             const SolutionBase& parent2) const override final {
+    Subset mask1, mask2;
     // here the two endpoints are excluded to ensure not all values come from the same parent
     auto points = permute(rng, parent1.num_discrete() - 1);
     if (num_points < parent1.num_discrete()) {
@@ -12322,15 +12333,184 @@ class NPointCrossover : public DiscreteCrossoverStrategyBase {
         mask2.discrete.push_back(j);
       }
     }
+    return std::make_tuple(mask1, mask2);
   };
 };
+
+class DiscreteMutationBase {
+ public:
+  virtual void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const = 0;
+  virtual ~DiscreteMutationBase() = default;
+};
+
+class RandomMutation : public DiscreteMutationBase {
+  std::optional<double> p_mutation;
+
+ public:
+  RandomMutation(std::optional<double> p_mutation = std::nullopt) : p_mutation(p_mutation) {
+    if (p_mutation.value_or(0.0) >= 1.0) {
+      throw std::runtime_error("A mutation rate of 100% performs random search!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+
+    const usize l = problem.num_discrete();
+    const double p_mut = p_mutation.value_or(1.0 / static_cast<double>(l));
+
+    if (p_mut > 0.0) {
+      for (usize i = 0; i < l; i++) {
+        const usize d_i = problem.discrete_domain_sizes()(i);
+        std::uniform_int_distribution<usize> D(0, d_i - 1);
+        if (U(rng) < p_mut && d_i > 1) {
+          usize v = D(rng);
+          if (offspring.discrete_values()(i) == v) {
+            v = (v + 1) % d_i;
+          }
+          offspring.discrete_values()(i) = v;
+        }
+      }
+    }
+  }
+};
+
+/// A mutation operator that assumes an ordinal relationship for discrete variables
+class LocalizedMutation : public DiscreteMutationBase {
+  std::optional<double> p_mutation;
+  double strength;
+  bool wrap;
+
+ public:
+  LocalizedMutation(std::optional<double> p_mutation = std::nullopt, double strength = 0.05, bool wrap = false)
+      : p_mutation(p_mutation), strength(strength), wrap(wrap) {
+    if (p_mutation.value_or(0.0) >= 1.0) {
+      throw std::runtime_error("A mutation rate of 100% performs random search!");
+    }
+
+    if (strength <= 0.0) {
+      throw std::runtime_error("The mutation strength must be positive!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<double> N(0.0, 1.0);
+
+    const usize l = problem.num_discrete();
+    const double p_mut = p_mutation.value_or(1.0 / static_cast<double>(l));
+
+    if (p_mut > 0.0) {
+      for (usize i = 0; i < l; i++) {
+        const usize d_i = problem.discrete_domain_sizes()(i);
+        if (U(rng) < p_mut && d_i > 1) {
+          double v = static_cast<double>(offspring.discrete_values()(i));
+          v += N(rng) * strength * static_cast<double>(d_i);
+          if(wrap){
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+                v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+                v = std::fmod(v, d_i);
+            }
+          } else {
+              v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
+          }
+
+          offspring.discrete_values()(i) = static_cast<DType>(v);
+        }
+      }
+    }
+  }
+};
+
+class MergeSplitMutation : public classic::DiscreteMutationBase {
+  double p_merge;
+  double noise;
+  usize min_num_cells;
+
+ public:
+  MergeSplitMutation(usize min_num_cells, std::optional<double> p_mutation = std::nullopt, double p_merge = 0.5, double splitting_noise = 0.05) : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
+    if (p_merge < 0.0 || 1.0 < p_merge) {
+      throw std::runtime_error("The probability of merging must be in [0, 1]!");
+    }
+
+    if (splitting_noise <= 0.0) {
+      throw std::runtime_error("The splitting noise must be positive!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+      const usize VARS_PER_CELL = 6;
+    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
+
+    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
+    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
+
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<double> N(0.0, 1.0);
+
+    bool merge = U(rng) < p_merge;
+
+    // loop until we find another active/inactive cell for merging/splitting into
+    usize start = random_cell;
+    while(merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)){
+        random_cell++;
+        if(random_cell >= num_cells){
+            random_cell = min_num_cells;
+        }
+        if(random_cell == start){
+            break;
+        }
+    }
+    usize offset = cell * VARS_PER_CELL;
+    usize offset_random = random_cell * VARS_PER_CELL;
+
+    auto x = offspring.discrete_values();
+    if(merge){
+        // disable the other cell
+        x(offset_random) = false;
+        // and linearly combine the cell information with random weights
+        double w = U(rng);
+        for(usize i = 1; i < VARS_PER_CELL; i++){
+            x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
+        }
+    } else /* split */ {
+        // enable the other cell
+        x(offset_random) = true;
+
+        // add noise to both cell values
+        double v;
+        for(usize i = 1; i < VARS_PER_CELL; i++){
+            const usize d_i = problem.discrete_domain_sizes()(offset + i);
+
+            // get value, add noise & map back into the domain for the other cell
+            v = static_cast<double>(x(offset + i));
+            v += N(rng) * noise * static_cast<double>(d_i);
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+            }
+            v = std::fmod(v, d_i);
+            x(offset_random + i) = static_cast<DType>(v);
+
+            // get value, add noise & map back into the domain for this cell
+            v = static_cast<double>(x(offset + i));
+            v += N(rng) * noise * static_cast<double>(d_i);
+            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+            }
+            v = std::fmod(v, d_i);
+            x(offset + i) = static_cast<DType>(v);
+        }
+    }
+  }
+};
+
 
 class SimpleGA : public EABase {
  private:
   // options
   std::shared_ptr<SelectionStrategyBase> selection_strategy;
-  std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy;
-  double p_mutation{};
+  std::shared_ptr<DiscreteCrossoverBase> crossover_strategy;
+  std::shared_ptr<DiscreteMutationBase> mutation_strategy;
   bool steady_state{};
 
   // temporary buffers
@@ -12342,21 +12522,27 @@ class SimpleGA : public EABase {
 
  public:
   SimpleGA(usize population_size = 100,
-           double p_mutation = 0.1,
-           std::shared_ptr<DiscreteCrossoverStrategyBase> crossover_strategy = std::make_shared<UniformCrossover>(),
+           std::shared_ptr<DiscreteCrossoverBase> crossover = std::make_shared<UniformCrossover>(),
+           std::shared_ptr<DiscreteMutationBase> mutation = std::make_shared<RandomMutation>(),
            bool steady_state =
                true,  // steady_state vs generational: select from P + O or just from O after generating more offspring?
-           std::shared_ptr<SelectionStrategyBase> selection_strategy = std::make_shared<TournamentSelection>(4))
+           std::shared_ptr<SelectionStrategyBase> selection = std::make_shared<TournamentSelection>(4))
       : EABase(population_size),
-        selection_strategy(selection_strategy),
-        crossover_strategy(crossover_strategy),
-        p_mutation(p_mutation),
+        selection_strategy(selection),
+        crossover_strategy(crossover),
+        mutation_strategy(mutation),
         steady_state(steady_state) {
+    if (!selection) {
+      throw std::runtime_error("No selection provided!");
+    }
+    if (!crossover) {
+      throw std::runtime_error("No crossover provided!");
+    }
+    if (!mutation) {
+      throw std::runtime_error("No mutation provided!");
+    }
     if (population_size % 2 != 0) {
       throw std::runtime_error("Population size must be even!");
-    }
-    if (p_mutation >= 1.0) {
-      throw std::runtime_error("A mutation rate of 100% performs random search!");
     }
     if (auto p = dynamic_cast<TruncationSelection*>(&*selection_strategy); p != nullptr && !steady_state) {
       // generational: need to select population_size parents -> no selection pressure with truncation selection
@@ -12364,28 +12550,32 @@ class SimpleGA : public EABase {
     }
   };
 
-  /// Mutates each discrete decision variable with p_mutation and returns the set of changed indices
-  Subset mutate(Rng& rng, InstanceBase& problem, SolutionBase& solution, bool& any_active_changed) const {
-    std::uniform_real_distribution<double> U(0.0, 1.0);
+  bool create_offspring(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& parent,
+                        const SolutionBase& donor,
+                        const Subset& crossover_mask,
+                        SolutionBase& offspring,
+                        std::vector<usize>& changed_indices) const {
+    // perform crossover with mask
+    problem.inherit_discrete(offspring, donor, crossover_mask);
 
-    Subset changed_indices;
-    if (p_mutation > 0.0) {
-      for (usize j = 0; j < problem.num_discrete(); j++) {
-        std::uniform_int_distribution<DType> D(0, problem.discrete_domain_sizes()(j) - 1);
-        if (U(rng) < p_mutation) {
-          auto v = solution.discrete_values()(j);
-          while (solution.discrete_values()(j) == v) {
-            v = D(rng);
-          }
-          solution.discrete_values()(j) = v;
-          any_active_changed |= solution.discrete_active()(j);
+    // apply mutation
+    mutation_strategy->mutate(rng, problem, offspring);
 
-          changed_indices.discrete.push_back(j);
+    // check what changed to support exploiting partial evaluations & knowledge about inactive variables
+    bool needs_evaluation = false;
+    changed_indices.clear();
+    for (usize i = 0; i < problem.num_discrete(); i++) {
+      if (parent.discrete_values()(i) != offspring.discrete_values()(i)) {
+        changed_indices.push_back(i);
+        if (parent.discrete_active()(i)) {
+          needs_evaluation = true;
         }
       }
     }
 
-    return changed_indices;
+    return needs_evaluation;
   };
 
   u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
@@ -12393,16 +12583,10 @@ class SimpleGA : public EABase {
       return 0;
     }
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    usize n = population.size();
+    const usize n = population.size();
     if (n % 2 != 0) {
       throw std::runtime_error("Population size must be even!");
     }
-
-    // house keeping
-    offspring.clear();
-    parents.clear();
-    solutions_to_evaluate.clear();
-    solutions_to_evaluate.reserve(n);
 
     // The problem interface supports partial evaluations and provides information
     // on which decision variables are active (or not) in case the problem can have
@@ -12411,89 +12595,58 @@ class SimpleGA : public EABase {
     // and only on offspring solutions where the active variables changed.
     // The crossover masks/subset of changed variables between offspring and parent need
     // to be passed to the evaluation call to support this.
-    subsets.resize(n);
-    subset_refs.resize(n);
-    for (usize i = 0; i < n; i++) {
-      subsets[i].discrete.reserve(problem.num_discrete());
-      subset_refs[i] = &subsets[i];
-    }
-
-    // parent selection (if generational)
-    std::vector<usize> parent_indices;
-    if (!steady_state) {
-      // generational selection from P
-      parent_indices = selection_strategy->select(rng, problem.fitness(), population, n);
-    } else {
-      // steady state: every solution gets offspring
-      parent_indices = permute(rng, population.size());
-    }
 
     // variation
-    for (usize i = 0, idx1, idx2; i < n; i += 2) {
-      idx1 = i;
-      idx2 = i + 1;
+    subsets.resize(n);
+    subset_refs.resize(n);
+    offspring.clear();
+    parents.clear();
+    solutions_to_evaluate.clear();
+    solutions_to_evaluate.reserve(n);
+    std::vector<usize> parent_indices = permute(rng, n);
+    for (usize i = 0; i < n; i += 2) {
+      // get and copy parents
+      const auto& parent1 = population[parent_indices[i]];
+      const auto& parent2 = population[parent_indices[i + 1]];
 
-      // get the parents
-      const auto& parent1 = population[parent_indices[idx1]];
-      const auto& parent2 = population[parent_indices[idx2]];
+      auto [mask1, mask2] = crossover_strategy->crossover_masks(rng, parent1, parent2);
 
       // add the offspring to the population (and a copy of the parent to support partial evaluations)
       offspring.add(parent1);
       parents.add(parent1);
-
       offspring.add(parent2);
       parents.add(parent2);
 
-      // get the crossover masks
-      auto& mask1 = subsets[idx1];
-      auto& mask2 = subsets[idx2];
-      mask1.discrete.clear();
-      mask2.discrete.clear();
-
-      crossover_strategy->crossover_masks(rng, parent1, parent2, mask1, mask2);
-
-      // crossover
-      auto o1_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx1], parent2, mask1));
-      auto o2_needs_evaluation = std::get<0>(problem.inherit_discrete(offspring[idx2], parent1, mask2));
-
-      // mutation
-      auto mutated_indices1 = mutate(rng, problem, offspring[idx1], o1_needs_evaluation);
-      auto mutated_indices2 = mutate(rng, problem, offspring[idx2], o2_needs_evaluation);
-
-      if (o1_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx1);
-        mask1 = mask1.merge(mutated_indices1);
+      if (create_offspring(rng, problem, parents[i], parent2, mask1, offspring[i], subsets[i].discrete)) {
+        solutions_to_evaluate.push_back(i);
       }
-      if (o2_needs_evaluation) {
-        solutions_to_evaluate.push_back(idx2);
-        mask2 = mask2.merge(mutated_indices2);
+
+      if (create_offspring(rng, problem, parents[i + 1], parent1, mask2, offspring[i + 1], subsets[i + 1].discrete)) {
+        solutions_to_evaluate.push_back(i + 1);
       }
     }
 
-    // evaluation
+    // evaluation & archive update
+    for (usize i : solutions_to_evaluate) {
+      subset_refs[i] = &subsets[i];
+    }
     problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
-
-    // archive update
     for (usize i : solutions_to_evaluate) {
       archive.update(offspring[i], false);
     }
 
-    // offspring selection (if steady-state)
+    // add offspring to selection pool (if steady-state)
     if (steady_state) {
-      // steady state selection from P + O
       for (usize i = 0; i < n; i++) {
         offspring.add(population[i]);
       }
-      auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
-      population.clear();
-      for (auto i : selection) {
-        population.add(offspring[i]);
-      }
-    } else {
-      population.clear();
-      for (usize i = 0; i < n; i++) {
-        population.add(offspring[i]);
-      }
+    }
+
+    // selection
+    auto selection = selection_strategy->select(rng, problem.fitness(), offspring, n);
+    population.clear();
+    for (auto i : selection) {
+      population.add(offspring[i]);
     }
 
     return solutions_to_evaluate.size();
@@ -12510,6 +12663,7 @@ class SimpleGA : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
+
 
 namespace goblin {
 namespace classic {
@@ -12699,6 +12853,333 @@ class StandardGP : public EABase {
 }  // namespace goblin
 
 #endif /* _GOBLIN_STANDARD_GP_H */
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/examples/voronoi.h included by goblin.h                                         //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_EXAMPLES_VORONOI_H
+#define _GOBLIN_EXAMPLES_VORONOI_H
+
+
+
+
+// struct KDTree {
+//     struct Node {
+//         usize idx{};
+//         std::unique_ptr<Node> left{};
+//         std::unique_ptr<Node> right{};
+//     };
+// };
+
+// as per https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
+template<typename C>
+void rgb2shifted_oklab(C&& c)
+{
+    float l = 0.4122214708f * c(0) + 0.5363325363f * c(1) + 0.0514459929f * c(2);
+    float m = 0.2119034982f * c(0) + 0.6806995451f * c(1) + 0.1073969566f * c(2);
+    float s = 0.0883024619f * c(0) + 0.2817188376f * c(1) + 0.6299787005f * c(2);
+
+    float l_ = std::cbrtf(l);
+    float m_ = std::cbrtf(m);
+    float s_ = std::cbrtf(s);
+
+    c(0) = 0.2104542553f*l_ + 0.7936177850f*m_ - 0.0040720468f*s_;
+    c(1) = 1.9779984951f*l_ - 2.4285922050f*m_ + 0.4505937099f*s_ + 0.5f;
+    c(2) = 0.0259040371f*l_ + 0.7827717662f*m_ - 0.8086757660f*s_ + 0.5f;
+}
+
+// as per https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
+// but assuming values in [0, 1] for a & b instead of [-0.5, 0.5]
+template<typename C>
+void shifted_oklab2rgb(C&& c)
+{
+    c(1) -= 0.5f; c(2) -= 0.5f;
+    float l_ = c(0) + 0.3963377774f * c(1) + 0.2158037573f * c(2);
+    float m_ = c(0) - 0.1055613458f * c(1) - 0.0638541728f * c(2);
+    float s_ = c(0) - 0.0894841775f * c(1) - 1.2914855480f * c(2);
+
+    float l = l_*l_*l_;
+    float m = m_*m_*m_;
+    float s = s_*s_*s_;
+
+    c(0) = +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
+	c(1) = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
+	c(2) = -0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s;
+}
+
+namespace goblin {
+
+class VoronoiImageReconstruction : public InstanceBase {
+    const usize VARS_PER_CELL = 6;
+    const usize ENABLED = 0;
+    const usize X_COORD = 1;
+    const usize Y_COORD = 2;
+    const usize OKLAB_L = 3;
+    const usize OKLAB_A = 4;
+    const usize OKLAB_B = 5;
+
+    const float MAX_COLOR_VALUE = 255.0f;
+
+    public:
+
+    VoronoiImageReconstruction(
+        const Mat<DType>& target_image,
+        usize width,
+        usize height,
+        usize min_num_cells = 10,
+        usize max_num_cells = 100,
+        std::optional<AnyInit> init = std::nullopt,
+        bool complexity_objective = false,
+        bool use_oklab = false
+    ):
+        _fitness(
+            /* num_objectives = */ complexity_objective ? 2 : 1,
+            /* minimize = */true
+        ),
+        target_image(target_image.cast<float>()),
+        init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
+        width(width),
+        height(height),
+        min_num_cells(min_num_cells),
+        max_num_cells(max_num_cells),
+        complexity_objective(complexity_objective),
+        use_oklab(use_oklab)
+    {
+        const usize num_pixels = target_image.rows();
+        if(num_pixels != width * height){
+            throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})", num_pixels, width, height, width * height));
+        }
+
+        if(min_num_cells > max_num_cells){
+            std::swap(min_num_cells, max_num_cells);
+            std::swap(this->min_num_cells, this->max_num_cells);
+        }
+
+        if(min_num_cells < 1){
+            throw std::runtime_error("At least one cell is required!");
+        }
+
+        if(max_num_cells >= num_pixels){
+            throw std::runtime_error("More voronoi cells than pixels in the image!");
+        }
+
+        for(usize i = 0; i < num_pixels; i++){
+            this->target_image.row(i) /= MAX_COLOR_VALUE;
+            if(use_oklab){
+                // convert from rgb to oklab
+                rgb2shifted_oklab(this->target_image.row(i));
+            }
+        }
+
+        // set up domain for each variable as [0, num_values)
+        _discrete_domain_sizes.resize(max_num_cells * VARS_PER_CELL);
+        for(usize i = 0; i < max_num_cells; i++){
+            usize j = i * VARS_PER_CELL;
+            _discrete_domain_sizes[j + ENABLED] = i < min_num_cells ? 1 : 2;
+            _discrete_domain_sizes[j + X_COORD] = width;
+            _discrete_domain_sizes[j + Y_COORD] = height;
+            DType num_color_values = std::floor(MAX_COLOR_VALUE + 1.1);
+            _discrete_domain_sizes[j + OKLAB_L] = num_color_values;
+            _discrete_domain_sizes[j + OKLAB_A] = num_color_values;
+            _discrete_domain_sizes[j + OKLAB_B] = num_color_values;
+        }
+    };
+
+    CRef<Vec<DType>> discrete_domain_sizes() const override final {
+        return _discrete_domain_sizes;
+    };
+
+    CRef<Vec<CType>> continuous_lower_bounds() const override final {
+        return _continuous_lower_bounds;
+    };
+    CRef<Vec<CType>> continuous_upper_bounds() const override final {
+        return _continuous_upper_bounds;
+    };
+
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
+        return _continuous_init_lower_bounds;
+    };
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
+        return _continuous_init_upper_bounds;
+    };
+
+    std::tuple<Mat<u8>, usize, usize> image_data(const SolutionBase& solution, float scale = 1.0) const {
+        if(scale <= 0.0){
+            throw std::runtime_error("The image scale must be > 0!");
+        }
+
+        const usize w = scale * width;
+        const usize h = scale * height;
+
+        Mat<float> image(w * h, 3);
+
+        // extract and scale centers
+        usize num_cells = 0;
+        Mat<float> centers(max_num_cells, VARS_PER_CELL);
+        for(usize j = 0; j < max_num_cells; j++){
+            usize k = j * VARS_PER_CELL;
+            if(j < min_num_cells || solution.discrete_values()(k + ENABLED)){
+                centers.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
+
+                if(use_oklab){
+                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) /= MAX_COLOR_VALUE;
+                    shifted_oklab2rgb(centers(num_cells, Eigen::seqN(OKLAB_L, 3)));
+                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) *= MAX_COLOR_VALUE;
+                }
+                num_cells++;
+            }
+        }
+        centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
+        centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
+
+        // TODO use KDTree
+        auto closest = [&](float x, float y){
+            float dist = std::numeric_limits<float>::infinity();
+            usize closest_idx = 0;
+            for(usize k = 0; k < num_cells; k++){
+                float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
+                if(d < dist){
+                    dist = d;
+                    closest_idx = k;
+                }
+            }
+            return closest_idx;
+        };
+
+        for(usize x = 0; x < w; x++){
+            for(usize y = 0; y < h; y++){
+                usize i = y * w + x;
+
+                usize cell_idx = closest(x, y);
+
+                image.row(i) = centers(cell_idx, Eigen::seqN(OKLAB_L, 3));
+            }
+        }
+
+        return std::make_tuple(image.cast<u8>(), w, h);
+    };
+
+    void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+        Mat<float> centers(max_num_cells, VARS_PER_CELL);
+
+        for(usize i: indices){
+            auto& s = solutions[i];
+
+            // extract centers, mark inactive cells as inactive
+            usize num_cells = 0;
+            for(usize j = 0; j < max_num_cells; j++){
+                usize k = j * VARS_PER_CELL;
+                if(j < min_num_cells || s.discrete_values()(k + ENABLED)){
+                    s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = true;
+                    if(j < min_num_cells){
+                        s.discrete_active()(k + ENABLED) = false;
+                    }
+
+                    centers.row(num_cells) = s.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
+                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) /= MAX_COLOR_VALUE;
+                    num_cells++;
+                } else {
+                    s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = false;
+                }
+            }
+
+            // TODO use KDTree
+            auto closest = [&](float x, float y){
+                float dist = std::numeric_limits<float>::infinity();
+                usize closest_idx = 0;
+                for(usize k = 0; k < num_cells; k++){
+                    float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
+                    if(d < dist){
+                        dist = d;
+                        closest_idx = k;
+                    }
+                }
+                return closest_idx;
+            };
+
+            // compute per-pixel mismatch
+            float reconstruction_error = 0.0;
+            for(usize x = 0; x < width; x++){
+                for(usize y = 0; y < height; y++){
+                    usize j = y * width + x;
+
+                    usize cell_idx = closest(x, y);
+
+                    reconstruction_error += (target_image.row(j) - centers(cell_idx, Eigen::seqN(OKLAB_L, 3))).array().square().sum();
+                }
+            }
+            reconstruction_error /= static_cast<float>(width * height);
+
+            s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
+            if(complexity_objective){
+                s.quality_as<MOQuality>().objectives(1) = static_cast<float>(num_cells);
+            }
+            s.quality_as<MOQuality>().constraint_value = 0.0;
+        }
+    }
+
+    void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+        init->add_random(rng, *this, solutions, count);
+    }
+
+    const FitnessBase& fitness() const override final { return _fitness;};
+    const ArchiveFitnessBase& archive_fitness() const override final { return _fitness;};
+
+    void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
+        Vec<float> c(3);
+        os << '{';
+        bool first = true;
+        for(usize i = 0; i < max_num_cells; i++){
+            usize j = i * VARS_PER_CELL;
+            if(j < min_num_cells || solution.discrete_values()(j + ENABLED)){
+                if(!first){
+                   os << ", ";
+                }
+
+                c = solution.discrete_values()(Eigen::seqN(j + OKLAB_L, 3)).cast<float>();
+
+                if(use_oklab){
+                    c /= MAX_COLOR_VALUE;
+                    shifted_oklab2rgb(c);
+                    c *= MAX_COLOR_VALUE;
+                }
+
+                // (x, y): (r, g, b)
+                os << '('
+                << usize(solution.discrete_values()(j + X_COORD)) << ", "
+                << usize(solution.discrete_values()(j + Y_COORD)) << "): ("
+                << c(0) << ", " << c(1) << ", " << c(2)
+                << ")";
+
+                first = false;
+            }
+        }
+        os << '}';
+    }
+
+    private:
+    MOFitness _fitness;
+    Mat<float> target_image;
+    std::shared_ptr<InitBase> init;
+    usize width;
+    usize height;
+    usize min_num_cells;
+    usize max_num_cells;
+    bool complexity_objective;
+    bool use_oklab;
+
+    Vec<DType> _discrete_domain_sizes{};
+    Vec<CType> _continuous_lower_bounds{};
+    Vec<CType> _continuous_upper_bounds{};
+
+    Vec<CType> _continuous_init_lower_bounds{};
+    Vec<CType> _continuous_init_upper_bounds{};
+};
+};
+
+#endif /* _GOBLIN_EXAMPLES_VORONOI_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
