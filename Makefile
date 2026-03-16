@@ -31,8 +31,9 @@ reconfigure: clean configure
 
 # type ?= Release
 type ?= Debug
+cpu_only ?= OFF
 configure:
-	@cmake -S . -B build -DCMAKE_BUILD_TYPE=$(type) -G $(GENERATOR)
+	@cmake -S . -B build -DCMAKE_BUILD_TYPE=$(type) -DGOBLIN_CPU_ONLY=$(cpu_only) -G $(GENERATOR)
 
 build: configure
 	@cmake --build build -j$(NPROC)

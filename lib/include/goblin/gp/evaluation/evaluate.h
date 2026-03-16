@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "goblin/ga-gp/misc.h"
+#include "goblin/gp/evaluation/misc.h"
 
 namespace goblin {
 

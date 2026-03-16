@@ -4,8 +4,8 @@
 #include <vector>
 #include <utility>
 
-#include "goblin/ga-gp/misc.h"
-#include "goblin/ga-gp/types.h"
+#include "goblin/gp/evaluation/misc.h"
+#include "goblin/gp/evaluation/types.h"
 
 using namespace goblin;
 

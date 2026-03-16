@@ -1,26 +1,10 @@
-enable_language(CUDA)
-
 find_package(Eigen3 REQUIRED)   # Eigen3::Eigen
 find_package(OpenRAND REQUIRED) # OpenRAND::OpenRAND
 find_package(gomea_library REQUIRED) # gomea_library
-find_package(CUDAToolkit REQUIRED)
 
 file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*.h")
 
-
-# if(SKBUILD OR GOBLIN_BUILD_PYLIB)
-#     add_library(${PROJECT_NAME}
-#         STATIC
-#         ${HEADER_LIST}
-#         lib/instance.cpp
-#         gp/sr.cpp
-#         methods/amalgam.cpp
-#         methods/mo_gomea.cpp
-#     )
-#     set_target_properties(lib PROPERTIES COMPILE_FLAGS "-O3")
-#     set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-# else()
-add_library(${PROJECT_NAME}
+set(LIB_SOURCES
     ${HEADER_LIST}
     gp/sr.cpp
     lib/archive.cpp
@@ -30,12 +14,19 @@ add_library(${PROJECT_NAME}
     lib/fitness.cpp
     lib/instance.cpp
     lib/solution.cpp
-    
     methods/amalgam.cpp
     methods/mo_gomea.cpp
-    ga-gp/evaluate.cu
-    ga-gp/helper.cu
 )
+
+if(GOBLIN_HAS_CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    list(APPEND LIB_SOURCES
+        gp/evaluation/evaluate.cu
+        gp/evaluation/helper.cu
+    )
+endif()
+
+add_library(${PROJECT_NAME} ${LIB_SOURCES})
 
 # endif()
 # disable any warnings in the amalgam code
@@ -62,6 +53,11 @@ target_link_libraries(${PROJECT_NAME}
         gomea_library
         Cache
 )
+
+if(GOBLIN_HAS_CUDA)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC GOBLIN_HAS_CUDA)
+    target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart)
+endif()
 
 # users will need at least C++23
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)

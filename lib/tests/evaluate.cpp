@@ -6,8 +6,8 @@
 #include <vector>
 #include <utility>
 
-#include "goblin/ga-gp/evaluate.h"
-#include "goblin/ga-gp/types.h"
+#include "goblin/gp/evaluation/evaluate.h"
+#include "goblin/gp/evaluation/types.h"
 
 using namespace goblin;
 

@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "goblin/ga-gp/helper.h"
+#include "goblin/gp/evaluation/helper.h"
 
 namespace goblin {
 

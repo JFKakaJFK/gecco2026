@@ -25,9 +25,7 @@ set(
     ctx_subfunction
     default_gradients
     entropy
-    evaluate
     fitness
-    ga_sr
     gp_operators
     ims
     misc
@@ -47,6 +45,10 @@ set(
     tracked
 )
 
+if(GOBLIN_HAS_CUDA)
+    list(APPEND LIB_TEST_SOURCES evaluate)
+endif()
+
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
     set(_target lib_test_${testcase})
     add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
@@ -56,7 +58,6 @@ endforeach()
 
 target_compile_options(lib_test_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_sr PRIVATE -O2 -g)
-target_compile_options(lib_test_ga_sr PRIVATE -O2 -g)
 target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
 target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)

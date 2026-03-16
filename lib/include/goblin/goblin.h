@@ -22,17 +22,25 @@
 #include "goblin/lib/method.h"
 #include "goblin/lib/init.h"
 
-#include "goblin/ga-gp/evaluate.h"
-#include "goblin/ga-gp/ga_sr.h"
-#include "goblin/ga-gp/helper.h"
-#include "goblin/ga-gp/types.h"
-
 #include "goblin/gp/instance.h"
 #include "goblin/gp/template.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/context.h"
 #include "goblin/gp/init.h"
 #include "goblin/gp/sr.h"
+
+#ifdef GOBLIN_HAS_CUDA
+#include "goblin/gp/evaluation/evaluate.h"
+#include "goblin/gp/evaluation/helper.h"
+#endif
+
+inline bool has_gpu_support() {
+#ifdef GOBLIN_HAS_CUDA
+  return true;
+#else
+  return false;
+#endif
+}
 
 #include "goblin/bench/functions.h"
 #include "goblin/bench/functions/combinators.h"

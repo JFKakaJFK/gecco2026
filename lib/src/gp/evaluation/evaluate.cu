@@ -2,10 +2,10 @@
 
 #include "cub/cub.cuh"
 
-#include "goblin/ga-gp/evaluate.h"
-#include "goblin/ga-gp/helper.h"
-#include "goblin/ga-gp/misc.h"
-#include "goblin/ga-gp/types.h"
+#include "goblin/gp/evaluation/evaluate.h"
+#include "goblin/gp/evaluation/helper.h"
+#include "goblin/gp/evaluation/misc.h"
+#include "goblin/gp/evaluation/types.h"
 
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 

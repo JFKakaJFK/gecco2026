@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <cassert>
 
-#include "goblin/ga-gp/types.h"
+#include "goblin/gp/evaluation/types.h"
 
 #define MAX_THREADS_PER_BLOCK 1024
 #define WARP_SIZE 32
