@@ -409,19 +409,19 @@ FEYNMAN_EXACT_CONFIG = ExperimentConfig(
     # Problem Space
     name="feynman",
     datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[2**i for i in range(7, 20)],  # 128 - 1048576
+    population_sizes=[128],  # 128 - 1048576
     num_observations=[100_000],
     num_features=None,
-    templates=[TemplateConfig(2, 5), TemplateConfig(2, 6), TemplateConfig(2, 7)],
+    templates=[TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
-    num_folds=3,
+    num_folds=30,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=10,
+    max_duration=60,
 )
 
 
