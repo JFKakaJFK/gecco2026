@@ -180,8 +180,12 @@ def run_one_task(task: Task, log_path: Path) -> None:
     df = pd.read_csv(log_path)
     expr = df.loc[df.index[-1], "expressions"]
 
-    y_pred = lambdify_expression(expr)(X)
-    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
+    try:
+        y_pred = lambdify_expression(expr)(X)
+        actual_mse = np.mean((y_pred - y.flatten()) ** 2)
+    except Exception as e:
+        print(f"Encountered {e} for expression: {expr}")
+        actual_mse = np.nan
 
     df.loc[df.index[-1], "mse"] = actual_mse
     df.to_csv(log_path, index=False)
