@@ -28,7 +28,7 @@ set(
     fitness
     gp_operators
     ims
-    misc
+    launch_config
     mixed_ia
     mixed_mixed
     mixed_rv

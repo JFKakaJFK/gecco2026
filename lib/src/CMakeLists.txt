@@ -21,8 +21,8 @@ set(LIB_SOURCES
 if(GOBLIN_HAS_CUDA)
     find_package(CUDAToolkit REQUIRED)
     list(APPEND LIB_SOURCES
-        gp/evaluation/evaluate.cu
-        gp/evaluation/helper.cu
+        gp/gpu_evaluation/evaluate.cu
+        gp/gpu_evaluation/memory.cu
     )
 endif()
 

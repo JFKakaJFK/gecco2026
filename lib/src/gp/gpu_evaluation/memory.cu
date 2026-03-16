@@ -1,6 +1,6 @@
 #include <iostream>
 
-#include "goblin/gp/evaluation/helper.h"
+#include "goblin/gp/gpu_evaluation/memory.h"
 
 namespace goblin {
 

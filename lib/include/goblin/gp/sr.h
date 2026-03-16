@@ -16,11 +16,11 @@
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
 
-#include "goblin/gp/evaluation/misc.h"
-#include "goblin/gp/evaluation/types.h"
+#include "goblin/gp/gpu_evaluation/launch_config.h"
+#include "goblin/gp/gpu_evaluation/types.h"
 #ifdef GOBLIN_HAS_CUDA
-#include "goblin/gp/evaluation/evaluate.h"
-#include "goblin/gp/evaluation/helper.h"
+#include "goblin/gp/gpu_evaluation/evaluate.h"
+#include "goblin/gp/gpu_evaluation/memory.h"
 #endif // GOBLIN_HAS_CUDA
 
 #include "goblin/gp/context.h"

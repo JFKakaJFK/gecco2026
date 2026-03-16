@@ -4,8 +4,8 @@
 #include <vector>
 #include <utility>
 
-#include "goblin/gp/evaluation/misc.h"
-#include "goblin/gp/evaluation/types.h"
+#include "goblin/gp/gpu_evaluation/launch_config.h"
+#include "goblin/gp/gpu_evaluation/types.h"
 
 using namespace goblin;
 

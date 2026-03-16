@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "goblin/gp/evaluation/misc.h"
+#include "goblin/gp/gpu_evaluation/launch_config.h"
 
 namespace goblin {
 
