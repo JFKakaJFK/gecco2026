@@ -161,8 +161,8 @@ class ES : public EABase {
       }
 
       // apply rotations
-      for (usize p = 1, p0; p <= l - 1; p++) {
-        for (usize q = p + 1, q0; q <= l; q++) {
+      for (usize p = 1; p <= l - 1; p++) {
+        for (usize q = p + 1; q <= l; q++) {
           // formula is 1-indexed in paper, but matrix indices are not
           usize j = ((2 * l - p) * (p + 1)) / 2 + q - 2 * l - 1;
 

@@ -4327,8 +4327,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassVoronoiImageReconstruction =
       nb::class_<goblin::VoronoiImageReconstruction, goblin::InstanceBase>
           (m, "VoronoiImageReconstruction", "")
-      .def(nb::init<const Arr2D<DType> &, usize, usize, usize, usize, std::optional<AnyInit>, bool>(),
-          nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10, nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(), nb::arg("complexity_objective") = false)
+      .def(nb::init<const Arr2D<DType> &, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool>(),
+          nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10, nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(), nb::arg("complexity_objective") = false, nb::arg("use_kdtree") = false)
       .def("discrete_domain_sizes",
           &goblin::VoronoiImageReconstruction::discrete_domain_sizes)
       .def("continuous_lower_bounds",

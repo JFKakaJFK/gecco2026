@@ -110,7 +110,7 @@ class TruncationSelection : public SelectionStrategyBase {
     } else {
       // multi-objective: non-dominated sorting, then add/truncate fronts until the target size is reached
       auto [ranks, fronts] = non_dominated_sorting(
-          [&solutions, &fitness, &selection](usize lhs, usize rhs) {
+          [&solutions, &fitness](usize lhs, usize rhs) {
             return fitness.cmp(solutions[lhs].quality(), solutions[rhs].quality(), std::nullopt);
           },
           solutions.size());
@@ -122,7 +122,7 @@ class TruncationSelection : public SelectionStrategyBase {
             selection.push_back(i);
           }
         } else {
-            // TODO scattered subset selection / crowding distance
+          // TODO scattered subset selection / crowding distance
           for (usize i : front) {
             if (selection.size() >= target_size) {
               break;

@@ -4594,6 +4594,7 @@ class VoronoiImageReconstruction(InstanceBase):
         max_num_cells: int = 100,
         init: Optional[AnyInit] = None,
         complexity_objective: bool = False,
+        use_kdtree: bool = False,
     ) -> None:
         pass
 

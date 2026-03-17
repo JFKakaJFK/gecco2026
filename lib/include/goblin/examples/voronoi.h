@@ -89,7 +89,8 @@ class KDTree {
   KDTree(const KDTree&) = delete;
   KDTree& operator=(const KDTree&) = delete;
 
-  KDTree(const C& coords, usize size) {
+  KDTree() = default;
+  void fill(const C& coords, usize size) {
     if (coords.rows() < size) {
       throw std::runtime_error("Not enough coordinates passed!");
     }
@@ -111,23 +112,6 @@ class KDTree {
     closest_helper(root, /* dim = */ 0, coords, point);
     return best_idx;
   }
-
-  void print_helper(Node* node, usize indent, const C& coords) {
-    if (node == nullptr)
-      return;
-    for (usize i = 0; i < indent; i++) {
-      std::print(" ");
-    }
-    std::print("{}: ({}", node->idx, coords(node->idx, 0));
-    for (isize i = 1; i < coords.cols(); i++) {
-      std::print(", {}", coords(node->idx, i));
-    }
-    std::println(")");
-    print_helper(node->left, indent + 2, coords);
-    print_helper(node->right, indent + 2, coords);
-  }
-
-  void print(const C& coords) { print_helper(root, 0, coords); };
 };
 
 namespace goblin {
@@ -150,7 +134,8 @@ class VoronoiImageReconstruction : public InstanceBase {
                              usize min_num_cells = 10,
                              usize max_num_cells = 100,
                              std::optional<AnyInit> init = std::nullopt,
-                             bool complexity_objective = false)
+                             bool complexity_objective = false,
+                             bool use_kdtree = false)
       : _fitness(
             /* num_objectives = */ complexity_objective ? 2 : 1,
             /* minimize = */ true),
@@ -160,7 +145,8 @@ class VoronoiImageReconstruction : public InstanceBase {
         height(height),
         min_num_cells(min_num_cells),
         max_num_cells(max_num_cells),
-        complexity_objective(complexity_objective) {
+        complexity_objective(complexity_objective),
+        use_kdtree(use_kdtree) {
     const usize num_pixels = target_image.rows();
     if (num_pixels != width * height) {
       throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})",
@@ -192,6 +178,15 @@ class VoronoiImageReconstruction : public InstanceBase {
       _discrete_domain_sizes[j + COLOR_R] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
+    }
+
+    image_coords.resize(2, num_pixels);
+    for (usize x = 0; x < width; x++) {
+      for (usize y = 0; y < height; y++) {
+        usize i = y * width + x;
+        image_coords(i, 0) = x;
+        image_coords(i, 1) = y;
+      }
     }
   };
 
@@ -284,14 +279,18 @@ class VoronoiImageReconstruction : public InstanceBase {
         }
       }
 
-      // TODO benchmark
-      KDTree kdt(centers, num_cells);
+      KDTree<decltype(centers)> kdt;
+      if (use_kdtree) {
+        kdt.fill(centers, num_cells);
+      }
 
       auto closest = [&](float x, float y) {
         float dist = std::numeric_limits<float>::infinity();
         usize closest_idx = 0;
         for (usize k = 0; k < num_cells; k++) {
-          float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
+            float dx = x - centers(k, 0), dy = y - centers(k, 1);
+          // float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
+          float d = dx * dx + dy * dy;
           if (d < dist) {
             dist = d;
             closest_idx = k;
@@ -300,17 +299,22 @@ class VoronoiImageReconstruction : public InstanceBase {
         return closest_idx;
       };
 
+      // TODO create image of positions, rowwise argmin dist...
+
       // compute per-pixel mismatch
       float reconstruction_error = 0.0;
       for (usize x = 0; x < width; x++) {
         for (usize y = 0; y < height; y++) {
           usize j = y * width + x;
 
-          pixel(0) = static_cast<float>(x);
-          pixel(1) = static_cast<float>(y);
-          usize cell_idx = kdt.closest(centers, pixel);
-
-          // usize cell_idx = closest(x, y);
+          usize cell_idx;
+          if (use_kdtree) {
+            pixel(0) = static_cast<float>(x);
+            pixel(1) = static_cast<float>(y);
+            cell_idx = kdt.closest(centers, pixel);
+          } else {
+            cell_idx = closest(x, y);
+          }
 
           reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
         }
@@ -358,12 +362,14 @@ class VoronoiImageReconstruction : public InstanceBase {
  private:
   MOFitness _fitness;
   Arr2D<float> target_image;
+  Arr2D<float> image_coords;
   std::shared_ptr<InitBase> init;
   usize width;
   usize height;
   usize min_num_cells;
   usize max_num_cells;
   bool complexity_objective;
+  bool use_kdtree;
 
   Vec<DType> _discrete_domain_sizes{};
   Vec<CType> _continuous_lower_bounds{};

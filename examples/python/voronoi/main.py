@@ -10,7 +10,7 @@ MIN_NUM_CELLS = 10
 MAX_NUM_CELLS = 100
 MAX_NUM_PIXELS = 64
 COMPLEXITY_OBJECTIVE = False
-# COMPLEXITY_OBJECTIVE = True
+COMPLEXITY_OBJECTIVE = True
 
 # kdtree
 # direct step loop
@@ -29,7 +29,7 @@ def problem_from_image(image_path: str, init: InitBase | None = None):
     else:
         scale_factor = 1.0
 
-    # img.show()
+    # im.show()
 
     data = np.array(im.get_flattened_data(), dtype=np.uint8)
     return VoronoiImageReconstruction(
@@ -39,7 +39,8 @@ def problem_from_image(image_path: str, init: InitBase | None = None):
         min_num_cells=MIN_NUM_CELLS,
         max_num_cells=MAX_NUM_CELLS,
         complexity_objective=COMPLEXITY_OBJECTIVE,
-        init=init
+        init=init,
+        # use_kdtree=True
     ), scale_factor
 
 if __name__ == "__main__":
@@ -48,7 +49,7 @@ if __name__ == "__main__":
     )
 
     alg = pygom.classic.SimpleGA(
-        population_size=250,
+        population_size=100,
         steady_state=True,
         crossover=pygom.classic.NPointCrossover(1),
         mutation=pygom.classic.LocalizedMutation(),
@@ -62,6 +63,7 @@ if __name__ == "__main__":
     # alg = MixedGOMEA()
 
     budget = Budget(max_time_seconds=10)
+    budget = Budget(max_evaluations=int(1e5))
 
     # WHY doesn't this work???
     assert isinstance(problem, InstanceBase)

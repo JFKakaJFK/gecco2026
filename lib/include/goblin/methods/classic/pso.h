@@ -67,13 +67,13 @@ class PSOState : public SolutionExtension<PSOState> {
   PSOState() = default;
   ~PSOState() = default;
   PSOState(const PSOState& other)
-      : velocity(other.velocity),
-        previous_best(other.previous_best),
-        _previous_best_quality(other._previous_best_quality->clone()) {};
+      : _previous_best_quality(other._previous_best_quality->clone()),
+        velocity(other.velocity),
+        previous_best(other.previous_best) {};
   PSOState(PSOState&& other)
-      : velocity(std::move(other.velocity)),
-        previous_best(std::move(other.previous_best)),
-        _previous_best_quality(std::move(other._previous_best_quality)) {};
+      : _previous_best_quality(std::move(other._previous_best_quality)),
+        velocity(std::move(other.velocity)),
+        previous_best(std::move(other.previous_best)) {};
   PSOState& operator=(const PSOState& other) {
     if (&other != this) {
       velocity = other.velocity;

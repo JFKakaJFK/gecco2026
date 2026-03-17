@@ -216,8 +216,10 @@ class SRProblem : public GPInstanceBase {
 
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
+#ifndef NDEBUG
     auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
     assert(p != nullptr && "Quality mismatch");
+#endif
   };
 
   const FitnessBase& fitness() const override final { return _fitness; };
