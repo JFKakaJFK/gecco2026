@@ -117,8 +117,18 @@ class TruncationSelection : public SelectionStrategyBase {
 
       selection.reserve(target_size);
       for (auto& front : fronts) {
-        for (usize i : front) {
-          selection.push_back(i);
+        if (front.size() + selection.size() <= target_size) {
+          for (usize i : front) {
+            selection.push_back(i);
+          }
+        } else {
+            // TODO scattered subset selection / crowding distance
+          for (usize i : front) {
+            if (selection.size() >= target_size) {
+              break;
+            }
+            selection.push_back(i);
+          }
         }
       }
     }

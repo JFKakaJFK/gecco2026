@@ -4584,25 +4584,16 @@ class MixedGOMEA(MethodBase):
 # #ifndef _GOBLIN_EXAMPLES_VORONOI_H
 #
 
-# struct KDTree {
-#     struct Node {
-#         usize idx{};
-#         std::unique_ptr<Node> left{};
-#         std::unique_ptr<Node> right{};
-#     };
-# };
-
 class VoronoiImageReconstruction(InstanceBase):
     def __init__(
         self,
-        target_image: Mat[int],
+        target_image: Arr2D[int],
         width: int,
         height: int,
         min_num_cells: int = 10,
         max_num_cells: int = 100,
         init: Optional[AnyInit] = None,
         complexity_objective: bool = False,
-        use_oklab: bool = False,
     ) -> None:
         pass
 
@@ -4623,7 +4614,7 @@ class VoronoiImageReconstruction(InstanceBase):
 
     def image_data(
         self, solution: SolutionBase, scale: float = 1.0
-    ) -> Tuple[Mat[int], int, int]:
+    ) -> Tuple[Arr2D[int], int, int]:
         pass
 
     def evaluate(
@@ -4642,6 +4633,10 @@ class VoronoiImageReconstruction(InstanceBase):
 
     def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
         pass
+
+# class XOver : public common::DiscreteCrossoverBase {
+
+# }
 
 # #endif
 
@@ -4899,9 +4894,22 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
     class DiscreteCrossoverBase:
         """/ Strategy used to generate the crossover masks to exchange information between two parents"""
 
-        def crossover_masks(  # overridable (pure virtual)
-            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
-        ) -> Tuple[Subset, Subset]:
+        def crossover_mask(  # overridable
+            self,
+            rng: Rng,
+            problem: InstanceBase,
+            donor: SolutionBase,
+            offspring: SolutionBase,
+        ) -> Subset:
+            pass
+
+        def crossover(  # overridable
+            self,
+            rng: Rng,
+            problem: InstanceBase,
+            donor: SolutionBase,
+            offspring: SolutionBase,
+        ) -> bool:
             pass
 
         def __init__(self) -> None:
@@ -4912,18 +4920,26 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         def __init__(self, p_crossover: float = 0.5) -> None:
             pass
 
-        def crossover_masks(
-            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
-        ) -> Tuple[Subset, Subset]:
+        def crossover_mask(
+            self,
+            rng: Rng,
+            problem: InstanceBase,
+            donor: SolutionBase,
+            offspring: SolutionBase,
+        ) -> Subset:
             pass
 
     class NPointCrossover(classic.DiscreteCrossoverBase):
         def __init__(self, num_points: int = 1) -> None:
             pass
 
-        def crossover_masks(
-            self, rng: Rng, parent1: SolutionBase, parent2: SolutionBase
-        ) -> Tuple[Subset, Subset]:
+        def crossover_mask(
+            self,
+            rng: Rng,
+            problem: InstanceBase,
+            donor: SolutionBase,
+            offspring: SolutionBase,
+        ) -> Subset:
             pass
 
     class DiscreteMutationBase:
@@ -4961,21 +4977,6 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         ) -> None:
             pass
 
-    class MergeSplitMutation(classic.DiscreteMutationBase):
-        def __init__(
-            self,
-            min_num_cells: int,
-            p_mutation: Optional[float] = None,
-            p_merge: float = 0.5,
-            splitting_noise: float = 0.05,
-        ) -> None:
-            pass
-
-        def mutate(
-            self, rng: Rng, problem: InstanceBase, offspring: SolutionBase
-        ) -> None:
-            pass
-
     class SimpleGA(classic.EABase):
         def __init__(
             self,
@@ -4993,16 +4994,13 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
             """
             pass
 
-        def create_offspring(
+        def check_changes(
             self,
-            rng: Rng,
-            problem: InstanceBase,
             parent: SolutionBase,
-            donor: SolutionBase,
-            crossover_mask: Subset,
             offspring: SolutionBase,
             changed_indices: List[int],
-        ) -> bool:
+            evaluation_needed: bool,
+        ) -> None:
             pass
 
         def step(

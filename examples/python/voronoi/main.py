@@ -10,11 +10,9 @@ MIN_NUM_CELLS = 10
 MAX_NUM_CELLS = 100
 MAX_NUM_PIXELS = 64
 COMPLEXITY_OBJECTIVE = False
-COMPLEXITY_OBJECTIVE = True
+# COMPLEXITY_OBJECTIVE = True
 
 # kdtree
-# use_oklab
-# merge split
 # direct step loop
 # operator combinators?
 # better objectives ()
@@ -41,8 +39,7 @@ def problem_from_image(image_path: str, init: InitBase | None = None):
         min_num_cells=MIN_NUM_CELLS,
         max_num_cells=MAX_NUM_CELLS,
         complexity_objective=COMPLEXITY_OBJECTIVE,
-        init=init,
-        # use_oklab=True
+        init=init
     ), scale_factor
 
 if __name__ == "__main__":
@@ -51,17 +48,20 @@ if __name__ == "__main__":
     )
 
     alg = pygom.classic.SimpleGA(
-        population_size=500,
+        population_size=250,
         steady_state=True,
         crossover=pygom.classic.NPointCrossover(1),
         mutation=pygom.classic.LocalizedMutation(),
-        # mutation=pygom.classic.MergeSplitMutation(min_num_cells = MIN_NUM_CELLS),
-        selection=pygom.classic.TournamentSelection(4),
+        selection=(
+            pygom.classic.TruncationSelection()
+            if COMPLEXITY_OBJECTIVE else
+            pygom.classic.TournamentSelection(4)
+        ),
     )
 
     # alg = MixedGOMEA()
 
-    budget = Budget(max_time_seconds=60)
+    budget = Budget(max_time_seconds=10)
 
     # WHY doesn't this work???
     assert isinstance(problem, InstanceBase)

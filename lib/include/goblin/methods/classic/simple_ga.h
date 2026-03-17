@@ -12,9 +12,21 @@ namespace classic {
 /// Strategy used to generate the crossover masks to exchange information between two parents
 class DiscreteCrossoverBase {
  public:
-  virtual std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                                     const SolutionBase& parent1,
-                                                     const SolutionBase& parent2) const = 0;
+  virtual Subset crossover_mask(Rng& rng,
+                                InstanceBase& problem,
+                                const SolutionBase& donor,
+                                SolutionBase& offspring) const {
+    throw std::runtime_error("Either implement this method or override the full crossover behaviour!");
+  };
+
+  virtual bool crossover(Rng& rng, InstanceBase& problem, const SolutionBase& donor, SolutionBase& offspring) {
+    auto mask = crossover_mask(rng, problem, donor, offspring);
+
+    auto [evaluation_needed, _] = problem.inherit_discrete(offspring, donor, mask);
+
+    return evaluation_needed;
+  };
+
   virtual ~DiscreteCrossoverBase() = default;
 };
 
@@ -28,18 +40,18 @@ class UniformCrossover : public DiscreteCrossoverBase {
     }
   };
 
-  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                             const SolutionBase& parent1,
-                                             const SolutionBase& parent2) const override final {
-    Subset mask1, mask2;
+  Subset crossover_mask(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& donor,
+                        SolutionBase& offspring) const override final {
+    Subset mask;
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    for (usize i = 0; i < parent1.num_discrete(); i++) {
+    for (usize i = 0; i < problem.num_discrete(); i++) {
       if (U(rng) < p_crossover) {
-        mask1.discrete.push_back(i);
-        mask2.discrete.push_back(i);
+        mask.discrete.push_back(i);
       }
     }
-    return std::make_tuple(mask1, mask2);
+    return mask;
   };
 };
 
@@ -53,13 +65,15 @@ class NPointCrossover : public DiscreteCrossoverBase {
     }
   };
 
-  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                             const SolutionBase& parent1,
-                                             const SolutionBase& parent2) const override final {
-    Subset mask1, mask2;
+  Subset crossover_mask(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& donor,
+                        SolutionBase& offspring) const override final {
+    const usize l = problem.num_discrete();
+    Subset mask;
     // here the two endpoints are excluded to ensure not all values come from the same parent
-    auto points = permute(rng, parent1.num_discrete() - 1);
-    if (num_points < parent1.num_discrete()) {
+    auto points = permute(rng, l - 1);
+    if (num_points < l) {
       points.resize(num_points);
     }
     std::sort(points.begin(), points.end());
@@ -68,13 +82,12 @@ class NPointCrossover : public DiscreteCrossoverBase {
     for (usize i = 0; i < points.size(); i += 2) {
       // + 1 since the first real crossover point is between index 0 and 1, not before index 0
       usize start = points[i] + 1;
-      usize end = i + 1 < points.size() ? points[i + 1] + 1 : parent1.num_discrete();
+      usize end = i + 1 < points.size() ? points[i + 1] + 1 : l;
       for (usize j = start; j < end; j++) {
-        mask1.discrete.push_back(j);
-        mask2.discrete.push_back(j);
+        mask.discrete.push_back(j);
       }
     }
-    return std::make_tuple(mask1, mask2);
+    return mask;
   };
 };
 
@@ -147,13 +160,13 @@ class LocalizedMutation : public DiscreteMutationBase {
         if (U(rng) < p_mut && d_i > 1) {
           double v = static_cast<double>(offspring.discrete_values()(i));
           v += N(rng) * strength * static_cast<double>(d_i);
-          if(wrap){
+          if (wrap) {
             if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-                v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-                v = std::fmod(v, d_i);
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+              v = std::fmod(v, d_i);
             }
           } else {
-              v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
+            v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
           }
 
           offspring.discrete_values()(i) = static_cast<DType>(v);
@@ -162,89 +175,6 @@ class LocalizedMutation : public DiscreteMutationBase {
     }
   }
 };
-
-class MergeSplitMutation : public classic::DiscreteMutationBase {
-  double p_merge;
-  double noise;
-  usize min_num_cells;
-
- public:
-  MergeSplitMutation(usize min_num_cells, std::optional<double> p_mutation = std::nullopt, double p_merge = 0.5, double splitting_noise = 0.05) : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
-    if (p_merge < 0.0 || 1.0 < p_merge) {
-      throw std::runtime_error("The probability of merging must be in [0, 1]!");
-    }
-
-    if (splitting_noise <= 0.0) {
-      throw std::runtime_error("The splitting noise must be positive!");
-    }
-  };
-
-  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-      const usize VARS_PER_CELL = 6;
-    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
-
-    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
-    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
-
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    std::normal_distribution<double> N(0.0, 1.0);
-
-    bool merge = U(rng) < p_merge;
-
-    // loop until we find another active/inactive cell for merging/splitting into
-    usize start = random_cell;
-    while(merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)){
-        random_cell++;
-        if(random_cell >= num_cells){
-            random_cell = min_num_cells;
-        }
-        if(random_cell == start){
-            break;
-        }
-    }
-    usize offset = cell * VARS_PER_CELL;
-    usize offset_random = random_cell * VARS_PER_CELL;
-
-    auto x = offspring.discrete_values();
-    if(merge){
-        // disable the other cell
-        x(offset_random) = false;
-        // and linearly combine the cell information with random weights
-        double w = U(rng);
-        for(usize i = 1; i < VARS_PER_CELL; i++){
-            x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
-        }
-    } else /* split */ {
-        // enable the other cell
-        x(offset_random) = true;
-
-        // add noise to both cell values
-        double v;
-        for(usize i = 1; i < VARS_PER_CELL; i++){
-            const usize d_i = problem.discrete_domain_sizes()(offset + i);
-
-            // get value, add noise & map back into the domain for the other cell
-            v = static_cast<double>(x(offset + i));
-            v += N(rng) * noise * static_cast<double>(d_i);
-            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-            }
-            v = std::fmod(v, d_i);
-            x(offset_random + i) = static_cast<DType>(v);
-
-            // get value, add noise & map back into the domain for this cell
-            v = static_cast<double>(x(offset + i));
-            v += N(rng) * noise * static_cast<double>(d_i);
-            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-            }
-            v = std::fmod(v, d_i);
-            x(offset + i) = static_cast<DType>(v);
-        }
-    }
-  }
-};
-
 
 class SimpleGA : public EABase {
  private:
@@ -256,7 +186,6 @@ class SimpleGA : public EABase {
 
   // temporary buffers
   mutable AoSSet offspring;
-  mutable AoSSet parents;
   mutable std::vector<usize> solutions_to_evaluate;
   mutable std::vector<Subset> subsets;
   mutable std::vector<const Subset*> subset_refs;
@@ -291,32 +220,21 @@ class SimpleGA : public EABase {
     }
   };
 
-  bool create_offspring(Rng& rng,
-                        InstanceBase& problem,
-                        const SolutionBase& parent,
-                        const SolutionBase& donor,
-                        const Subset& crossover_mask,
-                        SolutionBase& offspring,
-                        std::vector<usize>& changed_indices) const {
-    // perform crossover with mask
-    problem.inherit_discrete(offspring, donor, crossover_mask);
-
-    // apply mutation
-    mutation_strategy->mutate(rng, problem, offspring);
-
-    // check what changed to support exploiting partial evaluations & knowledge about inactive variables
-    bool needs_evaluation = false;
+  void check_changes(const SolutionBase& parent,
+                     const SolutionBase& offspring,
+                     std::vector<usize>& changed_indices,
+                     bool& evaluation_needed) const {
     changed_indices.clear();
-    for (usize i = 0; i < problem.num_discrete(); i++) {
+    for (usize i = 0; i < parent.num_discrete(); i++) {
+      // something changed if the values are different, but we only need to evaluate if at least one variable active in
+      // the parent changed or the fitness should still be the same
       if (parent.discrete_values()(i) != offspring.discrete_values()(i)) {
         changed_indices.push_back(i);
         if (parent.discrete_active()(i)) {
-          needs_evaluation = true;
+          evaluation_needed = true;
         }
       }
     }
-
-    return needs_evaluation;
   };
 
   u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
@@ -334,44 +252,38 @@ class SimpleGA : public EABase {
     // conditionally inactive variables.
     // To take full advantage of such problem settings, partial evaluations are performed
     // and only on offspring solutions where the active variables changed.
-    // The crossover masks/subset of changed variables between offspring and parent need
-    // to be passed to the evaluation call to support this.
+    // To support this, the subset of changed variables between offspring and parent need
+    // to be passed to the evaluation call.
 
     // variation
     subsets.resize(n);
     subset_refs.resize(n);
     offspring.clear();
-    parents.clear();
     solutions_to_evaluate.clear();
     solutions_to_evaluate.reserve(n);
     std::vector<usize> parent_indices = permute(rng, n);
-    for (usize i = 0; i < n; i += 2) {
-      // get and copy parents
-      const auto& parent1 = population[parent_indices[i]];
-      const auto& parent2 = population[parent_indices[i + 1]];
+    for (usize i = 0; i < n; i++) {
+      // copy to offspring
+      offspring.add(population[i]);
 
-      auto [mask1, mask2] = crossover_strategy->crossover_masks(rng, parent1, parent2);
+      const auto& donor = population[parent_indices[i]];
 
-      // add the offspring to the population (and a copy of the parent to support partial evaluations)
-      offspring.add(parent1);
-      parents.add(parent1);
-      offspring.add(parent2);
-      parents.add(parent2);
+      // perform crossover
+      bool evaluation_needed = crossover_strategy->crossover(rng, problem, donor, offspring[i]);
 
-      if (create_offspring(rng, problem, parents[i], parent2, mask1, offspring[i], subsets[i].discrete)) {
+      // apply mutation
+      mutation_strategy->mutate(rng, problem, offspring[i]);
+
+      // check what changed to allow for partial evaluations & exploiting introns
+      check_changes(population[i], offspring[i], subsets[i].discrete, evaluation_needed);
+      if (evaluation_needed) {
         solutions_to_evaluate.push_back(i);
-      }
-
-      if (create_offspring(rng, problem, parents[i + 1], parent1, mask2, offspring[i + 1], subsets[i + 1].discrete)) {
-        solutions_to_evaluate.push_back(i + 1);
+        subset_refs[i] = &subsets[i];
       }
     }
 
     // evaluation & archive update
-    for (usize i : solutions_to_evaluate) {
-      subset_refs[i] = &subsets[i];
-    }
-    problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
+    problem.evaluate_partial(rng, offspring, population, subset_refs, solutions_to_evaluate);
     for (usize i : solutions_to_evaluate) {
       archive.update(offspring[i], false);
     }

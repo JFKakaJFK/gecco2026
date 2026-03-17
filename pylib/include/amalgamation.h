@@ -9079,6 +9079,8 @@ inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
     by_fitness.reserve(indices.size());
     for (auto& front : fronts) {
       // TODO re-order fronts to maximize scattering in parameter space?
+      //
+      // TODO bug: we don't reduce the size to the selection size...
       for (usize i : front) {
         by_fitness.push_back(indices[i]);
       }
@@ -11404,8 +11406,17 @@ class TruncationSelection : public SelectionStrategyBase {
 
       selection.reserve(target_size);
       for (auto& front : fronts) {
-        for (usize i : front) {
-          selection.push_back(i);
+        if (front.size() + selection.size() <= target_size) {
+          for (usize i : front) {
+            selection.push_back(i);
+          }
+        } else {
+          for (usize i : front) {
+            if (selection.size() >= target_size) {
+              break;
+            }
+            selection.push_back(i);
+          }
         }
       }
     }
@@ -12271,9 +12282,21 @@ namespace classic {
 /// Strategy used to generate the crossover masks to exchange information between two parents
 class DiscreteCrossoverBase {
  public:
-  virtual std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                                     const SolutionBase& parent1,
-                                                     const SolutionBase& parent2) const = 0;
+  virtual Subset crossover_mask(Rng& rng,
+                                InstanceBase& problem,
+                                const SolutionBase& donor,
+                                SolutionBase& offspring) const {
+    throw std::runtime_error("Either implement this method or override the full crossover behaviour!");
+  };
+
+  virtual bool crossover(Rng& rng, InstanceBase& problem, const SolutionBase& donor, SolutionBase& offspring) {
+    auto mask = crossover_mask(rng, problem, donor, offspring);
+
+    auto [evaluation_needed, _] = problem.inherit_discrete(offspring, donor, mask);
+
+    return evaluation_needed;
+  };
+
   virtual ~DiscreteCrossoverBase() = default;
 };
 
@@ -12287,18 +12310,18 @@ class UniformCrossover : public DiscreteCrossoverBase {
     }
   };
 
-  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                             const SolutionBase& parent1,
-                                             const SolutionBase& parent2) const override final {
-    Subset mask1, mask2;
+  Subset crossover_mask(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& donor,
+                        SolutionBase& offspring) const override final {
+    Subset mask;
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    for (usize i = 0; i < parent1.num_discrete(); i++) {
+    for (usize i = 0; i < problem.num_discrete(); i++) {
       if (U(rng) < p_crossover) {
-        mask1.discrete.push_back(i);
-        mask2.discrete.push_back(i);
+        mask.discrete.push_back(i);
       }
     }
-    return std::make_tuple(mask1, mask2);
+    return mask;
   };
 };
 
@@ -12312,13 +12335,15 @@ class NPointCrossover : public DiscreteCrossoverBase {
     }
   };
 
-  std::tuple<Subset, Subset> crossover_masks(Rng& rng,
-                                             const SolutionBase& parent1,
-                                             const SolutionBase& parent2) const override final {
-    Subset mask1, mask2;
+  Subset crossover_mask(Rng& rng,
+                        InstanceBase& problem,
+                        const SolutionBase& donor,
+                        SolutionBase& offspring) const override final {
+    const usize l = problem.num_discrete();
+    Subset mask;
     // here the two endpoints are excluded to ensure not all values come from the same parent
-    auto points = permute(rng, parent1.num_discrete() - 1);
-    if (num_points < parent1.num_discrete()) {
+    auto points = permute(rng, l - 1);
+    if (num_points < l) {
       points.resize(num_points);
     }
     std::sort(points.begin(), points.end());
@@ -12327,13 +12352,12 @@ class NPointCrossover : public DiscreteCrossoverBase {
     for (usize i = 0; i < points.size(); i += 2) {
       // + 1 since the first real crossover point is between index 0 and 1, not before index 0
       usize start = points[i] + 1;
-      usize end = i + 1 < points.size() ? points[i + 1] + 1 : parent1.num_discrete();
+      usize end = i + 1 < points.size() ? points[i + 1] + 1 : l;
       for (usize j = start; j < end; j++) {
-        mask1.discrete.push_back(j);
-        mask2.discrete.push_back(j);
+        mask.discrete.push_back(j);
       }
     }
-    return std::make_tuple(mask1, mask2);
+    return mask;
   };
 };
 
@@ -12406,13 +12430,13 @@ class LocalizedMutation : public DiscreteMutationBase {
         if (U(rng) < p_mut && d_i > 1) {
           double v = static_cast<double>(offspring.discrete_values()(i));
           v += N(rng) * strength * static_cast<double>(d_i);
-          if(wrap){
+          if (wrap) {
             if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-                v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-                v = std::fmod(v, d_i);
+              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+              v = std::fmod(v, d_i);
             }
           } else {
-              v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
+            v = std::clamp(v, 0.0, static_cast<double>(d_i - 1));
           }
 
           offspring.discrete_values()(i) = static_cast<DType>(v);
@@ -12421,89 +12445,6 @@ class LocalizedMutation : public DiscreteMutationBase {
     }
   }
 };
-
-class MergeSplitMutation : public classic::DiscreteMutationBase {
-  double p_merge;
-  double noise;
-  usize min_num_cells;
-
- public:
-  MergeSplitMutation(usize min_num_cells, std::optional<double> p_mutation = std::nullopt, double p_merge = 0.5, double splitting_noise = 0.05) : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
-    if (p_merge < 0.0 || 1.0 < p_merge) {
-      throw std::runtime_error("The probability of merging must be in [0, 1]!");
-    }
-
-    if (splitting_noise <= 0.0) {
-      throw std::runtime_error("The splitting noise must be positive!");
-    }
-  };
-
-  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-      const usize VARS_PER_CELL = 6;
-    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
-
-    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
-    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
-
-    std::uniform_real_distribution<double> U(0.0, 1.0);
-    std::normal_distribution<double> N(0.0, 1.0);
-
-    bool merge = U(rng) < p_merge;
-
-    // loop until we find another active/inactive cell for merging/splitting into
-    usize start = random_cell;
-    while(merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)){
-        random_cell++;
-        if(random_cell >= num_cells){
-            random_cell = min_num_cells;
-        }
-        if(random_cell == start){
-            break;
-        }
-    }
-    usize offset = cell * VARS_PER_CELL;
-    usize offset_random = random_cell * VARS_PER_CELL;
-
-    auto x = offspring.discrete_values();
-    if(merge){
-        // disable the other cell
-        x(offset_random) = false;
-        // and linearly combine the cell information with random weights
-        double w = U(rng);
-        for(usize i = 1; i < VARS_PER_CELL; i++){
-            x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
-        }
-    } else /* split */ {
-        // enable the other cell
-        x(offset_random) = true;
-
-        // add noise to both cell values
-        double v;
-        for(usize i = 1; i < VARS_PER_CELL; i++){
-            const usize d_i = problem.discrete_domain_sizes()(offset + i);
-
-            // get value, add noise & map back into the domain for the other cell
-            v = static_cast<double>(x(offset + i));
-            v += N(rng) * noise * static_cast<double>(d_i);
-            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-            }
-            v = std::fmod(v, d_i);
-            x(offset_random + i) = static_cast<DType>(v);
-
-            // get value, add noise & map back into the domain for this cell
-            v = static_cast<double>(x(offset + i));
-            v += N(rng) * noise * static_cast<double>(d_i);
-            if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-              v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-            }
-            v = std::fmod(v, d_i);
-            x(offset + i) = static_cast<DType>(v);
-        }
-    }
-  }
-};
-
 
 class SimpleGA : public EABase {
  private:
@@ -12515,7 +12456,6 @@ class SimpleGA : public EABase {
 
   // temporary buffers
   mutable AoSSet offspring;
-  mutable AoSSet parents;
   mutable std::vector<usize> solutions_to_evaluate;
   mutable std::vector<Subset> subsets;
   mutable std::vector<const Subset*> subset_refs;
@@ -12550,32 +12490,21 @@ class SimpleGA : public EABase {
     }
   };
 
-  bool create_offspring(Rng& rng,
-                        InstanceBase& problem,
-                        const SolutionBase& parent,
-                        const SolutionBase& donor,
-                        const Subset& crossover_mask,
-                        SolutionBase& offspring,
-                        std::vector<usize>& changed_indices) const {
-    // perform crossover with mask
-    problem.inherit_discrete(offspring, donor, crossover_mask);
-
-    // apply mutation
-    mutation_strategy->mutate(rng, problem, offspring);
-
-    // check what changed to support exploiting partial evaluations & knowledge about inactive variables
-    bool needs_evaluation = false;
+  void check_changes(const SolutionBase& parent,
+                     const SolutionBase& offspring,
+                     std::vector<usize>& changed_indices,
+                     bool& evaluation_needed) const {
     changed_indices.clear();
-    for (usize i = 0; i < problem.num_discrete(); i++) {
+    for (usize i = 0; i < parent.num_discrete(); i++) {
+      // something changed if the values are different, but we only need to evaluate if at least one variable active in
+      // the parent changed or the fitness should still be the same
       if (parent.discrete_values()(i) != offspring.discrete_values()(i)) {
         changed_indices.push_back(i);
         if (parent.discrete_active()(i)) {
-          needs_evaluation = true;
+          evaluation_needed = true;
         }
       }
     }
-
-    return needs_evaluation;
   };
 
   u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const override final {
@@ -12593,44 +12522,38 @@ class SimpleGA : public EABase {
     // conditionally inactive variables.
     // To take full advantage of such problem settings, partial evaluations are performed
     // and only on offspring solutions where the active variables changed.
-    // The crossover masks/subset of changed variables between offspring and parent need
-    // to be passed to the evaluation call to support this.
+    // To support this, the subset of changed variables between offspring and parent need
+    // to be passed to the evaluation call.
 
     // variation
     subsets.resize(n);
     subset_refs.resize(n);
     offspring.clear();
-    parents.clear();
     solutions_to_evaluate.clear();
     solutions_to_evaluate.reserve(n);
     std::vector<usize> parent_indices = permute(rng, n);
-    for (usize i = 0; i < n; i += 2) {
-      // get and copy parents
-      const auto& parent1 = population[parent_indices[i]];
-      const auto& parent2 = population[parent_indices[i + 1]];
+    for (usize i = 0; i < n; i++) {
+      // copy to offspring
+      offspring.add(population[i]);
 
-      auto [mask1, mask2] = crossover_strategy->crossover_masks(rng, parent1, parent2);
+      const auto& donor = population[parent_indices[i]];
 
-      // add the offspring to the population (and a copy of the parent to support partial evaluations)
-      offspring.add(parent1);
-      parents.add(parent1);
-      offspring.add(parent2);
-      parents.add(parent2);
+      // perform crossover
+      bool evaluation_needed = crossover_strategy->crossover(rng, problem, donor, offspring[i]);
 
-      if (create_offspring(rng, problem, parents[i], parent2, mask1, offspring[i], subsets[i].discrete)) {
+      // apply mutation
+      mutation_strategy->mutate(rng, problem, offspring[i]);
+
+      // check what changed to allow for partial evaluations & exploiting introns
+      check_changes(population[i], offspring[i], subsets[i].discrete, evaluation_needed);
+      if (evaluation_needed) {
         solutions_to_evaluate.push_back(i);
-      }
-
-      if (create_offspring(rng, problem, parents[i + 1], parent1, mask2, offspring[i + 1], subsets[i + 1].discrete)) {
-        solutions_to_evaluate.push_back(i + 1);
+        subset_refs[i] = &subsets[i];
       }
     }
 
     // evaluation & archive update
-    for (usize i : solutions_to_evaluate) {
-      subset_refs[i] = &subsets[i];
-    }
-    problem.evaluate_partial(rng, offspring, parents, subset_refs, solutions_to_evaluate);
+    problem.evaluate_partial(rng, offspring, population, subset_refs, solutions_to_evaluate);
     for (usize i : solutions_to_evaluate) {
       archive.update(offspring[i], false);
     }
@@ -12864,319 +12787,384 @@ class StandardGP : public EABase {
 
 
 
-// struct KDTree {
-//     struct Node {
-//         usize idx{};
-//         std::unique_ptr<Node> left{};
-//         std::unique_ptr<Node> right{};
-//     };
-// };
+template <typename C>
+class KDTree {
+ private:
+  using Scalar = typename C::Scalar;
+  using usize = std::size_t;
+  using isize = std::ptrdiff_t;
 
-// as per https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
-template<typename C>
-void rgb2shifted_oklab(C&& c)
-{
-    float l = 0.4122214708f * c(0) + 0.5363325363f * c(1) + 0.0514459929f * c(2);
-    float m = 0.2119034982f * c(0) + 0.6806995451f * c(1) + 0.1073969566f * c(2);
-    float s = 0.0883024619f * c(0) + 0.2817188376f * c(1) + 0.6299787005f * c(2);
+  struct Node {
+    usize idx;
+    Node* left;
+    Node* right;
+  };
 
-    float l_ = std::cbrtf(l);
-    float m_ = std::cbrtf(m);
-    float s_ = std::cbrtf(s);
+  Node* root;
+  std::vector<Node> nodes;
 
-    c(0) = 0.2104542553f*l_ + 0.7936177850f*m_ - 0.0040720468f*s_;
-    c(1) = 1.9779984951f*l_ - 2.4285922050f*m_ + 0.4505937099f*s_ + 0.5f;
-    c(2) = 0.0259040371f*l_ + 0.7827717662f*m_ - 0.8086757660f*s_ + 0.5f;
-}
+  usize best_idx;
+  Scalar best_dist;
 
-// as per https://bottosson.github.io/posts/oklab/#converting-from-linear-srgb-to-oklab
-// but assuming values in [0, 1] for a & b instead of [-0.5, 0.5]
-template<typename C>
-void shifted_oklab2rgb(C&& c)
-{
-    c(1) -= 0.5f; c(2) -= 0.5f;
-    float l_ = c(0) + 0.3963377774f * c(1) + 0.2158037573f * c(2);
-    float m_ = c(0) - 0.1055613458f * c(1) - 0.0638541728f * c(2);
-    float s_ = c(0) - 0.0894841775f * c(1) - 1.2914855480f * c(2);
+  Node* build(usize begin, usize end, isize dim, const C& coords) {
+    if (end <= begin) {
+      return nullptr;
+    }
 
-    float l = l_*l_*l_;
-    float m = m_*m_*m_;
-    float s = s_*s_*s_;
+    // find midpoint in current dimension
+    usize mid = begin + (end - begin) / 2;
+    auto i = nodes.begin();
+    std::nth_element(i + begin, i + mid, i + end,
+                     [&](const Node& lhs, const Node& rhs) { return coords(lhs.idx, dim) < coords(rhs.idx, dim); });
 
-    c(0) = +4.0767416621f * l - 3.3077115913f * m + 0.2309699292f * s;
-	c(1) = -1.2684380046f * l + 2.6097574011f * m - 0.3413193965f * s;
-	c(2) = -0.0041960863f * l - 0.7034186147f * m + 1.7076147010f * s;
-}
+    // recurse with next dimension
+    dim = (dim + 1) % coords.cols();
+    nodes[mid].left = build(begin, mid, dim, coords);
+    nodes[mid].right = build(mid + 1, end, dim, coords);
+    return &nodes[mid];
+  };
+
+  template <typename P>
+  void closest_helper(Node* node, isize dim, const C& coords, const P& point) {
+    if (node == nullptr) {
+      return;
+    }
+
+    const isize n_dims = coords.cols();
+
+    // Note that (coords(node->idx) - point).square().sum()
+    // silently produces incorrect results due to broadcasting fun
+    Scalar dist = 0.0;
+    for (isize i = 0; i < n_dims; i++) {
+      dist += std::pow(coords(node->idx, i) - point(i), 2);
+    }
+
+    if (dist < best_dist) {
+      best_dist = dist;
+      best_idx = node->idx;
+    }
+
+    if (best_dist == 0.0) {
+      return;
+    }
+
+    Scalar dist_x = coords(node->idx, dim) - point(dim);
+    dim = (dim + 1) % n_dims;
+    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
+    if (dist_x * dist_x < best_dist) {
+      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
+    }
+  }
+
+ public:
+  // No default copying since the nodes are pointer-based
+  KDTree(const KDTree&) = delete;
+  KDTree& operator=(const KDTree&) = delete;
+
+  KDTree(const C& coords, usize size) {
+    if (coords.rows() < size) {
+      throw std::runtime_error("Not enough coordinates passed!");
+    }
+    nodes.resize(size);
+    for (usize i = 0; i < nodes.size(); i++) {
+      nodes[i].idx = i;
+    }
+    root = build(0, nodes.size(), /* dim = */ 0, coords);
+  };
+
+  template <typename P>
+  usize closest(const C& coords, const P& point) {
+    if (root == nullptr) {
+      throw std::runtime_error("Empty tree!");
+    }
+
+    best_idx = 0;
+    best_dist = std::numeric_limits<Scalar>::infinity();
+    closest_helper(root, /* dim = */ 0, coords, point);
+    return best_idx;
+  }
+
+  void print_helper(Node* node, usize indent, const C& coords) {
+    if (node == nullptr)
+      return;
+    for (usize i = 0; i < indent; i++) {
+      std::print(" ");
+    }
+    std::print("{}: ({}", node->idx, coords(node->idx, 0));
+    for (isize i = 1; i < coords.cols(); i++) {
+      std::print(", {}", coords(node->idx, i));
+    }
+    std::println(")");
+    print_helper(node->left, indent + 2, coords);
+    print_helper(node->right, indent + 2, coords);
+  }
+
+  void print(const C& coords) { print_helper(root, 0, coords); };
+};
 
 namespace goblin {
 
 class VoronoiImageReconstruction : public InstanceBase {
-    const usize VARS_PER_CELL = 6;
-    const usize ENABLED = 0;
-    const usize X_COORD = 1;
-    const usize Y_COORD = 2;
-    const usize OKLAB_L = 3;
-    const usize OKLAB_A = 4;
-    const usize OKLAB_B = 5;
+  const usize VARS_PER_CELL = 6;
+  const usize ENABLED = 0;
+  const usize X_COORD = 1;
+  const usize Y_COORD = 2;
+  const usize COLOR_R = 3;
+  const usize COLOR_G = 4;
+  const usize COLOR_B = 5;
 
-    const float MAX_COLOR_VALUE = 255.0f;
+  const usize NUM_COLOR_VALUES = 256;
 
-    public:
-
-    VoronoiImageReconstruction(
-        const Mat<DType>& target_image,
-        usize width,
-        usize height,
-        usize min_num_cells = 10,
-        usize max_num_cells = 100,
-        std::optional<AnyInit> init = std::nullopt,
-        bool complexity_objective = false,
-        bool use_oklab = false
-    ):
-        _fitness(
+ public:
+  VoronoiImageReconstruction(const Arr2D<DType>& target_image,
+                             usize width,
+                             usize height,
+                             usize min_num_cells = 10,
+                             usize max_num_cells = 100,
+                             std::optional<AnyInit> init = std::nullopt,
+                             bool complexity_objective = false)
+      : _fitness(
             /* num_objectives = */ complexity_objective ? 2 : 1,
-            /* minimize = */true
-        ),
+            /* minimize = */ true),
         target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
         min_num_cells(min_num_cells),
         max_num_cells(max_num_cells),
-        complexity_objective(complexity_objective),
-        use_oklab(use_oklab)
-    {
-        const usize num_pixels = target_image.rows();
-        if(num_pixels != width * height){
-            throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})", num_pixels, width, height, width * height));
-        }
-
-        if(min_num_cells > max_num_cells){
-            std::swap(min_num_cells, max_num_cells);
-            std::swap(this->min_num_cells, this->max_num_cells);
-        }
-
-        if(min_num_cells < 1){
-            throw std::runtime_error("At least one cell is required!");
-        }
-
-        if(max_num_cells >= num_pixels){
-            throw std::runtime_error("More voronoi cells than pixels in the image!");
-        }
-
-        for(usize i = 0; i < num_pixels; i++){
-            this->target_image.row(i) /= MAX_COLOR_VALUE;
-            if(use_oklab){
-                // convert from rgb to oklab
-                rgb2shifted_oklab(this->target_image.row(i));
-            }
-        }
-
-        // set up domain for each variable as [0, num_values)
-        _discrete_domain_sizes.resize(max_num_cells * VARS_PER_CELL);
-        for(usize i = 0; i < max_num_cells; i++){
-            usize j = i * VARS_PER_CELL;
-            _discrete_domain_sizes[j + ENABLED] = i < min_num_cells ? 1 : 2;
-            _discrete_domain_sizes[j + X_COORD] = width;
-            _discrete_domain_sizes[j + Y_COORD] = height;
-            DType num_color_values = std::floor(MAX_COLOR_VALUE + 1.1);
-            _discrete_domain_sizes[j + OKLAB_L] = num_color_values;
-            _discrete_domain_sizes[j + OKLAB_A] = num_color_values;
-            _discrete_domain_sizes[j + OKLAB_B] = num_color_values;
-        }
-    };
-
-    CRef<Vec<DType>> discrete_domain_sizes() const override final {
-        return _discrete_domain_sizes;
-    };
-
-    CRef<Vec<CType>> continuous_lower_bounds() const override final {
-        return _continuous_lower_bounds;
-    };
-    CRef<Vec<CType>> continuous_upper_bounds() const override final {
-        return _continuous_upper_bounds;
-    };
-
-    CRef<Vec<CType>> continuous_init_lower_bounds() const override final {
-        return _continuous_init_lower_bounds;
-    };
-    CRef<Vec<CType>> continuous_init_upper_bounds() const override final {
-        return _continuous_init_upper_bounds;
-    };
-
-    std::tuple<Mat<u8>, usize, usize> image_data(const SolutionBase& solution, float scale = 1.0) const {
-        if(scale <= 0.0){
-            throw std::runtime_error("The image scale must be > 0!");
-        }
-
-        const usize w = scale * width;
-        const usize h = scale * height;
-
-        Mat<float> image(w * h, 3);
-
-        // extract and scale centers
-        usize num_cells = 0;
-        Mat<float> centers(max_num_cells, VARS_PER_CELL);
-        for(usize j = 0; j < max_num_cells; j++){
-            usize k = j * VARS_PER_CELL;
-            if(j < min_num_cells || solution.discrete_values()(k + ENABLED)){
-                centers.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
-
-                if(use_oklab){
-                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) /= MAX_COLOR_VALUE;
-                    shifted_oklab2rgb(centers(num_cells, Eigen::seqN(OKLAB_L, 3)));
-                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) *= MAX_COLOR_VALUE;
-                }
-                num_cells++;
-            }
-        }
-        centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
-        centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
-
-        // TODO use KDTree
-        auto closest = [&](float x, float y){
-            float dist = std::numeric_limits<float>::infinity();
-            usize closest_idx = 0;
-            for(usize k = 0; k < num_cells; k++){
-                float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
-                if(d < dist){
-                    dist = d;
-                    closest_idx = k;
-                }
-            }
-            return closest_idx;
-        };
-
-        for(usize x = 0; x < w; x++){
-            for(usize y = 0; y < h; y++){
-                usize i = y * w + x;
-
-                usize cell_idx = closest(x, y);
-
-                image.row(i) = centers(cell_idx, Eigen::seqN(OKLAB_L, 3));
-            }
-        }
-
-        return std::make_tuple(image.cast<u8>(), w, h);
-    };
-
-    void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-        Mat<float> centers(max_num_cells, VARS_PER_CELL);
-
-        for(usize i: indices){
-            auto& s = solutions[i];
-
-            // extract centers, mark inactive cells as inactive
-            usize num_cells = 0;
-            for(usize j = 0; j < max_num_cells; j++){
-                usize k = j * VARS_PER_CELL;
-                if(j < min_num_cells || s.discrete_values()(k + ENABLED)){
-                    s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = true;
-                    if(j < min_num_cells){
-                        s.discrete_active()(k + ENABLED) = false;
-                    }
-
-                    centers.row(num_cells) = s.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
-                    centers(num_cells, Eigen::seqN(OKLAB_L, 3)) /= MAX_COLOR_VALUE;
-                    num_cells++;
-                } else {
-                    s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = false;
-                }
-            }
-
-            // TODO use KDTree
-            auto closest = [&](float x, float y){
-                float dist = std::numeric_limits<float>::infinity();
-                usize closest_idx = 0;
-                for(usize k = 0; k < num_cells; k++){
-                    float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
-                    if(d < dist){
-                        dist = d;
-                        closest_idx = k;
-                    }
-                }
-                return closest_idx;
-            };
-
-            // compute per-pixel mismatch
-            float reconstruction_error = 0.0;
-            for(usize x = 0; x < width; x++){
-                for(usize y = 0; y < height; y++){
-                    usize j = y * width + x;
-
-                    usize cell_idx = closest(x, y);
-
-                    reconstruction_error += (target_image.row(j) - centers(cell_idx, Eigen::seqN(OKLAB_L, 3))).array().square().sum();
-                }
-            }
-            reconstruction_error /= static_cast<float>(width * height);
-
-            s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
-            if(complexity_objective){
-                s.quality_as<MOQuality>().objectives(1) = static_cast<float>(num_cells);
-            }
-            s.quality_as<MOQuality>().constraint_value = 0.0;
-        }
+        complexity_objective(complexity_objective) {
+    const usize num_pixels = target_image.rows();
+    if (num_pixels != width * height) {
+      throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})",
+                                           num_pixels, width, height, width * height));
     }
 
-    void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
-        init->add_random(rng, *this, solutions, count);
+    if (min_num_cells > max_num_cells) {
+      std::swap(min_num_cells, max_num_cells);
+      std::swap(this->min_num_cells, this->max_num_cells);
     }
 
-    const FitnessBase& fitness() const override final { return _fitness;};
-    const ArchiveFitnessBase& archive_fitness() const override final { return _fitness;};
+    if (min_num_cells < 1) {
+      throw std::runtime_error("At least one cell is required!");
+    }
 
-    void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
-        Vec<float> c(3);
-        os << '{';
-        bool first = true;
-        for(usize i = 0; i < max_num_cells; i++){
-            usize j = i * VARS_PER_CELL;
-            if(j < min_num_cells || solution.discrete_values()(j + ENABLED)){
-                if(!first){
-                   os << ", ";
-                }
+    if (max_num_cells >= num_pixels) {
+      throw std::runtime_error("More voronoi cells than pixels in the image!");
+    }
 
-                c = solution.discrete_values()(Eigen::seqN(j + OKLAB_L, 3)).cast<float>();
+    // set up domain for each variable as [0, num_values)
+    _discrete_domain_sizes.resize(max_num_cells * VARS_PER_CELL);
+    for (usize i = 0; i < max_num_cells; i++) {
+      usize j = i * VARS_PER_CELL;
 
-                if(use_oklab){
-                    c /= MAX_COLOR_VALUE;
-                    shifted_oklab2rgb(c);
-                    c *= MAX_COLOR_VALUE;
-                }
+      // (enabled, X, Y, R, G, B)
+      _discrete_domain_sizes[j + ENABLED] = i < min_num_cells ? 1 : 2;
+      _discrete_domain_sizes[j + X_COORD] = width;
+      _discrete_domain_sizes[j + Y_COORD] = height;
+      _discrete_domain_sizes[j + COLOR_R] = NUM_COLOR_VALUES;
+      _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
+      _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
+    }
+  };
 
-                // (x, y): (r, g, b)
-                os << '('
-                << usize(solution.discrete_values()(j + X_COORD)) << ", "
-                << usize(solution.discrete_values()(j + Y_COORD)) << "): ("
-                << c(0) << ", " << c(1) << ", " << c(2)
-                << ")";
+  CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
 
-                first = false;
-            }
+  CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
+  CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override final { return _continuous_init_lower_bounds; };
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
+
+  std::tuple<Arr2D<u8>, usize, usize> image_data(const SolutionBase& solution, float scale = 1.0) const {
+    if (scale <= 0.0) {
+      throw std::runtime_error("The image scale must be > 0!");
+    }
+
+    const usize w = scale * width;
+    const usize h = scale * height;
+
+    Arr2D<float> image(w * h, 3);
+
+    // extract and scale centers
+    usize num_cells = 0;
+    Arr2D<float> centers(max_num_cells, VARS_PER_CELL);
+    for (usize j = 0; j < max_num_cells; j++) {
+      usize k = j * VARS_PER_CELL;
+      if (j < min_num_cells || solution.discrete_values()(k + ENABLED)) {
+        centers.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
+        num_cells++;
+      }
+    }
+    centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
+    centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
+
+    // TODO use KDTree
+    auto closest = [&](float x, float y) {
+      float dist = std::numeric_limits<float>::infinity();
+      usize closest_idx = 0;
+      for (usize k = 0; k < num_cells; k++) {
+        float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
+        if (d < dist) {
+          dist = d;
+          closest_idx = k;
         }
-        os << '}';
+      }
+      return closest_idx;
+    };
+
+    for (usize x = 0; x < w; x++) {
+      for (usize y = 0; y < h; y++) {
+        usize i = y * w + x;
+
+        usize cell_idx = closest(x, y);
+
+        image.row(i) = centers(cell_idx, Eigen::seqN(COLOR_R, 3));
+      }
     }
 
-    private:
-    MOFitness _fitness;
-    Mat<float> target_image;
-    std::shared_ptr<InitBase> init;
-    usize width;
-    usize height;
-    usize min_num_cells;
-    usize max_num_cells;
-    bool complexity_objective;
-    bool use_oklab;
+    return std::make_tuple(image.cast<u8>(), w, h);
+  };
 
-    Vec<DType> _discrete_domain_sizes{};
-    Vec<CType> _continuous_lower_bounds{};
-    Vec<CType> _continuous_upper_bounds{};
+  void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+    Arr2D<float> centers(max_num_cells, 2);
+    Arr2D<float> colors(max_num_cells, 3);
+    Array<float> pixel(2);
 
-    Vec<CType> _continuous_init_lower_bounds{};
-    Vec<CType> _continuous_init_upper_bounds{};
+    for (usize i : indices) {
+      auto& s = solutions[i];
+
+      // extract centers, mark inactive cells as inactive
+      usize num_cells = 0;
+      for (usize j = 0; j < max_num_cells; j++) {
+        usize k = j * VARS_PER_CELL;
+        if (j < min_num_cells || s.discrete_values()(k + ENABLED)) {
+          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = true;
+          if (j < min_num_cells) {
+            s.discrete_active()(k + ENABLED) = false;
+          }
+
+          centers(num_cells, 0) = s.discrete_values()(k + X_COORD);
+          centers(num_cells, 1) = s.discrete_values()(k + Y_COORD);
+
+          colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
+          colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
+          colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
+
+          num_cells++;
+        } else {
+          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = false;
+        }
+      }
+
+      // TODO benchmark
+      KDTree kdt(centers, num_cells);
+
+      auto closest = [&](float x, float y) {
+        float dist = std::numeric_limits<float>::infinity();
+        usize closest_idx = 0;
+        for (usize k = 0; k < num_cells; k++) {
+          float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
+          if (d < dist) {
+            dist = d;
+            closest_idx = k;
+          }
+        }
+        return closest_idx;
+      };
+
+      // compute per-pixel mismatch
+      float reconstruction_error = 0.0;
+      for (usize x = 0; x < width; x++) {
+        for (usize y = 0; y < height; y++) {
+          usize j = y * width + x;
+
+          pixel(0) = static_cast<float>(x);
+          pixel(1) = static_cast<float>(y);
+          usize cell_idx = kdt.closest(centers, pixel);
+
+          auto dst = [&](usize c) {
+            return std::pow(pixel(0) - centers(c, 0), 2) + std::pow(pixel(1) - centers(c, 1), 2);
+          };
+          auto p = [&](usize c, std::string s) {
+            std::println("{} ({}, {}) -> {} @ ({},{}) d^2 = ({})^2 + ({})^2 = {}", s, x, y, c, centers(c, 0),
+                         centers(c, 1), (pixel(0) - centers(c, 0)), (pixel(1) - centers(c, 1)), dst(c));
+          };
+
+          p(cell_idx, "Closest: ");
+          usize _c = closest(x, y);
+          p(_c, "Actual:  ");
+          if (dst(cell_idx) != dst(_c)) {
+            kdt.print(centers);
+            throw std::runtime_error("bad tree, very bad.");
+          }
+
+          // usize cell_idx = closest(x, y);
+
+          reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
+        }
+      }
+      reconstruction_error /= static_cast<float>(width * height);
+
+      s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
+      if (complexity_objective) {
+        s.quality_as<MOQuality>().objectives(1) = static_cast<float>(num_cells);
+      }
+      s.quality_as<MOQuality>().constraint_value = 0.0;
+    }
+  }
+
+  void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
+    init->add_random(rng, *this, solutions, count);
+  }
+
+  const FitnessBase& fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& archive_fitness() const override final { return _fitness; };
+
+  void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
+    Array<float> c(3);
+    os << '{';
+    bool first = true;
+    for (usize i = 0; i < max_num_cells; i++) {
+      usize j = i * VARS_PER_CELL;
+      if (j < min_num_cells || solution.discrete_values()(j + ENABLED)) {
+        if (!first) {
+          os << ", ";
+        }
+
+        c = solution.discrete_values()(Eigen::seqN(j + COLOR_R, 3)).cast<float>();
+
+        // (x, y): (r, g, b)
+        os << '(' << usize(solution.discrete_values()(j + X_COORD)) << ", "
+           << usize(solution.discrete_values()(j + Y_COORD)) << "): (" << c(0) << ", " << c(1) << ", " << c(2) << ")";
+
+        first = false;
+      }
+    }
+    os << '}';
+  }
+
+ private:
+  MOFitness _fitness;
+  Arr2D<float> target_image;
+  std::shared_ptr<InitBase> init;
+  usize width;
+  usize height;
+  usize min_num_cells;
+  usize max_num_cells;
+  bool complexity_objective;
+
+  Vec<DType> _discrete_domain_sizes{};
+  Vec<CType> _continuous_lower_bounds{};
+  Vec<CType> _continuous_upper_bounds{};
+
+  Vec<CType> _continuous_init_lower_bounds{};
+  Vec<CType> _continuous_init_upper_bounds{};
 };
-};
+
+// class XOver : public common::DiscreteCrossoverBase {
+
+// }
+};  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */
 

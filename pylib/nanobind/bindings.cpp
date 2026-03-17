@@ -1568,14 +1568,22 @@ namespace goblin { namespace classic {
 class DiscreteCrossoverBase_trampoline : public DiscreteCrossoverBase
 {
 public:
-    NB_TRAMPOLINE(DiscreteCrossoverBase, 1);
+    NB_TRAMPOLINE(DiscreteCrossoverBase, 2);
 
-    std::tuple<goblin::Subset, goblin::Subset> crossover_masks(Rng & rng, const goblin::SolutionBase & parent1, const goblin::SolutionBase & parent2) const override
+    goblin::Subset crossover_mask(Rng & rng, goblin::InstanceBase & problem, const goblin::SolutionBase & donor, goblin::SolutionBase & offspring) const override
     {
-        NB_OVERRIDE_PURE_NAME(
-            "crossover_masks", // function name (python)
-            crossover_masks, // function name (c++)
-            rng, parent1, parent2 // params
+        NB_OVERRIDE_NAME(
+            "crossover_mask", // function name (python)
+            crossover_mask, // function name (c++)
+            rng, problem, donor, offspring // params
+        );
+    }
+    bool crossover(Rng & rng, goblin::InstanceBase & problem, const goblin::SolutionBase & donor, goblin::SolutionBase & offspring) override
+    {
+        NB_OVERRIDE_NAME(
+            "crossover", // function name (python)
+            crossover, // function name (c++)
+            rng, problem, donor, offspring // params
         );
     }
 };
@@ -4319,8 +4327,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassVoronoiImageReconstruction =
       nb::class_<goblin::VoronoiImageReconstruction, goblin::InstanceBase>
           (m, "VoronoiImageReconstruction", "")
-      .def(nb::init<const Mat<DType> &, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool>(),
-          nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10, nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(), nb::arg("complexity_objective") = false, nb::arg("use_oklab") = false)
+      .def(nb::init<const Arr2D<DType> &, usize, usize, usize, usize, std::optional<AnyInit>, bool>(),
+          nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10, nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(), nb::arg("complexity_objective") = false)
       .def("discrete_domain_sizes",
           &goblin::VoronoiImageReconstruction::discrete_domain_sizes)
       .def("continuous_lower_bounds",
@@ -4542,8 +4550,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           nb::class_<goblin::classic::DiscreteCrossoverBase, goblin::classic::DiscreteCrossoverBase_trampoline>
               (pyNsclassic, "DiscreteCrossoverBase", "/ Strategy used to generate the crossover masks to exchange information between two parents")
           .def(nb::init<>()) // implicit default constructor
-          .def("crossover_masks",
-              &goblin::classic::DiscreteCrossoverBase::crossover_masks, nb::arg("rng"), nb::arg("parent1"), nb::arg("parent2"))
+          .def("crossover_mask",
+              &goblin::classic::DiscreteCrossoverBase::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
+          .def("crossover",
+              &goblin::classic::DiscreteCrossoverBase::crossover, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
           ;
 
 
@@ -4552,8 +4562,8 @@ void py_init_module_pygoblin(nb::module_& m) {
               (pyNsclassic, "UniformCrossover", "")
           .def(nb::init<double>(),
               nb::arg("p_crossover") = 0.5)
-          .def("crossover_masks",
-              &goblin::classic::UniformCrossover::crossover_masks, nb::arg("rng"), nb::arg("parent1"), nb::arg("parent2"))
+          .def("crossover_mask",
+              &goblin::classic::UniformCrossover::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
           ;
 
 
@@ -4562,8 +4572,8 @@ void py_init_module_pygoblin(nb::module_& m) {
               (pyNsclassic, "NPointCrossover", "")
           .def(nb::init<usize>(),
               nb::arg("num_points") = 1)
-          .def("crossover_masks",
-              &goblin::classic::NPointCrossover::crossover_masks, nb::arg("rng"), nb::arg("parent1"), nb::arg("parent2"))
+          .def("crossover_mask",
+              &goblin::classic::NPointCrossover::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
           ;
 
 
@@ -4593,16 +4603,6 @@ void py_init_module_pygoblin(nb::module_& m) {
               nb::arg("p_mutation").none() = nb::none(), nb::arg("strength") = 0.05, nb::arg("wrap") = false)
           .def("mutate",
               &goblin::classic::LocalizedMutation::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassMergeSplitMutation =
-          nb::class_<goblin::classic::MergeSplitMutation, goblin::classic::DiscreteMutationBase>
-              (pyNsclassic, "MergeSplitMutation", "")
-          .def(nb::init<usize, std::optional<double>, double, double>(),
-              nb::arg("min_num_cells"), nb::arg("p_mutation").none() = nb::none(), nb::arg("p_merge") = 0.5, nb::arg("splitting_noise") = 0.05)
-          .def("mutate",
-              &goblin::classic::MergeSplitMutation::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
           ;
 
 
@@ -4647,8 +4647,8 @@ void py_init_module_pygoblin(nb::module_& m) {
               },
               nb::arg("population_size") = 100, nb::arg("crossover").none() = nb::none(), nb::arg("mutation").none() = nb::none(), nb::arg("steady_state") = true, nb::arg("selection").none() = nb::none(),
               "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * crossover: std.make_shared<classic.UniformCrossover>()\n        * mutation: std.make_shared<classic.RandomMutation>()\n        * selection: std.make_shared<classic.TournamentSelection>(4)")
-          .def("create_offspring",
-              &goblin::classic::SimpleGA::create_offspring, nb::arg("rng"), nb::arg("problem"), nb::arg("parent"), nb::arg("donor"), nb::arg("crossover_mask"), nb::arg("offspring"), nb::arg("changed_indices"))
+          .def("check_changes",
+              &goblin::classic::SimpleGA::check_changes, nb::arg("parent"), nb::arg("offspring"), nb::arg("changed_indices"), nb::arg("evaluation_needed"))
           .def("step",
               &goblin::classic::SimpleGA::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
           ;
