@@ -90,6 +90,19 @@ void mse_kernel_restrict(
 );
 
 __global__
+void evaluate_mse_kernel_multiblock(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ partial,
+    const size_t solution_length,
+    const size_t num_datapoints,
+    const size_t datapoints_per_block,
+    const size_t items_per_thread
+);
+
+__global__
 void compute_tree_output_wrapper(
     float* X, 
     float* type,

@@ -23,6 +23,7 @@ if(GOBLIN_HAS_CUDA)
     list(APPEND LIB_SOURCES
         gp/gpu_evaluation/evaluate.cu
         gp/gpu_evaluation/memory.cu
+        gp/gpu_evaluation/misc.cu
     )
 endif()
 

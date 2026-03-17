@@ -14,7 +14,8 @@ enum class KernelVersion : uint8_t {
     BlockReduce,
     SingleKernel,
     SingleKernelFMAF,
-    SingleKernelInplace
+    SingleKernelInplace,
+    Hybrid
 };
 
 constexpr std::string_view to_string(KernelVersion v) {
@@ -26,6 +27,7 @@ constexpr std::string_view to_string(KernelVersion v) {
         case KernelVersion::SingleKernel:        return "SingleKernel";
         case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
         case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
+        case KernelVersion::Hybrid:              return "Hybrid";
     }
 
     return "Unknown KernelVersion";

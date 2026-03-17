@@ -21,6 +21,7 @@
 #ifdef GOBLIN_HAS_CUDA
 #include "goblin/gp/gpu_evaluation/evaluate.h"
 #include "goblin/gp/gpu_evaluation/memory.h"
+#include "goblin/gp/gpu_evaluation/misc.h"
 #endif // GOBLIN_HAS_CUDA
 
 #include "goblin/gp/context.h"
@@ -536,8 +537,9 @@ class SRProblem : public GPInstanceBase {
     __goblin_runtime_assert(node_type.size() == node_value.size());
 
     const size_t solution_length = ctx.max_expression_size;
-    const LaunchConfig config =
-        LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
+    const LaunchConfig config = (_kernel_version.value() == KernelVersion::SingleKernelInplace)
+        ? LaunchConfig::determine_auto(num_solutions, X_train.rows(), solution_length, _num_sms)
+        : LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
 
     config.check();
 
@@ -562,6 +564,7 @@ class SRProblem : public GPInstanceBase {
     Arr2D<float> Y32 = Y_train.cast<float>();
     d_X = allocate_and_copy(X32.data(), X32.size());
     d_Y = allocate_and_copy(Y32.data(), Y32.size());
+    _num_sms = get_gpu_info().num_sms;
   }
 
   void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
@@ -582,9 +585,11 @@ class SRProblem : public GPInstanceBase {
     if (config.kernel_version != KernelVersion::SingleKernel &&
         config.kernel_version != KernelVersion::SingleKernelFMAF &&
         config.kernel_version != KernelVersion::SingleKernelInplace) {
-      const size_t num_partials = (config.kernel_version == KernelVersion::BlockReduce)
-                                      ? config.num_solutions * config.eval.grid.y
-                                      : config.num_solutions * config.num_datapoints;
+      const size_t num_partials =
+          (config.kernel_version == KernelVersion::BlockReduce ||
+           config.kernel_version == KernelVersion::MultiBlockInplace)
+              ? config.num_solutions * config.eval.grid.y
+              : config.num_solutions * config.num_datapoints;
 
       if (_num_partials_allocated < num_partials) {
         free_on_gpu(d_partial);
@@ -645,6 +650,7 @@ class SRProblem : public GPInstanceBase {
 #ifdef GOBLIN_HAS_CUDA
   // GPU fields
   std::optional<KernelVersion> _kernel_version{};
+  int _num_sms = 0;
   size_t _num_solutions_allocated = 0;
   size_t _num_partials_allocated = 0;
   size_t _num_results_allocated = 0;

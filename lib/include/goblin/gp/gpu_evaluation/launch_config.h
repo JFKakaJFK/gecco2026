@@ -1,10 +1,11 @@
 #pragma once
-#ifndef _GOBLIN_GA_GP_MISC_H
-#define _GOBLIN_GA_GP_MISC_H
+#ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+#define _GOBLIN_GA_GP_LAUNCH_CONFIG_H
 
 #include <algorithm>
 #include <cassert>
 
+#include "goblin/gp/gpu_evaluation/misc.h"
 #include "goblin/gp/gpu_evaluation/types.h"
 
 #define MAX_THREADS_PER_BLOCK 1024
@@ -100,6 +101,17 @@ struct KernelConfig {
         return config;
     }
 
+    static KernelConfig for_multi_block(size_t num_solutions, size_t num_datapoints, size_t blocks_per_individual) {
+        KernelConfig config;
+
+        const size_t datapoints_per_block = ceil_div(num_datapoints, blocks_per_individual);
+        config.grid.x = num_solutions;
+        config.grid.y = blocks_per_individual;
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(datapoints_per_block, WARP_SIZE));
+
+        return config;
+    }
+
     void check() const {
         block.check();
         // grid.check(); TODO
@@ -118,6 +130,8 @@ struct LaunchConfig {
     size_t num_datapoints;
     size_t solution_length;
     size_t items_per_thread;
+    size_t blocks_per_individual = 1;
+    size_t datapoints_per_block = 0;
 
     LaunchConfig() = default;
     LaunchConfig(
@@ -140,7 +154,8 @@ struct LaunchConfig {
         KernelVersion kernel_version,
         size_t num_solutions,
         size_t num_datapoints,
-        size_t solution_length
+        size_t solution_length,
+        size_t blocks_per_individual = 1
     ) {
         LaunchConfig config;
 
@@ -158,8 +173,17 @@ struct LaunchConfig {
             case (KernelVersion::SingleKernelInplace):
                 config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
                 config.mse = KernelConfig();
-                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
+                config.items_per_thread = ceil_div(num_datapoints, config.eval.block.x);
                 break;
+            case (KernelVersion::MultiBlockInplace): {
+                config.eval = KernelConfig::for_multi_block(num_solutions, num_datapoints, blocks_per_individual);
+                config.datapoints_per_block = ceil_div(num_datapoints, blocks_per_individual);
+                config.items_per_thread = ceil_div(config.datapoints_per_block, config.eval.block.x);
+                config.mse.grid.x = num_solutions;
+                config.mse.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(blocks_per_individual, WARP_SIZE));
+                config.blocks_per_individual = blocks_per_individual;
+                break;
+            }
             default:
                 break;
         }
@@ -170,6 +194,19 @@ struct LaunchConfig {
         config.solution_length = solution_length;
 
         return config;
+    }
+
+    static LaunchConfig determine_auto(
+        size_t num_solutions,
+        size_t num_datapoints,
+        size_t solution_length,
+        int num_sms
+    ) {
+        const size_t blocks_per_individual = std::max((size_t)1, ceil_div((size_t)num_sms, num_solutions));
+        const KernelVersion version = (blocks_per_individual > 1)
+            ? KernelVersion::MultiBlockInplace
+            : KernelVersion::SingleKernelInplace;
+        return determine(version, num_solutions, num_datapoints, solution_length, blocks_per_individual);
     }
 
     void check() const {
@@ -184,4 +221,4 @@ struct LaunchConfig {
 
 }  // namespace goblin
 
-#endif /* _GOBLIN_GA_GP_MISC_H */
+#endif /* _GOBLIN_GA_GP_LAUNCH_CONFIG_H */
