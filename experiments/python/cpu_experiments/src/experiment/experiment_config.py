@@ -265,7 +265,7 @@ FEYNMAN_CPU_CONFIG = ExperimentConfig(
     population_sizes=[2**i for i in range(7, 17)],  # 128 - 65536
     num_observations=[100_000],
     num_features=None,
-    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 4)],  # TemplateConfig(2, 6)],
     operator_sets=["paper"],
     # Execution Parameters
     use_target=False,
