@@ -109,16 +109,15 @@ def run_one_task(task: Task, log_path: Path) -> None:
         linear_scaling=False,
         ims_kwargs={
             "initial_population_size": task["population_size"],
-            "max_num_populations": 25,  # 1
-            "subgeneration_factor": 10,
-            "restart_stale_populations": False,  # True
+            "max_num_populations": 1,
+            "restart_stale_populations": True,
         },
         rv_kwargs={"enabled": False},
         discrete_model_kwargs={
-            # "metric": "node_proximity",
+            "metric": "node_proximity",
             "merge_continuous": False,
             "num_continuous_bins": 25,
-            "normalize_initial_linkage_bias": True,  # False
+            "normalize_initial_linkage_bias": False,
         },
         outputs=[(task["branching_factor"], task["depth"])],
         operators=OPERATOR_SETS[task["operator_set"]],
@@ -147,7 +146,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
 def run_cpu_tasks(
     tasks: TaskGenerator,
     output_directory: Path,
-    max_workers: int | None = None,
+    max_workers: int | None = 60,
     required_rate: float | None = None,
     dry_run: bool = False,
 ) -> float | None:
