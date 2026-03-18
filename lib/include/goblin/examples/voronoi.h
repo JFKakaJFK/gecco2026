@@ -6,113 +6,11 @@
 #include <cmath>
 #include <limits>
 #include <format>
-#include <algorithm>
 #include <vector>
-
-#include <print>
 
 #include "goblin/lib/instance.h"
 #include "goblin/lib/init.h"
 #include "goblin/methods/classic/simple_ga.h"
-
-template <typename C>
-class KDTree {
- private:
-  using Scalar = typename C::Scalar;
-  using usize = std::size_t;
-  using isize = std::ptrdiff_t;
-
-  struct Node {
-    usize idx;
-    Node* left;
-    Node* right;
-  };
-
-  Node* root;
-  std::vector<Node> nodes;
-
-  usize best_idx;
-  Scalar best_dist;
-
-  Node* build(usize begin, usize end, isize dim, const C& coords) {
-    if (end <= begin) {
-      return nullptr;
-    }
-
-    // find midpoint in current dimension
-    usize mid = begin + (end - begin) / 2;
-    auto i = nodes.begin();
-    std::nth_element(i + begin, i + mid, i + end,
-                     [&](const Node& lhs, const Node& rhs) { return coords(lhs.idx, dim) < coords(rhs.idx, dim); });
-
-    // recurse with next dimension
-    dim = (dim + 1) % coords.cols();
-    nodes[mid].left = build(begin, mid, dim, coords);
-    nodes[mid].right = build(mid + 1, end, dim, coords);
-    return &nodes[mid];
-  };
-
-  template <typename P>
-  void closest_helper(Node* node, isize dim, const C& coords, const P& point) {
-    if (node == nullptr) {
-      return;
-    }
-
-    const isize n_dims = coords.cols();
-
-    // Note that (coords(node->idx) - point).square().sum()
-    // silently produces incorrect results due to broadcasting fun
-    Scalar dist = 0.0;
-    for (isize i = 0; i < n_dims; i++) {
-      dist += std::pow(coords(node->idx, i) - point(i), 2);
-    }
-
-    if (dist < best_dist) {
-      best_dist = dist;
-      best_idx = node->idx;
-    }
-
-    if (best_dist == 0.0) {
-      return;
-    }
-
-    Scalar dist_x = coords(node->idx, dim) - point(dim);
-    dim = (dim + 1) % n_dims;
-    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
-    if (dist_x * dist_x < best_dist) {
-      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
-    }
-  }
-
- public:
-  // No default copying since the nodes are pointer-based
-  KDTree(const KDTree&) = delete;
-  KDTree& operator=(const KDTree&) = delete;
-
-  KDTree() = default;
-  void fill(const C& coords, usize size) {
-    if (coords.rows() < size) {
-      throw std::runtime_error("Not enough coordinates passed!");
-    }
-    nodes.resize(size);
-    for (usize i = 0; i < nodes.size(); i++) {
-      nodes[i].idx = i;
-    }
-    root = build(0, nodes.size(), /* dim = */ 0, coords);
-  };
-
-  template <typename P>
-  usize closest(const C& coords, const P& point) {
-    if (root == nullptr) {
-      throw std::runtime_error("Empty tree!");
-    }
-
-    best_idx = 0;
-    best_dist = std::numeric_limits<Scalar>::infinity();
-    closest_helper(root, /* dim = */ 0, coords, point);
-    return best_idx;
-  }
-};
 
 namespace goblin {
 
@@ -135,18 +33,19 @@ class VoronoiImageReconstruction : public InstanceBase {
                              usize max_num_cells = 100,
                              std::optional<AnyInit> init = std::nullopt,
                              bool complexity_objective = false,
-                             bool use_kdtree = false)
-      : _fitness(
+                             bool track_complexity = false)
+      : _fitness(  // this preference is optimized
             /* num_objectives = */ complexity_objective ? 2 : 1,
+            /* minimize = */ true),
+        _archive_fitness(  // this one is used for the archive
+            /* num_objectives = */ complexity_objective || track_complexity ? 2 : 1,
             /* minimize = */ true),
         target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
         min_num_cells(min_num_cells),
-        max_num_cells(max_num_cells),
-        complexity_objective(complexity_objective),
-        use_kdtree(use_kdtree) {
+        max_num_cells(max_num_cells) {
     const usize num_pixels = target_image.rows();
     if (num_pixels != width * height) {
       throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})",
@@ -221,7 +120,6 @@ class VoronoiImageReconstruction : public InstanceBase {
     centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
     centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
 
-    // TODO use KDTree
     auto closest = [&](float x, float y) {
       float dist = std::numeric_limits<float>::infinity();
       usize closest_idx = 0;
@@ -249,7 +147,8 @@ class VoronoiImageReconstruction : public InstanceBase {
   };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    Arr2D<float> centers(max_num_cells, 2);
+    const usize num_pixels = width * height;
+    Arr2D<float> centers(2, max_num_cells);
     Arr2D<float> colors(max_num_cells, 3);
     Array<float> pixel(2);
 
@@ -266,8 +165,8 @@ class VoronoiImageReconstruction : public InstanceBase {
             s.discrete_active()(k + ENABLED) = false;
           }
 
-          centers(num_cells, 0) = s.discrete_values()(k + X_COORD);
-          centers(num_cells, 1) = s.discrete_values()(k + Y_COORD);
+          centers(0, num_cells) = s.discrete_values()(k + X_COORD);
+          centers(1, num_cells) = s.discrete_values()(k + Y_COORD);
 
           colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
           colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
@@ -279,17 +178,13 @@ class VoronoiImageReconstruction : public InstanceBase {
         }
       }
 
-      KDTree<decltype(centers)> kdt;
-      if (use_kdtree) {
-        kdt.fill(centers, num_cells);
-      }
-
       auto closest = [&](float x, float y) {
         float dist = std::numeric_limits<float>::infinity();
         usize closest_idx = 0;
         for (usize k = 0; k < num_cells; k++) {
-            float dx = x - centers(k, 0), dy = y - centers(k, 1);
+          // float dx = x - centers(k, 0), dy = y - centers(k, 1);
           // float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
+          float dx = x - centers(0, k), dy = y - centers(1, k);
           float d = dx * dx + dy * dy;
           if (d < dist) {
             dist = d;
@@ -307,24 +202,15 @@ class VoronoiImageReconstruction : public InstanceBase {
         for (usize y = 0; y < height; y++) {
           usize j = y * width + x;
 
-          usize cell_idx;
-          if (use_kdtree) {
-            pixel(0) = static_cast<float>(x);
-            pixel(1) = static_cast<float>(y);
-            cell_idx = kdt.closest(centers, pixel);
-          } else {
-            cell_idx = closest(x, y);
-          }
+          usize cell_idx = closest(x, y);
 
           reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
         }
       }
-      reconstruction_error /= static_cast<float>(width * height);
+      reconstruction_error /= static_cast<float>(num_pixels);
 
       s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
-      if (complexity_objective) {
-        s.quality_as<MOQuality>().objectives(1) = static_cast<float>(num_cells);
-      }
+      s.quality_as<MOQuality>().objectives(1) = num_cells;
       s.quality_as<MOQuality>().constraint_value = 0.0;
     }
   }
@@ -334,7 +220,7 @@ class VoronoiImageReconstruction : public InstanceBase {
   }
 
   const FitnessBase& fitness() const override final { return _fitness; };
-  const ArchiveFitnessBase& archive_fitness() const override final { return _fitness; };
+  const ArchiveFitnessBase& archive_fitness() const override final { return _archive_fitness; };
 
   void log_solution(std::ostream& os, const SolutionBase& solution) const override final {
     Array<float> c(3);
@@ -361,6 +247,7 @@ class VoronoiImageReconstruction : public InstanceBase {
 
  private:
   MOFitness _fitness;
+  MOFitness _archive_fitness;
   Arr2D<float> target_image;
   Arr2D<float> image_coords;
   std::shared_ptr<InitBase> init;
@@ -368,8 +255,6 @@ class VoronoiImageReconstruction : public InstanceBase {
   usize height;
   usize min_num_cells;
   usize max_num_cells;
-  bool complexity_objective;
-  bool use_kdtree;
 
   Vec<DType> _discrete_domain_sizes{};
   Vec<CType> _continuous_lower_bounds{};

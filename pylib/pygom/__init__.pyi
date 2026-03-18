@@ -805,6 +805,8 @@ class InstanceBase:
         self,
     ) -> CRef[Vec[float]]:
         pass
+    # TODO support ordinal discrete spaces (e.g. bool per discrete to indicate categorical/ordinal)
+    # TODO support permutation spaces (e.g. bool per continuous variable to indicate continuous/random keys)
 
     def evaluate(  # overridable (pure virtual)
         self, rng: Rng, solutions: SolutionSetBase, indices: std.span[int]
@@ -4594,7 +4596,7 @@ class VoronoiImageReconstruction(InstanceBase):
         max_num_cells: int = 100,
         init: Optional[AnyInit] = None,
         complexity_objective: bool = False,
-        use_kdtree: bool = False,
+        track_complexity: bool = False,
     ) -> None:
         pass
 
@@ -4710,12 +4712,18 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         ) -> int:
             pass
 
+        def set_population(self, population: SolutionSetBase) -> None:
+            pass
+
+        def get_population(self) -> AoSSet:
+            pass
+
         def run(  # overridable
             self,
             problem: InstanceBase,
             budget: Budget,
-            seed: Optional[int],
-            population_size: Optional[int],
+            seed: Optional[int] = None,
+            population_size: Optional[int] = None,
         ) -> Tuple[ArchiveBase, TerminationStatus]:
             pass
 

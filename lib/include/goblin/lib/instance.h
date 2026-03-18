@@ -45,6 +45,9 @@ class InstanceBase {
   virtual CRef<Vec<CType>> continuous_init_lower_bounds() const = 0;
   virtual CRef<Vec<CType>> continuous_init_upper_bounds() const = 0;
 
+  // TODO support ordinal discrete spaces (e.g. bool per discrete to indicate categorical/ordinal)
+  // TODO support permutation spaces (e.g. bool per continuous variable to indicate continuous/random keys)
+
   virtual void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) = 0;
   virtual void evaluate_partial(Rng& rng,
                                 SolutionSetBase& solutions,

@@ -16,6 +16,7 @@
 
 #include "goblin/lib/method.h"
 #include "goblin/lib/algorithms/mo.h"
+#include "goblin/lib/algorithms/subset_selection.h"
 #include "goblin/gp/instance.h"
 
 namespace goblin {
@@ -110,24 +111,33 @@ class TruncationSelection : public SelectionStrategyBase {
     } else {
       // multi-objective: non-dominated sorting, then add/truncate fronts until the target size is reached
       auto [ranks, fronts] = non_dominated_sorting(
-          [&solutions, &fitness](usize lhs, usize rhs) {
+          [&](usize lhs, usize rhs) {
             return fitness.cmp(solutions[lhs].quality(), solutions[rhs].quality(), std::nullopt);
           },
           solutions.size());
 
       selection.reserve(target_size);
       for (auto& front : fronts) {
-        if (front.size() + selection.size() <= target_size) {
+        if (selection.size() >= target_size) {
+          break;
+        }
+        if (selection.size() + front.size() <= target_size) {
           for (usize i : front) {
             selection.push_back(i);
           }
         } else {
-          // TODO scattered subset selection / crowding distance
-          for (usize i : front) {
-            if (selection.size() >= target_size) {
-              break;
-            }
-            selection.push_back(i);
+          // for the last front, select based on objective space diversity
+          std::vector<usize> f2s(front.begin(), front.end());
+          auto [selected, _] = greedy_scattered_subset_selection(
+              [&](const usize lhs, const usize rhs) {
+                return fitness.distance(solutions[f2s[lhs]].quality(), solutions[f2s[lhs]].quality(), std::nullopt);
+              },
+              /* pool_size = */ f2s.size(),
+              /* target_size = */ target_size - selection.size(),
+              /* initial = */ std::uniform_int_distribution<usize>(0, f2s.size() - 1)(rng));
+
+          for (usize i : selected) {
+            selection.push_back(f2s[i]);
           }
         }
       }
@@ -138,6 +148,7 @@ class TruncationSelection : public SelectionStrategyBase {
 };
 
 class EABase : public MethodBase {
+  AoSSet population{};
   u64 generation{};
 
  protected:
@@ -149,10 +160,21 @@ class EABase : public MethodBase {
 
   virtual u64 step(Rng& rng, InstanceBase& problem, SolutionSetBase& population, ArchiveBase& archive) const = 0;
 
-  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(InstanceBase& problem,
-                                                                  const Budget& budget,
-                                                                  std::optional<u64> seed,
-                                                                  std::optional<usize> population_size) override {
+  void set_population(const SolutionSetBase& population) {
+    this->population_size = population.size();
+    this->population.clear();
+    for (usize i = 0; i < population.size(); i++) {
+      this->population.add(population[i]);
+    }
+  }
+
+  AoSSet get_population() { return population; }
+
+  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& problem,
+      const Budget& budget,
+      std::optional<u64> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) override {
     usize n = population_size.value_or(this->population_size);
 
     generation = 0;
@@ -162,11 +184,18 @@ class EABase : public MethodBase {
     Rng rng = seeded_rng(seed);
 
     // create & evaluate initial population
-    AoSSet population;
-    problem.add_random(rng, population, n);
+    if (population.size() < n) {
+      problem.add_random(rng, population, n - population.size());
+    }
 
-    std::vector<usize> solutions_to_evaluate(n);
-    std::iota(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), 0);
+    std::vector<usize> solutions_to_evaluate;
+    solutions_to_evaluate.reserve(n);
+    auto worst = problem.archive_fitness().worst();
+    for (usize i = 0; i < n; i++) {
+      if (problem.fitness().cmp(population[i].quality(), *worst, std::nullopt) != Ordering::Better) {
+        solutions_to_evaluate.push_back(i);
+      }
+    }
     problem.evaluate(rng, population, solutions_to_evaluate);
 
     auto archive = std::make_shared<UnboundedArchive>(problem.archive_fitness());
