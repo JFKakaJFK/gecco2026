@@ -9,13 +9,15 @@
 #include "goblin/gp/gpu_evaluation/evaluate.h"
 #include "goblin/gp/gpu_evaluation/types.h"
 
+#define E2 std::pow(e_v<float>, 2.0F)
+
 using namespace goblin;
 
 TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
     using namespace std::numbers;
     using namespace test;
 
-    float e2 = std::pow(e_v<float>, 2.0f);
+    // float e2 = std::pow(e_v<float>, 2.0F);
 
     std::vector<KernelVersion> kernel_versions = {
         KernelVersion::Baseline, KernelVersion::Restrict, KernelVersion::SingleKernelInplace
@@ -52,8 +54,8 @@ TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
         { {8}, {I, C, O}, {Idx(0), Val(4), Div}, 1, 0, 2 }, // x0 / 4
         { {pi}, {I, O}, {Idx(0), Sin}, 1, 0, 0 }, // x0 = pi, sin(x0) = 0
         { {pi}, {I, O}, {Idx(0), Cos}, 1, 0, -1 }, // x0 = pi, cos(x0) = -1
-        { {2}, {I, O}, {Idx(0), Exp}, 1, 0, e2 }, // x0 = 2, exp(x0) = e ^ 2
-        { {e2}, {I, O}, {Idx(0), Log}, 1, 0, 2 }, // x0 = e ^ 2, log(x0) = 2
+        { {2}, {I, O}, {Idx(0), Exp}, 1, 0, E2 }, // x0 = 2, exp(x0) = e ^ 2
+        { {E2}, {I, O}, {Idx(0), Log}, 1, 0, 2 }, // x0 = e ^ 2, log(x0) = 2
         { {3}, {I, O}, {Idx(0), Square}, 1, 0, 9 }, // x0 = 3, x0 ^ 2 = 9
         { {9}, {I, O}, {Idx(0), Sqrt}, 1, 0, 3 }, // x0 = 9, sqrt(x0) = 3
         { {2}, {I, C, O}, {Idx(0), Val(3), Pow}, 1, 0, 8 }, // x0 = 2, x0 ^ 3 = 8
@@ -583,6 +585,111 @@ TEST_CASE("goblin::ga-gp::evaluate::evaluate_mse_kernel") {
 
             for (size_t j = 0; j < result.size(); j++) {
                 INFO("Datapoint: ", j, "\tResult: ", result[j], "\tExpected: ", tc.expected[j]);
+                CHECK_EQ(result[j], doctest::Approx(tc.expected[j]));
+            }
+        }
+    }
+}
+
+TEST_CASE("goblin::ga-gp::evaluate::hybrid_kernel") {
+    using namespace test;
+
+    struct TestCase {
+        std::vector<float> X;
+        std::vector<float> Y;
+        std::vector<float> type;
+        std::vector<float> value;
+        size_t num_solutions;
+        size_t num_datapoints;
+        std::vector<float> expected;
+    };
+
+    std::vector<TestCase> test_cases = {
+        //////////////////////////////////////////
+        /// SINGLE SOLUTION | SINGLE DATAPOINT ///
+        //////////////////////////////////////////
+
+        // (10 / x0) * (x1 - x0) = 5
+        { {2, 3}, {5},  {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {0} },   // mse = (5-5)^2
+        { {2, 3}, {10}, {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {25} },  // mse = (5-10)^2
+        { {2, 3}, {1},  {C, I, O, I, I, O, O}, {Val(10), Idx(0), Div, Idx(1), Idx(0), Sub, Mul}, 1, 1, {16} },  // mse = (5-1)^2
+
+        ////////////////////////////////////////////
+        /// SINGLE SOLUTION | MULTIPLE DATAPOINT ///
+        ////////////////////////////////////////////
+
+        // x0, mse = (1 + 0 + 1 + 4) / 4 = 1.5
+        { {3, 2, 1, 0}, {2, 2, 2, 2}, {I}, {Idx(0)}, 1, 4, {1.5} },
+
+        // x0 + x1, mse = (4 + 0) / 2 = 2
+        { {0, 1, 2, 3}, {4, 4}, {I, I, O}, {Idx(0), Idx(1), Add}, 1, 2, {2} },
+
+        // (x1 * x2) + (10 - x0), tree outputs = {54, 68, 84, 102}, mse = (16+4+36+64)/4 = 30
+        { {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}, {50, 70, 90, 110}, {I, I, O, C, I, O, O}, {Idx(1), Idx(2), Mul, Val(10), Idx(0), Sub, Add}, 1, 4, {30} },
+
+        ////////////////////////////////////////////
+        /// MULTIPLE SOLUTION | SINGLE DATAPOINT ///
+        ////////////////////////////////////////////
+
+        // c0 = 2, 4, 6
+        { {0}, {3}, {C, C, C}, {Val(2), Val(4), Val(6)}, 3, 1, {1, 1, 9} },
+
+        // x0 = 1, 2, 3
+        { {1, 2, 3}, {3}, {I, I, I}, {Idx(0), Idx(1), Idx(2)}, 3, 1, {4, 1, 0} },
+
+        // x0 op x1, op = +, -, *, /, tree outputs = {6, 2, 8, 2}, mse = {0, 16, 4, 16}
+        { {4, 2}, {6}, {I, I, O, I, I, O, I, I, O, I, I, O}, {Idx(0), Idx(1), Add, Idx(0), Idx(1), Sub, Idx(0), Idx(1), Mul, Idx(0), Idx(1), Div}, 4, 1, {0, 16, 4, 16} },
+
+        //////////////////////////////////////////////
+        /// MULTIPLE SOLUTION | MULTIPLE DATAPOINT ///
+        //////////////////////////////////////////////
+
+        // s0 = x0, s1 = x1, mse = {2.5, 8.5}
+        { {1, 2, 3, 4}, {2, 0}, {I, I}, {Idx(0), Idx(1)}, 2, 2, {2.5, 8.5} },
+
+        // s0 = c0 + x0, s1 = x0 - c1, mse = {13, 13}
+        { {2, 7}, {5, 6}, {C, I, O, I, C, O}, {Val(4), Idx(0), Add, Idx(0), Val(2), Sub}, 2, 2, {13, 13} },
+
+        // s0 = c0 + (x1 * (x2 / c1)), s1 = ((x0 * x2) - c1) / c0, s2 = x0 / ((x2 + c0) * c1)
+        {
+            {1, 4, 7, 10, 2, 5, 8, 11, 3, 6, 9, 12},
+            {5, 10, 20, 35},
+            {
+                C, I, I, C, O, O, O,
+                I, I, O, C, O, C, O,
+                I, I, C, O, C, O, O,
+            },
+            {
+                Val(1.2), Idx(1), Idx(2), Val(-3.14), Div, Mul, Add,
+                Idx(0), Idx(2), Mul, Val(-4.5), Sub, Val(5), Div,
+                Idx(0), Idx(2), Val(0.1), Add, Val(0.25f), Mul, Div,
+            },
+            3, 4,
+            { 1965.5847f, 43.75f, 339.7731f }
+        },
+    };
+
+    // Test with several blocks_per_individual values to exercise the multi-block
+    // splitting logic. Results must be invariant to this parameter.
+    std::vector<size_t> blocks_per_individual_values = { 2, 4, 8 };
+
+    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
+        for (auto bpi : blocks_per_individual_values) {
+            INFO("Test Case: ", i, "\tBlocks per individual: ", bpi);
+
+            REQUIRE_EQ(tc.type.size(), tc.value.size());
+            REQUIRE_EQ(tc.Y.size(), tc.num_datapoints);
+            REQUIRE_EQ(tc.expected.size(), tc.num_solutions);
+
+            std::vector<float> result = test_kernel_hybrid(
+                tc.X, tc.Y, tc.type, tc.value,
+                tc.num_solutions, tc.num_datapoints, bpi
+            );
+
+            CHECK_EQ(result.size(), tc.expected.size());
+
+            for (size_t j = 0; j < result.size(); j++) {
+                INFO("Solution: ", j, "\tResult: ", result[j], "\tExpected: ", tc.expected[j]);
                 CHECK_EQ(result[j], doctest::Approx(tc.expected[j]));
             }
         }

@@ -90,16 +90,16 @@ void mse_kernel_restrict(
 );
 
 __global__
-void evaluate_mse_kernel_multiblock(
+void evaluate_kernel_hybrid(
     const float* __restrict__ X,
     const float* __restrict__ Y,
     const float* __restrict__ v_type,
     const float* __restrict__ v_value,
     float* __restrict__ partial,
-    const size_t solution_length,
-    const size_t num_datapoints,
-    const size_t datapoints_per_block,
-    const size_t items_per_thread
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoints_per_block,
+    size_t datapoints_per_thread
 );
 
 __global__
@@ -176,12 +176,22 @@ std::vector<float> test_compute_mse_kernel(
 );
 
 std::vector<float> test_evaluate_mse_kernel(
-    std::vector<float> h_X, 
-    std::vector<float> h_Y, 
-    std::vector<float> h_type, 
-    std::vector<float> h_value, 
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
     size_t num_solutions,
     size_t num_datapoints
+);
+
+std::vector<float> test_kernel_hybrid(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_solutions,
+    size_t num_datapoints,
+    size_t blocks_per_individual
 );
 
 }  // namespace goblin

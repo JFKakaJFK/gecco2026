@@ -183,7 +183,7 @@ class SRProblem : public GPInstanceBase {
 
 #ifdef GOBLIN_HAS_CUDA
     if (_kernel_version.has_value()) {
-      _copy_data_to_gpu();
+      _init_gpu();
     }
 #endif
   };
@@ -537,9 +537,11 @@ class SRProblem : public GPInstanceBase {
     __goblin_runtime_assert(node_type.size() == node_value.size());
 
     const size_t solution_length = ctx.max_expression_size;
-    const LaunchConfig config = (_kernel_version.value() == KernelVersion::SingleKernelInplace)
-        ? LaunchConfig::determine_auto(num_solutions, X_train.rows(), solution_length, _num_sms)
-        : LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
+    const LaunchConfig config = LaunchConfig::determine(_kernel_version.value(), num_solutions, _num_datapoints, solution_length, _num_sms);
+
+    // const LaunchConfig config = (_kernel_version.value() == KernelVersion::SingleKernelInplace)
+        // ? LaunchConfig::determine_auto(num_solutions, X_train.rows(), solution_length, _num_sms)
+        // : LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
 
     config.check();
 
@@ -559,12 +561,18 @@ class SRProblem : public GPInstanceBase {
     }
   }
 
+  void _init_gpu() {
+    _num_sms = get_gpu_info().num_sms;
+    _num_datapoints = X_train.rows();
+
+    _copy_data_to_gpu();
+  }
+
   void _copy_data_to_gpu() {
     Arr2D<float> X32 = X_train.cast<float>();
     Arr2D<float> Y32 = Y_train.cast<float>();
     d_X = allocate_and_copy(X32.data(), X32.size());
     d_Y = allocate_and_copy(Y32.data(), Y32.size());
-    _num_sms = get_gpu_info().num_sms;
   }
 
   void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
@@ -587,7 +595,7 @@ class SRProblem : public GPInstanceBase {
         config.kernel_version != KernelVersion::SingleKernelInplace) {
       const size_t num_partials =
           (config.kernel_version == KernelVersion::BlockReduce ||
-           config.kernel_version == KernelVersion::MultiBlockInplace)
+           config.kernel_version == KernelVersion::Hybrid)
               ? config.num_solutions * config.eval.grid.y
               : config.num_solutions * config.num_datapoints;
 
@@ -651,6 +659,7 @@ class SRProblem : public GPInstanceBase {
   // GPU fields
   std::optional<KernelVersion> _kernel_version{};
   int _num_sms = 0;
+  size_t _num_datapoints = 0;
   size_t _num_solutions_allocated = 0;
   size_t _num_partials_allocated = 0;
   size_t _num_results_allocated = 0;
