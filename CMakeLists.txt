@@ -11,7 +11,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(GOBLIN_CPU_ONLY "Disable CUDA and build CPU-only code" OFF)
 
 if(NOT GOBLIN_CPU_ONLY)
-    set(CMAKE_CUDA_COMPILER /usr/local/cuda-12.9/bin/nvcc)
     include(CheckLanguage)
     check_language(CUDA)
     if(CMAKE_CUDA_COMPILER)
