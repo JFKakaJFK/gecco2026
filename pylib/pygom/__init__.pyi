@@ -1534,13 +1534,7 @@ class CompleteInit(DiscreteInitBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/instance.h included by goblin.h                                              //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GP_INSTANCE_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
+#                       goblin/gp/context.h included by goblin.h                                               //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_CONTEXT_H
 #
@@ -1620,6 +1614,48 @@ class Template:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/types.h included by goblin/gp/operator.h                      //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_TYPES_H
+#
+
+class KernelVersion(enum.IntEnum):
+    baseline = enum.auto()  # (= 0)
+    restrict = enum.auto()  # (= 1)
+    shared_memory = enum.auto()  # (= 2)
+    block_reduce = enum.auto()  # (= 3)
+    single_kernel = enum.auto()  # (= 4)
+    single_kernel_fmaf = enum.auto()  # (= 5)
+    single_kernel_inplace = enum.auto()  # (= 6)
+    hybrid = enum.auto()  # (= 7)
+
+def to_string(v: KernelVersion) -> str:
+    pass
+
+class NodeType(enum.IntEnum):
+    input = enum.auto()  # (= 0)
+    constant = enum.auto()  # (= 1)
+    operator = enum.auto()  # (= 2)
+
+class Operator(enum.IntEnum):
+    add = enum.auto()  # (= 0)
+    sub = enum.auto()  # (= 1)
+    mul = enum.auto()  # (= 2)
+    div = enum.auto()  # (= 3)
+    sin = enum.auto()  # (= 4)
+    cos = enum.auto()  # (= 5)
+    exp = enum.auto()  # (= 6)
+    log = enum.auto()  # (= 7)
+    square = enum.auto()  # (= 8)
+    sqrt = enum.auto()  # (= 9)
+    pow = enum.auto()  # (= 10)
+    abs = enum.auto()  # (= 11)
+    min = enum.auto()  # (= 12)
+    max = enum.auto()  # (= 13)
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/gp/operator.h continued                                                         //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1686,6 +1722,9 @@ class OperatorBase:
     def __call__(self, args: CRef[Arr2D[float]]) -> Array[float]:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:  # overridable
+        pass
+
     def format(self, args: std.span[str]) -> str:  # overridable (pure virtual)
         pass
 
@@ -1748,6 +1787,9 @@ class OpAdd(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -1814,6 +1856,9 @@ class OpSubGPU(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -1844,6 +1889,9 @@ class OpMul(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -1878,6 +1926,9 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -1908,6 +1959,9 @@ class OpSin(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -1942,6 +1996,9 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -1972,6 +2029,9 @@ class OpExp(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2006,6 +2066,9 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2036,6 +2099,9 @@ class OpSquare(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2070,6 +2136,9 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2100,6 +2169,9 @@ class OpPow(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2134,6 +2206,9 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2166,6 +2241,9 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2196,6 +2274,9 @@ class OpMax(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2336,8 +2417,16 @@ class GPContext:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/instance.h continued                                                         //
+#                       goblin/gp/init.h included by goblin.h                                                  //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GP_INIT_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/instance.h included by goblin/gp/init.h                                      //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GP_INSTANCE_H
+#
 
 class GPInstanceBase(InstanceBase):
     def context(self) -> GPContext:  # overridable (pure virtual)
@@ -2350,10 +2439,8 @@ class GPInstanceBase(InstanceBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/init.h included by goblin.h                                                  //
+#                       goblin/gp/init.h continued                                                             //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GP_INIT_H
-#
 
 class GrowInit(DiscreteInitBase):
     """
@@ -2441,54 +2528,31 @@ class RecursiveCompleteInit2(DiscreteInitBase):
 #
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/evaluation/misc.h included by goblin/gp/sr.h                                 //
+#                       goblin/gp/gpu_evaluation/launch_config.h included by goblin/gp/sr.h                    //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/misc.h included by goblin/gp/gpu_evaluation/launch_config.h   //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GA_GP_MISC_H
 #
 
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/evaluation/types.h included by goblin/gp/evaluation/misc.h                   //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_TYPES_H
-#
+class GpuInfo:
+    device_id: int
+    num_sms: int
+    def __init__(self, device_id: int = int(), num_sms: int = int()) -> None:
+        """Auto-generated default constructor with named params"""
+        pass
 
-class KernelVersion(enum.IntEnum):
-    baseline = enum.auto()  # (= 0)
-    restrict = enum.auto()  # (= 1)
-    shared_memory = enum.auto()  # (= 2)
-    block_reduce = enum.auto()  # (= 3)
-    single_kernel = enum.auto()  # (= 4)
-    single_kernel_fmaf = enum.auto()  # (= 5)
-    single_kernel_inplace = enum.auto()  # (= 6)
-
-def to_string(v: KernelVersion) -> str:
+def get_gpu_info() -> GpuInfo:
     pass
-
-class NodeType(enum.IntEnum):
-    input = enum.auto()  # (= 0)
-    constant = enum.auto()  # (= 1)
-    operator = enum.auto()  # (= 2)
-
-class Operator(enum.IntEnum):
-    add = enum.auto()  # (= 0)
-    sub = enum.auto()  # (= 1)
-    mul = enum.auto()  # (= 2)
-    div = enum.auto()  # (= 3)
-    sin = enum.auto()  # (= 4)
-    cos = enum.auto()  # (= 5)
-    exp = enum.auto()  # (= 6)
-    log = enum.auto()  # (= 7)
-    square = enum.auto()  # (= 8)
-    sqrt = enum.auto()  # (= 9)
-    pow = enum.auto()  # (= 10)
-    abs = enum.auto()  # (= 11)
-    min = enum.auto()  # (= 12)
-    max = enum.auto()  # (= 13)
 
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/evaluation/misc.h continued                                                  //
+#                       goblin/gp/gpu_evaluation/launch_config.h continued                                     //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 def round_up(value: int, multiple: int) -> int:
@@ -2511,7 +2575,10 @@ class KernelDim:
         pass
 
     @staticmethod
-    def determine(count: int, max_threads: int = MAX_THREADS_PER_BLOCK) -> KernelDim:
+    def determine(count: int) -> KernelDim:
+        """Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)
+        that minimises idle threads when covering `count` items.
+        """
         pass
 
     def check(self) -> None:
@@ -2534,16 +2601,29 @@ class KernelConfig:
 
     @staticmethod
     def for_eval(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        """One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce."""
         pass
 
     @staticmethod
-    def for_mse(
-        num_solutions: int, num_partial: int, kernel_version: KernelVersion
+    def for_eval_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        """One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants."""
+        pass
+
+    @staticmethod
+    def for_eval_hybrid(
+        num_solutions: int, num_datapoints: int, blocks_per_individual: int
     ) -> KernelConfig:
+        """Multiple blocks per solution; blocks split the datapoints. Used by Hybrid."""
         pass
 
     @staticmethod
-    def for_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
+    def for_mse_simple(num_solutions: int) -> KernelConfig:
+        """One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory."""
+        pass
+
+    @staticmethod
+    def for_mse_block(num_solutions: int, num_partial: int) -> KernelConfig:
+        """One block per solution for the MSE reduction. Used by BlockReduce and Hybrid."""
         pass
 
     def check(self) -> None:
@@ -2556,10 +2636,12 @@ class LaunchConfig:
     eval: KernelConfig
     mse: KernelConfig
     kernel_version: KernelVersion = KernelVersion.baseline
-    num_solutions: int
-    num_datapoints: int
-    solution_length: int
-    items_per_thread: int
+    num_solutions: int = 0
+    num_datapoints: int = 0
+    solution_length: int = 0
+    blocks_per_individual: int = 1
+    datapoints_per_block: int = 0
+    datapoints_per_thread: int = 0
 
     @overload
     def __init__(self) -> None:
@@ -2571,10 +2653,6 @@ class LaunchConfig:
         eval: KernelConfig,
         mse: KernelConfig,
         version: KernelVersion = KernelVersion.baseline,
-        num_solutions: int = 1,
-        num_datapoints: int = 1,
-        solution_length: int = 1,
-        items_per_thread: int = 1,
     ) -> None:
         pass
 
@@ -2584,6 +2662,7 @@ class LaunchConfig:
         num_solutions: int,
         num_datapoints: int,
         solution_length: int,
+        num_sms: Optional[int],
     ) -> LaunchConfig:
         pass
 
@@ -2594,6 +2673,7 @@ class LaunchConfig:
         pass
 
 # #endif
+
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/gp/sr.h continued                                                               //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////

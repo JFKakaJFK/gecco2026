@@ -3071,14 +3071,7 @@ class CompleteInit final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/instance.h included by goblin.h                                              //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GP_INSTANCE_H
-#define _GOBLIN_GP_INSTANCE_H
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
+//                       goblin/gp/context.h included by goblin.h                                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
@@ -3092,6 +3085,7 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
+#include <sys/types.h>
 
 
 
@@ -3116,10 +3110,6 @@ struct TemplateNode {
         root.children.push_back(full_nary(branching_factor, depth - 1));
       }
     }
-
-    // Calculate maximum number of nodes in the template
-    root.max_num_nodes = calc_max_num_nodes(depth, branching_factor);
-
     return root;
   };
 
@@ -3184,20 +3174,6 @@ struct TemplateNode {
     path.erase(current);
     return true;
   };
-
-  static size_t calc_max_num_nodes(size_t branching_factor, size_t depth) {
-    if (branching_factor == 0) return depth == 0 ? 1 : 0;
-    if (branching_factor == 1) return depth + 1;
-
-    auto ipow = [](size_t base, size_t exp) {
-      size_t result = 1;
-      for (size_t i = 0; i < exp; ++i)
-        result *= base;
-      return result;
-    };
-
-    return (ipow(branching_factor, depth + 1) - 1) / (branching_factor - 1);
-  }
 };
 
 struct Template {
@@ -3267,6 +3243,95 @@ struct Template {
 
 #endif /* _GOBLIN_GP_TEMPLATE_H */
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/gpu_evaluation/types.h included by goblin/gp/operator.h                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_TYPES_H
+#define _GOBLIN_GA_GP_TYPES_H
+
+
+namespace goblin {
+
+enum class KernelVersion : uint8_t {
+    Baseline,
+    Restrict,
+    SharedMemory,
+    BlockReduce,
+    SingleKernel,
+    SingleKernelFMAF,
+    SingleKernelInplace,
+    Hybrid
+};
+
+constexpr std::string_view to_string(KernelVersion v) {
+    switch (v) {
+        case KernelVersion::Baseline:            return "Baseline";
+        case KernelVersion::Restrict:            return "Restrict";
+        case KernelVersion::SharedMemory:        return "SharedMemory";
+        case KernelVersion::BlockReduce:         return "BlockReduce";
+        case KernelVersion::SingleKernel:        return "SingleKernel";
+        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
+        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
+        case KernelVersion::Hybrid:              return "Hybrid";
+    }
+
+    return "Unknown KernelVersion";
+}
+
+enum class NodeType : uint8_t {
+    Input,
+    Constant,
+    Operator,
+};
+
+enum class Operator : uint8_t {
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Sin,
+    Cos,
+    Exp,
+    Log,
+    Square,
+    Sqrt,
+    Pow,
+    Abs,
+    Min,
+    Max
+};
+
+// The following declarations are used to create more readable test cases
+namespace test {
+    constexpr float C = static_cast<float>(NodeType::Constant);
+    constexpr float I = static_cast<float>(NodeType::Input);
+    constexpr float O = static_cast<float>(NodeType::Operator);
+
+    constexpr float Val(float x) { return x; }
+    constexpr float Val(int x) { return static_cast<float>(x); }
+    constexpr float Val(double x) { return static_cast<float>(x); }
+    constexpr float Idx(int idx) { return static_cast<float>(idx); }
+    constexpr float Op(Operator op) { return static_cast<float>(op); }
+
+    constexpr float Add = Op(Operator::Add);
+    constexpr float Sub = Op(Operator::Sub);
+    constexpr float Mul = Op(Operator::Mul);
+    constexpr float Div = Op(Operator::Div);
+    constexpr float Sin = Op(Operator::Sin);
+    constexpr float Cos = Op(Operator::Cos);
+    constexpr float Exp = Op(Operator::Exp);
+    constexpr float Log = Op(Operator::Log);
+    constexpr float Square = Op(Operator::Square);
+    constexpr float Sqrt = Op(Operator::Sqrt);
+    constexpr float Pow = Op(Operator::Pow);
+    constexpr float Abs = Op(Operator::Abs);
+    constexpr float Min = Op(Operator::Min);
+    constexpr float Max = Op(Operator::Max);
+}
+
+}
+
+#endif /* _GOBLIN_GA_GP_TYPES_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -3329,6 +3394,8 @@ class OperatorBase {
     return out;
   };
 
+  virtual std::optional<uint8_t> gpu_operator_id() const { return std::nullopt; }
+
   virtual std::string format(const std::span<const std::string>& args) const = 0;
 
   virtual ~OperatorBase() = default;
@@ -3373,6 +3440,10 @@ class OpAdd : public OperatorBase {
     apply(out, args);
     d_out = d_args.rowwise().sum();
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Add);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
@@ -3468,6 +3539,10 @@ class OpSubGPU : public OperatorBase {
     }
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sub);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     if (args.size() == 1) {
@@ -3514,6 +3589,10 @@ class OpMul : public OperatorBase {
         args(Eigen::placeholders::all, Eigen::seq(0, args.cols() - 2)).rowwise().prod() * d_args.col(d_args.cols() - 1);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Mul);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
@@ -3558,6 +3637,10 @@ class OpDiv : public OperatorBase {
     }
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Div);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(' << args[0] << '/';
@@ -3597,6 +3680,10 @@ class OpSin : public OperatorBase {
     d_out = args.col(0).cos() * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sin);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sin({})", args[0]);
   };
@@ -3620,6 +3707,10 @@ class OpCos : public OperatorBase {
 
     d_out = -args.col(0).sin() * d_args.col(0);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Cos);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("cos({})", args[0]);
@@ -3645,6 +3736,10 @@ class OpExp : public OperatorBase {
     d_out = out * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Exp);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("exp({})", args[0]);
   };
@@ -3668,6 +3763,10 @@ class OpLog : public OperatorBase {
 
     d_out = d_args.col(0) / args.col(0);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Log);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("log({})", args[0]);
@@ -3693,6 +3792,10 @@ class OpSquare : public OperatorBase {
     d_out = CType(2.0) * args.col(0) * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Square);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, 2)", args[0]);
   };
@@ -3716,6 +3819,10 @@ class OpSqrt : public OperatorBase {
 
     d_out = d_args.col(0) / (out + out);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sqrt);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sqrt({})", args[0]);
@@ -3744,6 +3851,10 @@ class OpPow : public OperatorBase {
             (args.col(0) * d_args.col(1) * args.col(0).log() + args.col(1) * d_args.col(0));
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Pow);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, {})", args[0], args[1]);
   };
@@ -3767,6 +3878,10 @@ class OpAbs : public OperatorBase {
 
     d_out = args.col(0) * d_args.col(0) / out;
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Abs);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("abs({})", args[0]);
@@ -3793,6 +3908,10 @@ class OpMin : public OperatorBase {
       d_out(i) = d_args(i, arg_min);
     }
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Min);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
@@ -3828,6 +3947,10 @@ class OpMax : public OperatorBase {
       d_out(i) = d_args(i, arg_max);
     }
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Max);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
@@ -4612,8 +4735,9 @@ class GPContext {
 
     return proximity;
   };
+
   template <typename S>
-  void gpu_nodes_post_order(
+  void to_gpu_representation(
     S& solution,
     std::vector<float>& node_type,
     std::vector<float>& node_value,
@@ -4676,7 +4800,38 @@ class GPContext {
           visited(idx) = 1;
         }
 
-        if (type == ValueKind::Operator) {
+        if (type == ValueKind::Arg) {
+          visited(idx) = 0;
+
+          usize calling_node = call_stack[call_stack_idx];
+          isize num_frames = 1;
+
+          auto pidx = parent(idx);
+          while (pidx.has_value()) {
+            if (pidx.value() == calling_node) {
+              calling_node = call_stack[call_stack_idx - num_frames++];
+            }
+            pidx = parent(pidx.value());
+          }
+
+          auto& cnodes = children[calling_node];
+          assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+
+          node_stack.pop_back();
+          node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
+                                  call_stack_idx - num_frames,
+                                  false);
+        } else if (type == ValueKind::Subtree) {
+          visited(idx) = 0;
+          assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
+
+          call_stack.push_back(idx);
+
+          std::get<2>(node_stack[node_stack_idx]) = true;
+          node_stack.emplace_back(subtree_roots[v_idx],
+                                  call_stack.size() - 1,
+                                  false);
+        } else if (type == ValueKind::Operator) {
           std::get<2>(node_stack[node_stack_idx]) = true;
 
           usize arity = std::min(children[idx].size(), value_max_arity[value]);
@@ -4697,7 +4852,11 @@ class GPContext {
           node_stack.pop_back();
         }
       } else {
-        update_tree = true;
+        if (type == ValueKind::Subtree) {
+          call_stack.pop_back();
+        } else {
+          update_tree = true;
+        }
 
         node_stack.pop_back();
       }
@@ -4723,7 +4882,11 @@ class GPContext {
           temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
         } else if (type == ValueKind::Operator) {
           // Push the operator index, will be used to apply the operator on GPU
-          temp_value.push_back(static_cast<float>(v_idx));
+          auto gpu_id = this->operators[v_idx]->gpu_operator_id();
+          if (!gpu_id.has_value()) {
+            throw std::runtime_error("Operator not GPU-compatible");
+          }
+          temp_value.push_back(static_cast<float>(gpu_id.value()));
         }
       }
     }
@@ -4798,10 +4961,20 @@ class GPContext {
 
 #endif /* _GOBLIN_GP_CONTEXT_H */
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/init.h included by goblin.h                                                  //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GP_INIT_H
+#define _GOBLIN_GP_INIT_H
+
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/instance.h continued                                                         //
+//                       goblin/gp/instance.h included by goblin/gp/init.h                                      //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GP_INSTANCE_H
+#define _GOBLIN_GP_INSTANCE_H
+
 
 namespace goblin {
 
@@ -4816,13 +4989,10 @@ class GPInstanceBase : public InstanceBase {
 
 #endif /* _GOBLIN_GP_INSTANCE_H */
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/init.h included by goblin.h                                                  //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GP_INIT_H
-#define _GOBLIN_GP_INIT_H
 
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/init.h continued                                                             //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace goblin {
 
@@ -5403,103 +5573,35 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/evaluation/misc.h included by goblin/gp/sr.h                                 //
+//                       goblin/gp/gpu_evaluation/launch_config.h included by goblin/gp/sr.h                    //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+#define _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/gp/gpu_evaluation/misc.h included by goblin/gp/gpu_evaluation/launch_config.h   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_MISC_H
 #define _GOBLIN_GA_GP_MISC_H
 
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/evaluation/types.h included by goblin/gp/evaluation/misc.h                   //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GA_GP_TYPES_H
-#define _GOBLIN_GA_GP_TYPES_H
-
-
 namespace goblin {
 
-enum class KernelVersion : uint8_t {
-    Baseline,
-    Restrict,
-    SharedMemory,
-    BlockReduce,
-    SingleKernel,
-    SingleKernelFMAF,
-    SingleKernelInplace
+struct GpuInfo {
+    int device_id;
+    int num_sms;
 };
 
-constexpr std::string_view to_string(KernelVersion v) {
-    switch (v) {
-        case KernelVersion::Baseline:            return "Baseline";
-        case KernelVersion::Restrict:            return "Restrict";
-        case KernelVersion::SharedMemory:        return "SharedMemory";
-        case KernelVersion::BlockReduce:         return "BlockReduce";
-        case KernelVersion::SingleKernel:        return "SingleKernel";
-        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
-        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
-    }
-
-    return "Unknown KernelVersion";
-}
-
-enum class NodeType : uint8_t {
-    Input,
-    Constant,
-    Operator,
-};
-
-enum class Operator : uint8_t {
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Sin,
-    Cos,
-    Exp,
-    Log,
-    Square,
-    Sqrt,
-    Pow,
-    Abs,
-    Min,
-    Max
-};
-
-// The following declarations are used to create more readable test cases
-namespace test {
-    constexpr float C = static_cast<float>(NodeType::Constant);
-    constexpr float I = static_cast<float>(NodeType::Input);
-    constexpr float O = static_cast<float>(NodeType::Operator);
-
-    constexpr float Val(float x) { return x; }
-    constexpr float Val(int x) { return static_cast<float>(x); }
-    constexpr float Val(double x) { return static_cast<float>(x); }
-    constexpr float Idx(int idx) { return static_cast<float>(idx); }
-    constexpr float Op(Operator op) { return static_cast<float>(op); }
-
-    constexpr float Add = Op(Operator::Add);
-    constexpr float Sub = Op(Operator::Sub);
-    constexpr float Mul = Op(Operator::Mul);
-    constexpr float Div = Op(Operator::Div);
-    constexpr float Sin = Op(Operator::Sin);
-    constexpr float Cos = Op(Operator::Cos);
-    constexpr float Exp = Op(Operator::Exp);
-    constexpr float Log = Op(Operator::Log);
-    constexpr float Square = Op(Operator::Square);
-    constexpr float Sqrt = Op(Operator::Sqrt);
-    constexpr float Pow = Op(Operator::Pow);
-    constexpr float Abs = Op(Operator::Abs);
-    constexpr float Min = Op(Operator::Min);
-    constexpr float Max = Op(Operator::Max);
-}
+GpuInfo get_gpu_info();
 
 }
 
-#endif /* _GOBLIN_GA_GP_TYPES_H */
+#endif /* _GOBLIN_GA_GP_MISC_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/evaluation/misc.h continued                                                  //
+//                       goblin/gp/gpu_evaluation/launch_config.h continued                                     //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #define MAX_THREADS_PER_BLOCK 1024
@@ -5510,6 +5612,7 @@ namespace goblin {
 constexpr size_t round_up(size_t value, size_t multiple) {
     return ((value + multiple - 1) / multiple) * multiple;
 }
+
 constexpr size_t ceil_div(size_t a, size_t b) {
     return (a + b - 1) / b;
 }
@@ -5522,9 +5625,11 @@ struct KernelDim {
     KernelDim() = default;
     KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) : x(_x), y(_y), z(_z) {}
 
-    static KernelDim determine(size_t count, size_t max_threads = MAX_THREADS_PER_BLOCK) {
+    // Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)
+    // that minimises idle threads when covering `count` items.
+    static KernelDim determine(size_t count) {
         KernelDim dim{WARP_SIZE};
-        size_t min_redundant = max_threads;
+        size_t min_redundant = MAX_THREADS_PER_BLOCK;
 
         for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= WARP_SIZE) {
             // Round up division to determine number of blocks needed
@@ -5559,46 +5664,50 @@ struct KernelConfig {
     KernelConfig() = default;
     KernelConfig(KernelDim _grid, KernelDim _block) : grid(_grid), block(_block) {}
 
+    // One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce.
     static KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
-
-        config.block = KernelDim::determine(num_datapoints);
-        config.grid.x = num_solutions;
-        config.grid.y = ceil_div(num_datapoints, config.block.x);
-
-        return config;
-    };
-
-    static KernelConfig for_mse(size_t num_solutions, size_t num_partial, KernelVersion kernel_version) {
-        KernelConfig config;
-
-        if (kernel_version == KernelVersion::BlockReduce) {
-            // Each block determine the mse for a single solution
-            config.grid.x = num_solutions;
-            // Number of partial results determines the number of threads in a block
-            // Rounded to a multiple of 32
-            config.block.x = round_up(num_partial, WARP_SIZE);
-        } else {
-            config.block = KernelDim::determine(num_solutions);
-            config.grid.x = ceil_div(num_solutions, config.block.x);
-        }
-
+        config.block   = KernelDim::determine(num_datapoints);
+        config.grid.x  = num_solutions;
+        config.grid.y  = ceil_div(num_datapoints, config.block.x);
         return config;
     }
 
-    static KernelConfig for_single(size_t num_solutions, size_t num_datapoints) {
+    // One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants.
+    static KernelConfig for_eval_single(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
-
-        config.grid.x = num_solutions;
+        config.grid.x  = num_solutions;
         config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
-
         return config;
     }
 
-    void check() const {
-        block.check();
-        // grid.check(); TODO
+    // Multiple blocks per solution; blocks split the datapoints. Used by Hybrid.
+    static KernelConfig for_eval_hybrid(size_t num_solutions, size_t num_datapoints, size_t blocks_per_individual) {
+        const size_t datapoints_per_block = ceil_div(num_datapoints, blocks_per_individual);
+        KernelConfig config;
+        config.grid.x  = num_solutions;
+        config.grid.y  = blocks_per_individual;
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(datapoints_per_block, WARP_SIZE));
+        return config;
     }
+
+    // One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory.
+    static KernelConfig for_mse_simple(size_t num_solutions) {
+        KernelConfig config;
+        config.block  = KernelDim::determine(num_solutions);
+        config.grid.x = ceil_div(num_solutions, config.block.x);
+        return config;
+    }
+
+    // One block per solution for the MSE reduction. Used by BlockReduce and Hybrid.
+    static KernelConfig for_mse_block(size_t num_solutions, size_t num_partial) {
+        KernelConfig config;
+        config.grid.x  = num_solutions;
+        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_partial, WARP_SIZE));
+        return config;
+    }
+
+    void check() const { block.check(); }
 
     constexpr bool operator==(const KernelConfig& other) const {
         return grid == other.grid && block == other.block;
@@ -5608,61 +5717,77 @@ struct KernelConfig {
 struct LaunchConfig {
     KernelConfig eval;
     KernelConfig mse;
-    KernelVersion kernel_version = KernelVersion::Baseline;
-    size_t num_solutions;
-    size_t num_datapoints;
-    size_t solution_length;
-    size_t items_per_thread;
+    KernelVersion kernel_version    = KernelVersion::Baseline;
+    size_t num_solutions            = 0;
+    size_t num_datapoints           = 0;
+    size_t solution_length          = 0;
+    size_t blocks_per_individual    = 1;
+    size_t datapoints_per_block     = 0;
+    size_t datapoints_per_thread    = 0;
 
     LaunchConfig() = default;
+
     LaunchConfig(
         KernelConfig eval,
         KernelConfig mse,
-        KernelVersion version = KernelVersion::Baseline,
-        size_t num_solutions = 1,
-        size_t num_datapoints = 1,
-        size_t solution_length = 1,
-        size_t items_per_thread = 1
+        KernelVersion version = KernelVersion::Baseline
     ) : eval(eval),
         mse(mse),
-        kernel_version(version),
-        num_solutions(num_solutions),
-        num_datapoints(num_datapoints),
-        solution_length(solution_length),
-        items_per_thread(items_per_thread) {}
+        kernel_version(version) {}
 
     static LaunchConfig determine(
         KernelVersion kernel_version,
         size_t num_solutions,
         size_t num_datapoints,
-        size_t solution_length
+        size_t solution_length,
+        std::optional<size_t> num_sms
     ) {
         LaunchConfig config;
+        config.kernel_version  = kernel_version;
+        config.num_solutions   = num_solutions;
+        config.num_datapoints  = num_datapoints;
+        config.solution_length = solution_length;
 
-        // Determine grid and block dimensions for kernels
         switch (kernel_version) {
-            case (KernelVersion::Baseline):
-            case (KernelVersion::Restrict):
-            case (KernelVersion::SharedMemory):
-            case (KernelVersion::BlockReduce):
+            case KernelVersion::Baseline:
+            case KernelVersion::Restrict:
+            case KernelVersion::SharedMemory:
                 config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
-                config.mse = KernelConfig::for_mse(num_solutions, config.eval.grid.y, kernel_version);
+                config.mse  = KernelConfig::for_mse_simple(num_solutions);
                 break;
-            case (KernelVersion::SingleKernel):
-            case (KernelVersion::SingleKernelFMAF):
-            case (KernelVersion::SingleKernelInplace):
-                config.eval = KernelConfig::for_single(num_solutions, num_datapoints);
-                config.mse = KernelConfig();
-                config.items_per_thread = (num_datapoints + config.eval.block.x - 1) / config.eval.block.x;
+
+            case KernelVersion::BlockReduce:
+                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
+                config.mse  = KernelConfig::for_mse_block(num_solutions, config.eval.grid.y);
                 break;
+
+            case KernelVersion::SingleKernel:
+            case KernelVersion::SingleKernelFMAF:
+            case KernelVersion::SingleKernelInplace:
+                config.eval = KernelConfig::for_eval_single(num_solutions, num_datapoints);
+                config.datapoints_per_thread = ceil_div(num_datapoints, config.eval.block.x);
+                break;
+
+            case KernelVersion::Hybrid:
+                __goblin_runtime_assert(num_sms.has_value());
+
+                if (num_solutions * 2 <= num_sms.value()) {
+                    config.blocks_per_individual = num_sms.value() / num_solutions;
+                    config.eval = KernelConfig::for_eval_hybrid(
+                        num_solutions, num_datapoints, config.blocks_per_individual);
+                    config.datapoints_per_block  = ceil_div(num_datapoints, config.blocks_per_individual);
+                    config.datapoints_per_thread = ceil_div(config.datapoints_per_block, config.eval.block.x);
+                    config.mse = KernelConfig::for_mse_block(num_solutions, config.blocks_per_individual);
+                } else {
+                    // Not enough SMs to benefit from multi-block; fall back to single-block.
+                    return LaunchConfig::determine(
+                        KernelVersion::SingleKernelInplace, num_solutions, num_datapoints, solution_length, num_sms);
+                }
+                break;
+
             default:
                 break;
         }
-
-        config.kernel_version = kernel_version;
-        config.num_solutions = num_solutions;
-        config.num_datapoints = num_datapoints;
-        config.solution_length = solution_length;
 
         return config;
     }
@@ -5679,7 +5804,8 @@ struct LaunchConfig {
 
 }  // namespace goblin
 
-#endif /* _GOBLIN_GA_GP_MISC_H */
+#endif /* _GOBLIN_GA_GP_LAUNCH_CONFIG_H */
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/sr.h continued                                                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -5687,7 +5813,7 @@ struct LaunchConfig {
 #ifdef GOBLIN_HAS_CUDA
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/evaluation/evaluate.h included by goblin/gp/sr.h                             //
+//                       goblin/gp/gpu_evaluation/evaluate.h included by goblin/gp/sr.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
@@ -5778,6 +5904,19 @@ void mse_kernel_restrict(
 );
 
 __global__
+void evaluate_kernel_hybrid(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const float* __restrict__ v_type,
+    const float* __restrict__ v_value,
+    float* __restrict__ partial,
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoints_per_block,
+    size_t datapoints_per_thread
+);
+
+__global__
 void compute_tree_output_wrapper(
     float* X,
     float* type,
@@ -5859,11 +5998,21 @@ std::vector<float> test_evaluate_mse_kernel(
     size_t num_datapoints
 );
 
+std::vector<float> test_kernel_hybrid(
+    std::vector<float> h_X,
+    std::vector<float> h_Y,
+    std::vector<float> h_type,
+    std::vector<float> h_value,
+    size_t num_solutions,
+    size_t num_datapoints,
+    size_t blocks_per_individual
+);
+
 }  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/evaluation/helper.h included by goblin/gp/sr.h                               //
+//                       goblin/gp/gpu_evaluation/memory.h included by goblin/gp/sr.h                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GA_GP_HELPER_H
 #define _GOBLIN_GA_GP_HELPER_H
@@ -6049,7 +6198,7 @@ class SRProblem : public GPInstanceBase {
 
 #ifdef GOBLIN_HAS_CUDA
     if (_kernel_version.has_value()) {
-      _copy_data_to_gpu();
+      _init_gpu();
     }
 #endif
   };
@@ -6397,14 +6546,17 @@ class SRProblem : public GPInstanceBase {
     std::vector<float> node_value;
 
     for (auto i : indices) {
-      ctx.gpu_nodes_post_order(solutions[i], node_type, node_value, expression_size);
+      ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
     }
 
     __goblin_runtime_assert(node_type.size() == node_value.size());
 
     const size_t solution_length = ctx.max_expression_size;
-    const LaunchConfig config =
-        LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
+    const LaunchConfig config = LaunchConfig::determine(_kernel_version.value(), num_solutions, _num_datapoints, solution_length, _num_sms);
+
+    // const LaunchConfig config = (_kernel_version.value() == KernelVersion::SingleKernelInplace)
+        // ? LaunchConfig::determine_auto(num_solutions, X_train.rows(), solution_length, _num_sms)
+        // : LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
 
     config.check();
 
@@ -6422,6 +6574,13 @@ class SRProblem : public GPInstanceBase {
       quality.constraint_value = 0.0;
       quality.objectives(0) = result[k++];
     }
+  }
+
+  void _init_gpu() {
+    _num_sms = get_gpu_info().num_sms;
+    _num_datapoints = X_train.rows();
+
+    _copy_data_to_gpu();
   }
 
   void _copy_data_to_gpu() {
@@ -6449,9 +6608,11 @@ class SRProblem : public GPInstanceBase {
     if (config.kernel_version != KernelVersion::SingleKernel &&
         config.kernel_version != KernelVersion::SingleKernelFMAF &&
         config.kernel_version != KernelVersion::SingleKernelInplace) {
-      const size_t num_partials = (config.kernel_version == KernelVersion::BlockReduce)
-                                      ? config.num_solutions * config.eval.grid.y
-                                      : config.num_solutions * config.num_datapoints;
+      const size_t num_partials =
+          (config.kernel_version == KernelVersion::BlockReduce ||
+           config.kernel_version == KernelVersion::Hybrid)
+              ? config.num_solutions * config.eval.grid.y
+              : config.num_solutions * config.num_datapoints;
 
       if (_num_partials_allocated < num_partials) {
         free_on_gpu(d_partial);
@@ -6512,6 +6673,8 @@ class SRProblem : public GPInstanceBase {
 #ifdef GOBLIN_HAS_CUDA
   // GPU fields
   std::optional<KernelVersion> _kernel_version{};
+  int _num_sms = 0;
+  size_t _num_datapoints = 0;
   size_t _num_solutions_allocated = 0;
   size_t _num_partials_allocated = 0;
   size_t _num_results_allocated = 0;
@@ -6527,6 +6690,7 @@ class SRProblem : public GPInstanceBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_GP_SR_H */
+
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
