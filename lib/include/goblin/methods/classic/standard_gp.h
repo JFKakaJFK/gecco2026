@@ -23,7 +23,11 @@ class Chained : public GPVariationOperatorBase {
  public:
   Chained() = delete;
   Chained(std::vector<std::tuple<std::shared_ptr<GPVariationOperatorBase>, double>>&& operators)
-      : operators(std::move(operators)) {};
+      : operators(std::move(operators)) {
+    if (this->operators.empty()) {
+      throw std::runtime_error("At least one operator is required!");
+    }
+  };
 
   void apply(Rng& rng,
              const InstanceBase& problem,

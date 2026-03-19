@@ -19,7 +19,7 @@ class DiscreteCrossoverBase {
     throw std::runtime_error("Either implement this method or override the full crossover behaviour!");
   };
 
-  virtual bool crossover(Rng& rng, InstanceBase& problem, const SolutionBase& donor, SolutionBase& offspring) {
+  virtual bool crossover(Rng& rng, InstanceBase& problem, const SolutionBase& donor, SolutionBase& offspring) const {
     auto mask = crossover_mask(rng, problem, donor, offspring);
 
     auto [evaluation_needed, _] = problem.inherit_discrete(offspring, donor, mask);
@@ -28,6 +28,48 @@ class DiscreteCrossoverBase {
   };
 
   virtual ~DiscreteCrossoverBase() = default;
+};
+
+class CombinedCrossover : public DiscreteCrossoverBase {
+  std::vector<std::tuple<std::shared_ptr<DiscreteCrossoverBase>, double>> operators;
+
+ public:
+  CombinedCrossover() = delete;
+  CombinedCrossover(std::vector<std::tuple<std::shared_ptr<DiscreteCrossoverBase>, double>>&& operators,
+                    bool normalize = true)
+      : operators(std::move(operators)) {
+    if (this->operators.empty()) {
+      throw std::runtime_error("At least one operator is required!");
+    }
+
+    if (normalize) {
+      double norm = 0.0;
+      for (auto& [_, probability] : operators) {
+        norm += probability;
+      }
+      for (auto& [_, probability] : operators) {
+        probability /= norm;
+      }
+    }
+  };
+
+  bool crossover(Rng& rng,
+                 InstanceBase& problem,
+                 const SolutionBase& donor,
+                 SolutionBase& offspring) const override final {
+    bool evaluation_needed = false;
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    double r = U(rng);
+    for (auto& [op, probability] : operators) {
+      if (r < probability) {
+        evaluation_needed |= op->crossover(rng, problem, donor, offspring);
+        break;
+      } else {
+        r -= probability;
+      }
+    }
+    return evaluation_needed;
+  };
 };
 
 class UniformCrossover : public DiscreteCrossoverBase {
@@ -95,6 +137,43 @@ class DiscreteMutationBase {
  public:
   virtual void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const = 0;
   virtual ~DiscreteMutationBase() = default;
+};
+
+class CombinedMutation : public DiscreteMutationBase {
+  std::vector<std::tuple<std::shared_ptr<DiscreteMutationBase>, double>> operators;
+
+ public:
+  CombinedMutation() = delete;
+  CombinedMutation(std::vector<std::tuple<std::shared_ptr<DiscreteMutationBase>, double>>&& operators,
+                   bool normalize = true)
+      : operators(std::move(operators)) {
+    if (this->operators.empty()) {
+      throw std::runtime_error("At least one operator is required!");
+    }
+
+    if (normalize) {
+      double norm = 0.0;
+      for (auto& [_, probability] : operators) {
+        norm += probability;
+      }
+      for (auto& [_, probability] : operators) {
+        probability /= norm;
+      }
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    double r = U(rng);
+    for (auto& [op, probability] : operators) {
+      if (r < probability) {
+        op->mutate(rng, problem, offspring);
+        break;
+      } else {
+        r -= probability;
+      }
+    }
+  };
 };
 
 class RandomMutation : public DiscreteMutationBase {
@@ -265,14 +344,19 @@ class SimpleGA : public EABase {
     for (usize i = 0; i < n; i++) {
       // copy to offspring
       offspring.add(population[i]);
+      bool evaluation_needed = false;
 
       const auto& donor = population[parent_indices[i]];
 
       // perform crossover
-      bool evaluation_needed = crossover_strategy->crossover(rng, problem, donor, offspring[i]);
+      if (crossover_strategy) {
+        evaluation_needed |= crossover_strategy->crossover(rng, problem, donor, offspring[i]);
+      }
 
       // apply mutation
-      mutation_strategy->mutate(rng, problem, offspring[i]);
+      if (mutation_strategy) {
+        mutation_strategy->mutate(rng, problem, offspring[i]);
+      }
 
       // check what changed to allow for partial evaluations & exploiting introns
       check_changes(population[i], offspring[i], subsets[i].discrete, evaluation_needed);

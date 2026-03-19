@@ -13,7 +13,7 @@
 #include "goblin/methods/classic/simple_ga.h"
 
 namespace goblin {
-
+namespace voronoi {
 class VoronoiImageReconstruction : public InstanceBase {
   const usize VARS_PER_CELL = 6;
   const usize ENABLED = 0;
@@ -264,9 +264,190 @@ class VoronoiImageReconstruction : public InstanceBase {
   Vec<CType> _continuous_init_upper_bounds{};
 };
 
-// class XOver : public common::DiscreteCrossoverBase {
+// It is important to use the fully qualified name for the base class (i.e. goblin::classic::DiscreteCrossoverBase) so
+// that the bindings are generated correctly
+class CustomCrossover : public goblin::classic::DiscreteCrossoverBase {
+  bool crossover(Rng& rng,
+                 InstanceBase& problem,
+                 const SolutionBase& donor,
+                 SolutionBase& offspring) const override final {
+    // do whatever you want here
+    return goblin::classic::UniformCrossover().crossover(rng, problem, donor, offspring);
+  }
+};
 
-// }
+class CustomMutation : public goblin::classic::DiscreteMutationBase {
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    // do whatever you want here
+    goblin::classic::RandomMutation().mutate(rng, problem, offspring);
+  }
+};
+
+/// Idea:
+/// - color values have meaning _together_
+/// - other cells might have the needed color information
+/// - color mixing performs search compared to replacement
+/// => Randomly mix the current cell color with another cell's color
+class ColorMixCrossover : public goblin::classic::DiscreteCrossoverBase {
+  bool crossover(Rng& rng,
+                 InstanceBase& problem,
+                 const SolutionBase& donor,
+                 SolutionBase& offspring) const override final {
+    const usize VARS_PER_CELL = 6;
+    const usize l = problem.num_discrete();
+    const usize num_cells = l / VARS_PER_CELL;
+    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
+    std::uniform_real_distribution<float> U(0.0, 1.0);
+
+    usize donor_idx;
+    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
+      if (U(rng) < 0.5) {
+        // 1. get a random donor cell
+        do {
+          donor_idx = cells(rng);
+        } while (donor_idx == cell_idx);
+
+        // 2. randomly mix the colors
+        float w = U(rng);
+        Array<float> rgb = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)).cast<float>();
+        Array<float> rgb_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 3, 3)).cast<float>();
+        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)) =
+            (w * rgb + (1.0 - w) * rgb_donor).cast<DType>();
+      }
+    }
+
+    bool evaluation_needed = true;
+    return evaluation_needed;
+  };
+};
+
+/// Idea:
+/// - position values have meaning _together_
+/// - cell position has meaning relative to other cell positions
+/// => Randomly move to/from other cells
+class PositionMixCrossover : public goblin::classic::DiscreteCrossoverBase {
+  bool crossover(Rng& rng,
+                 InstanceBase& problem,
+                 const SolutionBase& donor,
+                 SolutionBase& offspring) const override final {
+    const usize VARS_PER_CELL = 6;
+    const usize l = problem.num_discrete();
+    const usize num_cells = l / VARS_PER_CELL;
+    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
+    std::uniform_real_distribution<float> U(0.0, 1.0);
+    std::normal_distribution<float> N(0.0, 1.0);
+
+    usize donor_idx;
+    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
+      if (U(rng) < 0.5) {
+        // 1. get a random donor cell
+        do {
+          donor_idx = cells(rng);
+        } while (donor_idx == cell_idx);
+
+        // 2. randomly move towards/away from donor
+        float w = N(rng);
+        Array<float> xy = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
+        Array<float> xy_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 1, 2)).cast<float>();
+        xy += w * 0.1 * (xy_donor - xy);
+        Array<float> ub = problem.discrete_domain_sizes()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
+        xy = xy.min(ub).max(0.0);
+        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)) = xy.cast<DType>();
+      }
+    }
+
+    bool evaluation_needed = true;
+    return evaluation_needed;
+  };
+};
+
+class MergeSplitMutation : public goblin::classic::DiscreteMutationBase {
+  double p_merge;
+  double noise;
+  usize min_num_cells;
+
+ public:
+  MergeSplitMutation(usize min_num_cells,
+                     std::optional<double> p_mutation = std::nullopt,
+                     double p_merge = 0.5,
+                     double splitting_noise = 0.05)
+      : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
+    if (p_merge < 0.0 || 1.0 < p_merge) {
+      throw std::runtime_error("The probability of merging must be in [0, 1]!");
+    }
+
+    if (splitting_noise <= 0.0) {
+      throw std::runtime_error("The splitting noise must be positive!");
+    }
+  };
+
+  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
+    const usize VARS_PER_CELL = 6;
+    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
+
+    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
+    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
+
+    std::uniform_real_distribution<double> U(0.0, 1.0);
+    std::normal_distribution<double> N(0.0, 1.0);
+
+    bool merge = U(rng) < p_merge;
+
+    // loop until we find another active/inactive cell for merging/splitting into
+    usize start = random_cell;
+    while (merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)) {
+      random_cell++;
+      if (random_cell >= num_cells) {
+        random_cell = min_num_cells;
+      }
+      if (random_cell == start) {
+        break;
+      }
+    }
+    usize offset = cell * VARS_PER_CELL;
+    usize offset_random = random_cell * VARS_PER_CELL;
+
+    auto x = offspring.discrete_values();
+    if (merge) {
+      // disable the other cell
+      x(offset_random) = false;
+      // and linearly combine the cell information with random weights
+      double w = U(rng);
+      for (usize i = 1; i < VARS_PER_CELL; i++) {
+        x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
+      }
+    } else /* split */ {
+      // enable the other cell
+      x(offset_random) = true;
+
+      // add noise to both cell values
+      double v;
+      for (usize i = 1; i < VARS_PER_CELL; i++) {
+        const usize d_i = problem.discrete_domain_sizes()(offset + i);
+
+        // get value, add noise & map back into the domain for the other cell
+        v = static_cast<double>(x(offset + i));
+        v += N(rng) * noise * static_cast<double>(d_i);
+        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+        }
+        v = std::fmod(v, d_i);
+        x(offset_random + i) = static_cast<DType>(v);
+
+        // get value, add noise & map back into the domain for this cell
+        v = static_cast<double>(x(offset + i));
+        v += N(rng) * noise * static_cast<double>(d_i);
+        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
+          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+        }
+        v = std::fmod(v, d_i);
+        x(offset + i) = static_cast<DType>(v);
+      }
+    }
+  }
+};
+
+};  // namespace voronoi
 };  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */

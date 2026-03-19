@@ -1341,7 +1341,7 @@ class DiscreteCrossoverBase_trampoline : public DiscreteCrossoverBase {
   bool crossover(Rng& rng,
                  goblin::InstanceBase& problem,
                  const goblin::SolutionBase& donor,
-                 goblin::SolutionBase& offspring) override {
+                 goblin::SolutionBase& offspring) const override {
     NB_OVERRIDE_NAME("crossover",                    // function name (python)
                      crossover,                      // function name (c++)
                      rng, problem, donor, offspring  // params
@@ -3719,27 +3719,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_EXAMPLES_VORONOI_H
   //
-
-  auto pyClassVoronoiImageReconstruction =
-      nb::class_<goblin::VoronoiImageReconstruction, goblin::InstanceBase>(m, "VoronoiImageReconstruction", "")
-          .def(nb::init<const Arr2D<DType>&, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool>(),
-               nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10,
-               nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(),
-               nb::arg("complexity_objective") = false, nb::arg("track_complexity") = false)
-          .def("discrete_domain_sizes", &goblin::VoronoiImageReconstruction::discrete_domain_sizes)
-          .def("continuous_lower_bounds", &goblin::VoronoiImageReconstruction::continuous_lower_bounds)
-          .def("continuous_upper_bounds", &goblin::VoronoiImageReconstruction::continuous_upper_bounds)
-          .def("continuous_init_lower_bounds", &goblin::VoronoiImageReconstruction::continuous_init_lower_bounds)
-          .def("continuous_init_upper_bounds", &goblin::VoronoiImageReconstruction::continuous_init_upper_bounds)
-          .def("image_data", &goblin::VoronoiImageReconstruction::image_data, nb::arg("solution"),
-               nb::arg("scale") = 1.0)
-          .def("evaluate", &goblin::VoronoiImageReconstruction::evaluate, nb::arg("rng"), nb::arg("solutions"),
-               nb::arg("indices"))
-          .def("add_random", &goblin::VoronoiImageReconstruction::add_random, nb::arg("rng"), nb::arg("solutions"),
-               nb::arg("count"))
-          .def("fitness", &goblin::VoronoiImageReconstruction::fitness)
-          .def("archive_fitness", &goblin::VoronoiImageReconstruction::archive_fitness)
-          .def("log_solution", &goblin::VoronoiImageReconstruction::log_solution, nb::arg("os"), nb::arg("solution"));
   // #endif
   // #endif
 
@@ -3936,6 +3915,16 @@ void py_init_module_pygoblin(nb::module_& m) {
             .def("crossover", &goblin::classic::DiscreteCrossoverBase::crossover, nb::arg("rng"), nb::arg("problem"),
                  nb::arg("donor"), nb::arg("offspring"));
 
+    auto pyNsclassic_ClassCombinedCrossover =
+        nb::class_<goblin::classic::CombinedCrossover, goblin::classic::DiscreteCrossoverBase>(pyNsclassic,
+                                                                                               "CombinedCrossover", "")
+            // (default constructor explicitly deleted)
+            .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteCrossoverBase>, double>>&&,
+                          bool>(),
+                 nb::arg("operators"), nb::arg("normalize") = true)
+            .def("crossover", &goblin::classic::CombinedCrossover::crossover, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("donor"), nb::arg("offspring"));
+
     auto pyNsclassic_ClassUniformCrossover =
         nb::class_<goblin::classic::UniformCrossover, goblin::classic::DiscreteCrossoverBase>(pyNsclassic,
                                                                                               "UniformCrossover", "")
@@ -3955,6 +3944,16 @@ void py_init_module_pygoblin(nb::module_& m) {
             pyNsclassic, "DiscreteMutationBase", "")
             .def(nb::init<>())  // implicit default constructor
             .def("mutate", &goblin::classic::DiscreteMutationBase::mutate, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("offspring"));
+
+    auto pyNsclassic_ClassCombinedMutation =
+        nb::class_<goblin::classic::CombinedMutation, goblin::classic::DiscreteMutationBase>(pyNsclassic,
+                                                                                             "CombinedMutation", "")
+            // (default constructor explicitly deleted)
+            .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteMutationBase>, double>>&&,
+                          bool>(),
+                 nb::arg("operators"), nb::arg("normalize") = true)
+            .def("mutate", &goblin::classic::CombinedMutation::mutate, nb::arg("rng"), nb::arg("problem"),
                  nb::arg("offspring"));
 
     auto pyNsclassic_ClassRandomMutation =
@@ -4141,6 +4140,73 @@ void py_init_module_pygoblin(nb::module_& m) {
             .def("step", &goblin::classic::StandardGP::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
                  nb::arg("archive"));
   }  // </namespace classic>
+
+  {  // <namespace voronoi>
+    nb::module_ pyNsvoronoi = m.def_submodule("voronoi", "");
+    auto pyNsvoronoi_ClassVoronoiImageReconstruction =
+        nb::class_<goblin::voronoi::VoronoiImageReconstruction, goblin::InstanceBase>(pyNsvoronoi,
+                                                                                      "VoronoiImageReconstruction", "")
+            .def(nb::init<const Arr2D<DType>&, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool>(),
+                 nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10,
+                 nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(),
+                 nb::arg("complexity_objective") = false, nb::arg("track_complexity") = false)
+            .def("discrete_domain_sizes", &goblin::voronoi::VoronoiImageReconstruction::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::voronoi::VoronoiImageReconstruction::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::voronoi::VoronoiImageReconstruction::continuous_upper_bounds)
+            .def("continuous_init_lower_bounds",
+                 &goblin::voronoi::VoronoiImageReconstruction::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds",
+                 &goblin::voronoi::VoronoiImageReconstruction::continuous_init_upper_bounds)
+            .def("image_data", &goblin::voronoi::VoronoiImageReconstruction::image_data, nb::arg("solution"),
+                 nb::arg("scale") = 1.0)
+            .def("evaluate", &goblin::voronoi::VoronoiImageReconstruction::evaluate, nb::arg("rng"),
+                 nb::arg("solutions"), nb::arg("indices"))
+            .def("add_random", &goblin::voronoi::VoronoiImageReconstruction::add_random, nb::arg("rng"),
+                 nb::arg("solutions"), nb::arg("count"))
+            .def("fitness", &goblin::voronoi::VoronoiImageReconstruction::fitness)
+            .def("archive_fitness", &goblin::voronoi::VoronoiImageReconstruction::archive_fitness)
+            .def("log_solution", &goblin::voronoi::VoronoiImageReconstruction::log_solution, nb::arg("os"),
+                 nb::arg("solution"));
+
+    auto pyNsvoronoi_ClassCustomCrossover =
+        nb::class_<goblin::voronoi::CustomCrossover, goblin::classic::DiscreteCrossoverBase>(
+            pyNsvoronoi, "CustomCrossover",
+            " It is important to use the fully qualified name for the base class (i.e. "
+            "goblin::classic::DiscreteCrossoverBase) so\n that the bindings are generated correctly")
+            .def(nb::init<>())  // implicit default constructor
+        ;
+
+    auto pyNsvoronoi_ClassCustomMutation =
+        nb::class_<goblin::voronoi::CustomMutation, goblin::classic::DiscreteMutationBase>(pyNsvoronoi,
+                                                                                           "CustomMutation", "")
+            .def(nb::init<>())  // implicit default constructor
+        ;
+
+    auto pyNsvoronoi_ClassColorMixCrossover =
+        nb::class_<goblin::voronoi::ColorMixCrossover, goblin::classic::DiscreteCrossoverBase>(
+            pyNsvoronoi, "ColorMixCrossover",
+            "/ Idea:\n/ - color values have meaning _together_\n/ - other cells might have the needed color "
+            "information\n/ - color mixing performs search compared to replacement\n/ => Randomly mix the current cell "
+            "color with another cell's color")
+            .def(nb::init<>())  // implicit default constructor
+        ;
+
+    auto pyNsvoronoi_ClassPositionMixCrossover =
+        nb::class_<goblin::voronoi::PositionMixCrossover, goblin::classic::DiscreteCrossoverBase>(
+            pyNsvoronoi, "PositionMixCrossover",
+            "/ Idea:\n/ - position values have meaning _together_\n/ - cell position has meaning relative to other "
+            "cell positions\n/ => Randomly move to/from other cells")
+            .def(nb::init<>())  // implicit default constructor
+        ;
+
+    auto pyNsvoronoi_ClassMergeSplitMutation =
+        nb::class_<goblin::voronoi::MergeSplitMutation, goblin::classic::DiscreteMutationBase>(pyNsvoronoi,
+                                                                                               "MergeSplitMutation", "")
+            .def(nb::init<usize, std::optional<double>, double, double>(), nb::arg("min_num_cells"),
+                 nb::arg("p_mutation").none() = nb::none(), nb::arg("p_merge") = 0.5, nb::arg("splitting_noise") = 0.05)
+            .def("mutate", &goblin::voronoi::MergeSplitMutation::mutate, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("offspring"));
+  }  // </namespace voronoi>
   ////////////////////    </generated_from:amalgamation.h>    ////////////////////
 
   // </litgen_pydef> // Autogenerated code end
