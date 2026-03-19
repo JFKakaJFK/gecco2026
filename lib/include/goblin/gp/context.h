@@ -781,8 +781,9 @@ class GPContext {
 
     return proximity;
   };
+
   template <typename S>
-  void gpu_nodes_post_order(
+  void to_gpu_representation(
     S& solution, 
     std::vector<float>& node_type,
     std::vector<float>& node_value, 
@@ -845,7 +846,38 @@ class GPContext {
           visited(idx) = 1;
         }
 
-        if (type == ValueKind::Operator) {
+        if (type == ValueKind::Arg) {
+          visited(idx) = 0;
+
+          usize calling_node = call_stack[call_stack_idx];
+          isize num_frames = 1;
+
+          auto pidx = parent(idx);
+          while (pidx.has_value()) {
+            if (pidx.value() == calling_node) {
+              calling_node = call_stack[call_stack_idx - num_frames++];
+            }
+            pidx = parent(pidx.value());
+          }
+
+          auto& cnodes = children[calling_node];
+          assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+
+          node_stack.pop_back();
+          node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
+                                  call_stack_idx - num_frames,
+                                  false);
+        } else if (type == ValueKind::Subtree) {
+          visited(idx) = 0;
+          assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
+
+          call_stack.push_back(idx);
+
+          std::get<2>(node_stack[node_stack_idx]) = true;
+          node_stack.emplace_back(subtree_roots[v_idx],
+                                  call_stack.size() - 1,
+                                  false);
+        } else if (type == ValueKind::Operator) {
           std::get<2>(node_stack[node_stack_idx]) = true;
 
           usize arity = std::min(children[idx].size(), value_max_arity[value]);
@@ -866,7 +898,11 @@ class GPContext {
           node_stack.pop_back();
         }
       } else {
-        update_tree = true;
+        if (type == ValueKind::Subtree) {
+          call_stack.pop_back();
+        } else {
+          update_tree = true;
+        }
 
         node_stack.pop_back();
       }
@@ -893,7 +929,9 @@ class GPContext {
         } else if (type == ValueKind::Operator) {
           // Push the operator index, will be used to apply the operator on GPU
           auto gpu_id = this->operators[v_idx]->gpu_operator_id();
-          if (!gpu_id.has_value()) { throw std::runtime_error("Operator not GPU-compatible"); }
+          if (!gpu_id.has_value()) { 
+            throw std::runtime_error("Operator not GPU-compatible"); 
+          }
           temp_value.push_back(static_cast<float>(gpu_id.value()));
         }
       }

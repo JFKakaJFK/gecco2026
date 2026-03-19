@@ -531,7 +531,7 @@ class SRProblem : public GPInstanceBase {
     std::vector<float> node_value;
 
     for (auto i : indices) {
-      ctx.gpu_nodes_post_order(solutions[i], node_type, node_value, expression_size);
+      ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
     }
 
     __goblin_runtime_assert(node_type.size() == node_value.size());
