@@ -1,3 +1,4 @@
+#include <cstdint>
 #include "doctest/doctest.h"
 
 #include "goblin/gp/context.h"
@@ -36,16 +37,16 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::simple_tree") {
     auto right_left = ctx.children[right][0];
     auto right_right = ctx.children[right][1];
 
-    std::vector<float> node_type; 
+    std::vector<u8> node_type; 
     std::vector<float> node_value;
     usize size = 0;
 
-    std::vector<float> expected_node_type;
+    std::vector<u8> expected_node_type;
     std::vector<float> expected_node_value;
     usize expected_size;
 
-    auto expect = [&](std::vector<float> types, std::vector<float> values) {
-        types.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
+    auto expect = [&](std::vector<u8> types, std::vector<float> values) {
+        types.resize(ctx.max_expression_size, std::numeric_limits<u8>::max());
         values.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
         expected_node_type = std::move(types);
         expected_node_value = std::move(values);
@@ -140,16 +141,16 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions") {
     auto out_left = ctx.children[out_root][0];
     auto out_right = ctx.children[out_root][1];
 
-    std::vector<float> node_type;
+    std::vector<u8> node_type;
     std::vector<float> node_value;
     usize size = 0;
 
-    std::vector<float> expected_node_type;
+    std::vector<u8> expected_node_type;
     std::vector<float> expected_node_value;
     usize expected_size;
 
-    auto expect = [&](std::vector<float> types, std::vector<float> values) {
-        types.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
+    auto expect = [&](std::vector<u8> types, std::vector<float> values) {
+        types.resize(ctx.max_expression_size, std::numeric_limits<u8>::max());
         values.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
         expected_node_type = std::move(types);
         expected_node_value = std::move(values);

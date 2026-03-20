@@ -37,6 +37,7 @@ enum class NodeType : uint8_t {
     Input,
     Constant,
     Operator,
+    Parameter
 };
 
 enum class Operator : uint8_t {
@@ -58,9 +59,9 @@ enum class Operator : uint8_t {
 
 // The following declarations are used to create more readable test cases
 namespace test {
-    constexpr float C = static_cast<float>(NodeType::Constant);
-    constexpr float I = static_cast<float>(NodeType::Input);
-    constexpr float O = static_cast<float>(NodeType::Operator);
+    constexpr uint8_t C = static_cast<uint8_t>(NodeType::Constant);
+    constexpr uint8_t I = static_cast<uint8_t>(NodeType::Input);
+    constexpr uint8_t O = static_cast<uint8_t>(NodeType::Operator);
 
     constexpr float Val(float x) { return x; }
     constexpr float Val(int x) { return static_cast<float>(x); }

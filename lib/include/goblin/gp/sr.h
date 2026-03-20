@@ -527,7 +527,7 @@ class SRProblem : public GPInstanceBase {
     }
 
     // Transform solutions to GPU compatible representation
-    std::vector<float> node_type;
+    std::vector<u8> node_type;
     std::vector<float> node_value;
 
     for (auto i : indices) {
@@ -575,7 +575,7 @@ class SRProblem : public GPInstanceBase {
     d_Y = allocate_and_copy(Y32.data(), Y32.size());
   }
 
-  void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
+  void _copy_solutions_to_gpu(std::vector<u8> node_type, std::vector<float> node_value) {
     const size_t num_elements = node_type.size();
 
     if (_num_solutions_allocated < num_elements) {
@@ -665,7 +665,7 @@ class SRProblem : public GPInstanceBase {
   size_t _num_results_allocated = 0;
   float* d_X = nullptr;
   float* d_Y = nullptr;
-  float* d_type = nullptr;
+  uint8_t* d_type = nullptr;
   float* d_value = nullptr;
   float* d_partial = nullptr;
   float* d_result = nullptr;

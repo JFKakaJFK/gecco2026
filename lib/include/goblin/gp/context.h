@@ -784,9 +784,9 @@ class GPContext {
 
   template <typename S>
   void to_gpu_representation(
-    S& solution, 
-    std::vector<float>& node_type,
-    std::vector<float>& node_value, 
+    S& solution,
+    std::vector<uint8_t>& node_type,
+    std::vector<float>& node_value,
     usize& size,
     bool discount_size = false
   ) const {
@@ -808,7 +808,7 @@ class GPContext {
     size = 0;
 
     // Vectors to hold temporary type and value data
-    std::vector<float> temp_type;
+    std::vector<uint8_t> temp_type;
     std::vector<float> temp_value;
     temp_type.reserve(max_expression_size);
     temp_value.reserve(max_expression_size);
@@ -914,7 +914,7 @@ class GPContext {
           }
         }
 
-        temp_type.push_back(static_cast<float>(type));
+        temp_type.push_back(static_cast<uint8_t>(type));
 
         if (type == ValueKind::Input) {
           // Push the index of the input feature, will be used to access the input matrix on GPU
@@ -941,7 +941,7 @@ class GPContext {
 
     // Pad vectors with placeholder values such that the data is at constant intervals in memory
     // are at constant intervals in memory
-    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
+    temp_type.resize(max_expression_size, std::numeric_limits<uint8_t>::max());
     temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
     // Append temporary vectors to final vectors

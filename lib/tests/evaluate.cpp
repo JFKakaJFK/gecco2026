@@ -17,6 +17,8 @@ TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
     using namespace std::numbers;
     using namespace test;
 
+    using u8 = std::uint8_t;
+
     // float e2 = std::pow(e_v<float>, 2.0F);
 
     std::vector<KernelVersion> kernel_versions = {
@@ -25,7 +27,7 @@ TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
 
     struct TestCase {
         std::vector<float> X;
-        std::vector<float> type;
+        std::vector<u8> type;
         std::vector<float> value;
         size_t num_datapoints;
         size_t datapoint_index;
@@ -138,7 +140,7 @@ TEST_CASE("goblin::ga-gp::evaluate::evaluate") {
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
-        std::vector<float> type;
+        std::vector<u8> type;
         std::vector<float> value;
         size_t num_solutions;
         size_t num_datapoints;
@@ -245,7 +247,7 @@ TEST_CASE("goblin::ga-gp::evaluate::evaluate_block_reduce") {
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
-        std::vector<float> type;
+        std::vector<u8> type;
         std::vector<float> value;
         size_t num_solutions;
         size_t num_datapoints;
@@ -491,7 +493,7 @@ TEST_CASE("goblin::ga-gp::evaluate::evaluate_mse_kernel") {
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
-        std::vector<float> type;
+        std::vector<u8> type;
         std::vector<float> value;
         size_t num_solutions;
         size_t num_datapoints;
@@ -597,7 +599,7 @@ TEST_CASE("goblin::ga-gp::evaluate::hybrid_kernel") {
     struct TestCase {
         std::vector<float> X;
         std::vector<float> Y;
-        std::vector<float> type;
+        std::vector<u8> type;
         std::vector<float> value;
         size_t num_solutions;
         size_t num_datapoints;

@@ -1,12 +1,10 @@
-#include <vector>
-
 #include "cub/cub.cuh"
 
 #include "goblin/gp/gpu_evaluation/evaluate.h"
 #include "goblin/gp/gpu_evaluation/launch_config.h"
 #include "goblin/gp/gpu_evaluation/memory.h"
-// #include "goblin/gp/gpu_evaluation/misc.h"
 #include "goblin/gp/gpu_evaluation/types.h"
+#include "goblin/lib/types.h"
 
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 
@@ -26,7 +24,7 @@ __global__
 void evaluate_kernel_baseline(
     float* X, 
     float* Y, 
-    float* v_type, 
+    u8* v_type, 
     float* v_value, 
     float* partial,
     size_t solution_length, 
@@ -41,7 +39,7 @@ void evaluate_kernel_baseline(
         size_t solution_offset = solution_index * solution_length;
 
         // Pointers to first element of solution
-        float* type = v_type + solution_offset;
+        u8* type = v_type + solution_offset;
         float* value = v_value + solution_offset;
 
         // Compute output of solution
@@ -67,7 +65,7 @@ __global__
 void evaluate_kernel_restrict(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
     size_t solution_length, 
@@ -82,7 +80,7 @@ void evaluate_kernel_restrict(
         size_t solution_offset = solution_index * solution_length;
 
         // Pointers to first element of solution
-        const float* type = v_type + solution_offset;
+        const u8* type = v_type + solution_offset;
         const float* value = v_value + solution_offset;
 
         // Compute output of solution
@@ -109,7 +107,7 @@ __global__
 void evaluate_kernel_shared_memory(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
     size_t solution_length,
@@ -123,9 +121,8 @@ void evaluate_kernel_shared_memory(
     size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
@@ -161,7 +158,7 @@ __global__
 void evaluate_kernel_block_reduce(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ partial,
     size_t solution_length, 
@@ -177,9 +174,8 @@ void evaluate_kernel_block_reduce(
     const size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
@@ -229,7 +225,7 @@ __global__
 void evaluate_mse_kernel(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ result,
     const size_t solution_length, 
@@ -245,9 +241,8 @@ void evaluate_mse_kernel(
     size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
@@ -291,7 +286,7 @@ __global__
 void evaluate_mse_kernel_fmaf(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ result,
     const size_t solution_length, 
@@ -307,9 +302,8 @@ void evaluate_mse_kernel_fmaf(
     size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
@@ -354,7 +348,7 @@ __global__
 void evaluate_mse_kernel_inplace(
     const float* __restrict__ X, 
     const float* __restrict__ Y, 
-    const float* __restrict__ v_type, 
+    const u8* __restrict__ v_type, 
     const float* __restrict__ v_value, 
     float* __restrict__ result,
     const size_t solution_length, 
@@ -370,9 +364,8 @@ void evaluate_mse_kernel_inplace(
     size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i+= blockDim.x) {
@@ -417,7 +410,7 @@ __global__
 void evaluate_kernel_hybrid(
     const float* __restrict__ X,
     const float* __restrict__ Y,
-    const float* __restrict__ v_type,
+    const u8* __restrict__ v_type,
     const float* __restrict__ v_value,
     float* __restrict__ partial,
     const size_t solution_length,
@@ -439,9 +432,8 @@ void evaluate_kernel_hybrid(
     const size_t solution_offset = solution_index * solution_length;
 
     // Layout shared memory
-    __shared__ float shmem[MAX_NUM_NODES * 2];
-    float* sh_type = (float*)shmem;
-    float* sh_value = (float*)(sh_type + solution_length);
+    __shared__ u8 sh_type[MAX_NUM_NODES];
+    __shared__ float sh_value[MAX_NUM_NODES];
 
     // Cooperative load of solution data into shared memory
     for (size_t i = threadIdx.x; i < solution_length; i += blockDim.x) {
@@ -485,7 +477,7 @@ void evaluate_kernel_hybrid(
 __device__
 float compute_tree_output_baseline(
     float* X, 
-    const float* type,
+    const u8* type,
     const float* value,
     size_t solution_length,
     size_t num_datapoints,
@@ -567,7 +559,7 @@ float compute_tree_output_baseline(
 __device__
 float compute_tree_output_restrict(
     const float* __restrict__ X, 
-    const float* __restrict__ type,
+    const u8* __restrict__ type,
     const float* __restrict__ value,
     size_t solution_length,
     size_t num_datapoints,
@@ -650,7 +642,7 @@ float compute_tree_output_restrict(
 __device__
 float compute_tree_output_inplace(
     const float* __restrict__ X, 
-    const float* __restrict__ type,
+    const u8* __restrict__ type,
     const float* __restrict__ value,
     size_t solution_length,
     size_t num_datapoints,
@@ -801,7 +793,7 @@ void mse_kernel_block_reduce(
 void evaluate_kernel_wrapper(
     float* X, 
     float* Y, 
-    float* type, 
+    u8* type, 
     float* value, 
     float* partial,
     const LaunchConfig config
@@ -905,7 +897,7 @@ void mse_kernel_wrapper(
 void evaluate_mse_kernel_wrapper(
     float* X, 
     float* Y, 
-    float* type, 
+    u8* type, 
     float* value, 
     float* result,
     const LaunchConfig config
@@ -969,7 +961,7 @@ void evaluate_mse_kernel_wrapper(
 void kernel_wrapper(
     float* X, 
     float* Y, 
-    float* type, 
+    u8* type, 
     float* value, 
     float* partial,
     float* result,
@@ -997,7 +989,7 @@ void kernel_wrapper(
 __global__
 void compute_tree_output_wrapper(
     float* X, 
-    float* type,
+    u8* type,
     float* value,
     float* result,
     size_t solution_length,
@@ -1039,7 +1031,7 @@ void compute_tree_output_wrapper(
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_datapoints,
     size_t datapoint_index,
@@ -1050,7 +1042,7 @@ float test_compute_output_kernel(
 
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
-    float* d_type = allocate_and_copy(h_type.data(), solution_length);
+    u8* d_type = allocate_and_copy(h_type.data(), solution_length);
     float* d_value = allocate_and_copy(h_value.data(), solution_length);
 
     // Allocate memory
@@ -1080,7 +1072,7 @@ float test_compute_output_kernel(
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X, 
     std::vector<float> h_Y, 
-    std::vector<float> h_type, 
+    std::vector<u8> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
     size_t num_datapoints,
@@ -1091,7 +1083,7 @@ std::vector<float> test_evaluate_kernel(
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
     float* d_Y = allocate_and_copy(h_Y.data(), h_Y.size());
-    float* d_type = allocate_and_copy(h_type.data(), h_type.size());
+    u8* d_type = allocate_and_copy(h_type.data(), h_type.size());
     float* d_value = allocate_and_copy(h_value.data(), h_value.size());
 
     size_t partial_size;
@@ -1146,7 +1138,7 @@ std::vector<float> test_compute_mse_kernel(
 std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_X, 
     std::vector<float> h_Y, 
-    std::vector<float> h_type, 
+    std::vector<u8> h_type, 
     std::vector<float> h_value, 
     size_t num_solutions,
     size_t num_datapoints
@@ -1156,7 +1148,7 @@ std::vector<float> test_evaluate_mse_kernel(
     // Allocate memory and copy data
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
     float* d_Y = allocate_and_copy(h_Y.data(), h_Y.size());
-    float* d_type = allocate_and_copy(h_type.data(), h_type.size());
+    u8* d_type = allocate_and_copy(h_type.data(), h_type.size());
     float* d_value = allocate_and_copy(h_value.data(), h_value.size());
 
     float* d_result = allocate_on_gpu<float>(num_solutions);    
@@ -1178,7 +1170,7 @@ std::vector<float> test_evaluate_mse_kernel(
 std::vector<float> test_kernel_hybrid(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
     size_t num_datapoints,
@@ -1188,7 +1180,7 @@ std::vector<float> test_kernel_hybrid(
 
     float* d_X = allocate_and_copy(h_X.data(), h_X.size());
     float* d_Y = allocate_and_copy(h_Y.data(), h_Y.size());
-    float* d_type = allocate_and_copy(h_type.data(), h_type.size());
+    u8* d_type = allocate_and_copy(h_type.data(), h_type.size());
     float* d_value = allocate_and_copy(h_value.data(), h_value.size());
 
     float* d_partial = allocate_on_gpu<float>(num_solutions * blocks_per_individual);

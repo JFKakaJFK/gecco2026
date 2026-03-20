@@ -1,5 +1,6 @@
 #include "goblin/gp/gpu_evaluation/memory.h"
 #include "goblin/gp/gpu_evaluation/misc.h"
+#include "goblin/lib/types.h"
 
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 
@@ -45,5 +46,10 @@ template float* allocate_and_copy<float>(const float*, size_t);
 template void copy_from_device<float>(float*, float*, size_t);
 template void free_on_gpu<float>(float*);
 template void zero_mem_on_gpu<float>(float* d_ptr, size_t count);
+
+template u8* allocate_on_gpu<u8>(size_t);
+template void copy_to_gpu<u8>(u8*, const u8*, size_t);
+template u8* allocate_and_copy<u8>(const u8*, size_t);
+template void free_on_gpu<u8>(u8*);
 
 }
