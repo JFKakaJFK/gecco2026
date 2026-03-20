@@ -1,8 +1,6 @@
-#include <cstdint>
 #include "doctest/doctest.h"
 
 #include "goblin/gp/context.h"
-#include "goblin/gp/sr.h"
 #include "goblin/gp/gpu_evaluation/types.h"
 #include "goblin/lib/fitness.h"
 
@@ -100,6 +98,99 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::simple_tree") {
     CHECK_EQ(size, expected_size);
 
     for (usize i = 0; i < ctx.max_expression_size; i++) {
+        INFO("Index: ", i);
+        INFO("Type: ", node_type[i], "\t|\t Expected: ", expected_node_type[i]);
+        INFO("Value: ", node_value[i], "\t|\t Expected: ", expected_node_value[i]);
+
+        CHECK_EQ(node_type[i], expected_node_type[i]);
+        CHECK_EQ(node_value[i], expected_node_value[i]);
+    }
+}
+
+TEST_CASE("goblin::gp::ctx_gpu_repr::multi_output") {
+    using namespace test;
+
+    // Binary tree with depth 1: root + 2 children = 3 nodes per output
+    auto tree = TemplateNode::full_nary(2, 1);
+    Template tmplate;
+    tmplate.add_output(tree);
+    tmplate.add_output(tree);
+
+    std::vector<std::shared_ptr<OperatorBase>> operators = {
+        std::make_shared<OpSubGPU>(),
+        std::make_shared<OpAdd>(),
+    };
+
+    GPContext ctx(
+        /* num_inputs = */ 2, tmplate, operators, /* num_parameters = */ 0,
+        /* constant_representation = */ "ercs", /* constant_pool_size= */ 10, /* enable_subfunctions= */ false
+    );
+
+    auto f = MOFitness(/* num_objectives= */ 2);
+    Solution s(f.worst(), Vec<DType>::Zero(ctx.num_discrete), Vec<CType>::Zero(ctx.num_continuous));
+
+    auto out0_root  = ctx.output_roots[0];
+    auto out0_left  = ctx.children[out0_root][0];
+    auto out0_right = ctx.children[out0_root][1];
+
+    auto out1_root  = ctx.output_roots[1];
+    auto out1_left  = ctx.children[out1_root][0];
+    auto out1_right = ctx.children[out1_root][1];
+
+    std::vector<u8> node_type;
+    std::vector<float> node_value;
+    usize size = 0;
+
+    std::vector<u8> expected_node_type;
+    std::vector<float> expected_node_value;
+    usize expected_size;
+
+    // Appends one output's worth of expected data, padded to max_expression_size
+    auto expect_output = [&](std::vector<u8> types, std::vector<float> values) {
+        types.resize(ctx.max_expression_size, std::numeric_limits<u8>::max());
+        values.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
+        expected_node_type.insert(expected_node_type.end(), types.begin(), types.end());
+        expected_node_value.insert(expected_node_value.end(), values.begin(), values.end());
+    };
+
+    SUBCASE("x0 + x1 and x1 - x0") {
+        // Output 0: x0 + x1
+        s.discrete_values()(out0_root)  = ctx.op_idx2value[1]; // +
+        s.discrete_values()(out0_left)  = 0;                   // x0
+        s.discrete_values()(out0_right) = 1;                   // x1
+
+        // Output 1: x1 - x0
+        s.discrete_values()(out1_root)  = ctx.op_idx2value[0]; // -
+        s.discrete_values()(out1_left)  = 1;                   // x1
+        s.discrete_values()(out1_right) = 0;                   // x0
+
+        expect_output({I, I, O}, {Idx(0), Idx(1), Add});
+        expect_output({I, I, O}, {Idx(1), Idx(0), Sub});
+        expected_size = 6;
+    }
+
+    SUBCASE("leaf output followed by operator output") {
+        // Output 0: just x0 at root (children are inactive)
+        s.discrete_values()(out0_root) = 0; // x0
+
+        // Output 1: x0 + x1
+        s.discrete_values()(out1_root)  = ctx.op_idx2value[1]; // +
+        s.discrete_values()(out1_left)  = 0;                   // x0
+        s.discrete_values()(out1_right) = 1;                   // x1
+
+        expect_output({I}, {Idx(0)});
+        expect_output({I, I, O}, {Idx(0), Idx(1), Add});
+        expected_size = 4;
+    }
+
+    ctx.to_gpu_representation(s, node_type, node_value, size);
+
+    CHECK_EQ(node_type.size(), expected_node_type.size());
+    CHECK_EQ(node_value.size(), expected_node_value.size());
+    CHECK_EQ(node_type.size(), node_value.size());
+    CHECK_EQ(size, expected_size);
+
+    for (usize i = 0; i < 2 * ctx.max_expression_size; i++) {
         INFO("Index: ", i);
         INFO("Type: ", node_type[i], "\t|\t Expected: ", expected_node_type[i]);
         INFO("Value: ", node_value[i], "\t|\t Expected: ", expected_node_value[i]);
@@ -228,6 +319,116 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions") {
     CHECK_EQ(size, expected_size);
 
     for (usize i = 0; i < ctx.max_expression_size; i++) {
+        INFO("Index: ", i);
+        INFO("Type: ", node_type[i], "\t|\t Expected: ", expected_node_type[i]);
+        INFO("Value: ", node_value[i], "\t|\t Expected: ", expected_node_value[i]);
+
+        CHECK_EQ(node_type[i], expected_node_type[i]);
+        CHECK_EQ(node_value[i], expected_node_value[i]);
+    }
+}
+
+TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions_multi_output") {
+    using namespace test;
+
+    // Binary tree of depth 2 (3 layers), 1 subtree, 2 outputs
+    auto tree = TemplateNode::full_nary(2, 2);
+    Template tmplate;
+    tmplate.add_subtree(tree);
+    tmplate.add_output(tree);
+    tmplate.add_output(tree);
+
+    std::vector<std::shared_ptr<OperatorBase>> operators = {std::make_shared<OpSubGPU>()};
+
+    GPContext ctx(
+        /* num_inputs = */ 2, tmplate, operators, /* num_parameters = */ 0,
+        /* constant_representation = */ "ercs", /* constant_pool_size= */ 10, /* enable_subfunctions= */ true
+    );
+
+    auto f = MOFitness(/* num_objectives= */ 2);
+    Solution s(f.worst(), Vec<DType>::Zero(ctx.num_discrete), Vec<CType>::Zero(ctx.num_continuous));
+
+    auto sub_root  = ctx.subtree_roots[0];
+    auto sub_left  = ctx.children[sub_root][0];
+    auto sub_right = ctx.children[sub_root][1];
+
+    auto out0_root  = ctx.output_roots[0];
+    auto out0_left  = ctx.children[out0_root][0];
+    auto out0_right = ctx.children[out0_root][1];
+
+    auto out1_root  = ctx.output_roots[1];
+    auto out1_left  = ctx.children[out1_root][0];
+    auto out1_right = ctx.children[out1_root][1];
+
+    std::vector<u8> node_type;
+    std::vector<float> node_value;
+    usize size = 0;
+
+    std::vector<u8> expected_node_type;
+    std::vector<float> expected_node_value;
+    usize expected_size;
+
+    auto expect_output = [&](std::vector<u8> types, std::vector<float> values) {
+        types.resize(ctx.max_expression_size, std::numeric_limits<u8>::max());
+        values.resize(ctx.max_expression_size, std::numeric_limits<float>::max());
+        expected_node_type.insert(expected_node_type.end(), types.begin(), types.end());
+        expected_node_value.insert(expected_node_value.end(), values.begin(), values.end());
+    };
+
+    REQUIRE(node_type.empty());
+    REQUIRE(node_value.empty());
+    REQUIRE(expected_node_type.empty());
+    REQUIRE(expected_node_value.empty());
+    REQUIRE_EQ(size, 0);
+
+    // Fn[0] = Arg[0] - Arg[1] (shared setup for all subcases)
+    // Subtree root domain (fn[0] excluded as cyclic): 0=x0, 1=x1, 2=const, 3=arg[0], 4=arg[1], 5=Sub
+    s.discrete_values()(sub_root)  = ctx.value2domain(sub_root, ctx.op_idx2value[0]).value_or(1000); // -
+    s.discrete_values()(sub_left)  = 3; // Arg[0]
+    s.discrete_values()(sub_right) = 4; // Arg[1]
+
+    // Output root domain (args excluded): 0=x0, 1=x1, 2=const, 3=fn[0], 4=Sub
+
+    SUBCASE("same subfunction, but with swapped arguments") {
+        // Output 0: fn[0](x0, x1) -> ... -> x0 - x1
+        s.discrete_values()(out0_root)  = 3; // Fn[0]
+        s.discrete_values()(out0_left)  = 0; // x0  (= arg[0])
+        s.discrete_values()(out0_right) = 1; // x1  (= arg[1])
+
+        // Output 1: fn[0](x1, x0) -> ... -> x1 - x0
+        s.discrete_values()(out1_root)  = 3; // Fn[0]
+        s.discrete_values()(out1_left)  = 1; // x1  (= arg[0])
+        s.discrete_values()(out1_right) = 0; // x0  (= arg[1])
+
+        expect_output({I, I, O}, {Idx(0), Idx(1), Sub});
+        expect_output({I, I, O}, {Idx(1), Idx(0), Sub});
+        expected_size = 6;
+    }
+
+    SUBCASE("subfunction in one output, direct operator in other") {
+        // Output 0: x0 - x1 without subfunction; call stack must stay clean for output 1
+        s.discrete_values()(out0_root)  = 4; // Sub (direct)
+        s.discrete_values()(out0_left)  = 0; // x0
+        s.discrete_values()(out0_right) = 1; // x1
+
+        // Output 1: fn[0](x1, x0) -> x1 - x0
+        s.discrete_values()(out1_root)  = 3; // Fn[0]
+        s.discrete_values()(out1_left)  = 1; // x1  (= arg[0])
+        s.discrete_values()(out1_right) = 0; // x0  (= arg[1])
+
+        expect_output({I, I, O}, {Idx(0), Idx(1), Sub});
+        expect_output({I, I, O}, {Idx(1), Idx(0), Sub});
+        expected_size = 6;
+    }
+
+    ctx.to_gpu_representation(s, node_type, node_value, size);
+
+    CHECK_EQ(node_type.size(), expected_node_type.size());
+    CHECK_EQ(node_value.size(), expected_node_value.size());
+    CHECK_EQ(node_type.size(), node_value.size());
+    CHECK_EQ(size, expected_size);
+
+    for (usize i = 0; i < 2 * ctx.max_expression_size; i++) {
         INFO("Index: ", i);
         INFO("Type: ", node_type[i], "\t|\t Expected: ", expected_node_type[i]);
         INFO("Value: ", node_value[i], "\t|\t Expected: ", expected_node_value[i]);
