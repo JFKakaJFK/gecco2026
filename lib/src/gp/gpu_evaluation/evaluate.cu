@@ -16,7 +16,7 @@
     X(544) X(576) X(608) X(640) X(672) X(704) X(736) X(768) \
     X(800) X(832) X(864) X(896) X(928) X(960) X(992) X(1024)
 
-#define MAX_STACK_DEPTH 256
+#define MAX_STACK_DEPTH 16
 #define MAX_NUM_NODES 256
 #define MAX_ARITY 2
 
