@@ -1,6 +1,8 @@
+#include <cstdint>
+
 #include "goblin/gp/gpu_evaluation/memory.h"
 #include "goblin/gp/gpu_evaluation/misc.h"
-#include "goblin/lib/types.h"
+#include "goblin/gp/gpu_evaluation/types.h"
 
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 

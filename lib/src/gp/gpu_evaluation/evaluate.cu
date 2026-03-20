@@ -1,10 +1,11 @@
 #include "cub/cub.cuh"
 
+#include <cstdint>
+
 #include "goblin/gp/gpu_evaluation/evaluate.h"
 #include "goblin/gp/gpu_evaluation/launch_config.h"
 #include "goblin/gp/gpu_evaluation/memory.h"
 #include "goblin/gp/gpu_evaluation/types.h"
-#include "goblin/lib/types.h"
 
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 
