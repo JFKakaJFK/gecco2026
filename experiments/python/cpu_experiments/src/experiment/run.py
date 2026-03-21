@@ -147,7 +147,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
 def run_cpu_tasks(
     tasks: TaskGenerator,
     output_directory: Path,
-    max_workers: int | None = 60,
+    max_workers: int | None = 30,
     required_rate: float | None = None,
     dry_run: bool = False,
 ) -> float | None:
