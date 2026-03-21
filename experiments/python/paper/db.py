@@ -61,7 +61,8 @@ def create_db(dir: pathlib.Path):
     )
 
     for csv_file in tqdm(
-        glob.glob(f"{dir}/**/*.csv", recursive=True), leave=False, ascii=True
+        [f for f in glob.glob(f"{dir}/**/*.csv", recursive=True) if "backup" not in f.split(os.sep)],
+        leave=False, ascii=True
     ):
         _, _, algorithm, dataset = csv_file.split(os.sep)
 
@@ -110,7 +111,8 @@ def create_db(dir: pathlib.Path):
         )
 
     for db_file in tqdm(
-        glob.glob(f"{dir}/**/*.duckdb", recursive=True), leave=False, ascii=True
+        [f for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True) if "backup" not in f.split(os.sep)],
+        leave=False, ascii=True
     ):
         stuff = db_file.split(os.sep)
 

@@ -1,4 +1,4 @@
-generation,total_time_seconds,evaluations,mse_train,r2_train,mse_test,r2_test,size,structure,problem,run,version
+generation,time_seconds,evaluations,mse_train,r2_train,mse_test,r2_test,size,structure,problem,run,version
 0,1.14708,128,0.0283807,-0.877541,0.0282407,-0.844629,11,sqrt((x2/((exp(x6)+x3)+sqrt(log(x7))))),feynman_I_9_18,13,GP-GOMEA (original)
 1,64.0907,5524,0.00953896,0.368945,0.00963393,0.37073,34,((exp(sin(sin(x0)))+sin(cos(exp(cos(x2)))))/((sqrt(sqrt(x3))+(cos(sin(x2))+log((x5*x3))))/(sqrt((x4+x0))/(sqrt(sin(x2))*x7)))),feynman_I_9_18,13,GP-GOMEA (original)
 2,122.718,11289,0.00536263,0.645233,0.0054537,0.643774,28,sqrt((((((x0*x0)*(x4*x4))+log(log(x1)))/((x8+(-7.097000/x1))*((x4+x5)*(x7+x8))))*x2)),feynman_I_9_18,13,GP-GOMEA (original)
