@@ -123,7 +123,7 @@ def run_one_task(task: Task) -> dict:
 def run_cpu_tasks(
     tasks: TaskGenerator,
     output_directory: Path,
-    max_workers: int | None = None,
+    max_workers: int | None = 30,
     dry_run: bool = False,
 ) -> None:
     if not dry_run:
