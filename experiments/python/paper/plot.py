@@ -22,11 +22,19 @@ DATASET_LABELS = {
 
 VAR_LABELS = {
     "mse": "MSE",
-    "evaluations": "Evaluations",
+    "evaluations": "#Evaluations / Minute",
+}
+
+TIME_BUDGET_MINUTES = {
+    "GP-GOMEA (CPU)": 60,
+    "GP-GOMEA (GPU)": 10,
+    "EvoGP": 10,
+    "Operon": 60,
+    "Kozax": 10,
 }
 
 
-def plot(var: str, dir: pathlib.Path):
+def plot(var: str, dir: pathlib.Path, sharey: str = "col"):
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
 
@@ -48,6 +56,9 @@ def plot(var: str, dir: pathlib.Path):
 
     df["algorithm"] = df["algorithm"].map(ALGORITHM_LABELS).fillna(df["algorithm"])
     df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    if var == "evaluations":
+        df["evaluations"] /= df["algorithm"].map(TIME_BUDGET_MINUTES)
 
     dataset_order = [
         DATASET_LABELS[d]
@@ -81,12 +92,24 @@ def plot(var: str, dir: pathlib.Path):
         col_order=dataset_order,
         marker="o",
         palette=palette,
-        facet_kws={"sharey": "col", "margin_titles": True},
+        facet_kws={"sharey": sharey, "margin_titles": True},
         height=2.5,
         aspect=1.0,
     )
 
-    g.set_titles(col_template="{col_name}", row_template="Depth {row_name}")
+    g.set_titles(col_template="{col_name}", row_template="")
+    for i, row_name in enumerate(g.row_names):
+        g.axes[i, 0].annotate(
+            f"{var_label}\nDepth {row_name}",
+            xy=(0, 0.5),
+            xycoords="axes fraction",
+            xytext=(-50, 0),
+            textcoords="offset points",
+            ha="center",
+            va="center",
+            rotation=90,
+            multialignment="center",
+        )
 
     for ax in g.axes.flat:
         ax.set_xscale("log", base=2)
@@ -94,9 +117,21 @@ def plot(var: str, dir: pathlib.Path):
         ax.set_axisbelow(True)
 
     g.set(yscale="log")
-    g.set_axis_labels("Population Size", var_label)
+    g.set_axis_labels("", "")
 
-    g.legend.set_title("Algorithm")
+    sns.move_legend(
+        g,
+        loc="lower center",
+        bbox_to_anchor=(0.42, -0.05),
+        ncol=len(algorithm_order),
+        title=None,
+    )
+
+    g.figure.canvas.draw()
+    positions = [ax.get_position() for ax in g.axes.flat]
+    grid_left = min(p.x0 for p in positions)
+    grid_right = max(p.x1 for p in positions)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.025)
 
     plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
     plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)
@@ -161,5 +196,5 @@ def plot_experiment_1(dir: pathlib.Path):
 
 if __name__ == "__main__":
     plot("mse", pathlib.Path("results/experiment_2"))
-    plot("evaluations", pathlib.Path("results/experiment_2"))
+    plot("evaluations", pathlib.Path("results/experiment_2"), sharey="row")
     plot_experiment_1(pathlib.Path("results/experiment_1"))

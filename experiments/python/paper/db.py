@@ -61,8 +61,13 @@ def create_db(dir: pathlib.Path):
     )
 
     for csv_file in tqdm(
-        [f for f in glob.glob(f"{dir}/**/*.csv", recursive=True) if "backup" not in f.split(os.sep)],
-        leave=False, ascii=True
+        [
+            f
+            for f in glob.glob(f"{dir}/**/*.csv", recursive=True)
+            if "backup" not in f.split(os.sep)
+        ],
+        leave=False,
+        ascii=True,
     ):
         _, _, algorithm, dataset = csv_file.split(os.sep)
 
@@ -111,8 +116,13 @@ def create_db(dir: pathlib.Path):
         )
 
     for db_file in tqdm(
-        [f for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True) if "backup" not in f.split(os.sep)],
-        leave=False, ascii=True
+        [
+            f
+            for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
+            if "backup" not in f.split(os.sep)
+        ],
+        leave=False,
+        ascii=True,
     ):
         stuff = db_file.split(os.sep)
 
@@ -143,6 +153,11 @@ def create_db(dir: pathlib.Path):
         #     FROM src.results
         # """)
 
+        mse_col = "mse_train"
+
+        if "gpu" in algorithm:
+            mse_col = "old_mse" if "auto_mpg" in dataset else "mse"
+
         conn.execute(f"""
             INSERT INTO results
             SELECT
@@ -150,7 +165,7 @@ def create_db(dir: pathlib.Path):
                 '{dataset.split(".")[0]}' AS dataset,
                 total_time_seconds,
                 expressions AS expression,
-                mse_train AS mse,
+                {mse_col} AS mse,
                 evaluations,
                 fold,
                 num_observations,
@@ -216,4 +231,4 @@ def create_db_experiment_1(dir: pathlib.Path):
 
 if __name__ == "__main__":
     create_db(pathlib.Path("results/experiment_2"))
-    create_db_experiment_1(pathlib.Path("results/experiment_1"))
+    # create_db_experiment_1(pathlib.Path("results/experiment_1"))
