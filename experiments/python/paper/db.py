@@ -17,28 +17,6 @@ def create_db(dir: pathlib.Path):
 
     conn = duckdb.connect(db_path)
 
-    # Create table
-    # conn.execute(
-    #     """
-    # CREATE TABLE IF NOT EXISTS results (
-    #     algorithm TEXT,
-    #     dataset TEXT,
-    #     total_time_seconds DOUBLE,
-    #     expression TEXT,
-    #     mse DOUBLE,
-    #     evaluation UBIGINT,
-    #     fold INTEGER,
-    #     num_observations INTEGER,
-    #     num_features INTEGER,
-    #     population_size INTEGER,
-    #     operator_set TEXT,
-    #     template_depth INTEGER,
-    #     run INTEGER,
-    #     seed UBIGINT,
-    # );
-    # """
-    # )
-
     conn.execute(
         """
     CREATE TABLE IF NOT EXISTS results (
@@ -70,28 +48,6 @@ def create_db(dir: pathlib.Path):
         ascii=True,
     ):
         _, _, algorithm, dataset = csv_file.split(os.sep)
-
-        # conn.execute(
-        #     f"""
-        # INSERT INTO results
-        # SELECT
-        #     '{algorithm}' AS algorithm,
-        #     '{dataset.split(".")[0]}' AS dataset,
-        #     total_time_seconds,
-        #     expression,
-        #     mse,
-        #     evaluations,
-        #     fold,
-        #     num_observations,
-        #     num_features,
-        #     population_size,
-        #     operator_set,
-        #     template_depth,
-        #     iteration AS run,
-        #     seed,
-        # FROM read_csv_auto('{csv_file}')
-        # """
-        # )
 
         conn.execute(
             f"""
@@ -133,30 +89,7 @@ def create_db(dir: pathlib.Path):
 
         conn.execute(f"ATTACH '{db_file}' AS src")
 
-        # conn.execute(f"""
-        #     INSERT INTO results
-        #     SELECT
-        #         '{algorithm}' AS algorithm,
-        #         '{dataset.split(".")[0]}' AS dataset,
-        #         total_time_seconds,
-        #         expressions AS expression,
-        #         mse_train AS mse,
-        #         evaluations,
-        #         fold,
-        #         num_observations,
-        #         num_features,
-        #         population_size,
-        #         operator_set,
-        #         template_depth,
-        #         run,
-        #         seed,
-        #     FROM src.results
-        # """)
-
-        mse_col = "mse_train"
-
-        if "gpu" in algorithm:
-            mse_col = "old_mse" if "auto_mpg" in dataset else "mse"
+        mse_col = "mse" if "gpu" in algorithm else "mse_train"
 
         conn.execute(f"""
             INSERT INTO results
