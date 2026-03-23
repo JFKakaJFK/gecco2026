@@ -485,11 +485,18 @@ class Concat final : public ObjectiveBase {
       c_len = o->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+      std::vector<usize> local_d_indices, local_c_indices;
+      for (auto idx : discrete_indices)
+        if (idx >= d_offset && idx < d_offset + d_len)
+          local_d_indices.push_back(idx - d_offset);
+      for (auto idx : continuous_indices)
+        if (idx >= c_offset && idx < c_offset + c_len)
+          local_c_indices.push_back(idx - c_offset);
       auto [fov, fcv] = o->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
           parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          std::span<const usize>(local_d_indices), std::span<const usize>(local_c_indices));
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
@@ -555,11 +562,18 @@ class Repeat final : public ObjectiveBase {
       c_len = fn->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+      std::vector<usize> local_d_indices, local_c_indices;
+      for (auto idx : discrete_indices)
+        if (idx >= d_offset && idx < d_offset + d_len)
+          local_d_indices.push_back(idx - d_offset);
+      for (auto idx : continuous_indices)
+        if (idx >= c_offset && idx < c_offset + c_len)
+          local_c_indices.push_back(idx - c_offset);
       auto [fov, fcv] = fn->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
           parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          std::span<const usize>(local_d_indices), std::span<const usize>(local_c_indices));
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
