@@ -1,22 +1,31 @@
 import pathlib
-import shutil
+from ast import literal_eval
 
-import numpy as np
-from PIL import Image, ImageDraw, ImageFont, ImageOps
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
 from pygom import *
 from pygom.classic import *
 from pygom.voronoi import (
-    ColorMixCrossover,
-    MergeSplitMutation,
-    PositionMixCrossover,
     VoronoiImageReconstruction,
+    YourCustomCrossover,
+    YourCustomMutation,
 )
 
-MIN_NUM_CELLS = 10
-MAX_NUM_CELLS = 100
+from src.utils import animate_evolution, load_image_data, save_images
+
+MIN_NUM_CELLS = 25
+MAX_NUM_CELLS = 25
 IMAGE_MAX_DIM = 64
+# Number of active cells needed to switch to using a KD-Tree for determining the nearest voronoi cell during evaluation. This depends on the number of pixels and cells and the hardware, but generally brute-forcing is fast...
+KDTREE_THRESHOLD = 200
 COMPLEXITY_OBJECTIVE = False
-# COMPLEXITY_OBJECTIVE = True
+COMPLEXITY_OBJECTIVE = True
+
+# If enabled the complexity objecitve is logged even if it is not optimized
+TRACK_COMPLEXITY = True
+
+RESULT_DIR = pathlib.Path("results")
 
 # learning objectives
 # - work with a C++ based python library
@@ -26,188 +35,141 @@ COMPLEXITY_OBJECTIVE = False
 # - linkage
 # - mo
 
-
-def problem_from_image(image_path: str, init: InitBase | None = None):
-    im = Image.open(image_path).convert("RGB")
-
-    w, h = im.size
-    m = max(w, h)
-    if m > IMAGE_MAX_DIM:
-        scale_factor = IMAGE_MAX_DIM / m
-        im = ImageOps.cover(im, (int(scale_factor * w), int(scale_factor * h)))
-        w, h = im.size
-    else:
-        scale_factor = 1.0
-
-    # im.show()
-
-    data = np.array(im.get_flattened_data(), dtype=np.uint8)
-    return VoronoiImageReconstruction(
-        target_image=data,
-        width=w,
-        height=h,
-        min_num_cells=MIN_NUM_CELLS,
-        max_num_cells=MAX_NUM_CELLS,
-        complexity_objective=COMPLEXITY_OBJECTIVE,
-        # track_complexity=True,
-        init=init,
-    ), scale_factor
+# i.e. you know what each decision variable represents, but you are not allowed to change the underlying fitness function
 
 
-def save_images(problem: VoronoiImageReconstruction, scale_factor: float = 1.0):
-    pass
+# deliverables
+# - initialisation & variation: 2 hypotheses
+# - mo: 1 hypothesis
+# - proper experiments, >= 30 repeats & statistical testing
 
 
 if __name__ == "__main__":
-    problem, scale_factor = problem_from_image(
-        "img/reference_image.jpg", init=RandomInit()
+    *image, scale_factor = load_image_data("img/reference_image.jpg", IMAGE_MAX_DIM)
+
+    init = RandomInit()
+
+    problem = VoronoiImageReconstruction(
+        *image,
+        min_num_cells=MIN_NUM_CELLS,
+        max_num_cells=MAX_NUM_CELLS,
+        complexity_objective=COMPLEXITY_OBJECTIVE,
+        track_complexity=TRACK_COMPLEXITY,
+        init=init,
+        kdtree_threshold=KDTREE_THRESHOLD,
     )
 
-    alg = SimpleGA(
-        population_size=100,
-        steady_state=True,
-        # crossover=UniformCrossover(0.25),
-        # crossover=NPointCrossover(1),
-        # crossover=ColorMixCrossover(),
-        crossover=CombinedCrossover(
-            [
-                (UniformCrossover(), 0.4),
-                (PositionMixCrossover(), 0.3),
-                (ColorMixCrossover(), 0.3),
-            ]
-        ),
-        mutation=CombinedMutation(
-            [
-                (LocalizedMutation(), 0.5),
-                (RandomMutation(), 0.5),
-                (MergeSplitMutation(MIN_NUM_CELLS, p_merge=0.25), 1.0),
-            ]
-        ),
-        selection=(
-            TruncationSelection() if COMPLEXITY_OBJECTIVE else TournamentSelection(4)
-        ),
-    )
-
-    custom_similarity = np.zeros(
-        (6 * MAX_NUM_CELLS, 6 * MAX_NUM_CELLS), dtype=np.float64
-    )
-
-    # min num cells are linked with each other
-    custom_similarity[: 6 * MIN_NUM_CELLS, : 6 * MIN_NUM_CELLS] = 0.01
-    for i in range(MAX_NUM_CELLS):
-        ii = 6 * i
-
-        #      / \
-        #    /   {X,Y, R, G, B}
-        #  /     /       \
-        # /     {X, Y}   {R, G, B}
-
-        for j in range(6):
-            for k in range(6):
-                if 1 <= j <= 2 and 1 <= k <= 2:  # X,Y
-                    custom_similarity[ii + j, ii + k] = 1.0
-                elif 3 <= j and 3 <= k:  # R,G,B
-                    custom_similarity[ii + j, ii + k] = 1.0
-                else:
-                    custom_similarity[ii + j, ii + k] = 0.5
-
-    # alg = MixedGOMEA(
-    #     ims_options=IMSOptions(initial_population_size=2, max_num_populations=4 + int(COMPLEXITY_OBJECTIVE), restart_stale_populations=True),
-    #     population_options=PopulationOptions(forced_improvements=True),
-    #     discrete_model=LinkageTreeFOS(custom_similarity=custom_similarity)
-    # )
-
+    # Note: the TruncationSelection implementation performs NSGA-II like
+    # selection using fast non-dominated sorting with multiple objectives
     selection = (
         TruncationSelection() if COMPLEXITY_OBJECTIVE else TournamentSelection(4)
     )
 
-    color_opt = SimpleGA(
+    ea = SimpleGA(
         population_size=100,
         steady_state=True,
-        crossover=ColorMixCrossover(),
-        mutation=None,
+        # apply uniform/one-point/your custom (*) crossover with different probabilities
+        # *: uniform crossover until you change it
+        crossover=CombinedCrossover(
+            [
+                (UniformCrossover(0.25), 0.3),
+                (NPointCrossover(1), 0.3),
+                (YourCustomCrossover(), 0.4),
+            ]
+        ),
+        mutation=CombinedMutation(
+            [(RandomMutation(), 0.9), (YourCustomMutation(), 0.1)]
+        ),
         selection=selection,
     )
 
-    position_opt = SimpleGA(
-        population_size=100,
-        steady_state=True,
-        crossover=PositionMixCrossover(),
-        mutation=None,
-        selection=selection,
+    budget = Budget(  #
+        max_time_seconds=600,
+        # max_evaluations=int(1e6), max_generations=1000
     )
 
-    stages = [alg, color_opt, position_opt]
+    seed = None
+    odir = RESULT_DIR / "SimpleGA"
 
-    budget = Budget(max_time_seconds=3)
-    population = None
-    for repeat in range(3):
-        for stage, m in enumerate(stages):
-            # print(type(m).__name__)
-            if population is not None:
-                m.set_population(population)
-            archive, status = m.run(problem, budget, population_size=100)
-            # archive, status = Tracked.run(  # works fine
-            #     problem,
-            #     m,
-            #     budget,
-            #     TrackingOptions(
-            #         f"logs/baseline_{repeat}_{stage}.csv",
-            #         log_info=[  # add any extra fields to log here
-            #             ("method_name", "baseline"),
-            #             ("stage", f"{repeat}.{stage}"),
-            #         ],
-            #     ),
-            #     population_size=100,
-            #     # seed=42
-            # )
-            print(status, archive.so_solution(0).quality().objectives)
-            population = m.get_population()
-            for i in range(50):
-                population.remove_at(population.size() - 1)
-            # population = AoSSet()
-            for i in range(archive.size()):
-                population.add(archive[i])
+    print("Running...", end="")
+    if odir is None:
+        archive, status = ea.run(problem, budget, seed=seed)
+    else:
+        archive, status = Tracked.run(
+            problem,
+            ea,
+            budget,
+            TrackingOptions(
+                str(odir / "stats.csv"),
+                # you can log any str,str header/value tuples you want here
+                log_info=[("method_name", "SimpleGA")],
+            ),
+            seed=seed,
+        )
 
-            print(
-                "PS",
-                population.size(),
-                population[0].quality().objectives,
-                archive[0].quality().objectives,
+    print(f" done.\nBest objective(s): {archive.so_solution(0).quality().objectives}")
+
+    save_images(
+        odir / "archive",
+        problem,
+        archive,
+        scale_factor,
+        show_objectives=True,  # add text showing the objective value(s)
+        clean=True,  # empty the directory beforehand
+    )
+
+    if odir:
+        multi_objective = TRACK_COMPLEXITY or COMPLEXITY_OBJECTIVE
+
+        df = pd.read_csv(odir / "stats.csv")
+        df["objectives"] = df["objectives"].apply(literal_eval)
+        df["reconstruction_error"] = df["objectives"].apply(lambda o: o[0])
+
+        elites = df.sort_values(["generation", "reconstruction_error"]).drop_duplicates(
+            "generation", keep="first"
+        )
+
+        animate_evolution(
+            odir / "evolution.gif",
+            problem,
+            elites,
+            sorted(elites["generation"].unique()),
+            scale_factor=scale_factor,
+        )
+
+        metric = "generation"
+        metric_label = "Generations"
+
+        fig, axes = plt.subplots(ncols=1 + int(multi_objective), figsize=(8, 4))
+        ax = axes[0] if multi_objective else axes
+
+        sns.lineplot(
+            elites,
+            x=metric,
+            y="reconstruction_error",
+            hue="method_name",
+            ax=ax,
+        )
+
+        ax.set_xlabel("Generations")
+        ax.set_title("Reconstruction Error")
+
+        if multi_objective:
+            elites["num_cells"] = elites["objectives"].apply(lambda o: o[1])
+
+            nc_ax = axes[1]
+
+            sns.lineplot(
+                elites,
+                x=metric,
+                y="num_cells",
+                hue="method_name",
+                alpha=0.5,
+                ls="dashed",
+                ax=nc_ax,
             )
 
-    # TODO stages
-    # optimize color only, then position only, then both
+            nc_ax.set_xlabel("Generations")
+            nc_ax.set_title("Cell count")
 
-    # TODO cleanup
-
-    # budget = Budget(max_time_seconds=30)
-    # budget = Budget(max_evaluations=int(1e5))
-    # budget = Budget(max_generations=500)
-
-    # archive, status = alg.run(problem, budget)
-    # archive, status = Tracked.run( # works fine
-    #     problem,
-    #     alg,
-    #     budget,
-    #     TrackingOptions(
-    #         "logs/baseline.csv",
-    #         log_info=[  # add any extra fields to log here
-    #             ("method_name", "baseline"),
-    #         ],
-    #     ),
-    #     # seed=42
-    # )
-
-    odir = pathlib.Path("archive")
-    if odir.exists():
-        shutil.rmtree(odir)
-    odir.mkdir(exist_ok=True, parents=True)
-    for i in range(archive.size()):
-        print(f"Solution {i}: {archive[i].quality().objectives}")
-
-        # save to archive/img
-        data, w, h = problem.image_data(archive[i], scale=1.0 / scale_factor)
-        im = Image.fromarray(data.reshape(h, w, 3), "RGB")
-        # im.show()
-        im.save(odir / f"img{i:04d}.png")
+        plt.show()

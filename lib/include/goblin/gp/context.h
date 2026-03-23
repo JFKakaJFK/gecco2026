@@ -53,7 +53,8 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            std::optional<usize> max_expression_size = std::nullopt)
+            std::optional<usize> max_expression_size = std::nullopt,
+            bool use_apply_buf = true)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -69,6 +70,7 @@ class GPContext {
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         enable_subfunctions(enable_subfunctions),
+        use_apply_buf(use_apply_buf),
         operators(std::move(operators)) {
     __goblin_runtime_assert(expression_template.is_valid());
     usize num_constant_values = const_repr == ConstantRepr::ERCs   ? 1
@@ -614,6 +616,9 @@ class GPContext {
 
     // for each output, evaluate the tree
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
+
+    // Eigen::internal::set_is_malloc_allowed(false);
+
     const auto trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
@@ -635,8 +640,7 @@ class GPContext {
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
-          eval_buffer.col(j) = X.col(
-              v_idx);  // @claude: runtime error: assumption of 128 byte alignment for pointer of type 'double *' failed
+          eval_buffer.col(j) = X.col(v_idx);
         } else if (value_kind[value] == ValueKind::Parameter) {
           eval_buffer.col(j) = params(v_idx);
         } else if (value_kind[value] == ValueKind::Constant) {
@@ -649,7 +653,11 @@ class GPContext {
           // arg_stack
           std::span<const usize> child_indices{arg_stack.end() - arity, arg_stack.end()};
 
-          operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          if (use_apply_buf) {
+            operators[v_idx]->apply_buf(eval_buffer, j, child_indices);
+          } else {
+            operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          }
 
           // pop the now used arguments from the stack
           arg_stack.resize(arg_stack.size() - arity);
@@ -671,6 +679,8 @@ class GPContext {
       assert(arg_stack.back() == tree.size() - 1);
       outputs.col(i) = eval_buffer.col(tree.size() - 1);
     }
+
+    // Eigen::internal::set_is_malloc_allowed(true);
 
     return outputs;
   }
@@ -915,6 +925,7 @@ class GPContext {
   usize num_parameters;
   usize max_num_children;
   bool enable_subfunctions;
+  bool use_apply_buf;
 
   std::vector<std::shared_ptr<OperatorBase>> operators;
   std::vector<usize> op_idx2value;

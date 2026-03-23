@@ -13,9 +13,6 @@
 #include <optional>
 #include <print>
 
-#include <unsupported/Eigen/NonLinearOptimization>
-#include <unsupported/Eigen/NumericalDiff>
-
 #include "goblin/gp/context.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
@@ -27,6 +24,9 @@
 #include "goblin/lib/solution.h"
 #include "goblin/lib/types.h"
 #include "goblin/lib/init.h"
+
+#include <unsupported/Eigen/NonLinearOptimization>
+#include <unsupported/Eigen/NumericalDiff>
 
 namespace goblin {
 
@@ -327,7 +327,7 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   void evaluate_test(const SolutionBase& solution) const {

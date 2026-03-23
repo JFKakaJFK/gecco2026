@@ -16,7 +16,7 @@ NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "constant_optimization"
+RESULT_DIR = pathlib.Path("results") / "speed_check"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,8 +24,9 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
+    max_evaluations=int(5e5)
     # max_evaluations=int(1e6)
-    max_evaluations=int(2e6)
+    # max_evaluations=int(2e6)
     # max_evaluations=int(5e6)
     # max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
@@ -44,7 +45,9 @@ def problems(rng):
         # "sin(1.57 * x0 + 1.04 * x1)",
     ]
 
-    noise_levels = [0.0, 0.05, 0.1]
+    noise_levels = [
+        0.0,  # 0.05, 0.1
+    ]
 
     problems = [
         (
@@ -64,10 +67,10 @@ def problems(rng):
         # "210_cloud",
         # "522_pm10",
         "Airfoil",
-        "Bike Sharing",
-        "Concrete Compressive Strength",
-        "Dow Chemical",
-        # "Tower",
+        # "Bike Sharing",
+        # "Concrete Compressive Strength",
+        # "Dow Chemical",
+        "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -95,7 +98,8 @@ def problems(rng):
             )
 
             for height in [
-                5  # , 7
+                # 5  # ,
+                7
             ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
@@ -131,21 +135,23 @@ def problems(rng):
                                 expression_template=template,
                                 operators=operators,
                                 constant_representation=constant_representation,
+                                use_apply_buf=False,
                             )
 
                             for batch_size in [  #
-                                # None, 32,
-                                256
+                                None,
+                                # 32,
+                                # 256
                             ]:
                                 for run in range(REPEATS_PER_FOLD):
                                     seed = int(rng.integers(2**32))
 
                                     instance = c.SRProblem(
                                         ctx,
-                                        x_train=c.np.load(str(X_path.absolute())),
-                                        y_train=c.np.load(str(y_path.absolute())),
-                                        x_test=c.np.load(str(X_test_path.absolute())),
-                                        y_test=c.np.load(str(y_test_path.absolute())),
+                                        X_train=c.np.load(str(X_path.absolute())),
+                                        Y_train=c.np.load(str(y_path.absolute())),
+                                        X_test=c.np.load(str(X_test_path.absolute())),
+                                        Y_test=c.np.load(str(y_test_path.absolute())),
                                         objectives="nmse",  # = MSE / var(y_train)
                                         linear_scaling=linear_scaling,
                                         init=c.HalfHalfInit(
@@ -154,6 +160,9 @@ def problems(rng):
                                         constant_init_lower_bound=min_y,
                                         constant_init_upper_bound=max_y,
                                         # early termination condition for "perfect" expression recovery
+                                        # target_objectives=[1e-8]
+                                        # if is_synthetic
+                                        # else [0.0],
                                         # target_objectives=[
                                         #     # R2 >= 0.999 for black-box problems
                                         #     # and (N)MSE < 1e-8 for synthetic problems
@@ -206,26 +215,26 @@ def methods(info, ctx):
         variants += [
             ", ERCs",
             # ", ERCs + Mut",
-            ", ERCs + LM",
+            # ", ERCs + LM",
             # ", ERCs + LM (mut)",
             # ", ERCs + LM (central)",
         ]
     if constant_representation == "pool":
         variants += [
             # ", $Pool_{10}$ + LM",
-            ", $Pool_{10}$ + RV (1:1)",
+            # ", $Pool_{10}$ + RV (1:1)",
             # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
-            ", $Pool_{10}$ + RV (iu)",
+            # ", $Pool_{10}$ + RV (iu)",
             # ", $Pool_{10}$ + RV (ai)",
             # ", $Pool_{10}$ + RV (me,ce)",
             # ", $Pool_{10}$ + RV (iu,me,ce)",
-            ", $Pool_{10}$ + RV (nSDR)",
+            # ", $Pool_{10}$ + RV (nSDR)",
             # ", $Pool_{10}$ + RV (nrvfi)",
             # ", $Pool_{10}$ + RV (nrvfi,nmfi)",
             # ", $Pool_{10}$ + RV (nrvfi,nfi)",
             # ", $Pool_{10}$ + LM (mut)",
-            ", $Pool_{10}$ + RV (nfa)",
+            # ", $Pool_{10}$ + RV (nfa)",
         ]
 
     for similarity in [  #
@@ -304,44 +313,38 @@ def methods(info, ctx):
                 **copt_model_kwargs,
             )
 
-            for reevaluate_solutions_after_adaption in [  #
-                # False,
-                True
-            ]:
-                yield (
-                    f'"{similarity} {copt} {["", "Reeval"][reevaluate_solutions_after_adaption]}"',
-                    c.MixedGOMEA(
-                        discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
-                        population_options=c.PopulationOptions(
-                            target_continuous_to_discrete_balance=0.5
-                            if "1:2" in copt
-                            else 1.0,
-                            forced_improvements="RV" in copt
-                            and "nfi"
-                            not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
-                            enable_mixed_forced_improvements="nmfi" not in copt,
-                            **copt_population_kwargs,
-                        ),
-                        rv_options=c.RvOptions(**rv_options),
-                        continuous_model=c.FullFOS(),
-                        sampling_model=c.AMaLGaMSamplingModel(
-                            distribution_multiplier_decrease=1.0
-                            if "nSDR" in copt
-                            else 0.9,
-                            distribution_multiplier_increase=1.0
-                            if "nSDR" in copt
-                            else 1.0 / 0.9,
-                        ),
-                        # IMS options
-                        ims_options=c.IMSOptions(
-                            initial_population_size=initial_population_size,
-                            max_num_populations=max_num_populations,
-                            subgeneration_factor=subgeneration_factor,
-                            restart_stale_populations=restart_stale_populations,
-                            reevaluate_solutions_after_adaption=reevaluate_solutions_after_adaption,
-                        ),
+            yield (
+                f'"{similarity} {copt}"',
+                c.MixedGOMEA(
+                    discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
+                    population_options=c.PopulationOptions(
+                        target_continuous_to_discrete_balance=0.5
+                        if "1:2" in copt
+                        else 1.0,
+                        forced_improvements="RV" in copt
+                        and "nfi"
+                        not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        enable_mixed_forced_improvements="nmfi" not in copt,
+                        **copt_population_kwargs,
                     ),
-                )
+                    rv_options=c.RvOptions(**rv_options),
+                    continuous_model=c.FullFOS(),
+                    sampling_model=c.AMaLGaMSamplingModel(
+                        distribution_multiplier_decrease=1.0 if "nSDR" in copt else 0.9,
+                        distribution_multiplier_increase=1.0
+                        if "nSDR" in copt
+                        else 1.0 / 0.9,
+                    ),
+                    # IMS options
+                    ims_options=c.IMSOptions(
+                        initial_population_size=initial_population_size,
+                        max_num_populations=max_num_populations,
+                        subgeneration_factor=subgeneration_factor,
+                        restart_stale_populations=restart_stale_populations,
+                        reevaluate_solutions_after_adaption=True,
+                    ),
+                ),
+            )
 
 
 def all_tasks():
@@ -389,8 +392,13 @@ def status():
         )
 
 
+# build introspection tools -> population diversity, rv distributions, termination & restarts (why does it effectively stop improving?)
+
+
 def main():
     # status()
+
+    # exit()
 
     # TODO add dry run option that only checks how many jobs would be run (per cpu)
     run_tasks(
@@ -400,6 +408,8 @@ def main():
         # limit=1,
         # max_workers=1,  # server has 44 physical cores
     )
+
+    # exit()
 
     with load_results(
         LOG_DIR,

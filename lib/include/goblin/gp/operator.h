@@ -60,6 +60,9 @@ class OperatorBase {
   virtual bool is_commutative() const = 0;
 
   virtual void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const = 0;
+  virtual void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const {
+    throw std::runtime_error("Not implemented.");
+  };
 
   virtual bool has_gradient() const { return false; };
   virtual void apply_grad(Ref<Array<CType>> out,
@@ -89,6 +92,10 @@ class OpIdentity : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -110,6 +117,13 @@ class OpAdd : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().sum(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+    for (usize i = 1; i < args.size(); i++) {
+      buf.col(out) += buf.col(args[i]);
+    }
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -152,6 +166,17 @@ class OpSub : public OperatorBase {
     }
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    if (args.size() > 1) {
+      buf.col(out) = buf.col(args[0]);
+      for (usize i = 1; i < args.size(); i++) {
+        buf.col(out) -= buf.col(args[i]);
+      }
+    } else {
+      buf.col(out) -= buf.col(args[0]);
+    }
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -191,6 +216,13 @@ class OpMul : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().prod(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+    for (usize i = 1; i < args.size(); i++) {
+      buf.col(out) *= buf.col(args[i]);
+    }
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -239,6 +271,14 @@ class OpDiv : public OperatorBase {
     out = args.col(0) / args(Eigen::placeholders::all, Eigen::seq(1, args.cols() - 1)).rowwise().prod();
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[1]);
+    for (usize i = 2; i < args.size(); i++) {
+      buf.col(out) *= buf.col(args[i]);
+    }
+    buf.col(out) = buf.col(args[0]) / buf.col(out);
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -284,6 +324,10 @@ class OpSin : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).sin(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).sin();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -307,6 +351,10 @@ class OpCos : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).cos(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).cos();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -332,6 +380,10 @@ class OpExp : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).exp(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).exp();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -355,6 +407,10 @@ class OpLog : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).log(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).log();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -380,6 +436,10 @@ class OpSquare : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).square(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).square();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -403,6 +463,10 @@ class OpSqrt : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).sqrt(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).sqrt();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -430,6 +494,10 @@ class OpPow : public OperatorBase {
     out = args.col(0).pow(args.col(1));
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).pow(buf.col(args[1]));
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -455,6 +523,10 @@ class OpAbs : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).abs(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).abs();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -478,6 +550,10 @@ class OpMin : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().minCoeff(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).minCoeff();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -513,6 +589,10 @@ class OpMax : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().maxCoeff(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).maxCoeff();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,

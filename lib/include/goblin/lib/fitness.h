@@ -113,39 +113,11 @@ class MOFitness : public ArchiveFitnessBase {
 
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
-               std::optional<usize> objective = std::nullopt) const override final; /* {
-    const auto& ql = lhs.as<MOQuality>();
-    const auto& qr = rhs.as<MOQuality>();
-    // Constraints are always minimized
-    Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
-
-    if (o == Ordering::Equal || o == Ordering::NonDominated) {
-      if (objective.has_value()) {
-        o = cmp(ql.objectives(objective.value()), qr.objectives(objective.value()), _epsilon, _minimize);
-      } else {
-        for (usize i = 0; i < _num_objectives && o != Ordering::NonDominated; i++) {
-          o = o | cmp(ql.objectives(i), qr.objectives(i), _epsilon, _minimize);
-        }
-      }
-    }
-    return o;
-  };
-  */
+               std::optional<usize> objective = std::nullopt) const override final;
 
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
-                 std::optional<usize> objective = std::nullopt) const override final; /*{
-    const auto& ql = lhs.as<MOQuality>();
-    const auto& qr = rhs.as<MOQuality>();
-    CType dist;
-    if (objective.has_value()) {
-      dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
-    } else {
-      dist = (ql.objectives - qr.objectives).norm();
-    }
-    return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
-  };
-  */
+                 std::optional<usize> objective = std::nullopt) const override final;
 
   virtual std::unique_ptr<QualityBase> worst() const override {
     const CType inf = std::numeric_limits<CType>().infinity();

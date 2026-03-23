@@ -20,8 +20,8 @@ class LeadingSpheres final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     CType cv = CType(0.0);
     bool active = true;

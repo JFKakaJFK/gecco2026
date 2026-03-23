@@ -132,7 +132,7 @@ class InstanceBase {
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   virtual void log_solution(std::ostream& os, const SolutionBase& solution) const {
@@ -172,7 +172,7 @@ class InstanceBase {
     os << '"';
     log_solution(os, solution);
     os << "\",";
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   std::string format_solution(const SolutionBase& solution) const {

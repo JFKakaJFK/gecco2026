@@ -380,6 +380,9 @@ class Tracked final : public WrappedInstance {
   void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
     alg_timer.stop();
 
+    // TODO if evaluations == 0 optionally add all solutions to the archive, not just indices => correct tracking for
+    // warm start scenarios where some solutions already have a fitness
+
     // check if the budget was exhausted while the algorithm was running
     auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
     generation = method.current_generation();

@@ -119,7 +119,7 @@ TEST_CASE("goblin::gp::precision") {
   // don't support types other than CType = double
   auto Y_pred = ctx.compute_outputs(s, X, params);
 
-  for (usize i = 0; i < Y.rows(); i++) {
+  for (isize i = 0; i < Y.rows(); i++) {
     std::println("{}: {} (pred) vs {} (target): ({})", i, Y_pred.value()(i, 0), Y(i, 0),
                  std::pow(Y_pred.value()(i, 0) - Y(i, 0), 2));
   }

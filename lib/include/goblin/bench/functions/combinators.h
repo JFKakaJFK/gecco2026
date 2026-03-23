@@ -46,8 +46,8 @@ class BBO final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
   };
 
@@ -64,8 +64,8 @@ class Masked final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
     return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -73,12 +73,12 @@ class Masked final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -104,8 +104,8 @@ class Inverted final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     // TODO this does not forward modifications to the actual solutions
     // (non-issue for my use cases so far, but still a violation of the api...)
     Vec<DType> d_inverted = DType(1) - discrete_values.array();
@@ -115,12 +115,12 @@ class Inverted final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -212,8 +212,8 @@ class Rotated final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
     auto r_values = rotated(continuous_values);
@@ -222,12 +222,12 @@ class Rotated final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -276,8 +276,8 @@ class Sum final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -289,12 +289,12 @@ class Sum final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -333,8 +333,8 @@ class Max final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = -std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -346,12 +346,12 @@ class Max final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -390,8 +390,8 @@ class Min final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -403,12 +403,12 @@ class Min final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -447,8 +447,8 @@ class Concat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (auto& o : fns) {
@@ -468,12 +468,12 @@ class Concat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -517,8 +517,8 @@ class Repeat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (usize i = 0; i < _repeats; i++) {
@@ -538,12 +538,12 @@ class Repeat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,

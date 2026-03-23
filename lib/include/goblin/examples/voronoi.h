@@ -7,10 +7,111 @@
 #include <limits>
 #include <format>
 #include <vector>
+#include <algorithm>
+#include <random>
 
 #include "goblin/lib/instance.h"
 #include "goblin/lib/init.h"
 #include "goblin/methods/classic/simple_ga.h"
+
+template <typename C>
+class KDTree {
+ private:
+  using Scalar = typename C::Scalar;
+  using usize = std::size_t;
+  using isize = std::ptrdiff_t;
+
+  struct Node {
+    usize idx;
+    Node* left;
+    Node* right;
+  };
+
+  Node* root;
+  std::vector<Node> nodes;
+
+  usize best_idx;
+  Scalar best_dist;
+
+  Node* build_helper(usize begin, usize end, isize dim, const C& coords) {
+    if (end <= begin) {
+      return nullptr;
+    }
+
+    // find midpoint in current dimension
+    usize mid = begin + (end - begin) / 2;
+    auto i = nodes.begin();
+    std::nth_element(i + begin, i + mid, i + end,
+                     [&](const Node& lhs, const Node& rhs) { return coords(dim, lhs.idx) < coords(dim, rhs.idx); });
+
+    // recurse with next dimension
+    dim = (dim + 1) % coords.rows();
+    nodes[mid].left = build_helper(begin, mid, dim, coords);
+    nodes[mid].right = build_helper(mid + 1, end, dim, coords);
+    return &nodes[mid];
+  };
+
+  template <typename P>
+  void closest_helper(Node* node, isize dim, const C& coords, const P& point) {
+    if (node == nullptr) {
+      return;
+    }
+
+    const isize n_dims = coords.rows();
+
+    // Note that (coords(node->idx) - point).square().sum()
+    // silently produces incorrect results due to broadcasting fun
+    Scalar dist = 0.0;
+    for (isize i = 0; i < n_dims; i++) {
+      dist += std::pow(coords(i, node->idx) - point(i), 2);
+    }
+
+    if (dist < best_dist) {
+      best_dist = dist;
+      best_idx = node->idx;
+    }
+
+    if (best_dist == 0.0) {
+      return;
+    }
+
+    Scalar dist_x = coords(dim, node->idx) - point(dim);
+    dim = (dim + 1) % n_dims;
+    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
+    if (dist_x * dist_x < best_dist) {
+      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
+    }
+  }
+
+ public:
+  // No default copying since the nodes are pointer-based
+  KDTree(const KDTree&) = delete;
+  KDTree& operator=(const KDTree&) = delete;
+
+  KDTree() = default;
+  void build(const C& coords, usize size) {
+    if (coords.cols() < size) {
+      throw std::runtime_error("Not enough coordinates passed!");
+    }
+    nodes.resize(size);
+    for (usize i = 0; i < nodes.size(); i++) {
+      nodes[i].idx = i;
+    }
+    root = build_helper(0, nodes.size(), /* dim = */ 0, coords);
+  };
+
+  template <typename P>
+  usize closest(const C& coords, const P& point) {
+    if (root == nullptr) {
+      throw std::runtime_error("Empty tree!");
+    }
+
+    best_idx = 0;
+    best_dist = std::numeric_limits<Scalar>::infinity();
+    closest_helper(root, /* dim = */ 0, coords, point);
+    return best_idx;
+  }
+};
 
 namespace goblin {
 namespace voronoi {
@@ -26,26 +127,30 @@ class VoronoiImageReconstruction : public InstanceBase {
   const usize NUM_COLOR_VALUES = 256;
 
  public:
-  VoronoiImageReconstruction(const Arr2D<DType>& target_image,
-                             usize width,
-                             usize height,
-                             usize min_num_cells = 10,
-                             usize max_num_cells = 100,
-                             std::optional<AnyInit> init = std::nullopt,
-                             bool complexity_objective = false,
-                             bool track_complexity = false)
+  VoronoiImageReconstruction(
+      const Arr2D<DType>& target_image,
+      usize width,
+      usize height,
+      usize min_num_cells = 10,
+      usize max_num_cells = 100,
+      std::optional<AnyInit> init = std::nullopt,
+      bool complexity_objective = false,
+      bool track_complexity = false,
+      /// Minimum number of cells after which a kd-tree should be used to determine the nearest cell center
+      usize kdtree_threshold = 50)
       : _fitness(  // this preference is optimized
             /* num_objectives = */ complexity_objective ? 2 : 1,
             /* minimize = */ true),
         _archive_fitness(  // this one is used for the archive
-            /* num_objectives = */ complexity_objective || track_complexity ? 2 : 1,
+            /* num_objectives = */ (complexity_objective || track_complexity) ? 2 : 1,
             /* minimize = */ true),
         target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
         min_num_cells(min_num_cells),
-        max_num_cells(max_num_cells) {
+        max_num_cells(max_num_cells),
+        kdtree_threshold(kdtree_threshold) {
     const usize num_pixels = target_image.rows();
     if (num_pixels != width * height) {
       throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})",
@@ -77,15 +182,6 @@ class VoronoiImageReconstruction : public InstanceBase {
       _discrete_domain_sizes[j + COLOR_R] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
-    }
-
-    image_coords.resize(2, num_pixels);
-    for (usize x = 0; x < width; x++) {
-      for (usize y = 0; y < height; y++) {
-        usize i = y * width + x;
-        image_coords(i, 0) = x;
-        image_coords(i, 1) = y;
-      }
     }
   };
 
@@ -151,6 +247,7 @@ class VoronoiImageReconstruction : public InstanceBase {
     Arr2D<float> centers(2, max_num_cells);
     Arr2D<float> colors(max_num_cells, 3);
     Array<float> pixel(2);
+    KDTree<decltype(centers)> kdt;
 
     for (usize i : indices) {
       auto& s = solutions[i];
@@ -159,8 +256,9 @@ class VoronoiImageReconstruction : public InstanceBase {
       usize num_cells = 0;
       for (usize j = 0; j < max_num_cells; j++) {
         usize k = j * VARS_PER_CELL;
-        if (j < min_num_cells || s.discrete_values()(k + ENABLED)) {
-          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = true;
+        bool cell_is_active = j < min_num_cells || s.discrete_values()(k + ENABLED);
+        s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = cell_is_active;
+        if (cell_is_active) {
           if (j < min_num_cells) {
             s.discrete_active()(k + ENABLED) = false;
           }
@@ -173,28 +271,13 @@ class VoronoiImageReconstruction : public InstanceBase {
           colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
 
           num_cells++;
-        } else {
-          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = false;
         }
       }
 
-      auto closest = [&](float x, float y) {
-        float dist = std::numeric_limits<float>::infinity();
-        usize closest_idx = 0;
-        for (usize k = 0; k < num_cells; k++) {
-          // float dx = x - centers(k, 0), dy = y - centers(k, 1);
-          // float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
-          float dx = x - centers(0, k), dy = y - centers(1, k);
-          float d = dx * dx + dy * dy;
-          if (d < dist) {
-            dist = d;
-            closest_idx = k;
-          }
-        }
-        return closest_idx;
-      };
-
-      // TODO create image of positions, rowwise argmin dist...
+      bool use_kdtree = num_cells >= kdtree_threshold;
+      if (use_kdtree) {
+        kdt.build(centers, num_cells);
+      }
 
       // compute per-pixel mismatch
       float reconstruction_error = 0.0;
@@ -202,7 +285,24 @@ class VoronoiImageReconstruction : public InstanceBase {
         for (usize y = 0; y < height; y++) {
           usize j = y * width + x;
 
-          usize cell_idx = closest(x, y);
+          usize cell_idx;
+          if (use_kdtree) {
+            pixel(0) = x;
+            pixel(1) = y;
+            cell_idx = kdt.closest(centers, pixel);
+          } else {
+            float best_dist = std::numeric_limits<float>::infinity();
+            cell_idx = 0;
+            for (usize k = 0; k < num_cells; k++) {
+              float dx = centers(0, k) - static_cast<float>(x);
+              float dy = centers(1, k) - static_cast<float>(y);
+              float dist = dx * dx + dy * dy;
+              if (dist < best_dist) {
+                best_dist = dist;
+                cell_idx = k;
+              }
+            }
+          }
 
           reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
         }
@@ -249,12 +349,12 @@ class VoronoiImageReconstruction : public InstanceBase {
   MOFitness _fitness;
   MOFitness _archive_fitness;
   Arr2D<float> target_image;
-  Arr2D<float> image_coords;
   std::shared_ptr<InitBase> init;
   usize width;
   usize height;
   usize min_num_cells;
   usize max_num_cells;
+  usize kdtree_threshold;
 
   Vec<DType> _discrete_domain_sizes{};
   Vec<CType> _continuous_lower_bounds{};
@@ -266,7 +366,7 @@ class VoronoiImageReconstruction : public InstanceBase {
 
 // It is important to use the fully qualified name for the base class (i.e. goblin::classic::DiscreteCrossoverBase) so
 // that the bindings are generated correctly
-class CustomCrossover : public goblin::classic::DiscreteCrossoverBase {
+class YourCustomCrossover : public goblin::classic::DiscreteCrossoverBase {
   bool crossover(Rng& rng,
                  InstanceBase& problem,
                  const SolutionBase& donor,
@@ -276,172 +376,29 @@ class CustomCrossover : public goblin::classic::DiscreteCrossoverBase {
   }
 };
 
-class CustomMutation : public goblin::classic::DiscreteMutationBase {
+class YourCustomMutation : public goblin::classic::DiscreteMutationBase {
   void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-    // do whatever you want here
-    goblin::classic::RandomMutation().mutate(rng, problem, offspring);
-  }
-};
-
-/// Idea:
-/// - color values have meaning _together_
-/// - other cells might have the needed color information
-/// - color mixing performs search compared to replacement
-/// => Randomly mix the current cell color with another cell's color
-class ColorMixCrossover : public goblin::classic::DiscreteCrossoverBase {
-  bool crossover(Rng& rng,
-                 InstanceBase& problem,
-                 const SolutionBase& donor,
-                 SolutionBase& offspring) const override final {
+    // do whatever you want here, for example toggle cells randomly
     const usize VARS_PER_CELL = 6;
     const usize l = problem.num_discrete();
-    const usize num_cells = l / VARS_PER_CELL;
-    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
-    std::uniform_real_distribution<float> U(0.0, 1.0);
-
-    usize donor_idx;
-    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
-      if (U(rng) < 0.5) {
-        // 1. get a random donor cell
-        do {
-          donor_idx = cells(rng);
-        } while (donor_idx == cell_idx);
-
-        // 2. randomly mix the colors
-        float w = U(rng);
-        Array<float> rgb = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)).cast<float>();
-        Array<float> rgb_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 3, 3)).cast<float>();
-        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)) =
-            (w * rgb + (1.0 - w) * rgb_donor).cast<DType>();
-      }
-    }
-
-    bool evaluation_needed = true;
-    return evaluation_needed;
-  };
-};
-
-/// Idea:
-/// - position values have meaning _together_
-/// - cell position has meaning relative to other cell positions
-/// => Randomly move to/from other cells
-class PositionMixCrossover : public goblin::classic::DiscreteCrossoverBase {
-  bool crossover(Rng& rng,
-                 InstanceBase& problem,
-                 const SolutionBase& donor,
-                 SolutionBase& offspring) const override final {
-    const usize VARS_PER_CELL = 6;
-    const usize l = problem.num_discrete();
-    const usize num_cells = l / VARS_PER_CELL;
-    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
-    std::uniform_real_distribution<float> U(0.0, 1.0);
-    std::normal_distribution<float> N(0.0, 1.0);
-
-    usize donor_idx;
-    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
-      if (U(rng) < 0.5) {
-        // 1. get a random donor cell
-        do {
-          donor_idx = cells(rng);
-        } while (donor_idx == cell_idx);
-
-        // 2. randomly move towards/away from donor
-        float w = N(rng);
-        Array<float> xy = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        Array<float> xy_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        xy += w * 0.1 * (xy_donor - xy);
-        Array<float> ub = problem.discrete_domain_sizes()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        xy = xy.min(ub).max(0.0);
-        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)) = xy.cast<DType>();
-      }
-    }
-
-    bool evaluation_needed = true;
-    return evaluation_needed;
-  };
-};
-
-class MergeSplitMutation : public goblin::classic::DiscreteMutationBase {
-  double p_merge;
-  double noise;
-  usize min_num_cells;
-
- public:
-  MergeSplitMutation(usize min_num_cells,
-                     std::optional<double> p_mutation = std::nullopt,
-                     double p_merge = 0.5,
-                     double splitting_noise = 0.05)
-      : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
-    if (p_merge < 0.0 || 1.0 < p_merge) {
-      throw std::runtime_error("The probability of merging must be in [0, 1]!");
-    }
-
-    if (splitting_noise <= 0.0) {
-      throw std::runtime_error("The splitting noise must be positive!");
-    }
-  };
-
-  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-    const usize VARS_PER_CELL = 6;
-    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
-
-    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
-    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
+    const usize max_num_cells = l / VARS_PER_CELL;
+    const auto domain = problem.discrete_domain_sizes();
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    std::normal_distribution<double> N(0.0, 1.0);
 
-    bool merge = U(rng) < p_merge;
-
-    // loop until we find another active/inactive cell for merging/splitting into
-    usize start = random_cell;
-    while (merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)) {
-      random_cell++;
-      if (random_cell >= num_cells) {
-        random_cell = min_num_cells;
-      }
-      if (random_cell == start) {
-        break;
-      }
+    usize min_num_cells = 0;
+    while (domain(min_num_cells) < 2) {
+      min_num_cells++;
     }
-    usize offset = cell * VARS_PER_CELL;
-    usize offset_random = random_cell * VARS_PER_CELL;
 
-    auto x = offspring.discrete_values();
-    if (merge) {
-      // disable the other cell
-      x(offset_random) = false;
-      // and linearly combine the cell information with random weights
-      double w = U(rng);
-      for (usize i = 1; i < VARS_PER_CELL; i++) {
-        x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
-      }
-    } else /* split */ {
-      // enable the other cell
-      x(offset_random) = true;
+    if (min_num_cells < max_num_cells) {
+      double p_mut = 1.0 / static_cast<double>(max_num_cells - min_num_cells);
 
-      // add noise to both cell values
-      double v;
-      for (usize i = 1; i < VARS_PER_CELL; i++) {
-        const usize d_i = problem.discrete_domain_sizes()(offset + i);
-
-        // get value, add noise & map back into the domain for the other cell
-        v = static_cast<double>(x(offset + i));
-        v += N(rng) * noise * static_cast<double>(d_i);
-        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+      for (usize i = min_num_cells; i < max_num_cells; i++) {
+        usize offset = i * VARS_PER_CELL;
+        if (U(rng) < p_mut) {
+          offspring.discrete_values()(offset) = !offspring.discrete_values()(offset);
         }
-        v = std::fmod(v, d_i);
-        x(offset_random + i) = static_cast<DType>(v);
-
-        // get value, add noise & map back into the domain for this cell
-        v = static_cast<double>(x(offset + i));
-        v += N(rng) * noise * static_cast<double>(d_i);
-        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-        }
-        v = std::fmod(v, d_i);
-        x(offset + i) = static_cast<DType>(v);
       }
     }
   }

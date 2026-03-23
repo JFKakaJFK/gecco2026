@@ -1,5 +1,6 @@
 import os
 import pathlib
+import re
 
 import litgen
 from codemanip import amalgamated_header
@@ -19,6 +20,7 @@ def type_replacements() -> litgen.RegexReplacementList:
     * types translations
     * NULL, nullptr, void translation
     """
+
     replacements_str = r"""
     \bunsigned \s*int\b -> int
     \bunsigned \s*short\b -> int
@@ -74,6 +76,18 @@ def type_replacements() -> litgen.RegexReplacementList:
 
     # TODO this doesn't really do the job - it might be necessary to manually replace some std:: and custom definitions after litgen is done...
     customm_replacements_str = r"""
+    \bVec<(.*)>\b -> np.ndarray
+    \bArray<(.*)>\b -> np.ndarray
+    \bMat<(.*)>\b -> np.ndarray
+    \bArr2D<(.*)>\b -> np.ndarray
+    \bC?RefS?<(.*)>\b -> np.ndarray
+
+    \bVec\[(.*)\]\b -> np.ndarray
+    \bArray\[(.*)\]\b -> np.ndarray
+    \bMat\[(.*)\]\b -> np.ndarray
+    \bArr2D\[(.*)\]\b -> np.ndarray
+    \bC?RefS?\[(.*)\]\b -> np.ndarray
+
     \bu8\b -> int
     \bu16\b -> int
     \bu32\b -> int
@@ -90,25 +104,87 @@ def type_replacements() -> litgen.RegexReplacementList:
     \bstd::ostream\b -> io.IOBase
     \bstd::string_view\b -> str
     \bstd::reference_wrapper<(.*)>\b -> \1
+    \bstd\.reference_wrapper\[(.*)\]\b -> \1
+    \bstd::set<(.*)>\b -> Set[\1]
     \bstd::make_shared<(.*)>\b -> \1
+    \bstd::make_unique<(.*)>\b -> \1
     \bstd::filesystem::path\b -> pathlib.Path | str
     \bstd::chrono::nanoseconds\b -> datetime.timedelta
     \bstd::span<(.*)>\b -> List[\1]
     \bstd::chrono::seconds\((\d+)\)\b -> datetime.timedelta(seconds=\1)
     \bstd::chrono::minutes\((\d+)\)\b -> datetime.timedelta(minutes=\1)
-
-    \bVec<(.*)>\b -> np.ndarray
-    \bArray<(.*)>\b -> np.ndarray
-    \bMat<(.*)>\b -> np.ndarray
-    \bArr2D<(.*)>\b -> np.ndarray
-    \bActive\b -> np.ndarray
-    \bC?RefS?<(.*)>\b -> np.ndarray
     """
 
     replaces = litgen.RegexReplacementList.from_string(
         replacements_str + customm_replacements_str
     )
     return replaces
+
+
+def postprocess_stub(code: str):
+    patterns = [
+        tuple(map(lambda t: t.strip(), s.split("->")))
+        for r in r"""
+        Vec\[([^\]]*)\] -> np.ndarray
+        # negative lookbehind to avoid looping
+        (?<!npt\.ND)Array\[([^\]]*)\] -> np.ndarray
+        Mat\[([^\]]*)\] -> np.ndarray
+        Arr2D\[([^\]]*)\] -> np.ndarray
+        C?RefS?\[([^\]]*)\] -> \1
+        ScalarType -> float
+
+        # clean up missed std:: types
+        std\.reference_wrapper\[([^\]]*)\] -> \1
+        std\.span\[([^\]]*)\] -> List[\1]
+        std\.set\[([^\]]*)\] -> Set[\1]
+
+        # clean up invalid defaults
+        =\s*Array\s*<[^>]+>\s*\(\) -> REMOVE
+        =\s*Arr2D\s*<[^>]+>\s*\(\) -> REMOVE
+        =\s*Vec\s*<[^>]+>\s*\(\) -> REMOVE
+        =\s*Mat\s*<[^>]+>\s*\(\) -> REMOVE
+    """.splitlines()
+        if len(s := r.split("#")[0].strip()) > 0
+    ]
+
+    for pattern, replacement in patterns:
+        if replacement == "REMOVE":
+            replacement = ""
+        regex = re.compile(pattern)
+        while True:
+            print(pattern, len(regex.findall(code)))
+            new_code = regex.sub(replacement, code)
+            if new_code == code:
+                break
+            code = new_code
+
+    # map <submodule>.<type> to just <type> within submodules
+    submodule_names = re.compile(r"# <submodule ([^>]+)>")
+    for submodule in submodule_names.findall(code):
+        full_submodule = re.compile(
+            rf"# <submodule {submodule}>[\s\S]*# <\/submodule {submodule}>"
+        ).search(code)
+        assert full_submodule is not None
+        full_submodule = full_submodule.group(0)
+        fixed_submodule = full_submodule
+
+        # fix types for each class defined in the submodule
+        class_names = re.compile(r"class\s(\w[\w\d]+)(?:\([^\)]*\))?:")
+        for name in class_names.findall(full_submodule):
+            if name == submodule:
+                continue
+
+            # replace overly qualified references to the type
+            regex = re.compile(rf"{submodule}\.{name}")
+            fixed_submodule = regex.sub(name, fixed_submodule)
+
+            # replace default values that do not resolve correctly
+            default_regex = re.compile(rf"=\s{name}\(\)")
+            fixed_submodule = default_regex.sub("", fixed_submodule)
+
+        code = code.replace(full_submodule, fixed_submodule)
+
+    return code
 
 
 def amalgamate():
@@ -137,6 +213,10 @@ def configure_litgen() -> litgen.LitgenOptions:
     # configure your options here
     options = litgen.LitgenOptions()
 
+    # the C++ already conforms to the Python convention of
+    # PascalCase for classes and snake_case for methods/functions
+    # options.python_convert_to_snake_case = False
+
     # options.bind_library = litgen.BindLibraryType.nanobind
     options.use_nanobind()
 
@@ -145,6 +225,7 @@ def configure_litgen() -> litgen.LitgenOptions:
 
     # some replacements to clean up the definitions made in goblin/lib/types.h
     options.type_replacements = type_replacements()
+    options.postprocess_stub_function = postprocess_stub
 
     # options.class_exclude_by_name__regex = "Instance|Problem"
     # options.class_template_options.add_specialization(
@@ -160,7 +241,7 @@ def configure_litgen() -> litgen.LitgenOptions:
     options.class_override_virtual_methods_in_python__regex = "Base$"
     options.member_exclude_by_name__regex = "^_private|^request_debug_report$|^log_"
 
-    # For reasons (I do not understand) the 'quality' Solution(Base) members get bound as
+    # For reasons (I do not fully understand) the 'quality' Solution(Base) members get bound as
     #
     # ```
     # ...

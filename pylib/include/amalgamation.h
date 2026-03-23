@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -43,6 +44,8 @@
 #endif
 #endif
 
+// #define EIGEN_RUNTIME_NO_MALLOC  // enable runtime allocation testing
+
 #include <Eigen/Dense>
 #include <cstdint>
 #include <span>
@@ -67,12 +70,6 @@ using BType = u8;  // not using bool avoids implicit bitset types
 using DType = u16;
 using CType = f64;
 
-// Is this a good idea?
-// template <typename T>
-// using Box = std::unique_ptr<T>;
-// template <typename T>
-// using Rc = std::shared_ptr<T>;
-
 template <typename T>
 using Vec = Eigen::VectorX<T>;
 template <typename T>
@@ -91,7 +88,11 @@ using RefS = Eigen::Ref<T, 0, Eigen::InnerStride<>>;
 template <typename T>
 using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
-using Active = Array<BType>;
+// Is this a good idea?
+// template <typename T>
+// using Box = std::unique_ptr<T>;
+// template <typename T>
+// using Rc = std::shared_ptr<T>;
 
 template <typename T>
 constexpr bool isna(const T& v) {
@@ -336,39 +337,11 @@ class MOFitness : public ArchiveFitnessBase {
 
   Ordering cmp(const QualityBase& lhs,
                const QualityBase& rhs,
-               std::optional<usize> objective = std::nullopt) const override final; /* {
-    const auto& ql = lhs.as<MOQuality>();
-    const auto& qr = rhs.as<MOQuality>();
-    // Constraints are always minimized
-    Ordering o = cmp(ql.constraint_value, qr.constraint_value, _epsilon, true);
-
-    if (o == Ordering::Equal || o == Ordering::NonDominated) {
-      if (objective.has_value()) {
-        o = cmp(ql.objectives(objective.value()), qr.objectives(objective.value()), _epsilon, _minimize);
-      } else {
-        for (usize i = 0; i < _num_objectives && o != Ordering::NonDominated; i++) {
-          o = o | cmp(ql.objectives(i), qr.objectives(i), _epsilon, _minimize);
-        }
-      }
-    }
-    return o;
-  };
-  */
+               std::optional<usize> objective = std::nullopt) const override final;
 
   CType distance(const QualityBase& lhs,
                  const QualityBase& rhs,
-                 std::optional<usize> objective = std::nullopt) const override final; /*{
-    const auto& ql = lhs.as<MOQuality>();
-    const auto& qr = rhs.as<MOQuality>();
-    CType dist;
-    if (objective.has_value()) {
-      dist = distance(ql.objectives(objective.value()), qr.objectives(objective.value()));
-    } else {
-      dist = (ql.objectives - qr.objectives).norm();
-    }
-    return isna(dist) ? std::numeric_limits<CType>::infinity() : dist;
-  };
-  */
+                 std::optional<usize> objective = std::nullopt) const override final;
 
   virtual std::unique_ptr<QualityBase> worst() const override {
     const CType inf = std::numeric_limits<CType>().infinity();
@@ -669,15 +642,15 @@ class SolutionBase {
 
   virtual RefS<Vec<DType>> discrete_values() = 0;
   virtual CRefS<Vec<DType>> discrete_values() const = 0;
-  virtual RefS<Active> discrete_active() = 0;
-  virtual CRefS<Active> discrete_active() const = 0;
+  virtual RefS<Array<BType>> discrete_active() = 0;
+  virtual CRefS<Array<BType>> discrete_active() const = 0;
 
   inline usize num_continuous() const { return continuous_values().size(); };
 
   virtual RefS<Vec<CType>> continuous_values() = 0;
   virtual CRefS<Vec<CType>> continuous_values() const = 0;
-  virtual RefS<Active> continuous_active() = 0;
-  virtual CRefS<Active> continuous_active() const = 0;
+  virtual RefS<Array<BType>> continuous_active() = 0;
+  virtual CRefS<Array<BType>> continuous_active() const = 0;
 
   SolutionBase& operator=(const SolutionBase& other);
 
@@ -783,13 +756,13 @@ class Solution : public SolutionBase {
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
-  RefS<Active> discrete_active() override final { return _discrete_active; }
-  CRefS<Active> discrete_active() const override final { return _discrete_active; }
+  RefS<Array<BType>> discrete_active() override final { return _discrete_active; }
+  CRefS<Array<BType>> discrete_active() const override final { return _discrete_active; }
 
   RefS<Vec<CType>> continuous_values() override final { return _continuous_values; }
   CRefS<Vec<CType>> continuous_values() const override final { return _continuous_values; }
-  RefS<Active> continuous_active() override final { return _continuous_active; }
-  CRefS<Active> continuous_active() const override final { return _continuous_active; }
+  RefS<Array<BType>> continuous_active() override final { return _continuous_active; }
+  CRefS<Array<BType>> continuous_active() const override final { return _continuous_active; }
 
   bool has_extension(const SolutionExtensionKey& key) const override final {
     for (auto& e : _extensions) {
@@ -856,9 +829,9 @@ class Solution : public SolutionBase {
 
  private:
   Vec<DType> _discrete_values;
-  Active _discrete_active;
+  Array<BType> _discrete_active;
   Vec<CType> _continuous_values;
-  Active _continuous_active;
+  Array<BType> _continuous_active;
   std::vector<std::unique_ptr<SolutionExtensionBase>> _extensions{};
   std::unique_ptr<QualityBase> _quality;
 };
@@ -947,13 +920,13 @@ class SolutionHandle : public SolutionBase {
 
   RefS<Vec<DType>> discrete_values() override final { return arena->discrete.row(idx); }
   CRefS<Vec<DType>> discrete_values() const override final { return arena->discrete.row(idx); }
-  RefS<Active> discrete_active() override final { return arena->discrete_active.row(idx); }
-  CRefS<Active> discrete_active() const override final { return arena->discrete_active.row(idx); }
+  RefS<Array<BType>> discrete_active() override final { return arena->discrete_active.row(idx); }
+  CRefS<Array<BType>> discrete_active() const override final { return arena->discrete_active.row(idx); }
 
   RefS<Vec<CType>> continuous_values() override final { return arena->continuous.row(idx); }
   CRefS<Vec<CType>> continuous_values() const override final { return arena->continuous.row(idx); }
-  RefS<Active> continuous_active() override final { return arena->continuous_active.row(idx); }
-  CRefS<Active> continuous_active() const override final { return arena->continuous_active.row(idx); }
+  RefS<Array<BType>> continuous_active() override final { return arena->continuous_active.row(idx); }
+  CRefS<Array<BType>> continuous_active() const override final { return arena->continuous_active.row(idx); }
 
   bool has_extension(const SolutionExtensionKey& key) const override final {
     for (auto& e : arena->extensions[idx]) {
@@ -1599,7 +1572,7 @@ class InstanceBase {
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   virtual void log_solution(std::ostream& os, const SolutionBase& solution) const {
@@ -1639,7 +1612,7 @@ class InstanceBase {
     os << '"';
     log_solution(os, solution);
     os << "\",";
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   std::string format_solution(const SolutionBase& solution) const {
@@ -2074,6 +2047,7 @@ inline std::tuple<std::vector<usize>, std::vector<usize>> greedy_scattered_subse
 #define _GOBLIN_LIB_ALGORITHMS_MO_H
 
 #include <set>
+#include <variant>
 
 
 namespace goblin {
@@ -2117,6 +2091,71 @@ inline std::tuple<std::vector<usize>, std::vector<std::set<usize>>> non_dominate
   }
 
   return std::make_tuple(rank, fronts);
+};
+
+/// 2D Hypervolume
+///
+/// Uses an O(n * log(n)) sweeping line approach
+/// 1. Points are sorted in one dimension
+/// 2. The areas of the resulting rectangles are added together
+template <typename SD, typename D2R>
+inline CType hypervolume2D_impl(SD&& signed_distance, D2R&& distance_to_reference, usize num_points) {
+  if (num_points == 0) {
+    return 0.0;
+  } else if (num_points == 1) {
+    return std::abs(distance_to_reference(0, 0) * distance_to_reference(0, 1));
+  }
+
+  std::vector<usize> points(num_points);
+  std::iota(points.begin(), points.end(), 0);
+
+  std::sort(points.begin(), points.end(),
+            [&](const usize lhs, const usize rhs) { return signed_distance(lhs, rhs, 1) <= 0.0; });
+
+  CType hv = 0.0;
+  CType w = distance_to_reference(points[0], 0);
+  for (usize i = 1; i < points.size(); i++) {
+    hv += signed_distance(points[i], points[i - 1], 1) * w;
+    w = std::max(w, distance_to_reference(points[i], 0));
+  }
+  return hv + distance_to_reference(points.back(), 1) * w;
+};
+
+template <typename SolutionSetLike>
+inline CType hypervolume2D_dispatch(const SolutionSetLike& solutions,
+                                    const FitnessBase& fitness,
+                                    const QualityBase& reference_point) {
+  return hypervolume2D_impl(
+      [&](const usize lhs, const usize rhs, const usize objective) {
+        auto dist = fitness.distance(solutions[lhs].quality(), solutions[rhs].quality(), objective);
+        auto lhs_better =
+            fitness.cmp(solutions[lhs].quality(), solutions[rhs].quality(), objective) == Ordering::Better;
+        return lhs_better ? -dist : dist;
+      },
+      [&](const usize idx, const usize objective) {
+        return fitness.distance(solutions[idx].quality(), reference_point, objective);
+      },
+      solutions.size());
+};
+
+inline CType hypervolume2D(const ArchiveBase& solutions,
+                           const FitnessBase& fitness,
+                           const QualityBase& reference_point) {
+  return hypervolume2D_dispatch(solutions, fitness, reference_point);
+};
+inline CType hypervolume2D(const SolutionSetBase& solutions,
+                           const FitnessBase& fitness,
+                           const QualityBase& reference_point) {
+  return hypervolume2D_dispatch(solutions, fitness, reference_point);
+};
+
+inline CType hypervolume2D(const Arr2D<CType> points, const Array<CType> reference_point) {
+  return hypervolume2D_impl([&](const usize lhs, const usize rhs,
+                                const usize objective) { return points(lhs, objective) - points(rhs, objective); },
+                            [&](const usize idx, const usize objective) {
+                              return std::abs(points(idx, objective) - reference_point(objective));
+                            },
+                            points.rows());
 };
 
 };  // namespace goblin
@@ -2947,7 +2986,6 @@ class MethodBase {
 #ifndef _GOBLIN_LIB_INIT_H
 #define _GOBLIN_LIB_INIT_H
 
-#include <variant>
 
 
 namespace goblin {
@@ -3320,6 +3358,9 @@ class OperatorBase {
   virtual bool is_commutative() const = 0;
 
   virtual void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const = 0;
+  virtual void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const {
+    throw std::runtime_error("Not implemented.");
+  };
 
   virtual bool has_gradient() const { return false; };
   virtual void apply_grad(Ref<Array<CType>> out,
@@ -3349,6 +3390,10 @@ class OpIdentity : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3370,6 +3415,13 @@ class OpAdd : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().sum(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+    for (usize i = 1; i < args.size(); i++) {
+      buf.col(out) += buf.col(args[i]);
+    }
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3412,6 +3464,17 @@ class OpSub : public OperatorBase {
     }
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    if (args.size() > 1) {
+      buf.col(out) = buf.col(args[0]);
+      for (usize i = 1; i < args.size(); i++) {
+        buf.col(out) -= buf.col(args[i]);
+      }
+    } else {
+      buf.col(out) -= buf.col(args[0]);
+    }
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3451,6 +3514,13 @@ class OpMul : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().prod(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]);
+    for (usize i = 1; i < args.size(); i++) {
+      buf.col(out) *= buf.col(args[i]);
+    }
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3499,6 +3569,14 @@ class OpDiv : public OperatorBase {
     out = args.col(0) / args(Eigen::placeholders::all, Eigen::seq(1, args.cols() - 1)).rowwise().prod();
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[1]);
+    for (usize i = 2; i < args.size(); i++) {
+      buf.col(out) *= buf.col(args[i]);
+    }
+    buf.col(out) = buf.col(args[0]) / buf.col(out);
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3544,6 +3622,10 @@ class OpSin : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).sin(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).sin();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3567,6 +3649,10 @@ class OpCos : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).cos(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).cos();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3592,6 +3678,10 @@ class OpExp : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).exp(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).exp();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3615,6 +3705,10 @@ class OpLog : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).log(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).log();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3640,6 +3734,10 @@ class OpSquare : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).square(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).square();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3663,6 +3761,10 @@ class OpSqrt : public OperatorBase {
   bool is_commutative() const override final { return false; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).sqrt(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).sqrt();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3690,6 +3792,10 @@ class OpPow : public OperatorBase {
     out = args.col(0).pow(args.col(1));
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).pow(buf.col(args[1]));
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3715,6 +3821,10 @@ class OpAbs : public OperatorBase {
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.col(0).abs(); };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).abs();
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,
@@ -3738,6 +3848,10 @@ class OpMin : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().minCoeff(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).minCoeff();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3773,6 +3887,10 @@ class OpMax : public OperatorBase {
   bool is_commutative() const override final { return true; };
 
   void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final { out = args.rowwise().maxCoeff(); };
+
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    buf.col(out) = buf.col(args[0]).maxCoeff();
+  };
 
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
@@ -3838,7 +3956,8 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            std::optional<usize> max_expression_size = std::nullopt)
+            std::optional<usize> max_expression_size = std::nullopt,
+            bool use_apply_buf = true)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -3854,6 +3973,7 @@ class GPContext {
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         enable_subfunctions(enable_subfunctions),
+        use_apply_buf(use_apply_buf),
         operators(std::move(operators)) {
     __goblin_runtime_assert(expression_template.is_valid());
     usize num_constant_values = const_repr == ConstantRepr::ERCs   ? 1
@@ -4399,6 +4519,9 @@ class GPContext {
 
     // for each output, evaluate the tree
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
+
+    // Eigen::internal::set_is_malloc_allowed(false);
+
     const auto trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
@@ -4420,8 +4543,7 @@ class GPContext {
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
-          eval_buffer.col(j) = X.col(
-              v_idx);  // @claude: runtime error: assumption of 128 byte alignment for pointer of type 'double *' failed
+          eval_buffer.col(j) = X.col(v_idx);
         } else if (value_kind[value] == ValueKind::Parameter) {
           eval_buffer.col(j) = params(v_idx);
         } else if (value_kind[value] == ValueKind::Constant) {
@@ -4434,7 +4556,11 @@ class GPContext {
           // arg_stack
           std::span<const usize> child_indices{arg_stack.end() - arity, arg_stack.end()};
 
-          operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          if (use_apply_buf) {
+            operators[v_idx]->apply_buf(eval_buffer, j, child_indices);
+          } else {
+            operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          }
 
           // pop the now used arguments from the stack
           arg_stack.resize(arg_stack.size() - arity);
@@ -4456,6 +4582,8 @@ class GPContext {
       assert(arg_stack.back() == tree.size() - 1);
       outputs.col(i) = eval_buffer.col(tree.size() - 1);
     }
+
+    // Eigen::internal::set_is_malloc_allowed(true);
 
     return outputs;
   }
@@ -4700,6 +4828,7 @@ class GPContext {
   usize num_parameters;
   usize max_num_children;
   bool enable_subfunctions;
+  bool use_apply_buf;
 
   std::vector<std::shared_ptr<OperatorBase>> operators;
   std::vector<usize> op_idx2value;
@@ -5482,9 +5611,9 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #define _GOBLIN_GP_SR_H
 
 
+
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
-
 
 namespace goblin {
 
@@ -5785,7 +5914,7 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   void evaluate_test(const SolutionBase& solution) const {
@@ -5965,17 +6094,17 @@ class ObjectiveBase {
 
   virtual std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active) = 0;
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active) = 0;
 
   virtual std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                                     RefS<Vec<CType>> continuous_values,
-                                                    RefS<Active> discrete_active,
-                                                    RefS<Active> continuous_active,
+                                                    RefS<Array<BType>> discrete_active,
+                                                    RefS<Array<BType>> continuous_active,
                                                     CRefS<Vec<DType>> parent_discrete_values,
                                                     CRefS<Vec<CType>> parent_continuous_values,
-                                                    CRefS<Active> parent_discrete_active,
-                                                    CRefS<Active> parent_continuous_active,
+                                                    CRefS<Array<BType>> parent_discrete_active,
+                                                    CRefS<Array<BType>> parent_continuous_active,
                                                     const CType parent_objective_value,
                                                     const CType parent_constraint_value,
                                                     const std::span<const usize>& discrete_indices,
@@ -6032,8 +6161,8 @@ class BBO final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
   };
 
@@ -6050,8 +6179,8 @@ class Masked final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
     return fn->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -6059,12 +6188,12 @@ class Masked final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6090,8 +6219,8 @@ class Inverted final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     // TODO this does not forward modifications to the actual solutions
     // (non-issue for my use cases so far, but still a violation of the api...)
     Vec<DType> d_inverted = DType(1) - discrete_values.array();
@@ -6101,12 +6230,12 @@ class Inverted final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6198,8 +6327,8 @@ class Rotated final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     continuous_active.fill(true);
     auto r_values = rotated(continuous_values);
@@ -6208,12 +6337,12 @@ class Rotated final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6262,8 +6391,8 @@ class Sum final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -6275,12 +6404,12 @@ class Sum final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6319,8 +6448,8 @@ class Max final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = -std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -6332,12 +6461,12 @@ class Max final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6376,8 +6505,8 @@ class Min final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = std::numeric_limits<CType>().infinity(), cv = CType(0.0);
     for (auto& o : fns) {
       auto [fov, fcv] = o->evaluate(discrete_values, continuous_values, discrete_active, continuous_active);
@@ -6389,12 +6518,12 @@ class Min final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6433,8 +6562,8 @@ class Concat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (auto& o : fns) {
@@ -6454,12 +6583,12 @@ class Concat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6503,8 +6632,8 @@ class Repeat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (usize i = 0; i < _repeats; i++) {
@@ -6524,12 +6653,12 @@ class Repeat final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6583,20 +6712,20 @@ class OneMax final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
   };
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6620,20 +6749,20 @@ class ZeroMax final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
   };
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6657,8 +6786,8 @@ class LeadingOnes final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i++) {
       discrete_active(i) = true;
@@ -6683,8 +6812,8 @@ class TrailingZeros final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     for (usize i = dims; i > 0;) {
       i--;
@@ -6714,15 +6843,15 @@ class HLeadingOnes final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     eval_helper(discrete_values, discrete_active, 0, ov);
     return std::make_tuple(ov, 0.0);
   };
 
  private:
-  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov) {
+  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Array<BType>> discrete_active, usize i, double& ov) {
     discrete_active(i) = true;
     if (discrete_values(i) > 0) {
       ov += 1.0;
@@ -6751,8 +6880,8 @@ class DeceptiveTrap final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
 
     CType ov = CType(0.0);
@@ -6778,8 +6907,8 @@ class BimodalTrap final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
 
     CType ov = CType(0.0);
@@ -6820,20 +6949,20 @@ class Sphere final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
     return std::make_tuple(continuous_values.array().pow(2).sum(), 0.0);
   };
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -6857,8 +6986,8 @@ class Rosenbrock final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
     CType ov = 0.0;
     for (usize i = 0; i < dims - 1; i++) {
@@ -6883,8 +7012,8 @@ class Rastrigin final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
     CType ov = CType(10.0) * static_cast<CType>(dims)
 
@@ -6907,8 +7036,8 @@ class Griewank final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
 
     CType prod = 1.0;
@@ -6932,8 +7061,8 @@ class Ellipsoid final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
 
     CType ov = 0.0;
@@ -6957,8 +7086,8 @@ class CirclesInASquare final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     continuous_active.fill(true);
     CType min_dist = 1e308, cv = 0;
     for (usize i = 0; i < dims; i += 2) {
@@ -7001,8 +7130,8 @@ class LeadingSpheres final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     CType cv = CType(0.0);
     bool active = true;
@@ -7728,6 +7857,9 @@ class Tracked final : public WrappedInstance {
   void wrap_eval(E eval, SolutionSetBase& solutions, const std::span<const usize>& indices) {
     alg_timer.stop();
 
+    // TODO if evaluations == 0 optionally add all solutions to the archive, not just indices => correct tracking for
+    // warm start scenarios where some solutions already have a fitness
+
     // check if the budget was exhausted while the algorithm was running
     auto elapsed = config.consider_evaluation_time ? alg_timer.elapsed() + eval_timer.elapsed() : alg_timer.elapsed();
     generation = method.current_generation();
@@ -7976,11 +8108,14 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
+
+
 
 namespace goblin {
 
@@ -8236,6 +8371,9 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
+
+
+
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8357,11 +8495,13 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8450,6 +8590,9 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
+
+
+
 
 namespace goblin {
 
@@ -8547,14 +8690,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9867,6 +10014,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10583,7 +10731,7 @@ class Population {
           fos_stats[k].solution_activation_rate.resize(cluster_FOS[k].size(), 0.0);
           fos_stats[k].variables_activation_rate.resize(cluster_FOS[k].size(), 0.0);
           for (usize i = 0; i < cluster_solutions[k].size(); i++) {
-            const RefS<Active> s_a = solutions[cluster_solutions[k][i]].discrete_active();
+            const RefS<Array<BType>> s_a = solutions[cluster_solutions[k][i]].discrete_active();
             for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
               Array<BType> subset_active = s_a(cluster_FOS[k][fos_idx].discrete);
               if (subset_active.any()) {
@@ -11293,6 +11441,8 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
+
+
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11515,6 +11665,7 @@ class EABase : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -11729,6 +11880,7 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
+
 
 namespace goblin {
 namespace classic {
@@ -12070,6 +12222,7 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -12286,6 +12439,8 @@ class PSO : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
+
+
 
 namespace goblin {
 namespace classic {
@@ -12624,14 +12779,19 @@ class SimpleGA : public EABase {
     for (usize i = 0; i < n; i++) {
       // copy to offspring
       offspring.add(population[i]);
+      bool evaluation_needed = false;
 
       const auto& donor = population[parent_indices[i]];
 
       // perform crossover
-      bool evaluation_needed = crossover_strategy->crossover(rng, problem, donor, offspring[i]);
+      if (crossover_strategy) {
+        evaluation_needed |= crossover_strategy->crossover(rng, problem, donor, offspring[i]);
+      }
 
       // apply mutation
-      mutation_strategy->mutate(rng, problem, offspring[i]);
+      if (mutation_strategy) {
+        mutation_strategy->mutate(rng, problem, offspring[i]);
+      }
 
       // check what changed to allow for partial evaluations & exploiting introns
       check_changes(population[i], offspring[i], subsets[i].discrete, evaluation_needed);
@@ -12675,6 +12835,7 @@ class SimpleGA : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
+
 
 namespace goblin {
 namespace classic {
@@ -12869,11 +13030,113 @@ class StandardGP : public EABase {
 
 #endif /* _GOBLIN_STANDARD_GP_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/examples/voronoi.h included by goblin.h                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_EXAMPLES_VORONOI_H
 #define _GOBLIN_EXAMPLES_VORONOI_H
+
+
+
+template <typename C>
+class KDTree {
+ private:
+  using Scalar = typename C::Scalar;
+  using usize = std::size_t;
+  using isize = std::ptrdiff_t;
+
+  struct Node {
+    usize idx;
+    Node* left;
+    Node* right;
+  };
+
+  Node* root;
+  std::vector<Node> nodes;
+
+  usize best_idx;
+  Scalar best_dist;
+
+  Node* build_helper(usize begin, usize end, isize dim, const C& coords) {
+    if (end <= begin) {
+      return nullptr;
+    }
+
+    // find midpoint in current dimension
+    usize mid = begin + (end - begin) / 2;
+    auto i = nodes.begin();
+    std::nth_element(i + begin, i + mid, i + end,
+                     [&](const Node& lhs, const Node& rhs) { return coords(dim, lhs.idx) < coords(dim, rhs.idx); });
+
+    // recurse with next dimension
+    dim = (dim + 1) % coords.rows();
+    nodes[mid].left = build_helper(begin, mid, dim, coords);
+    nodes[mid].right = build_helper(mid + 1, end, dim, coords);
+    return &nodes[mid];
+  };
+
+  template <typename P>
+  void closest_helper(Node* node, isize dim, const C& coords, const P& point) {
+    if (node == nullptr) {
+      return;
+    }
+
+    const isize n_dims = coords.rows();
+
+    // Note that (coords(node->idx) - point).square().sum()
+    // silently produces incorrect results due to broadcasting fun
+    Scalar dist = 0.0;
+    for (isize i = 0; i < n_dims; i++) {
+      dist += std::pow(coords(i, node->idx) - point(i), 2);
+    }
+
+    if (dist < best_dist) {
+      best_dist = dist;
+      best_idx = node->idx;
+    }
+
+    if (best_dist == 0.0) {
+      return;
+    }
+
+    Scalar dist_x = coords(dim, node->idx) - point(dim);
+    dim = (dim + 1) % n_dims;
+    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
+    if (dist_x * dist_x < best_dist) {
+      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
+    }
+  }
+
+ public:
+  // No default copying since the nodes are pointer-based
+  KDTree(const KDTree&) = delete;
+  KDTree& operator=(const KDTree&) = delete;
+
+  KDTree() = default;
+  void build(const C& coords, usize size) {
+    if (coords.cols() < size) {
+      throw std::runtime_error("Not enough coordinates passed!");
+    }
+    nodes.resize(size);
+    for (usize i = 0; i < nodes.size(); i++) {
+      nodes[i].idx = i;
+    }
+    root = build_helper(0, nodes.size(), /* dim = */ 0, coords);
+  };
+
+  template <typename P>
+  usize closest(const C& coords, const P& point) {
+    if (root == nullptr) {
+      throw std::runtime_error("Empty tree!");
+    }
+
+    best_idx = 0;
+    best_dist = std::numeric_limits<Scalar>::infinity();
+    closest_helper(root, /* dim = */ 0, coords, point);
+    return best_idx;
+  }
+};
 
 namespace goblin {
 namespace voronoi {
@@ -12889,26 +13152,30 @@ class VoronoiImageReconstruction : public InstanceBase {
   const usize NUM_COLOR_VALUES = 256;
 
  public:
-  VoronoiImageReconstruction(const Arr2D<DType>& target_image,
-                             usize width,
-                             usize height,
-                             usize min_num_cells = 10,
-                             usize max_num_cells = 100,
-                             std::optional<AnyInit> init = std::nullopt,
-                             bool complexity_objective = false,
-                             bool track_complexity = false)
+  VoronoiImageReconstruction(
+      const Arr2D<DType>& target_image,
+      usize width,
+      usize height,
+      usize min_num_cells = 10,
+      usize max_num_cells = 100,
+      std::optional<AnyInit> init = std::nullopt,
+      bool complexity_objective = false,
+      bool track_complexity = false,
+      /// Minimum number of cells after which a kd-tree should be used to determine the nearest cell center
+      usize kdtree_threshold = 50)
       : _fitness(  // this preference is optimized
             /* num_objectives = */ complexity_objective ? 2 : 1,
             /* minimize = */ true),
         _archive_fitness(  // this one is used for the archive
-            /* num_objectives = */ complexity_objective || track_complexity ? 2 : 1,
+            /* num_objectives = */ (complexity_objective || track_complexity) ? 2 : 1,
             /* minimize = */ true),
         target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
         min_num_cells(min_num_cells),
-        max_num_cells(max_num_cells) {
+        max_num_cells(max_num_cells),
+        kdtree_threshold(kdtree_threshold) {
     const usize num_pixels = target_image.rows();
     if (num_pixels != width * height) {
       throw std::runtime_error(std::format("Image data ({}pixels) does not match withd and height ({} * {} = {})",
@@ -12940,15 +13207,6 @@ class VoronoiImageReconstruction : public InstanceBase {
       _discrete_domain_sizes[j + COLOR_R] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
-    }
-
-    image_coords.resize(2, num_pixels);
-    for (usize x = 0; x < width; x++) {
-      for (usize y = 0; y < height; y++) {
-        usize i = y * width + x;
-        image_coords(i, 0) = x;
-        image_coords(i, 1) = y;
-      }
     }
   };
 
@@ -13014,6 +13272,7 @@ class VoronoiImageReconstruction : public InstanceBase {
     Arr2D<float> centers(2, max_num_cells);
     Arr2D<float> colors(max_num_cells, 3);
     Array<float> pixel(2);
+    KDTree<decltype(centers)> kdt;
 
     for (usize i : indices) {
       auto& s = solutions[i];
@@ -13022,8 +13281,9 @@ class VoronoiImageReconstruction : public InstanceBase {
       usize num_cells = 0;
       for (usize j = 0; j < max_num_cells; j++) {
         usize k = j * VARS_PER_CELL;
-        if (j < min_num_cells || s.discrete_values()(k + ENABLED)) {
-          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = true;
+        bool cell_is_active = j < min_num_cells || s.discrete_values()(k + ENABLED);
+        s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = cell_is_active;
+        if (cell_is_active) {
           if (j < min_num_cells) {
             s.discrete_active()(k + ENABLED) = false;
           }
@@ -13036,28 +13296,13 @@ class VoronoiImageReconstruction : public InstanceBase {
           colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
 
           num_cells++;
-        } else {
-          s.discrete_active()(Eigen::seqN(k, VARS_PER_CELL)) = false;
         }
       }
 
-      auto closest = [&](float x, float y) {
-        float dist = std::numeric_limits<float>::infinity();
-        usize closest_idx = 0;
-        for (usize k = 0; k < num_cells; k++) {
-          // float dx = x - centers(k, 0), dy = y - centers(k, 1);
-          // float d = std::pow(x - centers(k, 0), 2) + std::pow(y - centers(k, 1), 2);
-          float dx = x - centers(0, k), dy = y - centers(1, k);
-          float d = dx * dx + dy * dy;
-          if (d < dist) {
-            dist = d;
-            closest_idx = k;
-          }
-        }
-        return closest_idx;
-      };
-
-      // TODO create image of positions, rowwise argmin dist...
+      bool use_kdtree = num_cells >= kdtree_threshold;
+      if (use_kdtree) {
+        kdt.build(centers, num_cells);
+      }
 
       // compute per-pixel mismatch
       float reconstruction_error = 0.0;
@@ -13065,7 +13310,24 @@ class VoronoiImageReconstruction : public InstanceBase {
         for (usize y = 0; y < height; y++) {
           usize j = y * width + x;
 
-          usize cell_idx = closest(x, y);
+          usize cell_idx;
+          if (use_kdtree) {
+            pixel(0) = x;
+            pixel(1) = y;
+            cell_idx = kdt.closest(centers, pixel);
+          } else {
+            float best_dist = std::numeric_limits<float>::infinity();
+            cell_idx = 0;
+            for (usize k = 0; k < num_cells; k++) {
+              float dx = centers(0, k) - static_cast<float>(x);
+              float dy = centers(1, k) - static_cast<float>(y);
+              float dist = dx * dx + dy * dy;
+              if (dist < best_dist) {
+                best_dist = dist;
+                cell_idx = k;
+              }
+            }
+          }
 
           reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
         }
@@ -13112,12 +13374,12 @@ class VoronoiImageReconstruction : public InstanceBase {
   MOFitness _fitness;
   MOFitness _archive_fitness;
   Arr2D<float> target_image;
-  Arr2D<float> image_coords;
   std::shared_ptr<InitBase> init;
   usize width;
   usize height;
   usize min_num_cells;
   usize max_num_cells;
+  usize kdtree_threshold;
 
   Vec<DType> _discrete_domain_sizes{};
   Vec<CType> _continuous_lower_bounds{};
@@ -13129,7 +13391,7 @@ class VoronoiImageReconstruction : public InstanceBase {
 
 // It is important to use the fully qualified name for the base class (i.e. goblin::classic::DiscreteCrossoverBase) so
 // that the bindings are generated correctly
-class CustomCrossover : public goblin::classic::DiscreteCrossoverBase {
+class YourCustomCrossover : public goblin::classic::DiscreteCrossoverBase {
   bool crossover(Rng& rng,
                  InstanceBase& problem,
                  const SolutionBase& donor,
@@ -13139,172 +13401,29 @@ class CustomCrossover : public goblin::classic::DiscreteCrossoverBase {
   }
 };
 
-class CustomMutation : public goblin::classic::DiscreteMutationBase {
+class YourCustomMutation : public goblin::classic::DiscreteMutationBase {
   void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-    // do whatever you want here
-    goblin::classic::RandomMutation().mutate(rng, problem, offspring);
-  }
-};
-
-/// Idea:
-/// - color values have meaning _together_
-/// - other cells might have the needed color information
-/// - color mixing performs search compared to replacement
-/// => Randomly mix the current cell color with another cell's color
-class ColorMixCrossover : public goblin::classic::DiscreteCrossoverBase {
-  bool crossover(Rng& rng,
-                 InstanceBase& problem,
-                 const SolutionBase& donor,
-                 SolutionBase& offspring) const override final {
+    // do whatever you want here, for example toggle cells randomly
     const usize VARS_PER_CELL = 6;
     const usize l = problem.num_discrete();
-    const usize num_cells = l / VARS_PER_CELL;
-    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
-    std::uniform_real_distribution<float> U(0.0, 1.0);
-
-    usize donor_idx;
-    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
-      if (U(rng) < 0.5) {
-        // 1. get a random donor cell
-        do {
-          donor_idx = cells(rng);
-        } while (donor_idx == cell_idx);
-
-        // 2. randomly mix the colors
-        float w = U(rng);
-        Array<float> rgb = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)).cast<float>();
-        Array<float> rgb_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 3, 3)).cast<float>();
-        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 3, 3)) =
-            (w * rgb + (1.0 - w) * rgb_donor).cast<DType>();
-      }
-    }
-
-    bool evaluation_needed = true;
-    return evaluation_needed;
-  };
-};
-
-/// Idea:
-/// - position values have meaning _together_
-/// - cell position has meaning relative to other cell positions
-/// => Randomly move to/from other cells
-class PositionMixCrossover : public goblin::classic::DiscreteCrossoverBase {
-  bool crossover(Rng& rng,
-                 InstanceBase& problem,
-                 const SolutionBase& donor,
-                 SolutionBase& offspring) const override final {
-    const usize VARS_PER_CELL = 6;
-    const usize l = problem.num_discrete();
-    const usize num_cells = l / VARS_PER_CELL;
-    std::uniform_int_distribution<usize> cells(0, num_cells - 1);
-    std::uniform_real_distribution<float> U(0.0, 1.0);
-    std::normal_distribution<float> N(0.0, 1.0);
-
-    usize donor_idx;
-    for (usize cell_idx = 0; cell_idx < num_cells; cell_idx++) {
-      if (U(rng) < 0.5) {
-        // 1. get a random donor cell
-        do {
-          donor_idx = cells(rng);
-        } while (donor_idx == cell_idx);
-
-        // 2. randomly move towards/away from donor
-        float w = N(rng);
-        Array<float> xy = offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        Array<float> xy_donor = donor.discrete_values()(Eigen::seqN(donor_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        xy += w * 0.1 * (xy_donor - xy);
-        Array<float> ub = problem.discrete_domain_sizes()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)).cast<float>();
-        xy = xy.min(ub).max(0.0);
-        offspring.discrete_values()(Eigen::seqN(cell_idx * VARS_PER_CELL + 1, 2)) = xy.cast<DType>();
-      }
-    }
-
-    bool evaluation_needed = true;
-    return evaluation_needed;
-  };
-};
-
-class MergeSplitMutation : public goblin::classic::DiscreteMutationBase {
-  double p_merge;
-  double noise;
-  usize min_num_cells;
-
- public:
-  MergeSplitMutation(usize min_num_cells,
-                     std::optional<double> p_mutation = std::nullopt,
-                     double p_merge = 0.5,
-                     double splitting_noise = 0.05)
-      : p_merge(p_merge), noise(splitting_noise), min_num_cells(min_num_cells) {
-    if (p_merge < 0.0 || 1.0 < p_merge) {
-      throw std::runtime_error("The probability of merging must be in [0, 1]!");
-    }
-
-    if (splitting_noise <= 0.0) {
-      throw std::runtime_error("The splitting noise must be positive!");
-    }
-  };
-
-  void mutate(Rng& rng, InstanceBase& problem, SolutionBase& offspring) const override final {
-    const usize VARS_PER_CELL = 6;
-    const usize num_cells = problem.num_discrete() / VARS_PER_CELL;
-
-    usize cell = std::uniform_int_distribution<usize>(0, num_cells - 1)(rng);
-    usize random_cell = std::uniform_int_distribution<usize>(min_num_cells, num_cells - 1)(rng);
+    const usize max_num_cells = l / VARS_PER_CELL;
+    const auto domain = problem.discrete_domain_sizes();
 
     std::uniform_real_distribution<double> U(0.0, 1.0);
-    std::normal_distribution<double> N(0.0, 1.0);
 
-    bool merge = U(rng) < p_merge;
-
-    // loop until we find another active/inactive cell for merging/splitting into
-    usize start = random_cell;
-    while (merge != offspring.discrete_active()(random_cell * VARS_PER_CELL)) {
-      random_cell++;
-      if (random_cell >= num_cells) {
-        random_cell = min_num_cells;
-      }
-      if (random_cell == start) {
-        break;
-      }
+    usize min_num_cells = 0;
+    while (domain(min_num_cells) < 2) {
+      min_num_cells++;
     }
-    usize offset = cell * VARS_PER_CELL;
-    usize offset_random = random_cell * VARS_PER_CELL;
 
-    auto x = offspring.discrete_values();
-    if (merge) {
-      // disable the other cell
-      x(offset_random) = false;
-      // and linearly combine the cell information with random weights
-      double w = U(rng);
-      for (usize i = 1; i < VARS_PER_CELL; i++) {
-        x(offset + i) = w * static_cast<double>(x(offset + i)) + (1.0 - w) * static_cast<double>(x(offset_random + i));
-      }
-    } else /* split */ {
-      // enable the other cell
-      x(offset_random) = true;
+    if (min_num_cells < max_num_cells) {
+      double p_mut = 1.0 / static_cast<double>(max_num_cells - min_num_cells);
 
-      // add noise to both cell values
-      double v;
-      for (usize i = 1; i < VARS_PER_CELL; i++) {
-        const usize d_i = problem.discrete_domain_sizes()(offset + i);
-
-        // get value, add noise & map back into the domain for the other cell
-        v = static_cast<double>(x(offset + i));
-        v += N(rng) * noise * static_cast<double>(d_i);
-        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
+      for (usize i = min_num_cells; i < max_num_cells; i++) {
+        usize offset = i * VARS_PER_CELL;
+        if (U(rng) < p_mut) {
+          offspring.discrete_values()(offset) = !offspring.discrete_values()(offset);
         }
-        v = std::fmod(v, d_i);
-        x(offset_random + i) = static_cast<DType>(v);
-
-        // get value, add noise & map back into the domain for this cell
-        v = static_cast<double>(x(offset + i));
-        v += N(rng) * noise * static_cast<double>(d_i);
-        if (v < 0.0) {  // wrap around by adding d_i * ceil(|v| / d_i)
-          v += static_cast<double>(d_i) * std::ceil(-v / static_cast<double>(d_i));
-        }
-        v = std::fmod(v, d_i);
-        x(offset + i) = static_cast<DType>(v);
       }
     }
   }
@@ -13314,6 +13433,7 @@ class MergeSplitMutation : public goblin::classic::DiscreteMutationBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

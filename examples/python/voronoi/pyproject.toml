@@ -5,9 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.7"
 dependencies = [
+    "matplotlib>=3.5.3",
     "numpy>=1.21.6",
+    "pandas>=1.1.5",
     "pillow>=9.5.0",
     "pygom",
+    "seaborn>=0.12.2",
 ]
 
 [tool.uv.sources]
