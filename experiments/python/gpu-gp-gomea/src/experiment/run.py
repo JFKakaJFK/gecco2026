@@ -16,6 +16,8 @@ import pandas as pd
 import pygom.gp as gp
 import sympy as sym
 from pygom import KernelVersion as KV
+from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
 from src.experiment.experiment_config import BASELINE_KV, OPERATOR_SETS
@@ -180,12 +182,8 @@ def run_one_task(task: Task, log_path: Path) -> None:
     df = pd.read_csv(log_path)
     expr = df.loc[df.index[-1], "expressions"]
 
-    try:
-        y_pred = lambdify_expression(expr)(X)
-        actual_mse = np.mean((y_pred - y.flatten()) ** 2)
-    except Exception as e:
-        print(f"Encountered {e} for expression: {expr}")
-        actual_mse = np.nan
+    y_pred = lambdify_expression(expr)(X)
+    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
 
     df.loc[df.index[-1], "mse"] = actual_mse
     df.to_csv(log_path, index=False)
