@@ -90,13 +90,11 @@ class NoisyFitness : public ArchiveFitnessBase {
 
 class NoisySphere : public InstanceBase {
  public:
-  usize num_discrete() const override final { return 0; }
   CRef<Vec<DType>> discrete_domain_sizes() const override final {
     static Vec<DType> d;
     return d;
   }
 
-  usize num_continuous() const override final { return D; }
   CRef<Vec<CType>> continuous_lower_bounds() const override final {
     static Vec<CType> lb = Vec<CType>::Constant(D, std::numeric_limits<CType>().infinity());
     return lb;

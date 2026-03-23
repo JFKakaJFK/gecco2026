@@ -10,7 +10,8 @@ project(gomea_library VERSION "1.1.0")
 # - some header fixes until the compiler was happy
 #   - <Eigen> -> <Eigen/Dense>
 #   - "src/..." -> "gomea/src/..."
-# - the main files and sources for the benchmark problems are not included
+# - moved the benchmark headers to the implementation files & commented out references in the parse commandline (for non-library use)
+# - the main files and sources for the benchmark problems are not included (after doing ls **/*.cpp from extern/gomea/src)
 
 add_subdirectory(extern/cxxopts)
 

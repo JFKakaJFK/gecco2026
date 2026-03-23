@@ -1,3 +1,5 @@
+// #define EIGEN_RUNTIME_NO_MALLOC  // enable runtime allocation testing
+
 #include <nanobind/eigen/dense.h>
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>

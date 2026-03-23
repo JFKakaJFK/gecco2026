@@ -541,6 +541,8 @@ inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
     by_fitness.reserve(indices.size());
     for (auto& front : fronts) {
       // TODO re-order fronts to maximize scattering in parameter space?
+      //
+      // TODO bug: we don't reduce the size to the selection size...
       for (usize i : front) {
         by_fitness.push_back(indices[i]);
       }

@@ -85,3 +85,7 @@ if __name__ == "__main__":
         )
 
     # for hypervolumes (not implemented yet) I'd recommend https://esa.github.io/pygmo2/tutorials/hypervolume.html (needs conda though)
+
+    # somehow the fact that the C++ code (benchmarkinstance) holds a reference to a python object (PyProblem) creates a reference cycle that requires manual deletion
+    # notably the issue only appears if a C++ object owns (a reference) to the python object, just calling with a callback is fine
+    del problem

@@ -28,6 +28,7 @@ add_library(${PROJECT_NAME}
         lib/solution.cpp
         gp/sr.cpp
         methods/amalgam.cpp
+        methods/library.cpp
         methods/mo_gomea.cpp
     )
 # endif()

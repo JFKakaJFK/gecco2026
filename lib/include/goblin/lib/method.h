@@ -17,6 +17,8 @@ class MethodBase {
                                                                           std::optional<u64> seed,
                                                                           std::optional<usize> population_size) = 0;
 
+  // TODO scipy.optimize compatible .minimize function
+
   /// Evaluations used and time elapsed can be collected without knowing about
   /// method details, but not the generation/iteraction. This method provides a
   /// hook for tracking the progress over generations

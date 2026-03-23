@@ -33,6 +33,7 @@ dependencies = [
 [tool.scikit-build]
 # cmake.build-type = "Release"
 cmake.build-type = "RelWithDebInfo"
+# cmake.build-type = "Debug"
 # cmake.verbose = true
 build.targets = ["_pygoblin"] # cmake target to build...
 build-dir = "build/{wheel_tag}"
@@ -50,7 +51,7 @@ test-extras = ["test"]
 test-skip = ["*universal2:arm64"]
 
 [tool.uv]
-# for development only, to avoid having to change something in the pyproject.toml every time the package should be re-installed downstream...
+# for development only, to avoid having to change something in the pyproject.toml every time the package should be re-installed downstream ...
 cache-keys = [{file = "pyproject.toml"}, {file = "pylib/**.py"}, {file = "pylib/**.h"}, {file = "pylib/**.cpp"}]
 
 [tool.uv.dependency-groups.dev]

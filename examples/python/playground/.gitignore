@@ -2,3 +2,4 @@ results/
 plots/rv_path
 .pmlb
 plots/symbolic_regression_conv*/
+*.duckdb

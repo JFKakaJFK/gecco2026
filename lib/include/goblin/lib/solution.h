@@ -138,15 +138,15 @@ class SolutionBase {
 
   virtual RefS<Vec<DType>> discrete_values() = 0;
   virtual CRefS<Vec<DType>> discrete_values() const = 0;
-  virtual RefS<Active> discrete_active() = 0;
-  virtual CRefS<Active> discrete_active() const = 0;
+  virtual RefS<Array<BType>> discrete_active() = 0;
+  virtual CRefS<Array<BType>> discrete_active() const = 0;
 
   inline usize num_continuous() const { return continuous_values().size(); };
 
   virtual RefS<Vec<CType>> continuous_values() = 0;
   virtual CRefS<Vec<CType>> continuous_values() const = 0;
-  virtual RefS<Active> continuous_active() = 0;
-  virtual CRefS<Active> continuous_active() const = 0;
+  virtual RefS<Array<BType>> continuous_active() = 0;
+  virtual CRefS<Array<BType>> continuous_active() const = 0;
 
   SolutionBase& operator=(const SolutionBase& other);
 
@@ -252,13 +252,13 @@ class Solution : public SolutionBase {
 
   RefS<Vec<DType>> discrete_values() override final { return _discrete_values; }
   CRefS<Vec<DType>> discrete_values() const override final { return _discrete_values; }
-  RefS<Active> discrete_active() override final { return _discrete_active; }
-  CRefS<Active> discrete_active() const override final { return _discrete_active; }
+  RefS<Array<BType>> discrete_active() override final { return _discrete_active; }
+  CRefS<Array<BType>> discrete_active() const override final { return _discrete_active; }
 
   RefS<Vec<CType>> continuous_values() override final { return _continuous_values; }
   CRefS<Vec<CType>> continuous_values() const override final { return _continuous_values; }
-  RefS<Active> continuous_active() override final { return _continuous_active; }
-  CRefS<Active> continuous_active() const override final { return _continuous_active; }
+  RefS<Array<BType>> continuous_active() override final { return _continuous_active; }
+  CRefS<Array<BType>> continuous_active() const override final { return _continuous_active; }
 
   bool has_extension(const SolutionExtensionKey& key) const override final {
     for (auto& e : _extensions) {
@@ -325,9 +325,9 @@ class Solution : public SolutionBase {
 
  private:
   Vec<DType> _discrete_values;
-  Active _discrete_active;
+  Array<BType> _discrete_active;
   Vec<CType> _continuous_values;
-  Active _continuous_active;
+  Array<BType> _continuous_active;
   std::vector<std::unique_ptr<SolutionExtensionBase>> _extensions{};
   std::unique_ptr<QualityBase> _quality;
 };
@@ -416,13 +416,13 @@ class SolutionHandle : public SolutionBase {
 
   RefS<Vec<DType>> discrete_values() override final { return arena->discrete.row(idx); }
   CRefS<Vec<DType>> discrete_values() const override final { return arena->discrete.row(idx); }
-  RefS<Active> discrete_active() override final { return arena->discrete_active.row(idx); }
-  CRefS<Active> discrete_active() const override final { return arena->discrete_active.row(idx); }
+  RefS<Array<BType>> discrete_active() override final { return arena->discrete_active.row(idx); }
+  CRefS<Array<BType>> discrete_active() const override final { return arena->discrete_active.row(idx); }
 
   RefS<Vec<CType>> continuous_values() override final { return arena->continuous.row(idx); }
   CRefS<Vec<CType>> continuous_values() const override final { return arena->continuous.row(idx); }
-  RefS<Active> continuous_active() override final { return arena->continuous_active.row(idx); }
-  CRefS<Active> continuous_active() const override final { return arena->continuous_active.row(idx); }
+  RefS<Array<BType>> continuous_active() override final { return arena->continuous_active.row(idx); }
+  CRefS<Array<BType>> continuous_active() const override final { return arena->continuous_active.row(idx); }
 
   bool has_extension(const SolutionExtensionKey& key) const override final {
     for (auto& e : arena->extensions[idx]) {

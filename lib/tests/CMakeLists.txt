@@ -12,7 +12,7 @@ set(deps
 )
 
 set(test_target ${PROJECT_NAME}_test_main)
-add_library(${test_target} test_main.cpp)
+add_library(${test_target} OBJECT test_main.cpp)
 target_link_libraries(${test_target} PRIVATE ${deps})
 
 set(
@@ -37,6 +37,7 @@ set(
     gp_operators
     sr
     sr_stats
+    sr_precision
     sr_gradient_step
     archive_objectives
     ctx_subfunction
@@ -44,18 +45,24 @@ set(
     quality
 )
 
+set(LIB_OPTIMIZED_TESTS
+    mixed
+    sr
+    sr_stats
+    mo_mixed
+    mixed_mixed
+    archive_objectives
+    ctx_introns
+    mixed_ia
+)
+
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
     set(_target lib_test_${testcase})
     add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
     target_link_libraries(${_target} PRIVATE ${deps})
     add_test(NAME ${_target} COMMAND ${_target})
-endforeach()
 
-target_compile_options(lib_test_mixed PRIVATE -O2 -g)
-target_compile_options(lib_test_sr PRIVATE -O2 -g)
-target_compile_options(lib_test_sr_stats PRIVATE -O2 -g)
-target_compile_options(lib_test_mo_mixed PRIVATE -O2 -g)
-target_compile_options(lib_test_mixed_mixed PRIVATE -O2 -g)
-target_compile_options(lib_test_archive_objectives PRIVATE -O2 -g)
-target_compile_options(lib_test_ctx_introns PRIVATE -O2 -g)
-target_compile_options(lib_test_mixed_ia PRIVATE -O2 -g)
+    # if(testcase IN_LIST LIB_OPTIMIZED_TESTS)
+    #     target_compile_options(${_target} PRIVATE -O2 -g1)
+    # endif()
+endforeach()

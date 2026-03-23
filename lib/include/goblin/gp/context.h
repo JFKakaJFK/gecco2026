@@ -7,7 +7,6 @@
 #include <iostream>
 #include <limits>
 #include <optional>
-#include <print>
 #include <set>
 #include <string>
 #include <vector>
@@ -54,7 +53,8 @@ class GPContext {
             std::string_view constant_representation = "ercs",  // ercs, edges, pool or none for no constants
             usize constant_pool_size = 10,
             bool enable_subfunctions = false,  // ADF vs ADT
-            std::optional<usize> max_expression_size = std::nullopt)
+            std::optional<usize> max_expression_size = std::nullopt,
+            bool use_apply_buf = true)
       : const_repr(constant_representation == "pool"
                        ? ConstantRepr::Pool
                        : (constant_representation == "ercs"
@@ -70,6 +70,7 @@ class GPContext {
         num_parameters(num_parameters),
         max_num_children(expression_template.max_num_children()),
         enable_subfunctions(enable_subfunctions),
+        use_apply_buf(use_apply_buf),
         operators(std::move(operators)) {
     __goblin_runtime_assert(expression_template.is_valid());
     usize num_constant_values = const_repr == ConstantRepr::ERCs   ? 1
@@ -615,6 +616,9 @@ class GPContext {
 
     // for each output, evaluate the tree
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
+
+    // Eigen::internal::set_is_malloc_allowed(false);
+
     const auto trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
@@ -636,8 +640,7 @@ class GPContext {
 
         // resolve value lookups / function calls
         if (value_kind[value] == ValueKind::Input) {
-          eval_buffer.col(j) = X.col(
-              v_idx);  // @claude: runtime error: assumption of 128 byte alignment for pointer of type 'double *' failed
+          eval_buffer.col(j) = X.col(v_idx);
         } else if (value_kind[value] == ValueKind::Parameter) {
           eval_buffer.col(j) = params(v_idx);
         } else if (value_kind[value] == ValueKind::Constant) {
@@ -650,7 +653,11 @@ class GPContext {
           // arg_stack
           std::span<const usize> child_indices{arg_stack.end() - arity, arg_stack.end()};
 
-          operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          if (use_apply_buf) {
+            operators[v_idx]->apply_buf(eval_buffer, j, child_indices);
+          } else {
+            operators[v_idx]->apply(eval_buffer.col(j), eval_buffer(Eigen::placeholders::all, child_indices));
+          }
 
           // pop the now used arguments from the stack
           arg_stack.resize(arg_stack.size() - arity);
@@ -672,6 +679,8 @@ class GPContext {
       assert(arg_stack.back() == tree.size() - 1);
       outputs.col(i) = eval_buffer.col(tree.size() - 1);
     }
+
+    // Eigen::internal::set_is_malloc_allowed(true);
 
     return outputs;
   }
@@ -804,6 +813,96 @@ class GPContext {
     return proximity;
   };
 
+  template <typename F>
+  void visit_tree(const SolutionBase& solution, usize root, F&& visit) const {
+    std::queue<usize> q;
+    q.emplace(root);
+    while (!q.empty()) {
+      usize current = q.front();
+      q.pop();
+
+      visit(current);
+
+      // lookup the value of the current node
+      DType value = domain2value(current, solution.discrete_values()(current));
+      usize v_idx = value_idx[value];
+
+      usize nc = std::min(value_max_arity[v_idx], children[current].size());
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[current][i]);
+      }
+    }
+  };
+
+  bool copy_tree(const SolutionBase& source, usize source_node, SolutionBase& target, usize target_node) const {
+    std::vector<std::tuple<usize, DType>> backup;
+    std::queue<std::tuple<usize, usize>> q;
+    q.emplace(source_node, target_node);
+
+    bool successful = true;
+    while (!q.empty()) {
+      auto [from, to] = q.front();
+      q.pop();
+
+      // lookup the value of the current node
+      DType value = domain2value(from, source.discrete_values()(from));
+      usize v_idx = value_idx[value];
+
+      // same node value must be permissible at target location
+      auto v = value2domain(to, value);
+      if (!v.has_value()) {
+        successful = false;
+        break;
+      }
+      backup.emplace_back(to, target.discrete_values()(to));
+      target.discrete_values()(to) = v.value();
+
+      usize nc = std::min(value_max_arity[v_idx], children[from].size());
+      // target must at least have the same number of children
+      if (children[to].size() < nc) {
+        successful = false;
+        break;
+      }
+      for (usize i = 0; i < nc; i++) {
+        q.emplace(children[from][i], children[to][i]);
+      }
+    }
+    // revert changes
+    if (!successful) {
+      for (auto [n, v] : backup) {
+        target.discrete_values()(n) = v;
+      }
+    }
+    return successful;
+  };
+
+  std::vector<usize> active_nodes(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize root : subtree_roots) {
+      if (solution.discrete_active()(root)) {
+        visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+      }
+    }
+    for (usize root : output_roots) {
+      visit_tree(solution, root, [&active](auto n) { active.push_back(n); });
+    }
+    return active;
+  };
+
+  std::vector<usize> active_constant_indices(const SolutionBase& solution) const {
+    std::vector<usize> active;
+    for (usize n : active_nodes(solution)) {
+      // lookup the value of the current node
+      DType value = domain2value(n, solution.discrete_values()(n));
+      if (value_kind[value] == ValueKind::Constant) {
+        usize ci = const_repr == ConstantRepr::Pool ? value_idx[value] : n;
+        active.push_back(ci);
+      }
+    }
+
+    return active;
+  };
+
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices
   // template <typename Scalar>
@@ -826,6 +925,7 @@ class GPContext {
   usize num_parameters;
   usize max_num_children;
   bool enable_subfunctions;
+  bool use_apply_buf;
 
   std::vector<std::shared_ptr<OperatorBase>> operators;
   std::vector<usize> op_idx2value;

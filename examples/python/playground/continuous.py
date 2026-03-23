@@ -9,7 +9,7 @@ from src.run import run_all
 
 REPEATS = 30
 
-budget = c.Budget(max_evaluations=int(1e5))
+budget = c.Budget(max_evaluations=int(1e6))
 
 VTR = 1e-10
 
@@ -73,12 +73,13 @@ cias_optima = [
 def problems():
     init_lb, init_ub = 100, 125
 
-    for d in [
+    for d in [  #
         2,
         5,
         10,
         20,
-        40,  # , 80
+        # 40,
+        # 80,
     ]:
         # display name, instance info, actual instance
         yield (
@@ -103,6 +104,39 @@ def problems():
                     continuous_init_upper_bound=init_ub,
                 ),
             )
+
+    for d in [2, 4, 8]:
+        yield (
+            "Ellipsoid",
+            d,
+            c.BenchmarkInstance(
+                c.Ellipsoid(d),
+                target=[VTR],
+                continuous_init_lower_bound=init_lb,
+                continuous_init_upper_bound=init_ub,
+            ),
+        )
+        yield (
+            "Rot. Ellipsoid",
+            d,
+            c.BenchmarkInstance(
+                c.Rotated(c.Ellipsoid(d), -45.0),
+                target=[VTR],
+                continuous_init_lower_bound=init_lb,
+                continuous_init_upper_bound=init_ub,
+            ),
+        )
+        # yield (
+        #     "Rosenbrock",
+        #     d,
+        #     c.BenchmarkInstance(
+        #         c.Rosenbrock(d),
+        #         target=[VTR],
+        #         continuous_init_lower_bound=init_lb,
+        #         continuous_init_upper_bound=init_ub,
+        #     ),
+        # )
+
     for d in [
         4,
         10,
@@ -177,28 +211,28 @@ def methods():
             update_elitist_during_gom=False,
         ),
     )
-    yield (
-        '"RV-GOMEA (LT)"',
-        c.RvGOMEA(
-            linkage_model="LinkageTree",
-            base_population_size=initial_population_size,
-            max_number_of_populations=max_num_populations,
-            max_nis=max_nis,
-            selection_during_gom=False,
-            update_elitist_during_gom=False,
-        ),
-    )
-    yield (
-        '"RV-GOMEA (U)"',
-        c.RvGOMEA(
-            linkage_model="Univariate",
-            base_population_size=initial_population_size,
-            max_number_of_populations=max_num_populations,
-            max_nis=max_nis,
-            selection_during_gom=False,
-            update_elitist_during_gom=False,
-        ),
-    )
+    # yield (
+    #     '"RV-GOMEA (LT)"',
+    #     c.RvGOMEA(
+    #         linkage_model="LinkageTree",
+    #         base_population_size=initial_population_size,
+    #         max_number_of_populations=max_num_populations,
+    #         max_nis=max_nis,
+    #         selection_during_gom=False,
+    #         update_elitist_during_gom=False,
+    #     ),
+    # )
+    # yield (
+    #     '"RV-GOMEA (U)"',
+    #     c.RvGOMEA(
+    #         linkage_model="Univariate",
+    #         base_population_size=initial_population_size,
+    #         max_number_of_populations=max_num_populations,
+    #         max_nis=max_nis,
+    #         selection_during_gom=False,
+    #         update_elitist_during_gom=False,
+    #     ),
+    # )
     yield (
         '"Mixed (Full)"',
         c.MixedGOMEA(
@@ -217,6 +251,32 @@ def methods():
             sampling_model=c.AMaLGaMSamplingModel(),
         ),
     )
+
+    for v in [  #
+        "single",
+        "multiple",
+        "full",
+        # "directed",
+    ]:
+        yield (
+            f'"ES({v}, 1:7)"',
+            c.classic.ES(strategy=v),
+        )
+
+    yield (
+        '"DE"',
+        c.classic.DE(
+            population_size=25,
+            strategy=c.classic.Rand1Bin(base="best", scale="dither"),
+        ),
+    )
+
+    yield (
+        '"PSO"',
+        c.classic.PSO(),
+    )
+
+    return
     # yield (
     #     '"Mixed (Full, MD)"',
     #     c.MixedGOMEA(

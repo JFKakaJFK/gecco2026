@@ -13,9 +13,6 @@
 #include <optional>
 #include <print>
 
-#include <unsupported/Eigen/NonLinearOptimization>
-#include <unsupported/Eigen/NumericalDiff>
-
 #include "goblin/gp/context.h"
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
@@ -27,6 +24,9 @@
 #include "goblin/lib/solution.h"
 #include "goblin/lib/types.h"
 #include "goblin/lib/init.h"
+
+#include <unsupported/Eigen/NonLinearOptimization>
+#include <unsupported/Eigen/NumericalDiff>
 
 namespace goblin {
 
@@ -188,10 +188,8 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
 
-  usize num_continuous() const override final { return _num_continuous; };
   CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
   CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
 
@@ -218,8 +216,10 @@ class SRProblem : public GPInstanceBase {
 
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
+#ifndef NDEBUG
     auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
     assert(p != nullptr && "Quality mismatch");
+#endif
   };
 
   const FitnessBase& fitness() const override final { return _fitness; };
@@ -327,7 +327,7 @@ class SRProblem : public GPInstanceBase {
       }
     }
 
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   void evaluate_test(const SolutionBase& solution) const {
