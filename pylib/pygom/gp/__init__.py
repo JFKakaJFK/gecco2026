@@ -75,14 +75,21 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             "*": pygom.OpMul(),
             "/": pygom.OpDiv(),
             "sin": pygom.OpSin(),
-            # TODO
+            "cos": pygom.OpCos(),
+            "exp": pygom.OpExp(),
+            "log": pygom.OpLog(),
+            "square": pygom.OpSquare(),
+            "sqrt": pygom.OpSqrt(),
+            "pow": pygom.OpPow(),
+            "abs": pygom.OpAbs(),
+            "min": pygom.OpMin(),
+            "max": pygom.OpMax(),
         }
         ctx = pygom.GPContext(
             num_inputs=int(X.shape[1]),
             expression_template=template,
             operators=[
-                str2op[op]
-                for op in self.kwargs.get("operators", "+,-,*,/,sin".split(","))
+                str2op[op] for op in self.kwargs.get("operators", "+,-,*,/").split(",")
             ],
             constant_representation=self.kwargs.get("constant_representation", "ercs"),
         )
