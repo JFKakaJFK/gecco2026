@@ -40,9 +40,15 @@ DATASETS: dict[str, DatasetConfig] = {
         target=1e-6,
     ),
     "simple_addition": DatasetConfig(
-        name="x0+x1+x2+x3+x4+x5+x6+x7+x8",
+        name="(x0*x1+x2*x3)/(x4+x5*x6+x7*x8)",
         dataset_type="synthetic",
         observations=100_000,
+        features=9,
+    ),
+    "feynman_million": DatasetConfig(
+        name="(x0*x1*x2)/((x4-x3)**2+(x6-x5)**2+(x8-x7)**2)",
+        dataset_type="synthetic",
+        observations=1_000_000,
         features=9,
     ),
     "201": DatasetConfig(

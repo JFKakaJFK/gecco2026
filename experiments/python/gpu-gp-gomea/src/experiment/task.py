@@ -69,8 +69,8 @@ def lambdify_expression(e: str | sym.Expr):
 def synthetic_problem(
     expr: str,
     size: int = 1000,
-    lb: float = -10.0,
-    ub: float = 10.0,
+    lb: float = 1.0,
+    ub: float = 5.0,
     noise: float = 0.01,
     seed: int | None = None,
 ):

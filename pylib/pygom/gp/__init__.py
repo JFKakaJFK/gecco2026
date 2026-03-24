@@ -85,6 +85,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             "exp": pygom.OpExp(),
             "log": pygom.OpLog(),
             "square": pygom.OpSquare(),
+            "squaresub": pygom.OpSquareSub(),
             "sqrt": pygom.OpSqrt(),
             "pow": pygom.OpPow(),
             "abs": pygom.OpAbs(),

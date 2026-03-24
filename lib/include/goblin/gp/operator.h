@@ -483,6 +483,27 @@ class OpSquare : public OperatorBase {
   };
 };
 
+
+class OpSquareSub : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 2; };
+  usize max_arity() const override final { return 2; };
+
+  bool is_commutative() const override final { return false; };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final {
+    out = (args.col(0) - args.col(1)).square();
+  };
+
+  std::optional<uint8_t> gpu_operator_id() const override {
+    return static_cast<uint8_t>(Operator::SquareSub);
+  }
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    return std::format("pow(({} - {}), 2)", args[0], args[1]);
+  };
+};
+
 class OpSqrt : public OperatorBase {
  public:
   usize min_arity() const override final { return 1; };

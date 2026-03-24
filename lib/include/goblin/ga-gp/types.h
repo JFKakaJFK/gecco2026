@@ -47,6 +47,7 @@ enum class Operator : uint8_t {
     Exp,
     Log,
     Square,
+    SquareSub,
     Sqrt,
     Pow,
     Abs,
@@ -75,6 +76,7 @@ namespace test {
     constexpr float Exp = Op(Operator::Exp);
     constexpr float Log = Op(Operator::Log);
     constexpr float Square = Op(Operator::Square);
+    constexpr float SquareSub = Op(Operator::SquareSub);
     constexpr float Sqrt = Op(Operator::Sqrt);
     constexpr float Pow = Op(Operator::Pow);
     constexpr float Abs = Op(Operator::Abs);

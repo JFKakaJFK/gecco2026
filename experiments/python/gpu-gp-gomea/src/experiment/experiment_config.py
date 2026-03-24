@@ -53,6 +53,7 @@ class CPUConfig:
 
 OPERATOR_SETS: dict[str, str] = {
     "arith": "+,-,*,/",
+    "squaresub": "+,-,*,/,squaresub",
     "trig": "+,-,*,/,sin,cos",
     "square": "+,-,*,/,square",
     "exp": "+,-,*,/,exp,log",
@@ -442,6 +443,24 @@ SIMPLE_ADDITION_CONFIG = ExperimentConfig(
     max_duration=10,
 )
 
+FEYNMAN_MILLION_CONFIG = ExperimentConfig(
+    name="feynman_million",
+    datasets=[DATASETS["feynman_million"]],
+    population_sizes=[2**i for i in range(15, 17)],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6)],
+    operator_sets=["square"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=240,
+)
+
 
 class Configs:
     # Paper experiments
@@ -452,6 +471,7 @@ class Configs:
     FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
 
     SIMPLE_ADDITION = SIMPLE_ADDITION_CONFIG
+    FEYNMAN_MILLION = FEYNMAN_MILLION_CONFIG
 
 
 cfg = Configs()

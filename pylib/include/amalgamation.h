@@ -3136,6 +3136,7 @@ enum class Operator : uint8_t {
     Exp,
     Log,
     Square,
+    SquareSub,
     Sqrt,
     Pow,
     Abs,
@@ -3164,6 +3165,7 @@ namespace test {
     constexpr float Exp = Op(Operator::Exp);
     constexpr float Log = Op(Operator::Log);
     constexpr float Square = Op(Operator::Square);
+    constexpr float SquareSub = Op(Operator::SquareSub);
     constexpr float Sqrt = Op(Operator::Sqrt);
     constexpr float Pow = Op(Operator::Pow);
     constexpr float Abs = Op(Operator::Abs);
@@ -4226,6 +4228,27 @@ class OpSquare : public OperatorBase {
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, 2)", args[0]);
+  };
+};
+
+
+class OpSquareSub : public OperatorBase {
+ public:
+  usize min_arity() const override final { return 2; };
+  usize max_arity() const override final { return 2; };
+
+  bool is_commutative() const override final { return false; };
+
+  void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override final {
+    out = (args.col(0) - args.col(1)).square();
+  };
+
+  std::optional<uint8_t> gpu_operator_id() const override {
+    return static_cast<uint8_t>(Operator::SquareSub);
+  }
+
+  std::string format(const std::span<const std::string>& args) const override final {
+    return std::format("pow(({} - {}), 2)", args[0], args[1]);
   };
 };
 

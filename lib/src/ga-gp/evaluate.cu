@@ -616,7 +616,12 @@ float compute_tree_output_inplace(
                 case Operator::Cos: stack[sp - 1]     = cosf(stack[sp - 1]);                break;
                 case Operator::Exp: stack[sp - 1]     = expf(stack[sp - 1]);                break;
                 case Operator::Log: stack[sp - 1]     = logf(stack[sp - 1]);                break;
-                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;  
+                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;
+                case Operator::SquareSub: {
+                    float rhs = stack[--sp];
+                    stack[sp - 1] = powf((stack[sp - 1] - rhs), 2);
+                    break;
+                }  
                 case Operator::Sqrt: stack[sp - 1]    = sqrtf(stack[sp - 1]);               break;
                 case Operator::Pow: {
                     float rhs = stack[--sp];

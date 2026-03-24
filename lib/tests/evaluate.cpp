@@ -126,6 +126,42 @@ TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output") {
     }
 }
 
+TEST_CASE("goblin::ga-gp::evaluate::compute_tree_output::square_sub") {
+    using namespace std::numbers;
+    using namespace test;
+
+    struct TestCase {
+        std::vector<float> X;
+        std::vector<float> type;
+        std::vector<float> value;
+        size_t num_datapoints;
+        size_t datapoint_index;
+        float expected;
+    };
+
+    // Instantiation of test cases
+    std::vector<TestCase> test_cases = {
+        //////////////////////////////////////////
+        /// SINGLE SOLUTION | SINGLE DATAPOINT ///
+        ////////////////////////////////////////// 
+
+        // operator at root #5
+        { {1}, {I, C, O}, {Idx(0), Val(1), SquareSub}, 1, 0, 0 }, // (x0 - x1)**2
+        { {2}, {I, C, O}, {Idx(0), Val(1), SquareSub}, 1, 0, 1 }, // (x0 - x1)**2
+        { {9}, {I, C, O}, {Idx(0), Val(2), SquareSub}, 1, 0, 49 }, // (x0 - 2)**2
+    };
+
+    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
+        INFO("Test Case: ", i);
+
+        REQUIRE_EQ(tc.type.size(), tc.value.size());
+
+        float result = test_compute_output_kernel(tc.X, tc.type, tc.value, tc.num_datapoints, tc.datapoint_index, KernelVersion::SingleKernelInplace);
+        
+        CHECK_EQ(result, doctest::Approx(tc.expected));
+    }
+}
+
 TEST_CASE("goblin::ga-gp::evaluate::evaluate") {
     using namespace test;
 

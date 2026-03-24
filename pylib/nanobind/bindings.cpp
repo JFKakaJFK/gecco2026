@@ -2449,6 +2449,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("exp", goblin::Operator::Exp, "")
           .value("log", goblin::Operator::Log, "")
           .value("square", goblin::Operator::Square, "")
+          .value("square_sub", goblin::Operator::SquareSub, "")
           .value("sqrt", goblin::Operator::Sqrt, "")
           .value("pow", goblin::Operator::Pow, "")
           .value("abs", goblin::Operator::Abs, "")
@@ -2886,6 +2887,25 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSquare::gpu_operator_id)
       .def("format",
           &goblin::OpSquare::format, nb::arg("args"))
+      ;
+
+
+  auto pyClassOpSquareSub =
+      nb::class_<goblin::OpSquareSub, goblin::OperatorBase>
+          (m, "OpSquareSub", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSquareSub::min_arity)
+      .def("max_arity",
+          &goblin::OpSquareSub::max_arity)
+      .def("is_commutative",
+          &goblin::OpSquareSub::is_commutative)
+      .def("apply",
+          &goblin::OpSquareSub::apply, nb::arg("out"), nb::arg("args"))
+      .def("gpu_operator_id",
+          &goblin::OpSquareSub::gpu_operator_id)
+      .def("format",
+          &goblin::OpSquareSub::format, nb::arg("args"))
       ;
 
 
