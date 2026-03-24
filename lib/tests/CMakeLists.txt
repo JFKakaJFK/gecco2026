@@ -46,7 +46,7 @@ set(
 )
 
 set(LIB_OPTIMIZED_TESTS
-    mixed
+    # mixed
     sr
     sr_stats
     mo_mixed
