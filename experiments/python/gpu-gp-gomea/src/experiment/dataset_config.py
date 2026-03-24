@@ -39,6 +39,12 @@ DATASETS: dict[str, DatasetConfig] = {
         features=1,
         target=1e-6,
     ),
+    "simple_addition": DatasetConfig(
+        name="x0+x1+x2+x3+x4+x5+x6+x7+x8",
+        dataset_type="synthetic",
+        observations=100_000,
+        features=9,
+    ),
     "201": DatasetConfig(
         name="201_pol",
         dataset_type="pmlb",

@@ -54,7 +54,7 @@ class CPUConfig:
 OPERATOR_SETS: dict[str, str] = {
     "arith": "+,-,*,/",
     "trig": "+,-,*,/,sin,cos",
-    "square": "+,-,*,/,square,sqrt",
+    "square": "+,-,*,/,square",
     "exp": "+,-,*,/,exp,log",
     "paper": "+,-,*,/,sin,cos,exp,log,square,sqrt,pow",
     "all": "+,-,*,/,sin,cos,square,sqrt,exp,log,pow,abs,min,max",
@@ -409,19 +409,37 @@ FEYNMAN_EXACT_CONFIG = ExperimentConfig(
     # Problem Space
     name="feynman",
     datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[128],  # 128 - 1048576
+    population_sizes=[2**i for i in range(14, 17)],  # 128 - 1048576
     num_observations=[100_000],
     num_features=None,
     templates=[TemplateConfig(2, 6)],
-    operator_sets=["paper"],
+    operator_sets=["square"],
     # Execution Parameters
     use_target=False,
-    num_folds=30,
+    num_folds=9,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
     max_duration=60,
+)
+
+SIMPLE_ADDITION_CONFIG = ExperimentConfig(
+    name="simple_addition",
+    datasets=[DATASETS["simple_addition"]],
+    population_sizes=[2**i for i in range(14, 17)],
+    num_observations=[100_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 5)],
+    operator_sets=["arith"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=10,
 )
 
 
@@ -432,6 +450,8 @@ class Configs:
     CALIFORNIA_GPU = CALIFORNIA_GPU_CONFIG
     FEYNMAN_GPU = FEYNMAN_GPU_CONFIG
     FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
+
+    SIMPLE_ADDITION = SIMPLE_ADDITION_CONFIG
 
 
 cfg = Configs()

@@ -179,6 +179,7 @@ def main():
     # grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
     # grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
     grid_execution(cfg.FEYNMAN_EXACT, output_directory, dry_run=True)
+    grid_execution(cfg.SIMPLE_ADDITION, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":
