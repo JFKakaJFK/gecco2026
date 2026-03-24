@@ -197,3 +197,6 @@ _skbuild/
 cmake-build-*/
 .idea/
 .DS_Store
+
+experiments/python/cpu_experiments/pmlb_cache
+experiments/python/cpu_experiments/results
