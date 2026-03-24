@@ -892,7 +892,9 @@ class GPContext {
           temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
         } else if (type == ValueKind::Operator) {
           // Push the operator index, will be used to apply the operator on GPU
-          temp_value.push_back(static_cast<float>(v_idx));
+          auto gpu_id = this->operators[v_idx]->gpu_operator_id();
+          if (!gpu_id.has_value()) throw std::runtime_error("Operator not GPU-compatible");
+          temp_value.push_back(static_cast<float>(gpu_id.value()));
         }
       }
     }

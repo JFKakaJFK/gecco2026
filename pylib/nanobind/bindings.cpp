@@ -1063,7 +1063,7 @@ namespace goblin {
 class OperatorBase_trampoline : public OperatorBase
 {
 public:
-    NB_TRAMPOLINE(OperatorBase, 7);
+    NB_TRAMPOLINE(OperatorBase, 8);
 
     usize min_arity() const override
     {
@@ -1107,6 +1107,13 @@ public:
             "apply_grad", // function name (python)
             apply_grad, // function name (c++)
             out, d_out, args, d_args // params
+        );
+    }
+    std::optional<uint8_t> gpu_operator_id() const override
+    {
+        NB_OVERRIDE_NAME(
+            "gpu_operator_id", // function name (python)
+            gpu_operator_id // function name (c++)
         );
     }
     std::string format(const std::span<const std::string> & args) const override
@@ -2626,6 +2633,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OperatorBase::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
       .def("__call__",
           &goblin::OperatorBase::operator(), nb::arg("args"))
+      .def("gpu_operator_id",
+          &goblin::OperatorBase::gpu_operator_id)
       .def("format",
           &goblin::OperatorBase::format, nb::arg("args"))
       ;
@@ -2668,6 +2677,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpAdd::has_gradient)
       .def("apply_grad",
           &goblin::OpAdd::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpAdd::gpu_operator_id)
       .def("format",
           &goblin::OpAdd::format, nb::arg("args"))
       ;
@@ -2710,6 +2721,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSubGPU::has_gradient)
       .def("apply_grad",
           &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSubGPU::gpu_operator_id)
       .def("format",
           &goblin::OpSubGPU::format, nb::arg("args"))
       ;
@@ -2731,6 +2744,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMul::has_gradient)
       .def("apply_grad",
           &goblin::OpMul::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMul::gpu_operator_id)
       .def("format",
           &goblin::OpMul::format, nb::arg("args"))
       ;
@@ -2752,6 +2767,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpDiv::has_gradient)
       .def("apply_grad",
           &goblin::OpDiv::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpDiv::gpu_operator_id)
       .def("format",
           &goblin::OpDiv::format, nb::arg("args"))
       ;
@@ -2773,6 +2790,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSin::has_gradient)
       .def("apply_grad",
           &goblin::OpSin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSin::gpu_operator_id)
       .def("format",
           &goblin::OpSin::format, nb::arg("args"))
       ;
@@ -2794,6 +2813,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpCos::has_gradient)
       .def("apply_grad",
           &goblin::OpCos::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpCos::gpu_operator_id)
       .def("format",
           &goblin::OpCos::format, nb::arg("args"))
       ;
@@ -2815,6 +2836,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpExp::has_gradient)
       .def("apply_grad",
           &goblin::OpExp::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpExp::gpu_operator_id)
       .def("format",
           &goblin::OpExp::format, nb::arg("args"))
       ;
@@ -2836,6 +2859,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpLog::has_gradient)
       .def("apply_grad",
           &goblin::OpLog::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpLog::gpu_operator_id)
       .def("format",
           &goblin::OpLog::format, nb::arg("args"))
       ;
@@ -2857,6 +2882,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSquare::has_gradient)
       .def("apply_grad",
           &goblin::OpSquare::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSquare::gpu_operator_id)
       .def("format",
           &goblin::OpSquare::format, nb::arg("args"))
       ;
@@ -2878,6 +2905,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSqrt::has_gradient)
       .def("apply_grad",
           &goblin::OpSqrt::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSqrt::gpu_operator_id)
       .def("format",
           &goblin::OpSqrt::format, nb::arg("args"))
       ;
@@ -2899,6 +2928,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpPow::has_gradient)
       .def("apply_grad",
           &goblin::OpPow::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpPow::gpu_operator_id)
       .def("format",
           &goblin::OpPow::format, nb::arg("args"))
       ;
@@ -2920,6 +2951,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpAbs::has_gradient)
       .def("apply_grad",
           &goblin::OpAbs::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpAbs::gpu_operator_id)
       .def("format",
           &goblin::OpAbs::format, nb::arg("args"))
       ;
@@ -2941,6 +2974,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMin::has_gradient)
       .def("apply_grad",
           &goblin::OpMin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMin::gpu_operator_id)
       .def("format",
           &goblin::OpMin::format, nb::arg("args"))
       ;
@@ -2962,6 +2997,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMax::has_gradient)
       .def("apply_grad",
           &goblin::OpMax::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMax::gpu_operator_id)
       .def("format",
           &goblin::OpMax::format, nb::arg("args"))
       ;

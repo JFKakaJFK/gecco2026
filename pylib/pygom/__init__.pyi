@@ -1924,6 +1924,9 @@ class OperatorBase:
     def __call__(self, args: CRef[Arr2D[float]]) -> Array[float]:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:  # overridable
+        pass
+
     def format(self, args: std.span[str]) -> str:  # overridable (pure virtual)
         pass
 
@@ -1986,6 +1989,9 @@ class OpAdd(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2052,6 +2058,9 @@ class OpSubGPU(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2082,6 +2091,9 @@ class OpMul(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2116,6 +2128,9 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2146,6 +2161,9 @@ class OpSin(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2180,6 +2198,9 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2210,6 +2231,9 @@ class OpExp(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2244,6 +2268,9 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2274,6 +2301,9 @@ class OpSquare(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2308,6 +2338,9 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2338,6 +2371,9 @@ class OpPow(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2372,6 +2408,9 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2404,6 +2443,9 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2434,6 +2476,9 @@ class OpMax(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
