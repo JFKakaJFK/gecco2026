@@ -93,6 +93,8 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> DiscreteGOMEA::run(I
           idxs({0}) {
       initialize();
       s.add(Solution(p.archive_fitness().worst(), Vec<DType>::Zero(p.num_discrete()), std::nullopt));
+      _parent.add(s[0]);
+      subsets.push_back(&touched_indices);
     };
 
     void evaluationFunction(gomea::solution_t<char>* solution) {
@@ -116,14 +118,24 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> DiscreteGOMEA::run(I
     };
 
     void partialEvaluationFunction(gomea::solution_t<char>* parent, gomea::partial_solution_t<char>* solution) {
-      auto& q = s[0].quality_as<MOQuality>();
-      s[0].discrete_values() =
+      _parent[0].discrete_values() =
           Eigen::Map<Eigen::VectorX<char>>(parent->variables.data(), parent->variables.size()).cast<DType>();
+      auto& qp = _parent[0].quality_as<MOQuality>();
+      qp.objectives(0) = parent->getObjectiveValue(0);
+      qp.constraint_value = parent->getConstraintValue();
+
+      s[0].discrete_values() = _parent[0].discrete_values();
+
+      touched_indices.discrete.clear();
       for (usize i = 0; i < solution->touched_indices.size(); i++) {
+        touched_indices.discrete.push_back(i);
         solution->touched_variables[i] %= static_cast<char>(p.discrete_domain_sizes()(solution->touched_indices[i]));
         s[0].discrete_values()(solution->touched_indices[i]) = static_cast<DType>(solution->touched_variables[i]);
       }
-      p.evaluate(rng, s, idxs);
+      // p.evaluate(rng, s, idxs);
+      p.evaluate_partial(rng, s, _parent, subsets, idxs);
+
+      auto& q = s[0].quality_as<MOQuality>();
       solution->setObjectiveValue(q.objectives(0));
       solution->setConstraintValue(q.constraint_value);
       a.update(s[0], true);
@@ -142,6 +154,9 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> DiscreteGOMEA::run(I
     ArchiveBase& a;
     std::vector<usize> idxs;
     DefaultSolutionSet s;
+    DefaultSolutionSet _parent;
+    Subset touched_indices;
+    std::vector<const Subset*> subsets;
   };
 
   Wrapper fn(rng, problem, *archive);
@@ -257,6 +272,8 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> RvGOMEA::run(Instanc
         : gomea::fitness::fitness_t<double>(p.num_continuous()), rng(rng), p(p), a(a), idxs({0}) {
       initialize();
       s.add(Solution(p.archive_fitness().worst(), std::nullopt, Vec<CType>::Zero(p.num_continuous())));
+      _parent.add(s[0]);
+      subsets.push_back(&touched_indices);
     };
 
     void evaluationFunction(gomea::solution_t<double>* solution) {
@@ -276,12 +293,23 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> RvGOMEA::run(Instanc
     };
 
     void partialEvaluationFunction(gomea::solution_t<double>* parent, gomea::partial_solution_t<double>* solution) {
-      s[0].continuous_values() = Eigen::Map<Eigen::VectorXd>(parent->variables.data(), parent->variables.size());
+      _parent[0].continuous_values() = Eigen::Map<Eigen::VectorXd>(parent->variables.data(), parent->variables.size());
+      auto& qp = _parent[0].quality_as<MOQuality>();
+      qp.objectives(0) = parent->getObjectiveValue(0);
+      qp.constraint_value = parent->getConstraintValue();
+
+      s[0].continuous_values() = _parent[0].continuous_values();
+
+      touched_indices.continuous.clear();
       for (usize i = 0; i < solution->touched_indices.size(); i++) {
+        touched_indices.continuous.push_back(i);
         s[0].continuous_values()(solution->touched_indices[i]) = solution->touched_variables[i];
       }
-      p.evaluate(rng, s, idxs);
-      auto q = s[0].quality_as<MOQuality>();
+
+      // p.evaluate(rng, s, idxs);
+      p.evaluate_partial(rng, s, _parent, subsets, idxs);
+
+      auto& q = s[0].quality_as<MOQuality>();
       solution->setObjectiveValue(q.objectives(0));
       solution->setConstraintValue(q.constraint_value);
       a.update(s[0], true);
@@ -304,6 +332,9 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> RvGOMEA::run(Instanc
     ArchiveBase& a;
     std::vector<usize> idxs;
     DefaultSolutionSet s;
+    DefaultSolutionSet _parent;
+    Subset touched_indices;
+    std::vector<const Subset*> subsets;
   };
 
   Wrapper fn(rng, problem, *archive);

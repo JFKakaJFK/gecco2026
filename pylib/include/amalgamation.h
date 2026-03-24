@@ -6,7 +6,6 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
-
 // clang-format off
 
 
@@ -8108,14 +8107,11 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
-
-
 
 namespace goblin {
 
@@ -8371,9 +8367,6 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
-
-
-
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8495,13 +8488,11 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
-
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
-
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8590,9 +8581,6 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
-
-
-
 
 namespace goblin {
 
@@ -8690,18 +8678,14 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
-
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
-
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
-
 
 namespace goblin {
 
@@ -10013,7 +9997,6 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11441,8 +11424,6 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
-
-
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11665,7 +11646,6 @@ class EABase : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
 
-
 namespace goblin {
 namespace classic {
 
@@ -11880,7 +11860,6 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
-
 
 namespace goblin {
 namespace classic {
@@ -12222,7 +12201,6 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
-
 namespace goblin {
 namespace classic {
 
@@ -12439,8 +12417,6 @@ class PSO : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
-
-
 
 namespace goblin {
 namespace classic {
@@ -12836,7 +12812,6 @@ class SimpleGA : public EABase {
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
 
-
 namespace goblin {
 namespace classic {
 
@@ -13030,14 +13005,11 @@ class StandardGP : public EABase {
 
 #endif /* _GOBLIN_STANDARD_GP_H */
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/examples/voronoi.h included by goblin.h                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_EXAMPLES_VORONOI_H
 #define _GOBLIN_EXAMPLES_VORONOI_H
-
-
 
 template <typename C>
 class KDTree {
@@ -13433,7 +13405,6 @@ class YourCustomMutation : public goblin::classic::DiscreteMutationBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
