@@ -118,11 +118,12 @@ def create_tasks(
         case "sklearn":
             X, y = fetch_california_housing(return_X_y=True)
         case "synthetic":
+            assert dataset.equation is not None
             X, y = synthetic_problem(
-                dataset.name,
+                dataset.equation,
                 dataset.observations,
                 noise=0.0,
-                seed=rng.integers(2**32 - 1),
+                seed=42,
             )
         case "uci":
             d = ucimlrepo.fetch_ucirepo(id=int(dataset.name))

@@ -425,31 +425,103 @@ FEYNMAN_EXACT_CONFIG = ExperimentConfig(
     max_duration=60,
 )
 
-SIMPLE_ADDITION_CONFIG = ExperimentConfig(
-    name="simple_addition",
-    datasets=[DATASETS["simple_addition"]],
-    population_sizes=[2**i for i in range(14, 17)],
-    num_observations=[100_000],
+ADDITION_CONFIG = ExperimentConfig(
+    name="1_addition",
+    datasets=[DATASETS["1_addition"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
     num_features=None,
-    templates=[TemplateConfig(2, 5)],
-    operator_sets=["arith"],
-    # Execution Parameters
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
     use_target=False,
     num_folds=9,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
-    max_duration=10,
+    max_duration=240,
+)
+
+DIVISION_CONFIG = ExperimentConfig(
+    name="2_division",
+    datasets=[DATASETS["2_division"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=240,
+)
+
+SUBTRACTION_CONFIG = ExperimentConfig(
+    name="3_subtraction",
+    datasets=[DATASETS["3_subtraction"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=240,
+)
+
+MULTIPLICATION_CONFIG = ExperimentConfig(
+    name="4_multiplication",
+    datasets=[DATASETS["4_multiplication"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=240,
+)
+
+SQUARE_CONFIG = ExperimentConfig(
+    name="5_square",
+    datasets=[DATASETS["5_square"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=(KV.single_kernel_inplace,)),
+    max_duration=240,
 )
 
 FEYNMAN_MILLION_CONFIG = ExperimentConfig(
     name="feynman_million",
     datasets=[DATASETS["feynman_million"]],
-    population_sizes=[2**i for i in range(15, 17)],
+    population_sizes=[65536],
     num_observations=[1_000_000],
     num_features=None,
-    templates=[TemplateConfig(2, 6)],
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
     operator_sets=["square"],
     # Execution Parameters
     use_target=False,
@@ -470,8 +542,13 @@ class Configs:
     FEYNMAN_GPU = FEYNMAN_GPU_CONFIG
     FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
 
-    SIMPLE_ADDITION = SIMPLE_ADDITION_CONFIG
     FEYNMAN_MILLION = FEYNMAN_MILLION_CONFIG
+
+    ADDITION = ADDITION_CONFIG
+    DIVISION = DIVISION_CONFIG
+    SUBTRACTION = SUBTRACTION_CONFIG
+    MULTIPLICATION = MULTIPLICATION_CONFIG
+    SQUARE = SQUARE_CONFIG
 
 
 cfg = Configs()
