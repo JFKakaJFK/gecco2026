@@ -135,6 +135,14 @@ def run_one_task(task: Task, log_path: Path) -> None:
     X = X_train[:obs, :feat]
     y = y_train[:obs]
 
+    if np.isnan(X_train).any():
+        imputer = IterativeImputer(
+            max_iter=10,
+            random_state=task["seed"],
+            sample_posterior=True,
+        )
+        X_train = imputer.fit_transform(X_train)
+
     log_info: list[tuple[str, str]] = task_to_log_info(task, float(np.var(y[:, 0])))
 
     if task["population_size"] is None:

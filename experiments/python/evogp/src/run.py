@@ -24,6 +24,8 @@ from evogp.algorithm import (
 from evogp.pipeline import StandardPipeline
 from evogp.problem import SymbolicRegression
 from evogp.tree import Forest, GenerateDescriptor
+from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
 from src.experiment_config import OPERATOR_SETS
@@ -79,6 +81,14 @@ def run_one_task(task: Task) -> dict:
 
     X_train = X_train[:obs, :feat]
     y_train = y_train[:obs]
+
+    if np.isnan(X_train).any():
+        imputer = IterativeImputer(
+            max_iter=10,
+            random_state=task["seed"],
+            sample_posterior=True,
+        )
+        X_train = imputer.fit_transform(X_train)
 
     X = torch.tensor(X_train, dtype=torch.float32, device="cuda").contiguous()
     y = torch.tensor(y_train, dtype=torch.float32, device="cuda").contiguous()

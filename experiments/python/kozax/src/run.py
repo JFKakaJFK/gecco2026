@@ -10,6 +10,8 @@ from typing import Never
 
 import numpy as np
 import sympy as sym
+from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
 from src.task import Task, TaskGenerator
@@ -99,6 +101,14 @@ def run_one_task(task: Task) -> dict:
 
     X = X_train[:obs, :feat]
     y = y_train[:obs]
+
+    if np.isnan(X_train).any():
+        imputer = IterativeImputer(
+            max_iter=10,
+            random_state=task["seed"],
+            sample_posterior=True,
+        )
+        X_train = imputer.fit_transform(X_train)
 
     if task["population_size"] is None:
         raise ValueError("Population size cannot be None")
