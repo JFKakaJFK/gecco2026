@@ -453,7 +453,7 @@ FEYNMAN_MILLION_CONFIG = ExperimentConfig(
     operator_sets=["square"],
     # Execution Parameters
     use_target=False,
-    num_folds=9,
+    num_folds=30,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
