@@ -2157,6 +2157,95 @@ inline CType hypervolume2D(const Arr2D<CType> points, const Array<CType> referen
                             points.rows());
 };
 
+/// pointwise hypervolume contribution as per doi.org/10.1109/DOCS63458.2024.10704327
+template <typename S2R, typename P2R>
+inline CType pHVC_impl(S2R&& signed_solution_to_ref,
+                       P2R&& signed_point_to_ref,
+                       usize num_solutions,
+                       usize num_objectives) {
+  if (num_solutions < 1) {
+    // contribution = hypervolume of the single point
+    CType hv = 1.0;
+    for (usize j = 0; j < num_objectives; j++) {
+      hv *= signed_point_to_ref(j);
+    }
+    return hv;
+  }
+
+  CType contribution = std::numeric_limits<CType>::infinity();
+  for (usize i = 0; i < num_solutions; i++) {
+    CType r2p_volume = 1.0, r2worst_volume = 1.0;
+    for (usize j = 0; j < num_objectives; j++) {
+      CType r2p_j = signed_point_to_ref(j);
+      CType r2s_j = signed_solution_to_ref(i, j);
+      r2p_volume *= r2p_j;
+      // ref_j - max(s_j, p_j) = min(dist_j(r, s), dist_j(r, p))
+      r2worst_volume *= std::min(r2p_j, r2s_j);
+    }
+
+    contribution = std::min(contribution, r2p_volume - r2worst_volume);
+  }
+  return contribution;
+};
+
+template <typename SolutionSetLike>
+inline CType pHVC_dispatch(const SolutionSetLike& solutions,
+                           const FitnessBase& fitness,
+                           const std::span<const usize> indices,
+                           const QualityBase& point,
+                           const QualityBase& reference_point) {
+  return pHVC_impl(
+      [&](const usize idx, const usize objective) {
+        CType dist = fitness.distance(solutions[indices[idx]].quality(), reference_point, objective);
+        bool solution_is_worse =
+            fitness.cmp(solutions[indices[idx]].quality(), reference_point, objective) == Ordering::Worse;
+        return solution_is_worse ? -dist : dist;
+      },
+      [&](const usize objective) {
+        CType dist = fitness.distance(point, reference_point, objective);
+        bool point_is_worse = fitness.cmp(point, reference_point, objective) == Ordering::Worse;
+        return point_is_worse ? -dist : dist;
+      },
+      indices.size(), fitness.num_objectives());
+};
+
+inline CType pHVC(const SolutionSetBase& solutions,
+                  const FitnessBase& fitness,
+                  const std::span<const usize> indices,
+                  const QualityBase& point,
+                  const QualityBase& reference_point) {
+  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
+};
+inline CType pHVC(const ArchiveBase& solutions,
+                  const FitnessBase& fitness,
+                  const std::span<const usize> indices,
+                  const QualityBase& point,
+                  const QualityBase& reference_point) {
+  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
+};
+inline CType pHVC(const SolutionSetBase& solutions,
+                  const FitnessBase& fitness,
+                  const QualityBase& point,
+                  const QualityBase& reference_point) {
+  std::vector<usize> indices(solutions.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
+};
+inline CType pHVC(const ArchiveBase& solutions,
+                  const FitnessBase& fitness,
+                  const QualityBase& point,
+                  const QualityBase& reference_point) {
+  std::vector<usize> indices(solutions.size());
+  std::iota(indices.begin(), indices.end(), 0);
+  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
+};
+inline CType pHVC(const Arr2D<CType> solutions, const Array<CType> point, const Array<CType> reference_point) {
+  return pHVC_impl(
+      [&](const usize idx, const usize objective) { return reference_point(objective) - solutions(idx, objective); },
+      [&](const usize objective) { return reference_point(objective) - point(objective); }, solutions.rows(),
+      solutions.cols());
+};
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_ALGORITHMS_MO_H */
@@ -6592,6 +6681,7 @@ class Concat final : public ObjectiveBase {
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
                                             const std::span<const usize>& continuous_indices) override final {
+    std::vector<usize> d_indices, c_indices;
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (auto& o : fns) {
@@ -6599,11 +6689,28 @@ class Concat final : public ObjectiveBase {
       c_len = o->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+
+      // discrete/continuous indices are the indices falling into d_seq/c_seq without the offset
+      d_indices.clear();
+      d_indices.reserve(d_len);
+      for (usize i : discrete_indices) {
+        if (d_offset <= i && i < d_offset + d_len) {
+          d_indices.push_back(i - d_offset);
+        }
+      }
+
+      c_indices.clear();
+      c_indices.reserve(c_len);
+      for (usize i : continuous_indices) {
+        if (c_offset <= i && i < c_offset + c_len) {
+          c_indices.push_back(i - c_offset);
+        }
+      }
+
       auto [fov, fcv] = o->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
-          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value, d_indices, c_indices);
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
@@ -6662,6 +6769,7 @@ class Repeat final : public ObjectiveBase {
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
                                             const std::span<const usize>& continuous_indices) override final {
+    std::vector<usize> d_indices, c_indices;
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (usize i = 0; i < _repeats; i++) {
@@ -6669,11 +6777,28 @@ class Repeat final : public ObjectiveBase {
       c_len = fn->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+
+      // discrete/continuous indices are the indices falling into d_seq/c_seq without the offset
+      d_indices.clear();
+      d_indices.reserve(d_len);
+      for (usize i : discrete_indices) {
+        if (d_offset <= i && i < d_offset + d_len) {
+          d_indices.push_back(i - d_offset);
+        }
+      }
+
+      c_indices.clear();
+      c_indices.reserve(c_len);
+      for (usize i : continuous_indices) {
+        if (c_offset <= i && i < c_offset + c_len) {
+          c_indices.push_back(i - c_offset);
+        }
+      }
+
       auto [fov, fcv] = fn->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
-          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value, d_indices, c_indices);
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
@@ -11546,6 +11671,111 @@ class TruncationSelection : public SelectionStrategyBase {
           }
         }
       }
+    }
+
+    return selection;
+  };
+};
+
+class pHVCSelection : public SelectionStrategyBase {
+  std::unique_ptr<QualityBase> reference_point;
+
+ public:
+  pHVCSelection(std::unique_ptr<QualityBase> reference_point) : reference_point(std::move(reference_point)) {};
+
+  std::vector<usize> select(Rng& rng,
+                            const FitnessBase& fitness,
+                            const SolutionSetBase& solutions,
+                            usize target_size) const override final {
+    std::vector<usize> selection;
+    selection.reserve(target_size);
+
+    if (solutions.size() <= target_size) {
+      selection.resize(solutions.size());
+      std::iota(selection.begin(), selection.end(), 0);
+      return selection;
+    }
+
+    std::vector<usize> selection_pool(solutions.size());
+    std::iota(selection_pool.begin(), selection_pool.end(), 0);
+
+    std::vector<usize> best_per_objective(fitness.num_objectives(), 0);
+    for (usize i = 1; i < solutions.size(); i++) {
+      for (usize j = 0; j < fitness.num_objectives(); j++) {
+        if (fitness.cmp(solutions[i].quality(), solutions[best_per_objective[j]].quality(), j) == Ordering::Better) {
+          best_per_objective[j] = i;
+        }
+      }
+    }
+    std::vector<usize> worst_per_objective(fitness.num_objectives(), 0);
+    for (usize i = 1; i < solutions.size(); i++) {
+      for (usize j = 0; j < fitness.num_objectives(); j++) {
+        bool worst_is_invalid = isna(fitness.distance(solutions[worst_per_objective[j]].quality(),
+                                                      solutions[best_per_objective[j]].quality(), j));
+
+        bool is_valid = !isna(fitness.distance(solutions[i].quality(), solutions[best_per_objective[j]].quality(), j));
+        if (worst_is_invalid ||
+            (is_valid &&
+             fitness.cmp(solutions[i].quality(), solutions[worst_per_objective[j]].quality(), j) == Ordering::Worse)) {
+          worst_per_objective[j] = i;
+        }
+      }
+    }
+    bool use_ref = false;
+    std::vector<CType> o_norm(fitness.num_objectives());
+    for (usize j = 0; j < fitness.num_objectives(); j++) {
+      o_norm[j] =
+          fitness.distance(solutions[best_per_objective[j]].quality(), solutions[worst_per_objective[j]].quality(), j);
+      if (isna(o_norm[j]) || o_norm[j] <= 0.0) {
+        use_ref = true;
+      }
+    }
+    auto normed_dist_to_ref = [&](const QualityBase& point, const usize objective) {
+      const auto& ref = solutions[worst_per_objective[objective]].quality();
+      CType dist = fitness.distance(point, ref, objective) / o_norm[objective];
+      bool point_is_worse = fitness.cmp(point, ref, objective) == Ordering::Worse;
+      return point_is_worse ? -dist : dist;
+    };
+
+    // TODO instead of reference point, use worst in each dimension...
+    // -> can't assemble, so call dispatch function...
+    // TODO delete :/
+
+    CType best_contribution;
+    usize best_idx;
+    while (selection.size() < target_size) {
+      // find point with highest contribution
+      best_idx = selection_pool.size();
+      for (usize i = 0; i < selection_pool.size(); i++) {
+        usize idx = selection_pool[i];
+        CType contribution;
+        if (use_ref) {
+          // get pool without idx
+          std::swap(selection_pool[i], selection_pool.back());
+          selection_pool.pop_back();
+          contribution = pHVC(solutions, fitness, selection_pool, solutions[idx].quality(), *reference_point);
+          // restore pool
+          selection_pool.push_back(selection_pool[i]);
+          selection_pool[i] = idx;
+        } else {
+          contribution = pHVC_impl(
+              [&](const usize s, const usize objective) {
+                return normed_dist_to_ref(solutions[s < idx ? s : s + 1].quality(), objective);
+              },
+              [&](const usize objective) { return normed_dist_to_ref(solutions[idx].quality(), objective); },
+              selection_pool.size() - 1, fitness.num_objectives());
+        }
+
+        if (best_idx >= selection_pool.size() || contribution > best_contribution) {
+          best_idx = i;
+          best_contribution = contribution;
+        }
+      }
+
+      // add to selection and remove from pool
+      selection.push_back(selection_pool[best_idx]);
+      std::swap(selection_pool[best_idx], selection_pool.back());
+      selection_pool.pop_back();
     }
 
     return selection;

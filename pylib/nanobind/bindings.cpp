@@ -1419,10 +1419,10 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
 
   auto pyEnumOrdering = nb::enum_<goblin::Ordering>(m, "Ordering", nb::is_arithmetic(), "")
-                            .value("better", goblin::Ordering::Better, "")
-                            .value("equal", goblin::Ordering::Equal, "")
-                            .value("worse", goblin::Ordering::Worse, "")
-                            .value("non_dominated", goblin::Ordering::NonDominated, "");
+                            .value("Better", goblin::Ordering::Better, "")
+                            .value("Equal", goblin::Ordering::Equal, "")
+                            .value("Worse", goblin::Ordering::Worse, "")
+                            .value("NonDominated", goblin::Ordering::NonDominated, "");
   // #endif
   // #ifndef _GOBLIN_LIB_FITNESS_H
   //
@@ -1678,13 +1678,13 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   auto pyEnumTerminationStatus =
       nb::enum_<goblin::TerminationStatus>(m, "TerminationStatus", nb::is_arithmetic(), "")
-          .value("time_limit_reached", goblin::TerminationStatus::TimeLimitReached, "")
-          .value("generation_limit_reached", goblin::TerminationStatus::GenerationLimitReached, "")
-          .value("evaluation_limit_reached", goblin::TerminationStatus::EvaluationLimitReached, "")
-          .value("target_reached", goblin::TerminationStatus::TargetReached, "")
-          .value("converged", goblin::TerminationStatus::Converged, "")
-          .value("aborted", goblin::TerminationStatus::Aborted, "")
-          .value("running", goblin::TerminationStatus::Running, "");
+          .value("TimeLimitReached", goblin::TerminationStatus::TimeLimitReached, "")
+          .value("GenerationLimitReached", goblin::TerminationStatus::GenerationLimitReached, "")
+          .value("EvaluationLimitReached", goblin::TerminationStatus::EvaluationLimitReached, "")
+          .value("TargetReached", goblin::TerminationStatus::TargetReached, "")
+          .value("Converged", goblin::TerminationStatus::Converged, "")
+          .value("Aborted", goblin::TerminationStatus::Aborted, "")
+          .value("Running", goblin::TerminationStatus::Running, "");
 
   auto pyClassBudget =
       nb::class_<goblin::Budget>(m, "Budget", "")
@@ -1815,7 +1815,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def("utilization", &goblin::CachedInstanceBase::utilization,
                "/ Proportion of cache entries used w.r.t. maximum size");
 
-  m.def("cached", goblin::Cached, nb::arg("problem"), nb::arg("cache_size") = 10000, nb::arg("cache_policy") = "lru");
+  m.def("Cached", goblin::Cached, nb::arg("problem"), nb::arg("cache_size") = 10000, nb::arg("cache_policy") = "lru");
   // #endif
   // #ifndef _GOBLIN_LIB_UPGMA_H
   //
@@ -1874,23 +1874,43 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #ifndef _GOBLIN_LIB_ALGORITHMS_MO_H
   //
 
-  m.def("hypervolume2_d", nb::overload_cast<const ArchiveBase&, const FitnessBase&, const QualityBase&>(hypervolume2D),
+  m.def("hypervolume2D", nb::overload_cast<const ArchiveBase&, const FitnessBase&, const QualityBase&>(hypervolume2D),
         nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
 
-  m.def("hypervolume2_d",
+  m.def("hypervolume2D",
         nb::overload_cast<const SolutionSetBase&, const FitnessBase&, const QualityBase&>(hypervolume2D),
         nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
 
-  m.def("hypervolume2_d", nb::overload_cast<const Arr2D<CType>, const Array<CType>>(hypervolume2D), nb::arg("points"),
+  m.def("hypervolume2D", nb::overload_cast<const Arr2D<CType>, const Array<CType>>(hypervolume2D), nb::arg("points"),
         nb::arg("reference_point"));
+
+  m.def("pHVC",
+        nb::overload_cast<const SolutionSetBase&, const FitnessBase&, const std::span<const usize>, const QualityBase&,
+                          const QualityBase&>(pHVC),
+        nb::arg("solutions"), nb::arg("fitness"), nb::arg("indices"), nb::arg("point"), nb::arg("reference_point"));
+
+  m.def("pHVC",
+        nb::overload_cast<const ArchiveBase&, const FitnessBase&, const std::span<const usize>, const QualityBase&,
+                          const QualityBase&>(pHVC),
+        nb::arg("solutions"), nb::arg("fitness"), nb::arg("indices"), nb::arg("point"), nb::arg("reference_point"));
+
+  m.def("pHVC",
+        nb::overload_cast<const SolutionSetBase&, const FitnessBase&, const QualityBase&, const QualityBase&>(pHVC),
+        nb::arg("solutions"), nb::arg("fitness"), nb::arg("point"), nb::arg("reference_point"));
+
+  m.def("pHVC", nb::overload_cast<const ArchiveBase&, const FitnessBase&, const QualityBase&, const QualityBase&>(pHVC),
+        nb::arg("solutions"), nb::arg("fitness"), nb::arg("point"), nb::arg("reference_point"));
+
+  m.def("pHVC", nb::overload_cast<const Arr2D<CType>, const Array<CType>, const Array<CType>>(pHVC),
+        nb::arg("solutions"), nb::arg("point"), nb::arg("reference_point"));
   // #endif
   // #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
   //
 
   auto pyEnumVariableSet = nb::enum_<goblin::VariableSet>(m, "VariableSet", nb::is_arithmetic(), "")
-                               .value("discrete", goblin::VariableSet::Discrete, "")
-                               .value("continuous", goblin::VariableSet::Continuous, "")
-                               .value("mixed", goblin::VariableSet::Mixed, "");
+                               .value("Discrete", goblin::VariableSet::Discrete, "")
+                               .value("Continuous", goblin::VariableSet::Continuous, "")
+                               .value("Mixed", goblin::VariableSet::Mixed, "");
 
   m.def("estimate_entropy", goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"),
         nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"),
@@ -2275,18 +2295,18 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
 
   auto pyEnumConstantRepr = nb::enum_<goblin::ConstantRepr>(m, "ConstantRepr", nb::is_arithmetic(), "")
-                                .value("er_cs", goblin::ConstantRepr::ERCs, "")
-                                .value("edges", goblin::ConstantRepr::Edges, "")
-                                .value("pool", goblin::ConstantRepr::Pool, "")
-                                .value("none", goblin::ConstantRepr::None, "");
+                                .value("ERCs", goblin::ConstantRepr::ERCs, "")
+                                .value("Edges", goblin::ConstantRepr::Edges, "")
+                                .value("Pool", goblin::ConstantRepr::Pool, "")
+                                .value("None_", goblin::ConstantRepr::None, "");
 
   auto pyEnumValueKind = nb::enum_<goblin::ValueKind>(m, "ValueKind", nb::is_arithmetic(), "")
-                             .value("input", goblin::ValueKind::Input, "input feature idx")
-                             .value("constant", goblin::ValueKind::Constant, "constant marker/pool idx")
-                             .value("operator", goblin::ValueKind::Operator, "operator idx")
-                             .value("arg", goblin::ValueKind::Arg, "subfunction argument idx")
-                             .value("subtree", goblin::ValueKind::Subtree, "subtree idx")
-                             .value("parameter", goblin::ValueKind::Parameter, "function class parameter idx");
+                             .value("Input", goblin::ValueKind::Input, "input feature idx")
+                             .value("Constant", goblin::ValueKind::Constant, "constant marker/pool idx")
+                             .value("Operator", goblin::ValueKind::Operator, "operator idx")
+                             .value("Arg", goblin::ValueKind::Arg, "subfunction argument idx")
+                             .value("Subtree", goblin::ValueKind::Subtree, "subtree idx")
+                             .value("Parameter", goblin::ValueKind::Parameter, "function class parameter idx");
 
   auto pyClassGPContext =
       nb::class_<goblin::GPContext>(
@@ -2314,7 +2334,7 @@ void py_init_module_pygoblin(nb::module_& m) {
                "same tree, otherwise 0")
           .def("normalized_node_proximity", &goblin::GPContext::normalized_node_proximity,
                "Normalized node proximity [1.0: same node, 0.0: no connection]")
-          .def("normalized_w_vig", &goblin::GPContext::normalized_wVIG,
+          .def("normalized_wVIG", &goblin::GPContext::normalized_wVIG,
                "Normalized node proximity [1.0: same node, 0.0: no connection]")
           .def("subtree_co_occurrences", &goblin::GPContext::subtree_co_occurrences)
           .def("copy_tree", &goblin::GPContext::copy_tree, nb::arg("source"), nb::arg("source_node"), nb::arg("target"),
@@ -2451,8 +2471,8 @@ void py_init_module_pygoblin(nb::module_& m) {
                         std::optional<usize>, bool, std::optional<AnyInit>, CType, CType,
                         std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>,
                         std::optional<usize>>(),
-               nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(),
-               nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse",
+               nb::arg("ctx"), nb::arg("X_train"), nb::arg("Y_train"), nb::arg("X_test").none() = nb::none(),
+               nb::arg("Y_test").none() = nb::none(), nb::arg("objectives") = "mse",
                nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true,
                nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0,
                nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(),
@@ -2487,15 +2507,15 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("ctx", &goblin::SRProblem::ctx, "")
           .def_rw("linear_scaling", &goblin::SRProblem::linear_scaling, "")
           .def_rw("objectives", &goblin::SRProblem::objectives, "")
-          .def_rw("x_train", &goblin::SRProblem::X_train, "")
-          .def_rw("y_train", &goblin::SRProblem::Y_train, "")
-          .def_rw("var_y_train", &goblin::SRProblem::var_Y_train, "")
-          .def_rw("x_batch", &goblin::SRProblem::X_batch, "")
-          .def_rw("y_batch", &goblin::SRProblem::Y_batch, "")
-          .def_rw("var_y_batch", &goblin::SRProblem::var_Y_batch, "")
-          .def_rw("x_test", &goblin::SRProblem::X_test, "")
-          .def_rw("y_test", &goblin::SRProblem::Y_test, "")
-          .def_rw("var_y_test", &goblin::SRProblem::var_Y_test, "");
+          .def_rw("X_train", &goblin::SRProblem::X_train, "")
+          .def_rw("Y_train", &goblin::SRProblem::Y_train, "")
+          .def_rw("var_Y_train", &goblin::SRProblem::var_Y_train, "")
+          .def_rw("X_batch", &goblin::SRProblem::X_batch, "")
+          .def_rw("Y_batch", &goblin::SRProblem::Y_batch, "")
+          .def_rw("var_Y_batch", &goblin::SRProblem::var_Y_batch, "")
+          .def_rw("X_test", &goblin::SRProblem::X_test, "")
+          .def_rw("Y_test", &goblin::SRProblem::Y_test, "")
+          .def_rw("var_Y_test", &goblin::SRProblem::var_Y_test, "");
   // #endif
   // #ifndef _GOBLIN_BENCH_FUNCTIONS_H
   //
@@ -3303,7 +3323,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           .def_rw("mean", &goblin::AMaLGaMSubsetState::mean, "")
           .def_rw("cov", &goblin::AMaLGaMSubsetState::cov,
                   "for storing the unscaled covariance, since in the incremental version the scaling happens after the")
-          .def_rw("l", &goblin::AMaLGaMSubsetState::L,
+          .def_rw("L", &goblin::AMaLGaMSubsetState::L,
                   " smoothing:\n "
                   "https://github.com/renzoscholman/irv-gomea/blob/89c62cf007858bd8ab9c2ba7955c7b80121/src/"
                   "distribution.cpp#L510");
@@ -3779,6 +3799,13 @@ void py_init_module_pygoblin(nb::module_& m) {
             .def("select", &goblin::classic::TruncationSelection::select, nb::arg("rng"), nb::arg("fitness"),
                  nb::arg("solutions"), nb::arg("target_size"));
 
+    auto pyNsclassic_ClasspHVCSelection =
+        nb::class_<goblin::classic::pHVCSelection, goblin::classic::SelectionStrategyBase>(pyNsclassic, "pHVCSelection",
+                                                                                           "")
+            .def(nb::init<std::unique_ptr<goblin::QualityBase>>(), nb::arg("reference_point"))
+            .def("select", &goblin::classic::pHVCSelection::select, nb::arg("rng"), nb::arg("fitness"),
+                 nb::arg("solutions"), nb::arg("target_size"));
+
     auto pyNsclassic_ClassEABase =
         nb::class_<goblin::classic::EABase, goblin::MethodBase, goblin::classic::EABase_trampoline>(pyNsclassic,
                                                                                                     "EABase", "")
@@ -3801,7 +3828,7 @@ void py_init_module_pygoblin(nb::module_& m) {
 
     auto pyNsclassic_ClassRand1Bin =
         nb::class_<goblin::classic::Rand1Bin, goblin::classic::DEStrategyBase>(pyNsclassic, "Rand1Bin", "")
-            .def(nb::init<double, double, std::string, std::string>(), nb::arg("f") = 0.8, nb::arg("cr") = 0.9,
+            .def(nb::init<double, double, std::string, std::string>(), nb::arg("F") = 0.8, nb::arg("Cr") = 0.9,
                  nb::arg("base") = "best", nb::arg("scale") = "dither")
             .def("trial_vector", &goblin::classic::Rand1Bin::trial_vector, nb::arg("rng"), nb::arg("problem"),
                  nb::arg("population"), nb::arg("archive"), nb::arg("idx"), nb::arg("subset"));
@@ -3843,12 +3870,11 @@ void py_init_module_pygoblin(nb::module_& m) {
                  nb::arg("archive"));
     auto pyEnumESStrategy =
         nb::enum_<goblin::classic::ESStrategy>(pyNsclassic, "ESStrategy", nb::is_arithmetic(), "")
-            .value("single_variance", goblin::classic::ESStrategy::SingleVariance,
-                   "/ Single variance for all variables")
-            .value("multiple_variance", goblin::classic::ESStrategy::MultipleVariance,
+            .value("SingleVariance", goblin::classic::ESStrategy::SingleVariance, "/ Single variance for all variables")
+            .value("MultipleVariance", goblin::classic::ESStrategy::MultipleVariance,
                    "/ Separate variance for all variables")
-            .value("full_variance", goblin::classic::ESStrategy::FullVariance, "/ Full covariance matrix")
-            .value("directed_variance", goblin::classic::ESStrategy::DirectedVariance,
+            .value("FullVariance", goblin::classic::ESStrategy::FullVariance, "/ Full covariance matrix")
+            .value("DirectedVariance", goblin::classic::ESStrategy::DirectedVariance,
                    "/ Directional variance for one arbitrary direction, single variance in all other directions");
 
     auto pyNsclassic_ClassESStrategyParameters =

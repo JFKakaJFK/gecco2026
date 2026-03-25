@@ -2,12 +2,101 @@ import pathlib
 import shutil
 from ast import literal_eval
 
+import matplotlib as mpl
 import matplotlib.animation as animation
 import matplotlib.patheffects as patheffects
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 from pygom import *
+
+
+def example_convergence_plot(
+    df,
+    elites,
+    multi_objective,
+    metric: str = "generation",
+    metric_label: str = "Generations",
+):
+    """
+    An example plot that shows how the objectives, hypervolume and fronts (if multi-objective) can be plotted
+    """
+    fig, axes = plt.subplot_mosaic(
+        "EC\nHF" if multi_objective else "E",
+        figsize=(8, [4, 8][multi_objective]),
+    )
+
+    # show first objective
+    sns.lineplot(
+        elites,
+        x=metric,
+        y="reconstruction_error",
+        hue="method_name",
+        ax=axes["E"],
+        legend=False,
+    )
+    axes["E"].set_xlabel(metric_label)
+    axes["E"].set_ylabel("Reconstruction Error")
+
+    if multi_objective:
+        # add complexity objective
+        elites["num_cells"] = elites["objectives"].apply(lambda o: o[1])
+
+        sns.lineplot(
+            elites,
+            x=metric,
+            y="num_cells",
+            hue="method_name",
+            ax=axes["C"],
+            legend=False,
+        )
+
+        axes["C"].set_xlabel(metric_label)
+        axes["C"].set_ylabel("Cell count")
+
+        # hypervolume
+
+        # normalize each dimension to [0, 1] to ensure that
+        # hypervolumes are comparable between generations (or methods)
+        all_objectives = np.array(df["objectives"].tolist())
+        o_min, o_max = (
+            np.min(all_objectives, axis=0),
+            np.max(all_objectives, axis=0),
+        )
+        assert (
+            np.isfinite(o_min).all()
+            and np.isfinite(o_max).all()
+            and (o_max - o_min > 0.0).all()
+        )
+        normalize = lambda o: (o - o_min) / (o_max - o_min)
+
+        reference_point = np.array([1.1, 1.1])
+
+        x = sorted(df[metric].unique())
+        fronts = [np.array(df[df[metric] == g]["objectives"].tolist()) for g in x]
+
+        axes["H"].plot(
+            x,
+            [hypervolume2D(normalize(front), reference_point) for front in fronts],
+        )
+        axes["H"].set_xlabel(metric_label)
+        axes["H"].set_ylabel("Hypervolume")
+
+        # fronts
+        for g, c in enumerate(sns.color_palette("viridis", n_colors=len(x))):
+            axes["F"].scatter(fronts[g][:, 0], fronts[g][:, 1], color=c)
+        axes["F"].set_xlabel("Reconstruction Error")
+        axes["F"].set_ylabel("Cell Count")
+        fig.colorbar(
+            mpl.cm.ScalarMappable(norm=plt.Normalize(x[0], x[-1]), cmap="viridis"),
+            ax=axes["F"],
+            label=metric_label,
+        )
+
+    fig.suptitle(df["method_name"][0])
+
+    plt.show()
 
 
 def load_image_data(image_path: str, image_max_dim: int):

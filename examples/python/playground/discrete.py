@@ -4,12 +4,11 @@ import pathlib
 import pandas as pd
 import pygom
 from pygom import *
-from tqdm import tqdm
-
 from src.config import Config, c
 from src.plots import plot_convergence_so, plot_scalability
 from src.postprocessing import load_results
 from src.run import run_all, run_one
+from tqdm import tqdm
 
 REPEATS = 30
 REPEATS = 100
@@ -121,8 +120,8 @@ def methods():
                 f'"SimpleGA(SS, S={sn},C={cx})"',
                 c.classic.SimpleGA(
                     population_size=100,
-                    crossover_strategy=crossover,
-                    selection_strategy=selection,
+                    crossover=crossover,
+                    selection=selection,
                 ),
             )
             # if sn != "Truncation":
