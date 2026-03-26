@@ -7,6 +7,7 @@
 #include <tuple>
 
 #include "goblin/lib/instance.h"
+#include "goblin/lib/init.h"
 #include "goblin/gp/context.h"
 
 namespace goblin {

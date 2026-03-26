@@ -72,7 +72,7 @@ iwyu:
 
 bindings:
 	cp -f pylib/nanobind/bindings_empty.cpp pylib/nanobind/bindings.cpp \
-	&& uv run scripts/autogenerate_bindings.py \
+	&& uv run --no-project scripts/autogenerate_bindings.py \
 	&& uv pip install -v -e .\
 	&& uv pip uninstall -v .
 

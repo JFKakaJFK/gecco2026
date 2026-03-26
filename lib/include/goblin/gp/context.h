@@ -1,4 +1,5 @@
 #pragma once
+#include <tuple>
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
@@ -901,6 +902,51 @@ class GPContext {
     }
 
     return active;
+  };
+
+  std::optional<std::tuple<bool, usize>> inherit_shifted(SolutionBase& solution,
+                                                         const SolutionBase& donor,
+                                                         usize node,
+                                                         usize num_levels) const {
+    auto p = parent(node);
+    for (usize levels_shifted = 0; levels_shifted < num_levels; levels_shifted++) {
+      if (!p.has_value()) {  // we went past the (sub)tree root
+        return std::nullopt;
+      }
+      p = parent(p.value());
+    }
+
+    // moving a single node means copying the value, possibly the associated constant
+    // and checking if something active changed...
+    auto inherit_to = [&](usize target_node) {
+      solution.discrete_values()(target_node) = donor.discrete_values()(node);
+      if (const_repr == ConstantRepr::ERCs || const_repr == ConstantRepr::Edges) {
+        solution.continuous_values()(target_node) = donor.continuous_values()(node);
+      }
+      return std::make_tuple(solution.discrete_active()(target_node), target_node);
+    };
+
+    if (!p.has_value()) {  // no target parent, so target node location is the root
+      return inherit_to(root[node]);
+    }
+
+    // get the child idx
+    usize parent_idx = parent(node).value();  // exists, or we would have returned earlier
+    usize child_idx = 0;
+    for (usize n : children[parent_idx]) {
+      if (n == node) {
+        break;
+      }
+      child_idx++;
+    }
+
+    // check if the target position actually exists
+    usize target_parent = p.value();
+    if (child_idx >= children[target_parent].size()) {
+      return std::nullopt;
+    }
+
+    return inherit_to(children[target_parent][child_idx]);
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter

@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -2155,95 +2156,6 @@ inline CType hypervolume2D(const Arr2D<CType> points, const Array<CType> referen
                               return std::abs(points(idx, objective) - reference_point(objective));
                             },
                             points.rows());
-};
-
-/// pointwise hypervolume contribution as per doi.org/10.1109/DOCS63458.2024.10704327
-template <typename S2R, typename P2R>
-inline CType pHVC_impl(S2R&& signed_solution_to_ref,
-                       P2R&& signed_point_to_ref,
-                       usize num_solutions,
-                       usize num_objectives) {
-  if (num_solutions < 1) {
-    // contribution = hypervolume of the single point
-    CType hv = 1.0;
-    for (usize j = 0; j < num_objectives; j++) {
-      hv *= signed_point_to_ref(j);
-    }
-    return hv;
-  }
-
-  CType contribution = std::numeric_limits<CType>::infinity();
-  for (usize i = 0; i < num_solutions; i++) {
-    CType r2p_volume = 1.0, r2worst_volume = 1.0;
-    for (usize j = 0; j < num_objectives; j++) {
-      CType r2p_j = signed_point_to_ref(j);
-      CType r2s_j = signed_solution_to_ref(i, j);
-      r2p_volume *= r2p_j;
-      // ref_j - max(s_j, p_j) = min(dist_j(r, s), dist_j(r, p))
-      r2worst_volume *= std::min(r2p_j, r2s_j);
-    }
-
-    contribution = std::min(contribution, r2p_volume - r2worst_volume);
-  }
-  return contribution;
-};
-
-template <typename SolutionSetLike>
-inline CType pHVC_dispatch(const SolutionSetLike& solutions,
-                           const FitnessBase& fitness,
-                           const std::span<const usize> indices,
-                           const QualityBase& point,
-                           const QualityBase& reference_point) {
-  return pHVC_impl(
-      [&](const usize idx, const usize objective) {
-        CType dist = fitness.distance(solutions[indices[idx]].quality(), reference_point, objective);
-        bool solution_is_worse =
-            fitness.cmp(solutions[indices[idx]].quality(), reference_point, objective) == Ordering::Worse;
-        return solution_is_worse ? -dist : dist;
-      },
-      [&](const usize objective) {
-        CType dist = fitness.distance(point, reference_point, objective);
-        bool point_is_worse = fitness.cmp(point, reference_point, objective) == Ordering::Worse;
-        return point_is_worse ? -dist : dist;
-      },
-      indices.size(), fitness.num_objectives());
-};
-
-inline CType pHVC(const SolutionSetBase& solutions,
-                  const FitnessBase& fitness,
-                  const std::span<const usize> indices,
-                  const QualityBase& point,
-                  const QualityBase& reference_point) {
-  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
-};
-inline CType pHVC(const ArchiveBase& solutions,
-                  const FitnessBase& fitness,
-                  const std::span<const usize> indices,
-                  const QualityBase& point,
-                  const QualityBase& reference_point) {
-  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
-};
-inline CType pHVC(const SolutionSetBase& solutions,
-                  const FitnessBase& fitness,
-                  const QualityBase& point,
-                  const QualityBase& reference_point) {
-  std::vector<usize> indices(solutions.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
-};
-inline CType pHVC(const ArchiveBase& solutions,
-                  const FitnessBase& fitness,
-                  const QualityBase& point,
-                  const QualityBase& reference_point) {
-  std::vector<usize> indices(solutions.size());
-  std::iota(indices.begin(), indices.end(), 0);
-  return pHVC_dispatch(solutions, fitness, indices, point, reference_point);
-};
-inline CType pHVC(const Arr2D<CType> solutions, const Array<CType> point, const Array<CType> reference_point) {
-  return pHVC_impl(
-      [&](const usize idx, const usize objective) { return reference_point(objective) - solutions(idx, objective); },
-      [&](const usize objective) { return reference_point(objective) - point(objective); }, solutions.rows(),
-      solutions.cols());
 };
 
 };  // namespace goblin
@@ -4892,6 +4804,51 @@ class GPContext {
     }
 
     return active;
+  };
+
+  std::optional<std::tuple<bool, usize>> inherit_shifted(SolutionBase& solution,
+                                                         const SolutionBase& donor,
+                                                         usize node,
+                                                         usize num_levels) const {
+    auto p = parent(node);
+    for (usize levels_shifted = 0; levels_shifted < num_levels; levels_shifted++) {
+      if (!p.has_value()) {  // we went past the (sub)tree root
+        return std::nullopt;
+      }
+      p = parent(p.value());
+    }
+
+    // moving a single node means copying the value, possibly the associated constant
+    // and checking if something active changed...
+    auto inherit_to = [&](usize target_node) {
+      solution.discrete_values()(target_node) = donor.discrete_values()(node);
+      if (const_repr == ConstantRepr::ERCs || const_repr == ConstantRepr::Edges) {
+        solution.continuous_values()(target_node) = donor.continuous_values()(node);
+      }
+      return std::make_tuple(solution.discrete_active()(target_node), target_node);
+    };
+
+    if (!p.has_value()) {  // no target parent, so target node location is the root
+      return inherit_to(root[node]);
+    }
+
+    // get the child idx
+    usize parent_idx = parent(node).value();  // exists, or we would have returned earlier
+    usize child_idx = 0;
+    for (usize n : children[parent_idx]) {
+      if (n == node) {
+        break;
+      }
+      child_idx++;
+    }
+
+    // check if the target position actually exists
+    usize target_parent = p.value();
+    if (child_idx >= children[target_parent].size()) {
+      return std::nullopt;
+    }
+
+    return inherit_to(children[target_parent][child_idx]);
   };
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -8232,11 +8189,14 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
+
+
 
 namespace goblin {
 
@@ -8492,6 +8452,9 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
+
+
+
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8613,11 +8576,13 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8706,6 +8671,9 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
+
+
+
 
 namespace goblin {
 
@@ -8803,14 +8771,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -10123,6 +10095,7 @@ class RvState {
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -10409,6 +10382,9 @@ struct PopulationOptions {
   bool mutate_before_gradient_step = true;
   usize gradient_step_frequency = 0;
   usize gradient_step_count = 10;
+
+  // TODO this whole file really needs a refactor lol
+  bool use_fancy_gpu_gp_gom = false;
 };
 
 template <typename SolutionSet>
@@ -10967,6 +10943,23 @@ class Population {
     return !strict || o == Ordering::Better || (!objective.has_value() && non_dominated);
   };
 
+  bool accept_and_update_archive(const SolutionBase& changed,
+                                 const SolutionBase& original,
+                                 std::optional<usize> objective,
+                                 bool strict) {
+    Ordering o = problem.fitness().cmp(changed.quality(), original.quality(), objective);
+
+    if (o == Ordering::Worse) {
+      return false;
+    }
+
+    bool non_dominated = local_archive->update(changed, strict);
+
+    // if strict: we want clear improvements,
+    // i.e. better in SO or at least non-dominated in MO
+    return !strict || o == Ordering::Better || (!objective.has_value() && non_dominated);
+  };
+
   u64 initialize(Rng& rng) {
     // reset the local archive
     local_archive->clear();
@@ -11022,7 +11015,150 @@ class Population {
     return solutions_to_evaluate.size();
   };
 
+  // TODO wayy to agressive - takes out all diversity and does not allow exploration of the seach space enough
+  /// GOM, but with two extra modifications:
+  ///
+  /// 1. Each solution gets multiple offspring such that `solutions_to_evaluate.size()` is an exact multiple of the
+  /// population size >= 1
+  /// 2. The extra offspring solutions are created by "shifting up" (*) the inherited subset values until this
+  /// fails (i.e. root is reached, template does not match or multiple values are assigned to the same node position)
+  ///
+  /// *: Subsets aren't necessarily full subtrees, but it is still possible to copy the node to where it would be if the
+  /// parent of the node would be the parent of the parent and so on.
+  u64 fancy_gp_gom_step(Rng& rng, const GPContext& ctx, usize subset_idx) {
+    std::vector<usize> donor_pool;
+    {
+      usize max_donor_pool_size = cluster_donors[0].size();
+      assert(max_donor_pool_size > 0);
+      for (usize k = 1; k < num_clusters; k++) {
+        assert(cluster_donors[k].size() > 0);
+        max_donor_pool_size = std::max(max_donor_pool_size, cluster_donors[k].size());
+      }
+      donor_pool.resize(max_donor_pool_size);
+      std::iota(donor_pool.begin(), donor_pool.end(), 0);
+    }
+
+    std::vector<usize> solution_pool(solutions.size());
+    std::iota(solution_pool.begin(), solution_pool.end(), 0);
+
+    // for each offspring, record the parent (= index in solutions)
+    std::vector<usize> solution_index;
+    SolutionSet offspring;
+    solutions_to_evaluate.clear();
+
+    usize iteration = 0;
+    bool done = false;
+    while (!done) {  // population iterations (iterate until each solution has at least had one chance to produce
+                     // offspring & keep looping after that until the number of offspring solutions is a multiple of the
+                     // population size)
+      for (usize i : solution_pool) {
+        auto k = solution_clusters[i];
+        auto fos_idx = subset_orders(i, subset_idx);
+
+        // due to filtering/max_subset_size, some clusters might have more
+        // subsets...
+        if (fos_idx < cluster_FOS[k].size()) {
+          // the library does donor search, so this also is added behind a flag to allow fair comparisons to the
+          // reference version...
+          usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * cluster_donors[k].size();
+          usize donor_idx, donor_pool_idx = 0;
+
+          bool offspring_added = false;
+          do {  // loop over donors
+            // do a partial Fisher-Yates shuffle
+            std::swap(donor_pool[donor_pool_idx],
+                      donor_pool[std::uniform_int_distribution<usize>(donor_pool_idx, donor_pool.size() - 1)(rng)]);
+
+            donor_idx = donor_pool[donor_pool_idx++];
+            if (donor_idx >= cluster_donors[k].size() || i == cluster_donors[k][donor_idx]) {
+              continue;
+            }
+
+            usize level_offset = 0;  // how many tree levels is the subset shifted towards the root?
+            while (!done) {          // loop over possible shifts
+              // try to create the offspring solution with the donor material
+              // 1. create a copy with the values in the right place
+              // 2. use the problem provided inherit function to handle constants & checking if an evaluation is needed
+              Solution o = solutions[i];
+
+              std::set<usize> occupied_nodes;
+              bool evaluation_needed = false;
+              bool offset_is_valid = true;
+              for (usize node : cluster_FOS[k][fos_idx].discrete) {
+                auto info = ctx.inherit_shifted(o, donors[cluster_donors[k][donor_idx]], node, level_offset);
+                if (info.has_value()) {
+                  auto [active_change, target_node] = info.value();
+                  if (occupied_nodes.contains(
+                          target_node)) {  // two variables would get shifted to the same node -> not valid
+                    offset_is_valid = false;
+                    break;
+                  }
+                  occupied_nodes.insert(target_node);
+                  evaluation_needed |= active_change;
+                } else {
+                  offset_is_valid = false;
+                  break;
+                }
+              }
+
+              if (!offset_is_valid) {
+                break;  // we don't need to shift up further
+              }
+
+              if (evaluation_needed) {
+                usize o_idx = offspring.size();
+                offspring.add(o);
+                solution_index[o_idx] = i;
+                solutions_to_evaluate.push_back(o_idx);
+                offspring_added = true;
+
+                done = iteration > 0 && solutions_to_evaluate.size() % solutions.size() == 0;
+              }
+              level_offset++;
+            }
+          } while (!done && !offspring_added && donor_pool_idx < max_donor_search_iterations);
+        }
+      }
+      std::shuffle(solution_pool.begin(), solution_pool.end(), rng);
+
+      iteration += 1;
+    }
+    // TODO create offspring
+
+    problem.evaluate(rng, offspring, solutions_to_evaluate);
+
+    // accept (in random order to un-bias archive updates, not sure if that is really needed though)
+    std::shuffle(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), rng);
+    for (usize i : solutions_to_evaluate) {
+      auto si = solution_index[i];
+      auto k = solution_clusters[si];
+
+      std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
+
+      if (accept_and_update_archive(offspring[i], solutions[si], objective,
+                                    /* strict */ false)) {
+        solution_changed[si] = true;
+        // update solution and gom backup
+        solutions[si] = offspring[i];
+        parents[si] = offspring[i];
+      } else {
+        // nothing to do here (either the offspring gets accepted or there is nothing to revert becasue that's a
+        // different solution buffer)
+      }
+    }
+
+    return solutions_to_evaluate.size();
+  };
+
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
+    if (options.use_fancy_gpu_gp_gom) {
+      if (auto ptr = dynamic_cast<const GPInstanceBase*>(&problem.unwrap()); ptr != nullptr) {
+        return fancy_gp_gom_step(rng, ptr->context(), subset_idx);
+      } else {
+        throw std::runtime_error("GP specialization enabled for a non GP instance.");
+      }
+    }
+
     std::vector<usize> donor_pool;
     {
       usize max_donor_pool_size = cluster_donors[0].size();
@@ -11549,6 +11685,8 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
+
+
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11677,111 +11815,6 @@ class TruncationSelection : public SelectionStrategyBase {
   };
 };
 
-class pHVCSelection : public SelectionStrategyBase {
-  std::unique_ptr<QualityBase> reference_point;
-
- public:
-  pHVCSelection(std::unique_ptr<QualityBase> reference_point) : reference_point(std::move(reference_point)) {};
-
-  std::vector<usize> select(Rng& rng,
-                            const FitnessBase& fitness,
-                            const SolutionSetBase& solutions,
-                            usize target_size) const override final {
-    std::vector<usize> selection;
-    selection.reserve(target_size);
-
-    if (solutions.size() <= target_size) {
-      selection.resize(solutions.size());
-      std::iota(selection.begin(), selection.end(), 0);
-      return selection;
-    }
-
-    std::vector<usize> selection_pool(solutions.size());
-    std::iota(selection_pool.begin(), selection_pool.end(), 0);
-
-    std::vector<usize> best_per_objective(fitness.num_objectives(), 0);
-    for (usize i = 1; i < solutions.size(); i++) {
-      for (usize j = 0; j < fitness.num_objectives(); j++) {
-        if (fitness.cmp(solutions[i].quality(), solutions[best_per_objective[j]].quality(), j) == Ordering::Better) {
-          best_per_objective[j] = i;
-        }
-      }
-    }
-    std::vector<usize> worst_per_objective(fitness.num_objectives(), 0);
-    for (usize i = 1; i < solutions.size(); i++) {
-      for (usize j = 0; j < fitness.num_objectives(); j++) {
-        bool worst_is_invalid = isna(fitness.distance(solutions[worst_per_objective[j]].quality(),
-                                                      solutions[best_per_objective[j]].quality(), j));
-
-        bool is_valid = !isna(fitness.distance(solutions[i].quality(), solutions[best_per_objective[j]].quality(), j));
-        if (worst_is_invalid ||
-            (is_valid &&
-             fitness.cmp(solutions[i].quality(), solutions[worst_per_objective[j]].quality(), j) == Ordering::Worse)) {
-          worst_per_objective[j] = i;
-        }
-      }
-    }
-    bool use_ref = false;
-    std::vector<CType> o_norm(fitness.num_objectives());
-    for (usize j = 0; j < fitness.num_objectives(); j++) {
-      o_norm[j] =
-          fitness.distance(solutions[best_per_objective[j]].quality(), solutions[worst_per_objective[j]].quality(), j);
-      if (isna(o_norm[j]) || o_norm[j] <= 0.0) {
-        use_ref = true;
-      }
-    }
-    auto normed_dist_to_ref = [&](const QualityBase& point, const usize objective) {
-      const auto& ref = solutions[worst_per_objective[objective]].quality();
-      CType dist = fitness.distance(point, ref, objective) / o_norm[objective];
-      bool point_is_worse = fitness.cmp(point, ref, objective) == Ordering::Worse;
-      return point_is_worse ? -dist : dist;
-    };
-
-    // TODO instead of reference point, use worst in each dimension...
-    // -> can't assemble, so call dispatch function...
-    // TODO delete :/
-
-    CType best_contribution;
-    usize best_idx;
-    while (selection.size() < target_size) {
-      // find point with highest contribution
-      best_idx = selection_pool.size();
-      for (usize i = 0; i < selection_pool.size(); i++) {
-        usize idx = selection_pool[i];
-        CType contribution;
-        if (use_ref) {
-          // get pool without idx
-          std::swap(selection_pool[i], selection_pool.back());
-          selection_pool.pop_back();
-          contribution = pHVC(solutions, fitness, selection_pool, solutions[idx].quality(), *reference_point);
-          // restore pool
-          selection_pool.push_back(selection_pool[i]);
-          selection_pool[i] = idx;
-        } else {
-          contribution = pHVC_impl(
-              [&](const usize s, const usize objective) {
-                return normed_dist_to_ref(solutions[s < idx ? s : s + 1].quality(), objective);
-              },
-              [&](const usize objective) { return normed_dist_to_ref(solutions[idx].quality(), objective); },
-              selection_pool.size() - 1, fitness.num_objectives());
-        }
-
-        if (best_idx >= selection_pool.size() || contribution > best_contribution) {
-          best_idx = i;
-          best_contribution = contribution;
-        }
-      }
-
-      // add to selection and remove from pool
-      selection.push_back(selection_pool[best_idx]);
-      std::swap(selection_pool[best_idx], selection_pool.back());
-      selection_pool.pop_back();
-    }
-
-    return selection;
-  };
-};
-
 class EABase : public MethodBase {
   AoSSet population{};
   u64 generation{};
@@ -11875,6 +11908,7 @@ class EABase : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
+
 
 namespace goblin {
 namespace classic {
@@ -12090,6 +12124,7 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
+
 
 namespace goblin {
 namespace classic {
@@ -12431,6 +12466,7 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -12647,6 +12683,8 @@ class PSO : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
+
+
 
 namespace goblin {
 namespace classic {
@@ -13042,6 +13080,7 @@ class SimpleGA : public EABase {
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -13235,11 +13274,14 @@ class StandardGP : public EABase {
 
 #endif /* _GOBLIN_STANDARD_GP_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/examples/voronoi.h included by goblin.h                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_EXAMPLES_VORONOI_H
 #define _GOBLIN_EXAMPLES_VORONOI_H
+
+
 
 template <typename C>
 class KDTree {
@@ -13290,7 +13332,8 @@ class KDTree {
     // silently produces incorrect results due to broadcasting fun
     Scalar dist = 0.0;
     for (isize i = 0; i < n_dims; i++) {
-      dist += std::pow(coords(i, node->idx) - point(i), 2);
+      Scalar d_i = coords(i, node->idx) - point(i);
+      dist += d_i * d_i;
     }
 
     if (dist < best_dist) {
@@ -13302,11 +13345,11 @@ class KDTree {
       return;
     }
 
-    Scalar dist_x = coords(dim, node->idx) - point(dim);
+    Scalar d_dim = coords(dim, node->idx) - point(dim);
     dim = (dim + 1) % n_dims;
-    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
-    if (dist_x * dist_x < best_dist) {
-      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
+    closest_helper(d_dim > 0.0 ? node->left : node->right, dim, coords, point);
+    if (d_dim * d_dim < best_dist) {
+      closest_helper(d_dim > 0.0 ? node->right : node->left, dim, coords, point);
     }
   }
 
@@ -13371,7 +13414,6 @@ class VoronoiImageReconstruction : public InstanceBase {
         _archive_fitness(  // this one is used for the archive
             /* num_objectives = */ (complexity_objective || track_complexity) ? 2 : 1,
             /* minimize = */ true),
-        target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
@@ -13410,6 +13452,20 @@ class VoronoiImageReconstruction : public InstanceBase {
       _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
     }
+
+    // precompute data
+    image_colors = target_image.cast<float>();
+    voronoi_centers.resize(max_num_cells, 2);
+    voronoi_colors.resize(max_num_cells, 3);
+    image_coords.resize(num_pixels, 2);
+    for (usize x = 0; x < width; x++) {
+      for (usize y = 0; y < height; y++) {
+        usize i = y * width + x;
+
+        image_coords(i, 0) = x;
+        image_coords(i, 1) = y;
+      }
+    }
   };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
@@ -13425,44 +13481,41 @@ class VoronoiImageReconstruction : public InstanceBase {
       throw std::runtime_error("The image scale must be > 0!");
     }
 
+    // extract and scale centers
+    usize num_cells = 0;
+    Arr2D<float> cells(max_num_cells, VARS_PER_CELL);
+    for (usize j = 0; j < max_num_cells; j++) {
+      usize k = j * VARS_PER_CELL;
+      if (j < min_num_cells || solution.discrete_values()(k + ENABLED)) {
+        cells.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
+        num_cells++;
+      }
+    }
+    cells(Eigen::seqN(0, num_cells), X_COORD) *= scale;
+    cells(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
+
+    // for each pixel, find the closest cell and assign its color
     const usize w = scale * width;
     const usize h = scale * height;
 
     Arr2D<float> image(w * h, 3);
-
-    // extract and scale centers
-    usize num_cells = 0;
-    Arr2D<float> centers(max_num_cells, VARS_PER_CELL);
-    for (usize j = 0; j < max_num_cells; j++) {
-      usize k = j * VARS_PER_CELL;
-      if (j < min_num_cells || solution.discrete_values()(k + ENABLED)) {
-        centers.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
-        num_cells++;
-      }
-    }
-    centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
-    centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
-
-    auto closest = [&](float x, float y) {
-      float dist = std::numeric_limits<float>::infinity();
-      usize closest_idx = 0;
-      for (usize k = 0; k < num_cells; k++) {
-        float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
-        if (d < dist) {
-          dist = d;
-          closest_idx = k;
-        }
-      }
-      return closest_idx;
-    };
-
     for (usize x = 0; x < w; x++) {
       for (usize y = 0; y < h; y++) {
         usize i = y * w + x;
 
-        usize cell_idx = closest(x, y);
+        usize cell_idx = 0;
+        float best_dist = std::numeric_limits<float>::infinity();
+        for (usize k = 0; k < num_cells; k++) {
+          float dx = cells(k, X_COORD) - static_cast<float>(x);
+          float dy = cells(k, Y_COORD) - static_cast<float>(y);
+          float dist = dx * dx + dy * dy;
+          if (dist < best_dist) {
+            best_dist = dist;
+            cell_idx = k;
+          }
+        }
 
-        image.row(i) = centers(cell_idx, Eigen::seqN(COLOR_R, 3));
+        image.row(i) = cells(cell_idx, Eigen::seqN(COLOR_R, 3));
       }
     }
 
@@ -13470,12 +13523,6 @@ class VoronoiImageReconstruction : public InstanceBase {
   };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    const usize num_pixels = width * height;
-    Arr2D<float> centers(2, max_num_cells);
-    Arr2D<float> colors(max_num_cells, 3);
-    Array<float> pixel(2);
-    KDTree<decltype(centers)> kdt;
-
     for (usize i : indices) {
       auto& s = solutions[i];
 
@@ -13490,12 +13537,12 @@ class VoronoiImageReconstruction : public InstanceBase {
             s.discrete_active()(k + ENABLED) = false;
           }
 
-          centers(0, num_cells) = s.discrete_values()(k + X_COORD);
-          centers(1, num_cells) = s.discrete_values()(k + Y_COORD);
+          voronoi_centers(num_cells, 0) = s.discrete_values()(k + X_COORD);
+          voronoi_centers(num_cells, 1) = s.discrete_values()(k + Y_COORD);
 
-          colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
-          colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
-          colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
+          voronoi_colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
+          voronoi_colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
+          voronoi_colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
 
           num_cells++;
         }
@@ -13503,37 +13550,42 @@ class VoronoiImageReconstruction : public InstanceBase {
 
       bool use_kdtree = num_cells >= kdtree_threshold;
       if (use_kdtree) {
-        kdt.build(centers, num_cells);
+        kdt.build(voronoi_centers, num_cells);
       }
 
-      // compute per-pixel mismatch
+      // compute error as MSE between the target pixel and voronoi colors
+      // const usize num_pixels = image_coords.cols();
+      const usize num_pixels = image_coords.rows();
       float reconstruction_error = 0.0;
-      for (usize x = 0; x < width; x++) {
-        for (usize y = 0; y < height; y++) {
-          usize j = y * width + x;
-
-          usize cell_idx;
-          if (use_kdtree) {
-            pixel(0) = x;
-            pixel(1) = y;
-            cell_idx = kdt.closest(centers, pixel);
-          } else {
-            float best_dist = std::numeric_limits<float>::infinity();
-            cell_idx = 0;
-            for (usize k = 0; k < num_cells; k++) {
-              float dx = centers(0, k) - static_cast<float>(x);
-              float dy = centers(1, k) - static_cast<float>(y);
-              float dist = dx * dx + dy * dy;
-              if (dist < best_dist) {
-                best_dist = dist;
-                cell_idx = k;
-              }
+      for (usize j = 0; j < num_pixels; j++) {
+        usize cell_idx = 0;
+        if (use_kdtree) {
+          cell_idx = kdt.closest(voronoi_centers, image_coords.row(j));
+        } else {
+          float best_dist = std::numeric_limits<float>::infinity();
+          for (usize k = 0; k < num_cells; k++) {
+            float dx = voronoi_centers(k, 0) - image_coords(j, 0);
+            float dy = voronoi_centers(k, 1) - image_coords(j, 1);
+            float dist = dx * dx + dy * dy;
+            if (dist < best_dist) {
+              cell_idx = k;
+              best_dist = dist;
             }
           }
 
-          reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
+          // (voronoi_centers(Eigen::placeholders::all, Eigen::seqN(0, num_cells)).rowwise() - image_coords.row(j))
+          //     .rowwise()
+          //     .squaredNorm()
+          //     .minCoeff(&cell_idx);
         }
+
+        float dr = voronoi_colors(cell_idx, 0) - image_colors(j, 0);
+        float dg = voronoi_colors(cell_idx, 1) - image_colors(j, 1);
+        float db = voronoi_colors(cell_idx, 2) - image_colors(j, 2);
+        reconstruction_error += dr * dr + dg * dg + db * db;
+        // reconstruction_error += (image_colors.row(j) - voronoi_colors.row(cell_idx)).squaredNorm();
       }
+
       reconstruction_error /= static_cast<float>(num_pixels);
 
       s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
@@ -13575,7 +13627,11 @@ class VoronoiImageReconstruction : public InstanceBase {
  private:
   MOFitness _fitness;
   MOFitness _archive_fitness;
-  Arr2D<float> target_image;
+  Mat<float> image_colors;
+  Mat<float> image_coords;
+  Mat<float> voronoi_centers;
+  Mat<float> voronoi_colors;
+  KDTree<Mat<float>> kdt;
   std::shared_ptr<InitBase> init;
   usize width;
   usize height;
@@ -13635,6 +13691,7 @@ class YourCustomMutation : public goblin::classic::DiscreteMutationBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //

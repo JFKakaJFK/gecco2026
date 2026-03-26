@@ -63,7 +63,8 @@ class KDTree {
     // silently produces incorrect results due to broadcasting fun
     Scalar dist = 0.0;
     for (isize i = 0; i < n_dims; i++) {
-      dist += std::pow(coords(i, node->idx) - point(i), 2);
+      Scalar d_i = coords(i, node->idx) - point(i);
+      dist += d_i * d_i;
     }
 
     if (dist < best_dist) {
@@ -75,11 +76,11 @@ class KDTree {
       return;
     }
 
-    Scalar dist_x = coords(dim, node->idx) - point(dim);
+    Scalar d_dim = coords(dim, node->idx) - point(dim);
     dim = (dim + 1) % n_dims;
-    closest_helper(dist_x > 0.0 ? node->left : node->right, dim, coords, point);
-    if (dist_x * dist_x < best_dist) {
-      closest_helper(dist_x > 0.0 ? node->right : node->left, dim, coords, point);
+    closest_helper(d_dim > 0.0 ? node->left : node->right, dim, coords, point);
+    if (d_dim * d_dim < best_dist) {
+      closest_helper(d_dim > 0.0 ? node->right : node->left, dim, coords, point);
     }
   }
 
@@ -144,7 +145,6 @@ class VoronoiImageReconstruction : public InstanceBase {
         _archive_fitness(  // this one is used for the archive
             /* num_objectives = */ (complexity_objective || track_complexity) ? 2 : 1,
             /* minimize = */ true),
-        target_image(target_image.cast<float>()),
         init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
         width(width),
         height(height),
@@ -183,6 +183,20 @@ class VoronoiImageReconstruction : public InstanceBase {
       _discrete_domain_sizes[j + COLOR_G] = NUM_COLOR_VALUES;
       _discrete_domain_sizes[j + COLOR_B] = NUM_COLOR_VALUES;
     }
+
+    // precompute data
+    image_colors = target_image.cast<float>();
+    voronoi_centers.resize(max_num_cells, 2);
+    voronoi_colors.resize(max_num_cells, 3);
+    image_coords.resize(num_pixels, 2);
+    for (usize x = 0; x < width; x++) {
+      for (usize y = 0; y < height; y++) {
+        usize i = y * width + x;
+
+        image_coords(i, 0) = x;
+        image_coords(i, 1) = y;
+      }
+    }
   };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
@@ -198,44 +212,41 @@ class VoronoiImageReconstruction : public InstanceBase {
       throw std::runtime_error("The image scale must be > 0!");
     }
 
+    // extract and scale centers
+    usize num_cells = 0;
+    Arr2D<float> cells(max_num_cells, VARS_PER_CELL);
+    for (usize j = 0; j < max_num_cells; j++) {
+      usize k = j * VARS_PER_CELL;
+      if (j < min_num_cells || solution.discrete_values()(k + ENABLED)) {
+        cells.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
+        num_cells++;
+      }
+    }
+    cells(Eigen::seqN(0, num_cells), X_COORD) *= scale;
+    cells(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
+
+    // for each pixel, find the closest cell and assign its color
     const usize w = scale * width;
     const usize h = scale * height;
 
     Arr2D<float> image(w * h, 3);
-
-    // extract and scale centers
-    usize num_cells = 0;
-    Arr2D<float> centers(max_num_cells, VARS_PER_CELL);
-    for (usize j = 0; j < max_num_cells; j++) {
-      usize k = j * VARS_PER_CELL;
-      if (j < min_num_cells || solution.discrete_values()(k + ENABLED)) {
-        centers.row(num_cells) = solution.discrete_values()(Eigen::seqN(k, VARS_PER_CELL)).cast<float>();
-        num_cells++;
-      }
-    }
-    centers(Eigen::seqN(0, num_cells), X_COORD) *= scale;
-    centers(Eigen::seqN(0, num_cells), Y_COORD) *= scale;
-
-    auto closest = [&](float x, float y) {
-      float dist = std::numeric_limits<float>::infinity();
-      usize closest_idx = 0;
-      for (usize k = 0; k < num_cells; k++) {
-        float d = std::pow(x - centers(k, X_COORD), 2) + std::pow(y - centers(k, Y_COORD), 2);
-        if (d < dist) {
-          dist = d;
-          closest_idx = k;
-        }
-      }
-      return closest_idx;
-    };
-
     for (usize x = 0; x < w; x++) {
       for (usize y = 0; y < h; y++) {
         usize i = y * w + x;
 
-        usize cell_idx = closest(x, y);
+        usize cell_idx = 0;
+        float best_dist = std::numeric_limits<float>::infinity();
+        for (usize k = 0; k < num_cells; k++) {
+          float dx = cells(k, X_COORD) - static_cast<float>(x);
+          float dy = cells(k, Y_COORD) - static_cast<float>(y);
+          float dist = dx * dx + dy * dy;
+          if (dist < best_dist) {
+            best_dist = dist;
+            cell_idx = k;
+          }
+        }
 
-        image.row(i) = centers(cell_idx, Eigen::seqN(COLOR_R, 3));
+        image.row(i) = cells(cell_idx, Eigen::seqN(COLOR_R, 3));
       }
     }
 
@@ -243,12 +254,6 @@ class VoronoiImageReconstruction : public InstanceBase {
   };
 
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-    const usize num_pixels = width * height;
-    Arr2D<float> centers(2, max_num_cells);
-    Arr2D<float> colors(max_num_cells, 3);
-    Array<float> pixel(2);
-    KDTree<decltype(centers)> kdt;
-
     for (usize i : indices) {
       auto& s = solutions[i];
 
@@ -263,12 +268,12 @@ class VoronoiImageReconstruction : public InstanceBase {
             s.discrete_active()(k + ENABLED) = false;
           }
 
-          centers(0, num_cells) = s.discrete_values()(k + X_COORD);
-          centers(1, num_cells) = s.discrete_values()(k + Y_COORD);
+          voronoi_centers(num_cells, 0) = s.discrete_values()(k + X_COORD);
+          voronoi_centers(num_cells, 1) = s.discrete_values()(k + Y_COORD);
 
-          colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
-          colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
-          colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
+          voronoi_colors(num_cells, 0) = s.discrete_values()(k + COLOR_R);
+          voronoi_colors(num_cells, 1) = s.discrete_values()(k + COLOR_G);
+          voronoi_colors(num_cells, 2) = s.discrete_values()(k + COLOR_B);
 
           num_cells++;
         }
@@ -276,37 +281,42 @@ class VoronoiImageReconstruction : public InstanceBase {
 
       bool use_kdtree = num_cells >= kdtree_threshold;
       if (use_kdtree) {
-        kdt.build(centers, num_cells);
+        kdt.build(voronoi_centers, num_cells);
       }
 
-      // compute per-pixel mismatch
+      // compute error as MSE between the target pixel and voronoi colors
+      // const usize num_pixels = image_coords.cols();
+      const usize num_pixels = image_coords.rows();
       float reconstruction_error = 0.0;
-      for (usize x = 0; x < width; x++) {
-        for (usize y = 0; y < height; y++) {
-          usize j = y * width + x;
-
-          usize cell_idx;
-          if (use_kdtree) {
-            pixel(0) = x;
-            pixel(1) = y;
-            cell_idx = kdt.closest(centers, pixel);
-          } else {
-            float best_dist = std::numeric_limits<float>::infinity();
-            cell_idx = 0;
-            for (usize k = 0; k < num_cells; k++) {
-              float dx = centers(0, k) - static_cast<float>(x);
-              float dy = centers(1, k) - static_cast<float>(y);
-              float dist = dx * dx + dy * dy;
-              if (dist < best_dist) {
-                best_dist = dist;
-                cell_idx = k;
-              }
+      for (usize j = 0; j < num_pixels; j++) {
+        usize cell_idx = 0;
+        if (use_kdtree) {
+          cell_idx = kdt.closest(voronoi_centers, image_coords.row(j));
+        } else {
+          float best_dist = std::numeric_limits<float>::infinity();
+          for (usize k = 0; k < num_cells; k++) {
+            float dx = voronoi_centers(k, 0) - image_coords(j, 0);
+            float dy = voronoi_centers(k, 1) - image_coords(j, 1);
+            float dist = dx * dx + dy * dy;
+            if (dist < best_dist) {
+              cell_idx = k;
+              best_dist = dist;
             }
           }
 
-          reconstruction_error += (target_image.row(j) - colors.row(cell_idx)).square().sum();
+          // (voronoi_centers(Eigen::placeholders::all, Eigen::seqN(0, num_cells)).rowwise() - image_coords.row(j))
+          //     .rowwise()
+          //     .squaredNorm()
+          //     .minCoeff(&cell_idx);
         }
+
+        float dr = voronoi_colors(cell_idx, 0) - image_colors(j, 0);
+        float dg = voronoi_colors(cell_idx, 1) - image_colors(j, 1);
+        float db = voronoi_colors(cell_idx, 2) - image_colors(j, 2);
+        reconstruction_error += dr * dr + dg * dg + db * db;
+        // reconstruction_error += (image_colors.row(j) - voronoi_colors.row(cell_idx)).squaredNorm();
       }
+
       reconstruction_error /= static_cast<float>(num_pixels);
 
       s.quality_as<MOQuality>().objectives(0) = reconstruction_error;
@@ -348,7 +358,11 @@ class VoronoiImageReconstruction : public InstanceBase {
  private:
   MOFitness _fitness;
   MOFitness _archive_fitness;
-  Arr2D<float> target_image;
+  Mat<float> image_colors;
+  Mat<float> image_coords;
+  Mat<float> voronoi_centers;
+  Mat<float> voronoi_colors;
+  KDTree<Mat<float>> kdt;
   std::shared_ptr<InitBase> init;
   usize width;
   usize height;

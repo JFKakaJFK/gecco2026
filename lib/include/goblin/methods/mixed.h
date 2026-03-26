@@ -27,6 +27,7 @@
 #include "goblin/bench/tracked.h"
 #include "goblin/methods/ims.h"
 #include "goblin/methods/continuous.h"
+#include "goblin/gp/instance.h"
 
 #ifndef NDEBUG
 #define __assert_fitness_invariant(s) check_fitness_invariant(rng, s, std::format("{}:{}", __FILE__, __LINE__))
@@ -310,6 +311,9 @@ struct PopulationOptions {
   bool mutate_before_gradient_step = true;
   usize gradient_step_frequency = 0;
   usize gradient_step_count = 10;
+
+  // TODO this whole file really needs a refactor lol
+  bool use_fancy_gpu_gp_gom = false;
 };
 
 template <typename SolutionSet>
@@ -868,6 +872,23 @@ class Population {
     return !strict || o == Ordering::Better || (!objective.has_value() && non_dominated);
   };
 
+  bool accept_and_update_archive(const SolutionBase& changed,
+                                 const SolutionBase& original,
+                                 std::optional<usize> objective,
+                                 bool strict) {
+    Ordering o = problem.fitness().cmp(changed.quality(), original.quality(), objective);
+
+    if (o == Ordering::Worse) {
+      return false;
+    }
+
+    bool non_dominated = local_archive->update(changed, strict);
+
+    // if strict: we want clear improvements,
+    // i.e. better in SO or at least non-dominated in MO
+    return !strict || o == Ordering::Better || (!objective.has_value() && non_dominated);
+  };
+
   u64 initialize(Rng& rng) {
     // reset the local archive
     local_archive->clear();
@@ -923,7 +944,150 @@ class Population {
     return solutions_to_evaluate.size();
   };
 
+  // TODO wayy to agressive - takes out all diversity and does not allow exploration of the seach space enough
+  /// GOM, but with two extra modifications:
+  ///
+  /// 1. Each solution gets multiple offspring such that `solutions_to_evaluate.size()` is an exact multiple of the
+  /// population size >= 1
+  /// 2. The extra offspring solutions are created by "shifting up" (*) the inherited subset values until this
+  /// fails (i.e. root is reached, template does not match or multiple values are assigned to the same node position)
+  ///
+  /// *: Subsets aren't necessarily full subtrees, but it is still possible to copy the node to where it would be if the
+  /// parent of the node would be the parent of the parent and so on.
+  u64 fancy_gp_gom_step(Rng& rng, const GPContext& ctx, usize subset_idx) {
+    std::vector<usize> donor_pool;
+    {
+      usize max_donor_pool_size = cluster_donors[0].size();
+      assert(max_donor_pool_size > 0);
+      for (usize k = 1; k < num_clusters; k++) {
+        assert(cluster_donors[k].size() > 0);
+        max_donor_pool_size = std::max(max_donor_pool_size, cluster_donors[k].size());
+      }
+      donor_pool.resize(max_donor_pool_size);
+      std::iota(donor_pool.begin(), donor_pool.end(), 0);
+    }
+
+    std::vector<usize> solution_pool(solutions.size());
+    std::iota(solution_pool.begin(), solution_pool.end(), 0);
+
+    // for each offspring, record the parent (= index in solutions)
+    std::vector<usize> solution_index;
+    SolutionSet offspring;
+    solutions_to_evaluate.clear();
+
+    usize iteration = 0;
+    bool done = false;
+    while (!done) {  // population iterations (iterate until each solution has at least had one chance to produce
+                     // offspring & keep looping after that until the number of offspring solutions is a multiple of the
+                     // population size)
+      for (usize i : solution_pool) {
+        auto k = solution_clusters[i];
+        auto fos_idx = subset_orders(i, subset_idx);
+
+        // due to filtering/max_subset_size, some clusters might have more
+        // subsets...
+        if (fos_idx < cluster_FOS[k].size()) {
+          // the library does donor search, so this also is added behind a flag to allow fair comparisons to the
+          // reference version...
+          usize max_donor_search_iterations = std::min(options.donor_search_proportion, 1.0) * cluster_donors[k].size();
+          usize donor_idx, donor_pool_idx = 0;
+
+          bool offspring_added = false;
+          do {  // loop over donors
+            // do a partial Fisher-Yates shuffle
+            std::swap(donor_pool[donor_pool_idx],
+                      donor_pool[std::uniform_int_distribution<usize>(donor_pool_idx, donor_pool.size() - 1)(rng)]);
+
+            donor_idx = donor_pool[donor_pool_idx++];
+            if (donor_idx >= cluster_donors[k].size() || i == cluster_donors[k][donor_idx]) {
+              continue;
+            }
+
+            usize level_offset = 0;  // how many tree levels is the subset shifted towards the root?
+            while (!done) {          // loop over possible shifts
+              // try to create the offspring solution with the donor material
+              // 1. create a copy with the values in the right place
+              // 2. use the problem provided inherit function to handle constants & checking if an evaluation is needed
+              Solution o = solutions[i];
+
+              std::set<usize> occupied_nodes;
+              bool evaluation_needed = false;
+              bool offset_is_valid = true;
+              for (usize node : cluster_FOS[k][fos_idx].discrete) {
+                auto info = ctx.inherit_shifted(o, donors[cluster_donors[k][donor_idx]], node, level_offset);
+                if (info.has_value()) {
+                  auto [active_change, target_node] = info.value();
+                  if (occupied_nodes.contains(
+                          target_node)) {  // two variables would get shifted to the same node -> not valid
+                    offset_is_valid = false;
+                    break;
+                  }
+                  occupied_nodes.insert(target_node);
+                  evaluation_needed |= active_change;
+                } else {
+                  offset_is_valid = false;
+                  break;
+                }
+              }
+
+              if (!offset_is_valid) {
+                break;  // we don't need to shift up further
+              }
+
+              if (evaluation_needed) {
+                usize o_idx = offspring.size();
+                offspring.add(o);
+                solution_index[o_idx] = i;
+                solutions_to_evaluate.push_back(o_idx);
+                offspring_added = true;
+
+                done = iteration > 0 && solutions_to_evaluate.size() % solutions.size() == 0;
+              }
+              level_offset++;
+            }
+          } while (!done && !offspring_added && donor_pool_idx < max_donor_search_iterations);
+        }
+      }
+      std::shuffle(solution_pool.begin(), solution_pool.end(), rng);
+
+      iteration += 1;
+    }
+    // TODO create offspring
+
+    problem.evaluate(rng, offspring, solutions_to_evaluate);
+
+    // accept (in random order to un-bias archive updates, not sure if that is really needed though)
+    std::shuffle(solutions_to_evaluate.begin(), solutions_to_evaluate.end(), rng);
+    for (usize i : solutions_to_evaluate) {
+      auto si = solution_index[i];
+      auto k = solution_clusters[si];
+
+      std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
+
+      if (accept_and_update_archive(offspring[i], solutions[si], objective,
+                                    /* strict */ false)) {
+        solution_changed[si] = true;
+        // update solution and gom backup
+        solutions[si] = offspring[i];
+        parents[si] = offspring[i];
+      } else {
+        // nothing to do here (either the offspring gets accepted or there is nothing to revert becasue that's a
+        // different solution buffer)
+      }
+    }
+
+    return solutions_to_evaluate.size();
+  };
+
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
+    if (options.use_fancy_gpu_gp_gom) {
+      if (auto ptr = dynamic_cast<const GPInstanceBase*>(&problem.unwrap()); ptr != nullptr) {
+        return fancy_gp_gom_step(rng, ptr->context(), subset_idx);
+      } else {
+        throw std::runtime_error("GP specialization enabled for a non GP instance.");
+      }
+    }
+
     std::vector<usize> donor_pool;
     {
       usize max_donor_pool_size = cluster_donors[0].size();

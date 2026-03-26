@@ -9,6 +9,7 @@ from pygom.voronoi import (
     YourCustomCrossover,
     YourCustomMutation,
 )
+
 from src.utils import (
     animate_evolution,
     example_convergence_plot,
@@ -22,7 +23,7 @@ IMAGE_MAX_DIM = 64
 # Number of active cells needed to switch to using a KD-Tree for determining the nearest voronoi cell during evaluation. This depends on the number of pixels and cells and the hardware, but generally brute-forcing is fast...
 KDTREE_THRESHOLD = 200
 COMPLEXITY_OBJECTIVE = False
-COMPLEXITY_OBJECTIVE = True
+# COMPLEXITY_OBJECTIVE = True
 
 # If enabled, the complexity objecitve is logged even if it is not optimized
 TRACK_COMPLEXITY = True
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     )
 
     ea = SimpleGA(
-        population_size=100,
+        population_size=250,
         steady_state=True,
         # apply uniform/one-point crossover with different probabilities
         crossover=CombinedCrossover(
