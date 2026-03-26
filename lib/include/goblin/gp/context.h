@@ -219,6 +219,12 @@ class GPContext {
     }
 
     assert(index == num_discrete && "The domain has not been defined for all discrete variables.");
+
+    // pre-allocate scratch buffers used on every evaluation to avoid per-call heap allocations
+    _scratch_visited.resize(num_discrete);
+    _scratch_call_stack.reserve(this->max_expression_size);
+    _scratch_node_stack.reserve(this->max_expression_size);
+    _scratch_arg_stack.reserve(this->max_expression_size);
   };
 
   inline std::optional<DType> value2domain(usize index, DType value) const {
@@ -312,20 +318,20 @@ class GPContext {
     // not punish re-using subfunctions by only counting the subfunction nodes once.
     // unless subfunctions are enabled, the discounting has no effect
     discount_size = discount_size && enable_subfunctions;
-    Array<u32> visited;
     if (discount_size) {
-      visited = Array<u32>::Zero(num_discrete);
+      _scratch_visited.setZero();
     }
+    auto& visited = _scratch_visited;
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
-    std::vector<usize> call_stack;
-    call_stack.reserve(max_expression_size);
+    _scratch_call_stack.clear();
+    auto& call_stack = _scratch_call_stack;
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
-    std::vector<std::tuple<usize, isize, bool>> node_stack;
-    node_stack.reserve(max_expression_size);
+    _scratch_node_stack.clear();
+    auto& node_stack = _scratch_node_stack;
 
     // for each output, walk the tree in post-order
     size = 0;  // initially the size is 0 (size in GP is somewhat arbitary - even without subftrees/args which are not
@@ -517,7 +523,7 @@ class GPContext {
     std::vector<std::string> arg_stack;
     arg_stack.reserve(max_expression_size);
 
-    const auto trees = nodes.value();
+    const auto& trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
 
@@ -611,15 +617,15 @@ class GPContext {
     // evaluation of postfix expressions assumes a stack model, i.e. results are pushed onto as stack, arguments
     // retrieved from the stack and at the end, the single stack entry is the result. Since arguments might be consist
     // of nested operations, the buffer indices corresponding to the actual results are needed somewhere.
-    std::vector<usize> arg_stack;
-    arg_stack.reserve(max_expression_size);
+    _scratch_arg_stack.clear();
+    auto& arg_stack = _scratch_arg_stack;
 
     // for each output, evaluate the tree
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
 
     // Eigen::internal::set_is_malloc_allowed(false);
 
-    const auto trees = nodes.value();
+    const auto& trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
 
@@ -954,6 +960,12 @@ class GPContext {
  private:
   Arr2D<DType> _value2domain;
   std::vector<usize> _parent;  // node -> parent or invalid index for root nodes
+
+  // scratch buffers reused across evaluations to avoid per-call heap allocations
+  mutable Array<u32> _scratch_visited;
+  mutable std::vector<usize> _scratch_call_stack;
+  mutable std::vector<std::tuple<usize, isize, bool>> _scratch_node_stack;
+  mutable std::vector<usize> _scratch_arg_stack;
 };
 };  // namespace goblin
 
