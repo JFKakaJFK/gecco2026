@@ -6,6 +6,7 @@
 #ifndef _GOBLIN_H
 #define _GOBLIN_H
 
+
 // clang-format off
 
 
@@ -4121,6 +4122,12 @@ class GPContext {
     }
 
     assert(index == num_discrete && "The domain has not been defined for all discrete variables.");
+
+    // pre-allocate scratch buffers used on every evaluation to avoid per-call heap allocations
+    _scratch_visited.resize(num_discrete);
+    _scratch_call_stack.reserve(this->max_expression_size);
+    _scratch_node_stack.reserve(this->max_expression_size);
+    _scratch_arg_stack.reserve(this->max_expression_size);
   };
 
   inline std::optional<DType> value2domain(usize index, DType value) const {
@@ -4214,20 +4221,20 @@ class GPContext {
     // not punish re-using subfunctions by only counting the subfunction nodes once.
     // unless subfunctions are enabled, the discounting has no effect
     discount_size = discount_size && enable_subfunctions;
-    Array<u32> visited;
     if (discount_size) {
-      visited = Array<u32>::Zero(num_discrete);
+      _scratch_visited.setZero();
     }
+    auto& visited = _scratch_visited;
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
-    std::vector<usize> call_stack;
-    call_stack.reserve(max_expression_size);
+    _scratch_call_stack.clear();
+    auto& call_stack = _scratch_call_stack;
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
-    std::vector<std::tuple<usize, isize, bool>> node_stack;
-    node_stack.reserve(max_expression_size);
+    _scratch_node_stack.clear();
+    auto& node_stack = _scratch_node_stack;
 
     // for each output, walk the tree in post-order
     size = 0;  // initially the size is 0 (size in GP is somewhat arbitary - even without subftrees/args which are not
@@ -4419,7 +4426,7 @@ class GPContext {
     std::vector<std::string> arg_stack;
     arg_stack.reserve(max_expression_size);
 
-    const auto trees = nodes.value();
+    const auto& trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
 
@@ -4513,15 +4520,15 @@ class GPContext {
     // evaluation of postfix expressions assumes a stack model, i.e. results are pushed onto as stack, arguments
     // retrieved from the stack and at the end, the single stack entry is the result. Since arguments might be consist
     // of nested operations, the buffer indices corresponding to the actual results are needed somewhere.
-    std::vector<usize> arg_stack;
-    arg_stack.reserve(max_expression_size);
+    _scratch_arg_stack.clear();
+    auto& arg_stack = _scratch_arg_stack;
 
     // for each output, evaluate the tree
     Arr2D<Scalar> outputs(X.rows(), num_outputs);
 
     // Eigen::internal::set_is_malloc_allowed(false);
 
-    const auto trees = nodes.value();
+    const auto& trees = nodes.value();
     for (usize i = 0; i < trees.size(); i++) {
       const auto& tree = trees[i];
 
@@ -4856,6 +4863,12 @@ class GPContext {
  private:
   Arr2D<DType> _value2domain;
   std::vector<usize> _parent;  // node -> parent or invalid index for root nodes
+
+  // scratch buffers reused across evaluations to avoid per-call heap allocations
+  mutable Array<u32> _scratch_visited;
+  mutable std::vector<usize> _scratch_call_stack;
+  mutable std::vector<std::tuple<usize, isize, bool>> _scratch_node_stack;
+  mutable std::vector<usize> _scratch_arg_stack;
 };
 };  // namespace goblin
 
@@ -5368,6 +5381,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
       active_indices.reserve(count);
       std::vector<usize> inactive_indices;
       inactive_indices.reserve(count);
+      std::vector<DType> perm;
 
       usize num_roots = ctx.output_roots.size() + ctx.subtree_roots.size();
       for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
@@ -5392,7 +5406,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 
           // NOTE it could be better to maximize the number of active variables by sampling terminals only once (this
           // definitely holds for the root, but not necessarily for other nodes, so this is not done here)
-          std::vector<DType> perm(problem.discrete_domain_sizes()(current));
+          perm.resize(problem.discrete_domain_sizes()(current));
           std::iota(perm.begin(), perm.end(), 0);
 
           usize i = perm.size();
@@ -5570,18 +5584,20 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 
     Vec<DType> values(total);
 
-    sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)));
-    sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)));
+    std::vector<DType> perm;
+    sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)), perm);
+    sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)), perm);
     sample_complete(rng, non_const_terminals[idx],
-                    values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)));
+                    values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)), perm);
 
     std::shuffle(values.begin(), values.end(), rng);
 
     return values;
   };
 
-  void sample_complete(Rng& rng, const std::vector<DType>& pool, Ref<Vec<DType>> values) const {
-    std::vector<DType> perm(pool.size());
+  void sample_complete(Rng& rng, const std::vector<DType>& pool, Ref<Vec<DType>> values,
+                       std::vector<DType>& perm) const {
+    perm.resize(pool.size());
     std::iota(perm.begin(), perm.end(), 0);
 
     usize i = perm.size();
@@ -6018,7 +6034,6 @@ class SRProblem : public GPInstanceBase {
       ls_params.resize(2, ctx.num_outputs);
       for (usize o = 0; o < ctx.num_outputs; o++) {
         A_ls.col(1) = Y_pred.col(o);
-        Vec<ScalarType> b = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
         ls_params.col(o) = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
       }
     }
@@ -6592,6 +6607,7 @@ class Concat final : public ObjectiveBase {
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
                                             const std::span<const usize>& continuous_indices) override final {
+    std::vector<usize> d_indices, c_indices;
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (auto& o : fns) {
@@ -6599,11 +6615,28 @@ class Concat final : public ObjectiveBase {
       c_len = o->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+
+      // discrete/continuous indices are the indices falling into d_seq/c_seq without the offset
+      d_indices.clear();
+      d_indices.reserve(d_len);
+      for (usize i : discrete_indices) {
+        if (d_offset <= i && i < d_offset + d_len) {
+          d_indices.push_back(i - d_offset);
+        }
+      }
+
+      c_indices.clear();
+      c_indices.reserve(c_len);
+      for (usize i : continuous_indices) {
+        if (c_offset <= i && i < c_offset + c_len) {
+          c_indices.push_back(i - c_offset);
+        }
+      }
+
       auto [fov, fcv] = o->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
-          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value, d_indices, c_indices);
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
@@ -6662,6 +6695,7 @@ class Repeat final : public ObjectiveBase {
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
                                             const std::span<const usize>& continuous_indices) override final {
+    std::vector<usize> d_indices, c_indices;
     CType ov = CType(0.0), cv = CType(0.0);
     usize d_offset = 0, c_offset = 0, d_len, c_len;
     for (usize i = 0; i < _repeats; i++) {
@@ -6669,11 +6703,28 @@ class Repeat final : public ObjectiveBase {
       c_len = fn->num_continuous();
       auto d_seq = Eigen::seqN(d_offset, d_len);
       auto c_seq = Eigen::seqN(c_offset, c_len);
+
+      // discrete/continuous indices are the indices falling into d_seq/c_seq without the offset
+      d_indices.clear();
+      d_indices.reserve(d_len);
+      for (usize i : discrete_indices) {
+        if (d_offset <= i && i < d_offset + d_len) {
+          d_indices.push_back(i - d_offset);
+        }
+      }
+
+      c_indices.clear();
+      c_indices.reserve(c_len);
+      for (usize i : continuous_indices) {
+        if (c_offset <= i && i < c_offset + c_len) {
+          c_indices.push_back(i - c_offset);
+        }
+      }
+
       auto [fov, fcv] = fn->evaluate_partial(
           discrete_values(d_seq), continuous_values(c_seq), discrete_active(d_seq), continuous_active(c_seq),
           parent_discrete_values(d_seq), parent_continuous_values(c_seq), parent_discrete_active(d_seq),
-          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value,
-          discrete_indices.subspan(d_offset, d_len), continuous_indices.subspan(c_offset, c_len));
+          parent_continuous_active(c_seq), parent_objective_value, parent_constraint_value, d_indices, c_indices);
       ov += fov;
       cv += std::max(CType(0.0), cv);
       d_offset += d_len;
@@ -8107,11 +8158,14 @@ inline std::string iterator2str(T&& it) {
 
 #endif /* _GOBLIN_BENCH_TRACKED_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/ims.h included by goblin.h                                              //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_LIB_IMS_H
 #define _GOBLIN_LIB_IMS_H
+
+
 
 namespace goblin {
 
@@ -8367,6 +8421,9 @@ class IMS final : public MethodBase {
 #ifndef _GOBLIN_AMALGAM_H
 #define _GOBLIN_AMALGAM_H
 
+
+
+
 namespace goblin {
 
 class AMaLGaM final : public MethodBase {
@@ -8488,11 +8545,13 @@ class AMaLGaM final : public MethodBase {
 #ifndef _GOBLIN_GOMEA_LIBRARY_H
 #define _GOBLIN_GOMEA_LIBRARY_H
 
+
 #include <gomea/src/common/linkage_config.hpp>
 #include <gomea/src/discrete/Config.hpp>
 #include <gomea/src/discrete/gomeaIMS.hpp>
 #include <gomea/src/real_valued/Config.hpp>
 #include <gomea/src/real_valued/rv-gomea.hpp>
+
 
 // Doesn't work yet since we store the full class, not a pointer...
 // // forward declaration to avoid pulling in the library headers in the header
@@ -8581,6 +8640,9 @@ class RvGOMEA final : public MethodBase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_MO_BINARY_GOMEA_H
 #define _GOBLIN_MO_BINARY_GOMEA_H
+
+
+
 
 namespace goblin {
 
@@ -8678,14 +8740,18 @@ class MOBinaryGOMEA final : public MethodBase {
 #ifndef _GOBLIN_MIXED_GOMEA_H
 #define _GOBLIN_MIXED_GOMEA_H
 
+
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/continuous.h included by goblin/methods/mixed.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_METHODS_CONTINUOUS_H
 #define _GOBLIN_METHODS_CONTINUOUS_H
 
+
 #include <Eigen/Cholesky>
 #include <Eigen/QR>
+
 
 namespace goblin {
 
@@ -9997,6 +10063,7 @@ class RvState {
 };  // namespace goblin
 
 #endif /* _GOBLIN_METHODS_CONTINUOUS_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h continued                                                       //
@@ -11424,6 +11491,8 @@ class MixedGOMEA : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
+
+
 namespace goblin {
 namespace classic {
 class SelectionStrategyBase {
@@ -11646,6 +11715,7 @@ class EABase : public MethodBase {
 #ifndef _GOBLIN_CLASSIC_DE_H
 #define _GOBLIN_CLASSIC_DE_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -11860,6 +11930,7 @@ class DE : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_ES_H
 #define _GOBLIN_ES_H
+
 
 namespace goblin {
 namespace classic {
@@ -12201,6 +12272,7 @@ class ES : public EABase {
 #ifndef _GOBLIN_CLASSIC_PSO_H
 #define _GOBLIN_CLASSIC_PSO_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -12417,6 +12489,8 @@ class PSO : public EABase {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_SIMPLE_GA_H
 #define _GOBLIN_SIMPLE_GA_H
+
+
 
 namespace goblin {
 namespace classic {
@@ -12812,6 +12886,7 @@ class SimpleGA : public EABase {
 #ifndef _GOBLIN_STANDARD_GP_H
 #define _GOBLIN_STANDARD_GP_H
 
+
 namespace goblin {
 namespace classic {
 
@@ -13005,11 +13080,14 @@ class StandardGP : public EABase {
 
 #endif /* _GOBLIN_STANDARD_GP_H */
 
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/examples/voronoi.h included by goblin.h                                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_EXAMPLES_VORONOI_H
 #define _GOBLIN_EXAMPLES_VORONOI_H
+
+
 
 template <typename C>
 class KDTree {
@@ -13405,6 +13483,7 @@ class YourCustomMutation : public goblin::classic::DiscreteMutationBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_EXAMPLES_VORONOI_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin.h continued                                                                     //
