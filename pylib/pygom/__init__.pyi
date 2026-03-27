@@ -211,7 +211,6 @@ class MOFitness(ArchiveFitnessBase):
     #    return o;
     #  };
     #
-
     @overload
     def distance(
         self, lhs: QualityBase, rhs: QualityBase, objective: Optional[int] = None
@@ -879,7 +878,6 @@ class InstanceBase:
         pass
     # // corresponds to e.g. ERCs / one constant per edge in GP
     # virtual bool always_inherit_continuous() const { return False; };
-
     def inherit_discrete(  # overridable
         self, offspring: SolutionBase, donor: SolutionBase, subset: Subset
     ) -> Tuple[bool, bool]:
@@ -4490,7 +4488,6 @@ class RvState:
     def converged(self) -> bool:
         pass
     # private:
-
     def select_and_learn_linkage(
         self,
         rng: Rng,
@@ -4557,7 +4554,6 @@ class RvState:
     #     std::optional<usize> population_size){
     #       // ims go brr
     #     }
-
     def current_generation(self) -> Optional[int]:
         """// override final"""
         pass
@@ -4638,16 +4634,10 @@ class PopulationOptions:
     forced_improvements: bool = True
     enable_mixed_forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
-    sequential_gom: bool = (
-        False  # performs GOM sequentially per solution, incompatible with other mechanisms
-    )
-    strict_elite_acceptance: bool = (
-        False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
-    )
+    sequential_gom: bool = False  # performs GOM sequentially per solution, incompatible with other mechanisms
+    strict_elite_acceptance: bool = False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
 
-    donor_search_proportion: float = (
-        0.0  # the fraction of solutions to consider before skipping an evaluation in case
-    )
+    donor_search_proportion: float = 0.0  # the fraction of solutions to consider before skipping an evaluation in case
     # of all subset variables being identical between the solution and donor
     subset_logfile: Optional[str] = None
     generation: int = 0
