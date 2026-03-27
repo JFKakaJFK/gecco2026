@@ -6,31 +6,18 @@ from itertools import chain, product
 from pathlib import Path
 
 from pygom import KernelVersion
-<<<<<<<< HEAD:experiments/python/3_gravity/main.py
-
-from src.db import create_db
-from src.experiment_config import ExperimentConfig, cfg
-from src.problem import Problem, format_problem, generate_problems
-from src.run import run_cpu_tasks, run_gpu_tasks, run_tasks
-from src.task import (
-========
 from shared.experiment_config import ExperimentConfig, cfg
 from shared.problem import Problem, format_problem, generate_problems
 from shared.task import (
->>>>>>>> dev:experiments/python/experiment_2/gpu-gp-gomea/symbolic_regression.py
     TaskTransform,
     cpu_transform,
     gpu_transform,
     override_tasks,
     task_factory,
 )
-<<<<<<<< HEAD:experiments/python/3_gravity/main.py
-========
 
 from src.db import create_db
-from src.plot.plots import create_plots, plot_minimally_required_population
 from src.run import run_cpu_tasks, run_gpu_tasks, run_tasks
->>>>>>>> dev:experiments/python/experiment_2/gpu-gp-gomea/symbolic_regression.py
 
 MIN_POPULATION = 8
 MAX_POPULATION = 65536
@@ -186,24 +173,10 @@ def main():
     output_directory = Path("results") / run_date
 
     # GPU Experiments
-<<<<<<<< HEAD:experiments/python/3_gravity/main.py
-    # grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
-========
-    grid_execution(cfg.TEST_GPU, output_directory)
->>>>>>>> dev:experiments/python/experiment_2/gpu-gp-gomea/symbolic_regression.py
-    # grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN_EXACT, output_directory, dry_run=True)
-    # grid_execution(cfg.SIMPLE_ADDITION, output_directory, dry_run=True)
-
-    grid_execution(cfg.FEYNMAN_MILLION, output_directory, dry_run=True)
-
-    grid_execution(cfg.ADDITION, output_directory, dry_run=True)
-    grid_execution(cfg.DIVISION, output_directory, dry_run=True)
-    grid_execution(cfg.SUBTRACTION, output_directory, dry_run=True)
-    grid_execution(cfg.MULTIPLICATION, output_directory, dry_run=True)
-    grid_execution(cfg.SQUARE, output_directory, dry_run=True)
+    grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":

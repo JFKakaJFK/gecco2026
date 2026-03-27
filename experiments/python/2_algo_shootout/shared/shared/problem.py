@@ -1,13 +1,8 @@
 from collections.abc import Generator
 from typing import TypedDict
 
-<<<<<<<< HEAD:experiments/python/3_gravity/src/problem.py
-from src.dataset_config import DatasetConfig
-from src.experiment_config import ExperimentConfig, TemplateConfig
-========
 from shared.dataset_config import DatasetConfig
 from shared.experiment_config import ExperimentConfig, TemplateConfig
->>>>>>>> dev:experiments/python/experiment_2/shared/shared/problem.py
 
 
 class Problem(TypedDict):

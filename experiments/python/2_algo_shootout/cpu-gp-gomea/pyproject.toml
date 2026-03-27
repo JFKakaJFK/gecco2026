@@ -1,5 +1,5 @@
 [project]
-name = "3_gravity_experiment"
+name = "cpu_gp_gomea_experiment"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -19,6 +19,7 @@ dependencies = [
     "sympy>=1.10.1",
     "tqdm>=4.67.1",
 ]
+
 
 [tool.uv.sources]
 experiment-shared = { path = "../shared", editable = true }

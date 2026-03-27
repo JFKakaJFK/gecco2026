@@ -3049,30 +3049,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
   // #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
   //
-  // #ifndef _GOBLIN_GA_GP_MISC_H
-  //
-
-
-  auto pyClassGpuInfo =
-      nb::class_<goblin::GpuInfo>
-          (m, "GpuInfo", "")
-      .def("__init__", [](goblin::GpuInfo * self, int device_id = int(), int num_sms = int())
-      {
-          new (self) goblin::GpuInfo();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->device_id = device_id;
-          r_ctor_->num_sms = num_sms;
-      },
-      nb::arg("device_id") = int(), nb::arg("num_sms") = int()
-      )
-      .def_rw("device_id", &goblin::GpuInfo::device_id, "")
-      .def_rw("num_sms", &goblin::GpuInfo::num_sms, "")
-      ;
-
-
-  m.def("get_gpu_info",
-      goblin::get_gpu_info);
-  // #endif
 
 
   m.def("round_up",

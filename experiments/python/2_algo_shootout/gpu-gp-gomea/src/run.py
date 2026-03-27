@@ -22,12 +22,6 @@ from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
-<<<<<<<< HEAD:experiments/python/3_gravity/src/run.py
-from src.experiment_config import BASELINE_KV, OPERATOR_SETS
-from src.task import Task, TaskGenerator, TaskTransform
-
-========
->>>>>>>> dev:experiments/python/experiment_2/gpu-gp-gomea/src/run.py
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
 
 # Some kernels have a limit to the amount of work they can do

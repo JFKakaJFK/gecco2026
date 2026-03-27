@@ -2534,28 +2534,6 @@ class RecursiveCompleteInit2(DiscreteInitBase):
 # #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
 #
 
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/gpu_evaluation/misc.h included by goblin/gp/gpu_evaluation/launch_config.h   //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_MISC_H
-#
-
-class GpuInfo:
-    device_id: int
-    num_sms: int
-    def __init__(self, device_id: int = int(), num_sms: int = int()) -> None:
-        """Auto-generated default constructor with named params"""
-        pass
-
-def get_gpu_info() -> GpuInfo:
-    pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/gpu_evaluation/launch_config.h continued                                     //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 def round_up(value: int, multiple: int) -> int:
     pass
 

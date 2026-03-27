@@ -7,14 +7,6 @@ from typing import TypedDict
 import numpy as np
 import pmlb
 import sympy as sym
-<<<<<<<< HEAD:experiments/python/3_gravity/src/task.py
-from pygom import KernelVersion
-from sklearn.model_selection import KFold, train_test_split
-
-from src.dataset_config import DatasetConfig
-from src.experiment_config import ExperimentConfig
-from src.problem import Problem
-========
 import ucimlrepo
 from sklearn.datasets import fetch_california_housing
 from sklearn.model_selection import KFold, train_test_split
@@ -22,7 +14,6 @@ from sklearn.model_selection import KFold, train_test_split
 from shared.dataset_config import DatasetConfig
 from shared.experiment_config import ExperimentConfig
 from shared.problem import Problem
->>>>>>>> dev:experiments/python/experiment_2/shared/shared/task.py
 
 PMLB_CACHE_DIRECTORY = "pmlb_cache"
 
@@ -122,6 +113,8 @@ def create_tasks(
                 return_X_y=True,
                 local_cache_dir=PMLB_CACHE_DIRECTORY,
             )
+        case "sklearn":
+            X, y = fetch_california_housing(return_X_y=True)
         case "synthetic":
             assert dataset.equation is not None
             X, y = synthetic_problem(
@@ -130,6 +123,11 @@ def create_tasks(
                 noise=0.0,
                 seed=42,
             )
+        case "uci":
+            d = ucimlrepo.fetch_ucirepo(id=int(dataset.name))
+
+            X = d.data.features.to_numpy()
+            y = d.data.targets.to_numpy()
 
     if config.test_size != 0:
         X_train, X_test, y_train, y_test = train_test_split(
