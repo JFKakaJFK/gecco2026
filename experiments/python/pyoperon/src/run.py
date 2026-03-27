@@ -54,6 +54,14 @@ def run_one_task(task: Task) -> dict:
     X_train = X_train[:obs, :feat]
     y_train = y_train[:obs].reshape(-1)
 
+    if np.isnan(X_train).any():
+        imputer = IterativeImputer(
+            max_iter=10,
+            random_state=task["seed"],
+            sample_posterior=True,
+        )
+        X_train = imputer.fit_transform(X_train)
+
     temp = float(np.nanmax(np.abs(y_train)))
     const_range = (-temp, temp)
 
@@ -78,16 +86,6 @@ def run_one_task(task: Task) -> dict:
         max_time=3600,  # assumed to be seconds
         random_state=task["seed"],
     )
-
-    imputer = IterativeImputer(
-        max_iter=10,
-        random_state=task["seed"],
-        sample_posterior=True,
-    )
-    if np.isnan(X_train).any():
-        X_train = imputer.fit_transform(X_train)
-    else:
-        imputer.fit(X_train)
 
     start_time = time.perf_counter()
     reg.fit(X_train, y_train)
@@ -123,7 +121,7 @@ def run_one_task(task: Task) -> dict:
 def run_cpu_tasks(
     tasks: TaskGenerator,
     output_directory: Path,
-    max_workers: int | None = None,
+    max_workers: int | None = 30,
     dry_run: bool = False,
 ) -> None:
     if not dry_run:

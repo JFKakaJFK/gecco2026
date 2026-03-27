@@ -3252,7 +3252,9 @@ struct Template {
 
 namespace goblin {
 
-enum class KernelVersion : uint8_t {
+using u8 = std::uint8_t;
+
+enum class KernelVersion : u8 {
     Baseline,
     Restrict,
     SharedMemory,
@@ -3278,13 +3280,14 @@ constexpr std::string_view to_string(KernelVersion v) {
     return "Unknown KernelVersion";
 }
 
-enum class NodeType : uint8_t {
+enum class NodeType : u8 {
     Input,
     Constant,
     Operator,
+    Parameter
 };
 
-enum class Operator : uint8_t {
+enum class Operator : u8 {
     Add,
     Sub,
     Mul,
@@ -3303,9 +3306,9 @@ enum class Operator : uint8_t {
 
 // The following declarations are used to create more readable test cases
 namespace test {
-    constexpr float C = static_cast<float>(NodeType::Constant);
-    constexpr float I = static_cast<float>(NodeType::Input);
-    constexpr float O = static_cast<float>(NodeType::Operator);
+    constexpr u8 C = static_cast<u8>(NodeType::Constant);
+    constexpr u8 I = static_cast<u8>(NodeType::Input);
+    constexpr u8 O = static_cast<u8>(NodeType::Operator);
 
     constexpr float Val(float x) { return x; }
     constexpr float Val(int x) { return static_cast<float>(x); }
@@ -4736,10 +4739,17 @@ class GPContext {
     return proximity;
   };
 
+  // Transforms trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation)
+  //
+  // Subfunctions are resolved within this function, so the transformed trees will not contain
+  // any subfunction/argument nodes
+  // Multi-output trees are stored one after another at constant intervals determined by 'max_expression_size'.
+  // This value is probably much too large for most trees, however it is very difficult to determine the
+  // maximum tree size when subfunctions are involved. Therefore a save maximum value is chosen.
   template <typename S>
   void to_gpu_representation(
     S& solution,
-    std::vector<float>& node_type,
+    std::vector<uint8_t>& node_type,
     std::vector<float>& node_value,
     usize& size,
     bool discount_size = false
@@ -4762,145 +4772,156 @@ class GPContext {
     size = 0;
 
     // Vectors to hold temporary type and value data
-    std::vector<float> temp_type;
+    std::vector<uint8_t> temp_type;
     std::vector<float> temp_value;
     temp_type.reserve(max_expression_size);
     temp_value.reserve(max_expression_size);
 
-    // TODO implement multi-output and subexpressions
-    node_stack.emplace_back(output_roots[0], 0, false);
+    for (usize n : output_roots) {
+      // Ensure vectors are clear for next output tree
+      temp_type.clear();
+      temp_value.clear();
 
-    // While there are still nodes to visit
-    while(!node_stack.empty()) {
-      // Hit the max size, but still have more nodes to process
-      if (size + temp_type.size() == max_expression_size) {
-        return;
-      }
+      // housekeeping: reset the call stack and node_stack per output
+      call_stack.clear();
+      node_stack.clear();
+      node_stack.emplace_back(n, 0, false);
 
-      // Pop the top node from the stack
-      auto [idx, call_stack_idx, is_post_order] = node_stack.back();
-      usize node_stack_idx = node_stack.size() - 1;
-
-      // Mark current node as active
-      if constexpr (!std::is_const<S>()) {
-        solution.discrete_active()(idx) = true;
-      }
-
-      // Get the type and value for the current node
-      DType value = domain2value(idx, solution.discrete_values()(idx));
-      usize v_idx = value_idx[value];
-      enum ValueKind type = value_kind[value];
-
-      bool update_tree = false;
-
-      // only look at the node if this is the first time we see it - in the post-order visit all
-      // we have to do is add it to the temp_type and temp_value
-      if (!is_post_order) {
-        if (discount_size) {
-          visited(idx) = 1;
+      // While there are still nodes to visit
+      while(!node_stack.empty()) {
+        // Hit the max size, but still have more nodes to process
+        if (size + temp_type.size() == max_expression_size) {
+          return;
         }
 
-        if (type == ValueKind::Arg) {
-          visited(idx) = 0;
+        // Pop the top node from the stack
+        auto [idx, call_stack_idx, is_post_order] = node_stack.back();
+        usize node_stack_idx = node_stack.size() - 1;
 
-          usize calling_node = call_stack[call_stack_idx];
-          isize num_frames = 1;
+        // Mark current node as active
+        if constexpr (!std::is_const<S>()) {
+          solution.discrete_active()(idx) = true;
+        }
 
-          auto pidx = parent(idx);
-          while (pidx.has_value()) {
-            if (pidx.value() == calling_node) {
-              calling_node = call_stack[call_stack_idx - num_frames++];
-            }
-            pidx = parent(pidx.value());
+        // Get the type and value for the current node
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
+        enum ValueKind type = value_kind[value];
+
+        bool update_tree = false;
+
+        // only look at the node if this is the first time we see it - in the post-order visit all
+        // we have to do is add it to the temp_type and temp_value
+        if (!is_post_order) {
+          if (discount_size) {
+            visited(idx) = 1;
           }
 
-          auto& cnodes = children[calling_node];
-          assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+          if (type == ValueKind::Arg) {
+            visited(idx) = 0;
+
+            usize calling_node = call_stack[call_stack_idx];
+            isize num_frames = 1;
+
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                calling_node = call_stack[call_stack_idx - num_frames++];
+              }
+              pidx = parent(pidx.value());
+            }
+
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+
+            node_stack.pop_back();
+            node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
+                                    call_stack_idx - num_frames,
+                                    false);
+          } else if (type == ValueKind::Subtree) {
+            visited(idx) = 0;
+            assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
+
+            call_stack.push_back(idx);
+
+            std::get<2>(node_stack[node_stack_idx]) = true;
+            node_stack.emplace_back(subtree_roots[v_idx],
+                                    call_stack.size() - 1,
+                                    false);
+          } else if (type == ValueKind::Operator) {
+            std::get<2>(node_stack[node_stack_idx]) = true;
+
+            usize arity = std::min(children[idx].size(), value_max_arity[value]);
+
+            for (usize i = arity; i > 0;) {
+              node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
+            }
+          } else if (value_min_arity[value] > 0) {
+            throw std::runtime_error("Encountered unhandled non-leaf node.");
+          } else {
+            if constexpr (!std::is_const<S>()) {
+              if (value_kind[value] == ValueKind::Constant) {
+                solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+              }
+            }
+
+            update_tree = true;
+            node_stack.pop_back();
+          }
+        } else {
+          if (type == ValueKind::Subtree) {
+            call_stack.pop_back();
+          } else {
+            update_tree = true;
+          }
 
           node_stack.pop_back();
-          node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                  call_stack_idx - num_frames,
-                                  false);
-        } else if (type == ValueKind::Subtree) {
-          visited(idx) = 0;
-          assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
+        }
 
-          call_stack.push_back(idx);
-
-          std::get<2>(node_stack[node_stack_idx]) = true;
-          node_stack.emplace_back(subtree_roots[v_idx],
-                                  call_stack.size() - 1,
-                                  false);
-        } else if (type == ValueKind::Operator) {
-          std::get<2>(node_stack[node_stack_idx]) = true;
-
-          usize arity = std::min(children[idx].size(), value_max_arity[value]);
-
-          for (usize i = arity; i > 0;) {
-            node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
-          }
-        } else if (value_min_arity[value] > 0) {
-          throw std::runtime_error("Encountered unhandled non-leaf node.");
-        } else {
-          if constexpr (!std::is_const<S>()) {
-            if (value_kind[value] == ValueKind::Constant) {
-              solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+        if (update_tree) {
+          if (const_repr == ConstantRepr::Edges) {
+            if constexpr (!std::is_const<S>()) {
+              solution.continuous_active()(idx) = true;
             }
           }
 
-          update_tree = true;
-          node_stack.pop_back();
-        }
-      } else {
-        if (type == ValueKind::Subtree) {
-          call_stack.pop_back();
-        } else {
-          update_tree = true;
-        }
+          temp_type.push_back(static_cast<uint8_t>(type));
 
-        node_stack.pop_back();
+          if (type == ValueKind::Input) {
+            // Push the index of the input feature, will be used to access the input matrix on GPU
+            temp_value.push_back(v_idx);
+          } else if (type == ValueKind::Parameter) {
+            // Push the index of the parameter, will be used to access the parameter array on GPU
+            temp_value.push_back(v_idx);
+          } else if (type == ValueKind::Constant) {
+            usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+            // Push the constant value, will be used directly in the evaluation on GPU
+            temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
+          } else if (type == ValueKind::Operator) {
+            // Push the operator index, will be used to apply the operator on GPU
+            auto gpu_id = this->operators[v_idx]->gpu_operator_id();
+            if (!gpu_id.has_value()) {
+              throw std::runtime_error("Operator not GPU-compatible");
+            }
+            temp_value.push_back(static_cast<float>(gpu_id.value()));
+          } else {
+            std::unreachable();  // if this triggers, a new ValueKind was added without handling it here
+          }
+
+          assert(temp_type.size() == temp_value.size() && "temp_type and temp_value are out of sync.");
+        }
       }
 
-      if (update_tree) {
-        if (const_repr == ConstantRepr::Edges) {
-          if constexpr (!std::is_const<S>()) {
-            solution.continuous_active()(idx) = true;
-          }
-        }
+      size += temp_type.size();
 
-        temp_type.push_back(static_cast<float>(type));
+      // Pad vectors with placeholder values such that the data is at constant intervals in memory
+      temp_type.resize(max_expression_size, std::numeric_limits<uint8_t>::max());
+      temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
 
-        if (type == ValueKind::Input) {
-          // Push the index of the input feature, will be used to access the input matrix on GPU
-          temp_value.push_back(v_idx);
-        } else if (type == ValueKind::Parameter) {
-          // Push the index of the parameter, will be used to access the parameter array on GPU
-          temp_value.push_back(v_idx);
-        } else if (type == ValueKind::Constant) {
-          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
-          // Push the constant value, will be used directly in the evaluation on GPU
-          temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
-        } else if (type == ValueKind::Operator) {
-          // Push the operator index, will be used to apply the operator on GPU
-          auto gpu_id = this->operators[v_idx]->gpu_operator_id();
-          if (!gpu_id.has_value()) {
-            throw std::runtime_error("Operator not GPU-compatible");
-          }
-          temp_value.push_back(static_cast<float>(gpu_id.value()));
-        }
-      }
+      // Append temporary vectors to final vectors
+      node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
+      node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
     }
-
-    size += temp_type.size();
-
-    // Pad vectors with placeholder values such that the data is at constant intervals in memory
-    // are at constant intervals in memory
-    temp_type.resize(max_expression_size, std::numeric_limits<float>::max());
-    temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
-
-    // Append temporary vectors to final vectors
-    node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
-    node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
 
     if (discount_size) {
       size = visited.sum();
@@ -5823,12 +5844,14 @@ struct LaunchConfig {
 
 namespace goblin {
 
+using u8 = std::uint8_t;
+
 #ifdef __CUDACC__
 __global__
 void evaluate_kernel_baseline(
     float* X,
     float* Y,
-    float* v_type,
+    const u8* v_type,
     float* v_value,
     float* partial,
     size_t solution_length,
@@ -5839,7 +5862,7 @@ __global__
 void evaluate_kernel_restrict(
     const float* __restrict__ X,
     const float* __restrict__ Y,
-    const float* __restrict__ v_type,
+    const u8* __restrict__ v_type,
     const float* __restrict__ v_value,
     float* __restrict__ v,
     size_t solution_length,
@@ -5850,7 +5873,7 @@ __global__
 void evaluate_kernel_shared_memory(
     const float* __restrict__ X,
     const float* __restrict__ Y,
-    const float* __restrict__ v_type,
+    const u8* __restrict__ v_type,
     const float* __restrict__ v_value,
     float* __restrict__ partial,
     size_t solution_length,
@@ -5860,7 +5883,7 @@ void evaluate_kernel_shared_memory(
 __device__
 float compute_tree_output_baseline(
     float* X,
-    const float* type,
+    const u8* type,
     const float* value,
     size_t solution_length,
     size_t num_datapoints,
@@ -5870,7 +5893,7 @@ float compute_tree_output_baseline(
 __device__
 float compute_tree_output_restrict(
     const float* __restrict__ X,
-    const float* __restrict__ type,
+    const u8* __restrict__ type,
     const float* __restrict__ value,
     size_t solution_length,
     size_t num_datapoints,
@@ -5880,7 +5903,7 @@ float compute_tree_output_restrict(
 __device__
 float compute_tree_output_inplace(
     const float* __restrict__ X,
-    const float* __restrict__ type,
+    const u8* __restrict__ type,
     const float* __restrict__ value,
     size_t solution_length,
     size_t num_datapoints,
@@ -5907,7 +5930,7 @@ __global__
 void evaluate_kernel_hybrid(
     const float* __restrict__ X,
     const float* __restrict__ Y,
-    const float* __restrict__ v_type,
+    const u8* __restrict__ v_type,
     const float* __restrict__ v_value,
     float* __restrict__ partial,
     size_t solution_length,
@@ -5919,7 +5942,7 @@ void evaluate_kernel_hybrid(
 __global__
 void compute_tree_output_wrapper(
     float* X,
-    float* type,
+    const u8* type,
     float* value,
     float* result,
     size_t solution_length,
@@ -5932,7 +5955,7 @@ void compute_tree_output_wrapper(
 void evaluate_kernel_wrapper(
     float* X,
     float* Y,
-    float* type,
+    u8* type,
     float* value,
     float* partial,
     LaunchConfig config
@@ -5947,7 +5970,7 @@ void mse_kernel_wrapper(
 void evaluate_mse_kernel_wrapper(
     float* X,
     float* Y,
-    float* type,
+    u8* type,
     float* value,
     float* result,
     LaunchConfig config
@@ -5956,7 +5979,7 @@ void evaluate_mse_kernel_wrapper(
 void kernel_wrapper(
     float* X,
     float* Y,
-    float* type,
+    u8* type,
     float* value,
     float* partial,
     float* result,
@@ -5965,7 +5988,7 @@ void kernel_wrapper(
 
 float test_compute_output_kernel(
     std::vector<float> h_X,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_datapoints,
     size_t datapoint_index,
@@ -5975,7 +5998,7 @@ float test_compute_output_kernel(
 std::vector<float> test_evaluate_kernel(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
     size_t num_datapoints,
@@ -5992,16 +6015,17 @@ std::vector<float> test_compute_mse_kernel(
 std::vector<float> test_evaluate_mse_kernel(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
-    size_t num_datapoints
+    size_t num_datapoints,
+    KernelVersion version
 );
 
 std::vector<float> test_kernel_hybrid(
     std::vector<float> h_X,
     std::vector<float> h_Y,
-    std::vector<float> h_type,
+    std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
     size_t num_datapoints,
@@ -6542,7 +6566,7 @@ class SRProblem : public GPInstanceBase {
     }
 
     // Transform solutions to GPU compatible representation
-    std::vector<float> node_type;
+    std::vector<u8> node_type;
     std::vector<float> node_value;
 
     for (auto i : indices) {
@@ -6590,7 +6614,7 @@ class SRProblem : public GPInstanceBase {
     d_Y = allocate_and_copy(Y32.data(), Y32.size());
   }
 
-  void _copy_solutions_to_gpu(std::vector<float> node_type, std::vector<float> node_value) {
+  void _copy_solutions_to_gpu(std::vector<u8> node_type, std::vector<float> node_value) {
     const size_t num_elements = node_type.size();
 
     if (_num_solutions_allocated < num_elements) {
@@ -6680,7 +6704,7 @@ class SRProblem : public GPInstanceBase {
   size_t _num_results_allocated = 0;
   float* d_X = nullptr;
   float* d_Y = nullptr;
-  float* d_type = nullptr;
+  uint8_t* d_type = nullptr;
   float* d_value = nullptr;
   float* d_partial = nullptr;
   float* d_result = nullptr;

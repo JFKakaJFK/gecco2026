@@ -1636,6 +1636,7 @@ class NodeType(enum.IntEnum):
     input = enum.auto()  # (= 0)
     constant = enum.auto()  # (= 1)
     operator = enum.auto()  # (= 2)
+    parameter = enum.auto()  # (= 3)
 
 class Operator(enum.IntEnum):
     add = enum.auto()  # (= 0)

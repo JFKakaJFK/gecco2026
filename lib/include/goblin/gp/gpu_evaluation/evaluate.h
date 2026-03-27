@@ -184,7 +184,8 @@ std::vector<float> test_evaluate_mse_kernel(
     std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
-    size_t num_datapoints
+    size_t num_datapoints,
+    KernelVersion version
 );
 
 std::vector<float> test_kernel_hybrid(
