@@ -172,14 +172,6 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    # GPU Experiments
-    # grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
-    # grid_execution(cfg.FEYNMAN_EXACT, output_directory, dry_run=True)
-    # grid_execution(cfg.SIMPLE_ADDITION, output_directory, dry_run=True)
-
     grid_execution(cfg.FEYNMAN_MILLION, output_directory, dry_run=True)
 
     grid_execution(cfg.ADDITION, output_directory, dry_run=True)

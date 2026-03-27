@@ -1,5 +1,5 @@
 CompileFlags:
-    Add: [-std=c++23]
+    Add: [-std=c++23, -Wno-unknown-warning-option]
     CompilationDatabase: None
     Remove:
         # nvcc flags
@@ -11,6 +11,8 @@ CompileFlags:
         - ^-fmodules-ts$
         - ^-fmodule-mapper=.*$
         - ^-fdeps-format=.*$
+        - -m*
+        - -f*
 
 Diagnostics:
     ClangTidy:

@@ -20,22 +20,21 @@ PMLB_CACHE_DIRECTORY = "pmlb_cache"
 class Task(TypedDict):
     dataset: str
     accelerated: bool
-    kernel: KernelVersion | None
+    kernel_version: KernelVersion | None
     population_size: int | None
     num_observations: int
     num_features: int
     branching_factor: int
     depth: int
+    max_tree_len: int
     operator_set: str
-    target_objectives: list[float] | None
+    target_objectives: list[float] = None
     fold: int
     iteration: int
     X_path: Path
     y_path: Path
-    X_test_path: Path | None
-    y_test_path: Path | None
     seed: int
-    max_duration: int
+    max_duration: int | None
 
 
 TaskGenerator = Generator[Task]
@@ -184,8 +183,6 @@ def create_tasks(
                 "iteration": iteration,
                 "X_path": X_path,
                 "y_path": y_path,
-                "X_test_path": X_test_path,
-                "y_test_path": y_test_path,
                 "seed": seed,
                 "max_duration": problem["max_duration"],
             }

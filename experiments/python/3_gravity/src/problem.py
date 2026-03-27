@@ -12,7 +12,7 @@ class Problem(TypedDict):
     num_features: int
     template: TemplateConfig
     operator_set: str
-    max_duration: int
+    max_duration: int | None
 
 
 def format_problem(problem: Problem) -> str:

@@ -53,7 +53,6 @@ class CPUConfig:
 
 OPERATOR_SETS: dict[str, str] = {
     "arith": "+,-,*,/",
-    "squaresub": "+,-,*,/,squaresub",
     "trig": "+,-,*,/,sin,cos",
     "square": "+,-,*,/,square",
     "exp": "+,-,*,/,exp,log",

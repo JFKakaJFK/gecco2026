@@ -18,7 +18,6 @@ dependencies = [
     "seaborn>=0.12.2",
     "sympy>=1.10.1",
     "tqdm>=4.67.1",
-    "ucimlrepo",
 ]
 
 [tool.uv.sources]

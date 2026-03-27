@@ -16,6 +16,8 @@ import pandas as pd
 import pygom.gp as gp
 import sympy as sym
 from pygom import KernelVersion as KV
+from sklearn.experimental import enable_iterative_imputer  # noqa
+from sklearn.impute import IterativeImputer
 from tqdm import tqdm
 
 from src.experiment_config import BASELINE_KV, OPERATOR_SETS
@@ -44,15 +46,9 @@ class LogInfo(TypedDict):
 
 
 def task_to_log_info(task: Task, var_y: float) -> list[tuple[str, str]]:
-    kernel_str: str = (
-        str(task["kernel"]).replace("KernelVersion.", "")
-        if task["kernel"] is not None
-        else "cpu"
-    )
-
     log_info: LogInfo = LogInfo(
         dataset=task["dataset"],
-        kernel=kernel_str,
+        kernel=task["kernel"],
         population_size=task["population_size"],
         num_observations=task["num_observations"],
         num_features=task["num_features"],
@@ -133,6 +129,14 @@ def run_one_task(task: Task, log_path: Path) -> None:
     X = X_train[:obs, :feat]
     y = y_train[:obs]
 
+    if np.isnan(X).any():
+        imputer = IterativeImputer(
+            max_iter=10,
+            random_state=task["seed"],
+            sample_posterior=True,
+        )
+        X = imputer.fit_transform(X)
+
     log_info: list[tuple[str, str]] = task_to_log_info(task, float(np.var(y[:, 0])))
 
     if task["population_size"] is None:
@@ -181,12 +185,8 @@ def run_one_task(task: Task, log_path: Path) -> None:
     df = pd.read_csv(log_path)
     expr = df.loc[df.index[-1], "expressions"]
 
-    try:
-        y_pred = lambdify_expression(expr)(X)
-        actual_mse = np.mean((y_pred - y.flatten()) ** 2)
-    except Exception as e:
-        print(f"Encountered {e} for expression: {expr}")
-        actual_mse = np.nan
+    y_pred = lambdify_expression(expr)(X)
+    actual_mse = np.mean((y_pred - y.flatten()) ** 2)
 
     df.loc[df.index[-1], "mse"] = actual_mse
     df.to_csv(log_path, index=False)
