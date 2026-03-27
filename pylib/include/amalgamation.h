@@ -3085,8 +3085,6 @@ class CompleteInit final : public DiscreteInitBase {
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
-#include <sys/types.h>
-
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3803,6 +3801,7 @@ class OpSquare : public OperatorBase {
     return std::format("pow({}, 2)", args[0]);
   };
 };
+
 
 class OpSqrt : public OperatorBase {
  public:

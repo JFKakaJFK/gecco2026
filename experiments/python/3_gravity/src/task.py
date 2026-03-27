@@ -7,22 +7,12 @@ from typing import TypedDict
 import numpy as np
 import pmlb
 import sympy as sym
-<<<<<<<< HEAD:experiments/python/3_gravity/src/task.py
 from pygom import KernelVersion
 from sklearn.model_selection import KFold, train_test_split
 
 from src.dataset_config import DatasetConfig
 from src.experiment_config import ExperimentConfig
 from src.problem import Problem
-========
-import ucimlrepo
-from sklearn.datasets import fetch_california_housing
-from sklearn.model_selection import KFold, train_test_split
-
-from shared.dataset_config import DatasetConfig
-from shared.experiment_config import ExperimentConfig
-from shared.problem import Problem
->>>>>>>> dev:experiments/python/experiment_2/shared/shared/task.py
 
 PMLB_CACHE_DIRECTORY = "pmlb_cache"
 
@@ -30,7 +20,7 @@ PMLB_CACHE_DIRECTORY = "pmlb_cache"
 class Task(TypedDict):
     dataset: str
     accelerated: bool
-    kernel_version: str | None
+    kernel_version: KernelVersion | None
     population_size: int | None
     num_observations: int
     num_features: int
@@ -188,7 +178,6 @@ def create_tasks(
                 "kernel": None,
                 "branching_factor": problem["template"].branching_factor,
                 "depth": problem["template"].depth,
-                "max_tree_len": problem["template"].max_tree_len,
                 "target_objectives": target_objectives,
                 "fold": fold,
                 "iteration": iteration,
@@ -224,7 +213,7 @@ def override_tasks(overrides: dict[str, int]) -> TaskGenerator:
     return _transform
 
 
-def gpu_transform(kernel: str) -> TaskTransform:
+def gpu_transform(kernel: KernelVersion) -> TaskTransform:
     def _transform(tasks: TaskGenerator) -> TaskGenerator:
         override = override_tasks({"accelerated": True, "kernel": kernel})
 

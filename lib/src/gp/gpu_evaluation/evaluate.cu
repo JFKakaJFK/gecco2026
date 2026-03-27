@@ -16,7 +16,7 @@
     X(800) X(832) X(864) X(896) X(928) X(960) X(992) X(1024)
 
 #define MAX_STACK_DEPTH 16
-#define MAX_NUM_NODES 256
+#define MAX_NUM_NODES 512
 #define MAX_ARITY 2
 
 namespace goblin {
@@ -678,7 +678,7 @@ float compute_tree_output_inplace(
                 case Operator::Cos: stack[sp - 1]     = cosf(stack[sp - 1]);                break;
                 case Operator::Exp: stack[sp - 1]     = expf(stack[sp - 1]);                break;
                 case Operator::Log: stack[sp - 1]     = logf(stack[sp - 1]);                break;
-                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;  
+                case Operator::Square: stack[sp - 1] *= stack[sp - 1];                      break;
                 case Operator::Sqrt: stack[sp - 1]    = sqrtf(stack[sp - 1]);               break;
                 case Operator::Pow: {
                     float rhs = stack[--sp];
