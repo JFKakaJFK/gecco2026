@@ -1,8 +1,8 @@
 from collections.abc import Generator
 from typing import TypedDict
 
-from src.experiment.dataset_config import DatasetConfig
-from src.experiment.experiment_config import ExperimentConfig, TemplateConfig
+from src.dataset_config import DatasetConfig
+from src.experiment_config import ExperimentConfig, TemplateConfig
 
 
 class Problem(TypedDict):

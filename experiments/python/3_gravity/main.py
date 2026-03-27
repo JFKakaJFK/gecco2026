@@ -8,17 +8,16 @@ from pathlib import Path
 from pygom import KernelVersion
 
 from src.db import create_db
-from src.experiment.experiment_config import ExperimentConfig, cfg
-from src.experiment.problem import Problem, format_problem, generate_problems
-from src.experiment.run import run_cpu_tasks, run_gpu_tasks, run_tasks
-from src.experiment.task import (
+from src.experiment_config import ExperimentConfig, cfg
+from src.problem import Problem, format_problem, generate_problems
+from src.run import run_cpu_tasks, run_gpu_tasks, run_tasks
+from src.task import (
     TaskTransform,
     cpu_transform,
     gpu_transform,
     override_tasks,
     task_factory,
 )
-from src.plot.plots import create_plots, plot_minimally_required_population
 
 MIN_POPULATION = 8
 MAX_POPULATION = 65536

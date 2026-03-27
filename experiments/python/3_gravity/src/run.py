@@ -18,8 +18,8 @@ import sympy as sym
 from pygom import KernelVersion as KV
 from tqdm import tqdm
 
-from src.experiment.experiment_config import BASELINE_KV, OPERATOR_SETS
-from src.experiment.task import Task, TaskGenerator, TaskTransform
+from src.experiment_config import BASELINE_KV, OPERATOR_SETS
+from src.task import Task, TaskGenerator, TaskTransform
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
 
