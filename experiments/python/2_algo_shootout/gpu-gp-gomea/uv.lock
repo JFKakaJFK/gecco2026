@@ -23,7 +23,6 @@ dependencies = [
     { name = "numpy", version = "2.4.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pandas", version = "2.3.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "pandas", version = "3.0.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "pmlb" },
     { name = "pygom" },
     { name = "pyyaml" },
     { name = "rliable" },
@@ -34,7 +33,6 @@ dependencies = [
     { name = "seaborn" },
     { name = "sympy" },
     { name = "tqdm" },
-    { name = "ucimlrepo" },
 ]
 
 [package.dev-dependencies]
@@ -49,7 +47,6 @@ requires-dist = [
     { name = "matplotlib", specifier = ">=3.5.3" },
     { name = "numpy", specifier = ">=1.21.6" },
     { name = "pandas", specifier = ">=1.1.5" },
-    { name = "pmlb", git = "https://github.com/EpistasisLab/pmlb.git?rev=master" },
     { name = "pygom", directory = "../../../../" },
     { name = "pyyaml", specifier = ">=6.0.1" },
     { name = "rliable", specifier = ">=1.2.0" },
@@ -58,7 +55,6 @@ requires-dist = [
     { name = "seaborn", specifier = ">=0.12.2" },
     { name = "sympy", specifier = ">=1.10.1" },
     { name = "tqdm", specifier = ">=4.67.1" },
-    { name = "ucimlrepo" },
 ]
 
 [package.metadata.requires-dev]
