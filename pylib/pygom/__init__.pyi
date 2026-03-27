@@ -211,7 +211,6 @@ class MOFitness(ArchiveFitnessBase):
     #    return o;
     #  };
     #
-
     @overload
     def distance(
         self, lhs: QualityBase, rhs: QualityBase, objective: Optional[int] = None
@@ -879,7 +878,6 @@ class InstanceBase:
         pass
     # // corresponds to e.g. ERCs / one constant per edge in GP
     # virtual bool always_inherit_continuous() const { return False; };
-
     def inherit_discrete(  # overridable
         self, offspring: SolutionBase, donor: SolutionBase, subset: Subset
     ) -> Tuple[bool, bool]:
@@ -1534,251 +1532,7 @@ class CompleteInit(DiscreteInitBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/evaluate.h included by goblin.h                                           //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-# #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/misc.h included by goblin/ga-gp/evaluate.h                                //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_MISC_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/types.h included by goblin/ga-gp/misc.h                                   //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_TYPES_H
-#
-
-class KernelVersion(enum.IntEnum):
-    baseline = enum.auto()  # (= 0)
-    restrict = enum.auto()  # (= 1)
-    shared_memory = enum.auto()  # (= 2)
-    block_reduce = enum.auto()  # (= 3)
-    single_kernel = enum.auto()  # (= 4)
-    single_kernel_fmaf = enum.auto()  # (= 5)
-    single_kernel_inplace = enum.auto()  # (= 6)
-
-def to_string(v: KernelVersion) -> str:
-    pass
-
-class NodeType(enum.IntEnum):
-    input = enum.auto()  # (= 0)
-    constant = enum.auto()  # (= 1)
-    operator = enum.auto()  # (= 2)
-
-class Operator(enum.IntEnum):
-    add = enum.auto()  # (= 0)
-    sub = enum.auto()  # (= 1)
-    mul = enum.auto()  # (= 2)
-    div = enum.auto()  # (= 3)
-    sin = enum.auto()  # (= 4)
-    cos = enum.auto()  # (= 5)
-    exp = enum.auto()  # (= 6)
-    log = enum.auto()  # (= 7)
-    square = enum.auto()  # (= 8)
-    sqrt = enum.auto()  # (= 9)
-    pow = enum.auto()  # (= 10)
-    abs = enum.auto()  # (= 11)
-    min = enum.auto()  # (= 12)
-    max = enum.auto()  # (= 13)
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/misc.h continued                                                          //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def round_up(value: int, multiple: int) -> int:
-    pass
-
-def ceil_div(a: int, b: int) -> int:
-    pass
-
-class KernelDim:
-    x: int = 1
-    y: int = 1
-    z: int = 1
-
-    @overload
-    def __init__(self) -> None:
-        pass
-
-    @overload
-    def __init__(self, _x: int, _y: int = 1, _z: int = 1) -> None:
-        pass
-
-    @staticmethod
-    def determine(count: int, max_threads: int = MAX_THREADS_PER_BLOCK) -> KernelDim:
-        pass
-
-    def check(self) -> None:
-        pass
-
-    def __eq__(self, other: KernelDim) -> bool:
-        pass
-
-class KernelConfig:
-    grid: KernelDim
-    block: KernelDim
-
-    @overload
-    def __init__(self) -> None:
-        pass
-
-    @overload
-    def __init__(self, _grid: KernelDim, _block: KernelDim) -> None:
-        pass
-
-    @staticmethod
-    def for_eval(num_solutions: int, num_datapoints: int) -> KernelConfig:
-        pass
-
-    @staticmethod
-    def for_mse(
-        num_solutions: int, num_partial: int, kernel_version: KernelVersion
-    ) -> KernelConfig:
-        pass
-
-    @staticmethod
-    def for_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
-        pass
-
-    def check(self) -> None:
-        pass
-
-    def __eq__(self, other: KernelConfig) -> bool:
-        pass
-
-class LaunchConfig:
-    eval: KernelConfig
-    mse: KernelConfig
-    kernel_version: KernelVersion = KernelVersion.baseline
-    num_solutions: int
-    num_datapoints: int
-    solution_length: int
-    items_per_thread: int
-
-    @overload
-    def __init__(self) -> None:
-        pass
-
-    @overload
-    def __init__(
-        self,
-        eval: KernelConfig,
-        mse: KernelConfig,
-        version: KernelVersion = KernelVersion.baseline,
-        num_solutions: int = 1,
-        num_datapoints: int = 1,
-        solution_length: int = 1,
-        items_per_thread: int = 1,
-    ) -> None:
-        pass
-
-    @staticmethod
-    def determine(
-        kernel_version: KernelVersion,
-        num_solutions: int,
-        num_datapoints: int,
-        solution_length: int,
-    ) -> LaunchConfig:
-        pass
-
-    def check(self) -> None:
-        pass
-
-    def __eq__(self, other: LaunchConfig) -> bool:
-        pass
-
-# #endif
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/evaluate.h continued                                                      //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-def evaluate_kernel_wrapper(
-    x: float, y: float, type: float, value: float, partial: float, config: LaunchConfig
-) -> None:
-    pass
-
-def mse_kernel_wrapper(partial: float, result: float, config: LaunchConfig) -> None:
-    pass
-
-def evaluate_mse_kernel_wrapper(
-    x: float, y: float, type: float, value: float, result: float, config: LaunchConfig
-) -> None:
-    pass
-
-def kernel_wrapper(
-    x: float,
-    y: float,
-    type: float,
-    value: float,
-    partial: float,
-    result: float,
-    config: LaunchConfig,
-) -> None:
-    pass
-
-def test_compute_output_kernel(
-    h_x: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_datapoints: int,
-    datapoint_index: int,
-    version: KernelVersion,
-) -> float:
-    pass
-
-def test_evaluate_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_compute_mse_kernel(
-    partial: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-def test_evaluate_mse_kernel(
-    h_x: List[float],
-    h_y: List[float],
-    h_type: List[float],
-    h_value: List[float],
-    num_solutions: int,
-    num_datapoints: int,
-    version: KernelVersion,
-) -> List[float]:
-    pass
-
-# #endif
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/ga_sr.h included by goblin.h                                              //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_SR_H
-#
-
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/helper.h included by goblin/ga-gp/ga_sr.h                                 //
-# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
-# #ifndef _GOBLIN_GA_GP_HELPER_H
-#
-
-# #endif
-# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/context.h included by goblin/ga-gp/ga_sr.h                                   //
+#                       goblin/gp/context.h included by goblin.h                                               //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_CONTEXT_H
 #
@@ -1858,6 +1612,49 @@ class Template:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/types.h included by goblin/gp/operator.h                      //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_TYPES_H
+#
+
+class KernelVersion(enum.IntEnum):
+    baseline = enum.auto()  # (= 0)
+    restrict = enum.auto()  # (= 1)
+    shared_memory = enum.auto()  # (= 2)
+    block_reduce = enum.auto()  # (= 3)
+    single_kernel = enum.auto()  # (= 4)
+    single_kernel_fmaf = enum.auto()  # (= 5)
+    single_kernel_inplace = enum.auto()  # (= 6)
+    hybrid = enum.auto()  # (= 7)
+
+def to_string(v: KernelVersion) -> str:
+    pass
+
+class NodeType(enum.IntEnum):
+    input = enum.auto()  # (= 0)
+    constant = enum.auto()  # (= 1)
+    operator = enum.auto()  # (= 2)
+    parameter = enum.auto()  # (= 3)
+
+class Operator(enum.IntEnum):
+    add = enum.auto()  # (= 0)
+    sub = enum.auto()  # (= 1)
+    mul = enum.auto()  # (= 2)
+    div = enum.auto()  # (= 3)
+    sin = enum.auto()  # (= 4)
+    cos = enum.auto()  # (= 5)
+    exp = enum.auto()  # (= 6)
+    log = enum.auto()  # (= 7)
+    square = enum.auto()  # (= 8)
+    sqrt = enum.auto()  # (= 9)
+    pow = enum.auto()  # (= 10)
+    abs = enum.auto()  # (= 11)
+    min = enum.auto()  # (= 12)
+    max = enum.auto()  # (= 13)
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/gp/operator.h continued                                                         //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -1924,6 +1721,9 @@ class OperatorBase:
     def __call__(self, args: CRef[Arr2D[float]]) -> Array[float]:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:  # overridable
+        pass
+
     def format(self, args: std.span[str]) -> str:  # overridable (pure virtual)
         pass
 
@@ -1986,6 +1786,9 @@ class OpAdd(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2052,6 +1855,9 @@ class OpSubGPU(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2082,6 +1888,9 @@ class OpMul(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2116,6 +1925,9 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2146,6 +1958,9 @@ class OpSin(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2180,6 +1995,9 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2210,6 +2028,9 @@ class OpExp(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2244,6 +2065,9 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2274,6 +2098,9 @@ class OpSquare(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2308,6 +2135,9 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2338,6 +2168,9 @@ class OpPow(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2372,6 +2205,9 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2404,6 +2240,9 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: std.span[str]) -> str:
         pass
 
@@ -2434,6 +2273,9 @@ class OpMax(OperatorBase):
         args: CRef[Arr2D[float]],
         d_args: CRef[Arr2D[float]],
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: std.span[str]) -> str:
@@ -2574,7 +2416,7 @@ class GPContext:
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/init.h included by goblin/ga-gp/ga_sr.h                                      //
+#                       goblin/gp/init.h included by goblin.h                                                  //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_INIT_H
 #
@@ -2679,10 +2521,161 @@ class RecursiveCompleteInit2(DiscreteInitBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/gp/sr.h included by goblin/ga-gp/ga_sr.h                                        //
+#                       goblin/gp/sr.h included by goblin.h                                                    //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_GP_SR_H
 #
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/launch_config.h included by goblin/gp/sr.h                    //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+#
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/misc.h included by goblin/gp/gpu_evaluation/launch_config.h   //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_GA_GP_MISC_H
+#
+
+class GpuInfo:
+    device_id: int
+    num_sms: int
+    def __init__(self, device_id: int = int(), num_sms: int = int()) -> None:
+        """Auto-generated default constructor with named params"""
+        pass
+
+def get_gpu_info() -> GpuInfo:
+    pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/gpu_evaluation/launch_config.h continued                                     //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+def round_up(value: int, multiple: int) -> int:
+    pass
+
+def ceil_div(a: int, b: int) -> int:
+    pass
+
+class KernelDim:
+    x: int = 1
+    y: int = 1
+    z: int = 1
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(self, _x: int, _y: int = 1, _z: int = 1) -> None:
+        pass
+
+    @staticmethod
+    def determine(count: int) -> KernelDim:
+        """Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)
+        that minimises idle threads when covering `count` items.
+        """
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: KernelDim) -> bool:
+        pass
+
+class KernelConfig:
+    grid: KernelDim
+    block: KernelDim
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(self, _grid: KernelDim, _block: KernelDim) -> None:
+        pass
+
+    @staticmethod
+    def for_eval(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        """One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce."""
+        pass
+
+    @staticmethod
+    def for_eval_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        """One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants."""
+        pass
+
+    @staticmethod
+    def for_eval_hybrid(
+        num_solutions: int, num_datapoints: int, blocks_per_individual: int
+    ) -> KernelConfig:
+        """Multiple blocks per solution; blocks split the datapoints. Used by Hybrid."""
+        pass
+
+    @staticmethod
+    def for_mse_simple(num_solutions: int) -> KernelConfig:
+        """One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory."""
+        pass
+
+    @staticmethod
+    def for_mse_block(num_solutions: int, num_partial: int) -> KernelConfig:
+        """One block per solution for the MSE reduction. Used by BlockReduce and Hybrid."""
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: KernelConfig) -> bool:
+        pass
+
+class LaunchConfig:
+    eval: KernelConfig
+    mse: KernelConfig
+    kernel_version: KernelVersion = KernelVersion.baseline
+    num_solutions: int = 0
+    num_datapoints: int = 0
+    solution_length: int = 0
+    blocks_per_individual: int = 1
+    datapoints_per_block: int = 0
+    datapoints_per_thread: int = 0
+
+    @overload
+    def __init__(self) -> None:
+        pass
+
+    @overload
+    def __init__(
+        self,
+        eval: KernelConfig,
+        mse: KernelConfig,
+        version: KernelVersion = KernelVersion.baseline,
+    ) -> None:
+        pass
+
+    @staticmethod
+    def determine(
+        kernel_version: KernelVersion,
+        num_solutions: int,
+        num_datapoints: int,
+        solution_length: int,
+        num_sms: Optional[int],
+    ) -> LaunchConfig:
+        pass
+
+    def check(self) -> None:
+        pass
+
+    def __eq__(self, other: LaunchConfig) -> bool:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/gp/sr.h continued                                                               //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class SRQuality(MOQuality):
     def clone(self) -> QualityBase:
@@ -2731,10 +2724,8 @@ class SRProblem(GPInstanceBase):
         archive_epsilon: float = 0.0,
         always_inherit_continuous: Optional[bool] = None,
         batch_size: Optional[int] = None,
+        kernel_version: Optional[KernelVersion] = None,
     ) -> None:
-        pass
-
-    def adapt(self, rng: Rng) -> bool:
         pass
 
     def num_discrete(self) -> int:
@@ -2756,6 +2747,9 @@ class SRProblem(GPInstanceBase):
         pass
 
     def continuous_init_upper_bounds(self) -> CRef[Vec[float]]:
+        pass
+
+    def adapt(self, rng: Rng) -> bool:
         pass
 
     def evaluate(
@@ -2776,9 +2770,6 @@ class SRProblem(GPInstanceBase):
         self, offspring: SolutionBase, donor: SolutionBase, subset: Subset
     ) -> Tuple[bool, bool]:
         pass
-    # bool always_inherit_continuous() const override final {
-    #   return ;
-    # };
 
     def as_continuous(
         self, solution: SolutionBase, discrete_index: int
@@ -2799,13 +2790,16 @@ class SRProblem(GPInstanceBase):
     def log_header(self, os: io.IOBase) -> None:
         pass
 
-    def evaluate_test(self, solution: SolutionBase) -> None:
-        pass
-
     def log(self, os: io.IOBase, solution: SolutionBase) -> None:
         pass
 
     def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
+        pass
+
+    def evaluate_test(self, solution: SolutionBase) -> None:
+        pass
+
+    def context(self) -> GPContext:
         pass
 
     def gradient_steps(
@@ -2816,9 +2810,6 @@ class SRProblem(GPInstanceBase):
         indices: std.span[int],
         num_steps: int,
     ) -> Tuple[List[int], int]:
-        pass
-
-    def context(self) -> GPContext:
         pass
     ctx: GPContext
     linear_scaling: bool
@@ -2836,96 +2827,11 @@ class SRProblem(GPInstanceBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#                       goblin/ga-gp/ga_sr.h continued                                                         //
+#                       goblin.h continued                                                                     //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-class GASRProblem(GPInstanceBase):
-    def __init__(
-        self,
-        ctx: GPContext,
-        x_train: Arr2D[float],
-        y_train: Arr2D[float],
-        x_test: Optional[Arr2D[float]] = None,
-        y_test: Optional[Arr2D[float]] = None,
-        objectives: Union[str, List[str]] = "mse",
-        objectives_to_optimize: Optional[int] = None,
-        linear_scaling: bool = False,
-        init: Optional[AnyInit] = None,
-        constant_init_lower_bound: float = -1.0,
-        constant_init_upper_bound: float = 1.0,
-        target_objectives: Optional[List[float]] = None,
-        archive_epsilon: float = 0.0,
-    ) -> None:
-        pass
-
-    def set_kernel_version(self, kernel_version: KernelVersion) -> None:
-        pass
-
-    def free_gpu(self) -> None:
-        pass
-
-    def num_discrete(self) -> int:
-        pass
-
-    def discrete_domain_sizes(self) -> CRef[Vec[int]]:
-        pass
-
-    def num_continuous(self) -> int:
-        pass
-
-    def continuous_lower_bounds(self) -> CRef[Vec[float]]:
-        pass
-
-    def continuous_upper_bounds(self) -> CRef[Vec[float]]:
-        pass
-
-    def continuous_init_lower_bounds(self) -> CRef[Vec[float]]:
-        pass
-
-    def continuous_init_upper_bounds(self) -> CRef[Vec[float]]:
-        pass
-
-    def evaluate(
-        self, rng: Rng, solutions: SolutionSetBase, indices: std.span[int]
-    ) -> None:
-        pass
-
-    def add_random(self, rng: Rng, solutions: SolutionSetBase, count: int) -> None:
-        pass
-
-    def fitness(self) -> FitnessBase:
-        pass
-
-    def archive_fitness(self) -> ArchiveFitnessBase:
-        pass
-
-    def context(self) -> GPContext:
-        pass
-
-    @overload
-    def register_target(self, target_objectives: CRefS[Vec[float]]) -> None:
-        pass
-
-    @overload
-    def register_target(self, target_objectives: List[float]) -> None:
-        pass
-
-    def target_reached(self, archive: ArchiveBase) -> bool:
-        pass
-
-    def log_header(self, os: io.IOBase) -> None:
-        pass
-
-    def log(self, os: io.IOBase, solution: SolutionBase) -> None:
-        pass
-
-    def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
-        pass
-    ctx: GPContext
-    linear_scaling: bool
-    objectives: List[str]
-
-# #endif
+def has_gpu_support() -> bool:
+    pass
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/bench/functions.h included by goblin.h                                          //
@@ -4582,7 +4488,6 @@ class RvState:
     def converged(self) -> bool:
         pass
     # private:
-
     def select_and_learn_linkage(
         self,
         rng: Rng,
@@ -4649,7 +4554,6 @@ class RvState:
     #     std::optional<usize> population_size){
     #       // ims go brr
     #     }
-
     def current_generation(self) -> Optional[int]:
         """// override final"""
         pass
@@ -4730,16 +4634,10 @@ class PopulationOptions:
     forced_improvements: bool = True
     enable_mixed_forced_improvements: bool = True
     target_continuous_to_discrete_balance: float = 1.0
-    sequential_gom: bool = (
-        False  # performs GOM sequentially per solution, incompatible with other mechanisms
-    )
-    strict_elite_acceptance: bool = (
-        False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
-    )
+    sequential_gom: bool = False  # performs GOM sequentially per solution, incompatible with other mechanisms
+    strict_elite_acceptance: bool = False  # should the single objective elite solutions accept only strict improvements or also neutral changes?
 
-    donor_search_proportion: float = (
-        0.0  # the fraction of solutions to consider before skipping an evaluation in case
-    )
+    donor_search_proportion: float = 0.0  # the fraction of solutions to consider before skipping an evaluation in case
     # of all subset variables being identical between the solution and donor
     subset_logfile: Optional[str] = None
     generation: int = 0

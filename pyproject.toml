@@ -51,7 +51,7 @@ test-skip = ["*universal2:arm64"]
 
 [tool.uv]
 # for development only, to avoid having to change something in the pyproject.toml every time the package should be re-installed downstream...
-cache-keys = [{file = "pyproject.toml"}, {file = "pylib/**.py"}, {file = "pylib/**.h"}, {file = "pylib/**.cpp"}]
+cache-keys = [{file = "pyproject.toml"}, {file = "pylib/**.py"}, {file = "pylib/**.h"}, {file = "pylib/**.cpp"}, {env = "SKBUILD_CMAKE_ARGS"}]
 
 [tool.uv.dependency-groups.dev]
 requires_python = ">=3.10"

@@ -1,6 +1,9 @@
 #ifndef _GOBLIN_GP_OPERATOR_H
 #define _GOBLIN_GP_OPERATOR_H
 
+#include <sys/types.h>
+#include <cstdint>
+#include <optional>
 #pragma once
 
 #include <cassert>
@@ -15,6 +18,7 @@
 #include <iostream>
 
 #include "goblin/gp/template.h"
+#include "goblin/gp/gpu_evaluation/types.h"
 #include "goblin/lib/assert.h"
 #include "goblin/lib/types.h"
 
@@ -75,6 +79,8 @@ class OperatorBase {
     return out;
   };
 
+  virtual std::optional<uint8_t> gpu_operator_id() const { return std::nullopt; }
+
   virtual std::string format(const std::span<const std::string>& args) const = 0;
 
   virtual ~OperatorBase() = default;
@@ -119,6 +125,10 @@ class OpAdd : public OperatorBase {
     apply(out, args);
     d_out = d_args.rowwise().sum();
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Add);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
@@ -214,6 +224,10 @@ class OpSubGPU : public OperatorBase {
     }
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sub);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     if (args.size() == 1) {
@@ -260,6 +274,10 @@ class OpMul : public OperatorBase {
         args(Eigen::placeholders::all, Eigen::seq(0, args.cols() - 2)).rowwise().prod() * d_args.col(d_args.cols() - 1);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Mul);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(';
@@ -304,6 +322,10 @@ class OpDiv : public OperatorBase {
     }
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Div);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
     ss << '(' << args[0] << '/';
@@ -343,6 +365,10 @@ class OpSin : public OperatorBase {
     d_out = args.col(0).cos() * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sin);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sin({})", args[0]);
   };
@@ -366,6 +392,10 @@ class OpCos : public OperatorBase {
 
     d_out = -args.col(0).sin() * d_args.col(0);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Cos);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("cos({})", args[0]);
@@ -391,6 +421,10 @@ class OpExp : public OperatorBase {
     d_out = out * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Exp);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("exp({})", args[0]);
   };
@@ -414,6 +448,10 @@ class OpLog : public OperatorBase {
 
     d_out = d_args.col(0) / args.col(0);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Log);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("log({})", args[0]);
@@ -439,6 +477,10 @@ class OpSquare : public OperatorBase {
     d_out = CType(2.0) * args.col(0) * d_args.col(0);
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Square);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, 2)", args[0]);
   };
@@ -462,6 +504,10 @@ class OpSqrt : public OperatorBase {
 
     d_out = d_args.col(0) / (out + out);
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Sqrt);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("sqrt({})", args[0]);
@@ -490,6 +536,10 @@ class OpPow : public OperatorBase {
             (args.col(0) * d_args.col(1) * args.col(0).log() + args.col(1) * d_args.col(0));
   };
 
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Pow);
+  }
+
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("pow({}, {})", args[0], args[1]);
   };
@@ -513,6 +563,10 @@ class OpAbs : public OperatorBase {
 
     d_out = args.col(0) * d_args.col(0) / out;
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Abs);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     return std::format("abs({})", args[0]);
@@ -539,6 +593,10 @@ class OpMin : public OperatorBase {
       d_out(i) = d_args(i, arg_min);
     }
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Min);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;
@@ -574,6 +632,10 @@ class OpMax : public OperatorBase {
       d_out(i) = d_args(i, arg_max);
     }
   };
+
+  std::optional<uint8_t> gpu_operator_id() const override final {
+    return static_cast<uint8_t>(Operator::Max);
+  }
 
   std::string format(const std::span<const std::string>& args) const override final {
     std::ostringstream ss;

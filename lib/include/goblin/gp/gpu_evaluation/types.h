@@ -7,14 +7,17 @@
 
 namespace goblin {
 
-enum class KernelVersion : uint8_t {
+using u8 = std::uint8_t;
+
+enum class KernelVersion : u8 {
     Baseline,
     Restrict,
     SharedMemory,
     BlockReduce,
     SingleKernel,
     SingleKernelFMAF,
-    SingleKernelInplace
+    SingleKernelInplace,
+    Hybrid
 };
 
 constexpr std::string_view to_string(KernelVersion v) {
@@ -26,18 +29,20 @@ constexpr std::string_view to_string(KernelVersion v) {
         case KernelVersion::SingleKernel:        return "SingleKernel";
         case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
         case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
+        case KernelVersion::Hybrid:              return "Hybrid";
     }
 
     return "Unknown KernelVersion";
 }
 
-enum class NodeType : uint8_t {
+enum class NodeType : u8 {
     Input,
     Constant,
     Operator,
+    Parameter
 };
 
-enum class Operator : uint8_t {
+enum class Operator : u8 {
     Add,
     Sub,
     Mul,
@@ -56,9 +61,9 @@ enum class Operator : uint8_t {
 
 // The following declarations are used to create more readable test cases
 namespace test {
-    constexpr float C = static_cast<float>(NodeType::Constant);
-    constexpr float I = static_cast<float>(NodeType::Input);
-    constexpr float O = static_cast<float>(NodeType::Operator);
+    constexpr u8 C = static_cast<u8>(NodeType::Constant);
+    constexpr u8 I = static_cast<u8>(NodeType::Input);
+    constexpr u8 O = static_cast<u8>(NodeType::Operator);
 
     constexpr float Val(float x) { return x; }
     constexpr float Val(int x) { return static_cast<float>(x); }
