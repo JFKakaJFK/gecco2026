@@ -206,16 +206,6 @@ examples/python/playground/plots/symbolic_regression_convergence/
 *.html
 *.sqlite
 
-gpu_experiments/
-
 # Experiment results
-experiments/python/cpu-gp-gomea/pmlb_cache
-experiments/python/cpu-gp-gomea/results
-experiments/python/evogp/pmlb_cache
-experiments/python/evogp/results
-experiments/python/gpu-gp-gomea/pmlb_cache
-experiments/python/gpu-gp-gomea/results
-experiments/python/kozax/pmlb_cache
-experiments/python/kozax/results
-experiments/python/pyoperon/pmlb_cache
-experiments/python/pyoperon/results
+**/pmlb_cache
+**/results
