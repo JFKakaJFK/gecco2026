@@ -1821,6 +1821,9 @@ class OpSubGPU(OperatorBase):
     def apply(self, out: np.ndarray, args: np.ndarray) -> None:
         pass
 
+    def apply_buf(self, buf: np.ndarray, out: int, args: List[int]) -> None:
+        pass
+
     def has_gradient(self) -> bool:
         pass
 

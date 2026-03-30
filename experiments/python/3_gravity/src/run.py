@@ -16,18 +16,41 @@ import pandas as pd
 import pygom.gp as gp
 import sympy as sym
 from pygom import KernelVersion as KV
+from shared.experiment_config import OPERATOR_SETS, KernelType
+from shared.task import Task, TaskGenerator, TaskTransform
 from sklearn.experimental import enable_iterative_imputer  # noqa
 from sklearn.impute import IterativeImputer
 from tqdm import tqdm
-
-from src.experiment_config import BASELINE_KV, OPERATOR_SETS
-from src.task import Task, TaskGenerator, TaskTransform
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
 
 # Some kernels have a limit to the amount of work they can do
 BASELINE_LIMIT = 3e9  # roughly 12GB of memory required
 BLOCK_REDUCE_LIMIT = 1024**2
+
+KERNELS: dict[KernelType, KV] = {
+    "baseline": KV.baseline,
+    "restrict": KV.restrict,
+    "shared_memory": KV.shared_memory,
+    "block_reduce": KV.block_reduce,
+    "single_kernel": KV.single_kernel,
+    "single_kernel_fmaf": KV.single_kernel_fmaf,
+    "single_kernel_inplace": KV.single_kernel_inplace,
+    "hybrid": KV.hybrid,
+}
+
+MAIN_KV: tuple[KV, ...] = (
+    KV.shared_memory,
+    KV.block_reduce,
+    KV.single_kernel_inplace,
+    KV.hybrid,
+)
+BASELINE_KV: tuple[KV, ...] = (KV.baseline, KV.restrict, KV.shared_memory)
+SINGLE_KV: tuple[KV, ...] = (
+    KV.single_kernel,
+    KV.single_kernel_fmaf,
+    KV.single_kernel_inplace,
+)
 
 
 class LogInfo(TypedDict):
@@ -65,11 +88,7 @@ def task_to_log_info(task: Task, var_y: float) -> list[tuple[str, str]]:
 
 
 def task_to_file_name(task: Task) -> str:
-    kernel_str: str = (
-        str(task["kernel"]).replace("KernelVersion.", "")
-        if task["kernel"] is not None
-        else "cpu"
-    )
+    kernel_str: str = task["kernel"] if task["kernel"] is not None else "cpu"
 
     return (
         f"{task['dataset']}-{kernel_str}-pop{task['population_size']}"
@@ -144,7 +163,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
 
     est = gp.SymbolicRegressor(
         gpu_accelerated=task["accelerated"],
-        kernel_version=task["kernel"],
+        kernel_version=KERNELS[task["kernel"]],
         linear_scaling=False,
         ims_kwargs={
             "initial_population_size": task["population_size"],

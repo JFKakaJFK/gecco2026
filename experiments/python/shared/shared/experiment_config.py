@@ -117,7 +117,7 @@ class PaperExperimentConfig(ExperimentConfig):
 
 
 ####################
-### TEST Configs ###
+### Test Configs ###
 ####################
 
 TEST_CPU_CONFIG = ExperimentConfig(
@@ -160,6 +160,33 @@ TEST_GPU_CONFIG = ExperimentConfig(
 ### Paper Configs ###
 #####################
 
+##################################
+### Experiment 1: CPU Shootout ###
+##################################
+
+CPU_SHOOTOUT_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="feynman",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[128],
+    num_observations=[100_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=30,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+########################################
+### Experiment 2: Algorithm Shootout ###
+########################################
+
 ### CPU Configs ###
 DAILY_DEMAND_CPU_CONFIG = PaperExperimentConfig("daily_demand", False)
 AUTO_MPG_CPU_CONFIG = PaperExperimentConfig("auto_mpg", False)
@@ -172,12 +199,148 @@ AUTO_MPG_GPU_CONFIG = PaperExperimentConfig("auto_mpg", True)
 CALIFORNIA_GPU_CONFIG = PaperExperimentConfig("california_housing", True)
 FEYNMAN_GPU_CONFIG = PaperExperimentConfig("feynman_I_9_18", True)
 
+####################################
+### Experiment 3: Exact Solution ###
+####################################
+
+FEYNMAN_EXACT_CONFIG = ExperimentConfig(
+    # Problem Space
+    name="feynman",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[2**i for i in range(14, 17)],  # 128 - 1048576
+    num_observations=[100_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6)],
+    operator_sets=["square"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=60,
+)
+
+ADDITION_CONFIG = ExperimentConfig(
+    name="1_addition",
+    datasets=[DATASETS["1_addition"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
+DIVISION_CONFIG = ExperimentConfig(
+    name="2_division",
+    datasets=[DATASETS["2_division"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
+SUBTRACTION_CONFIG = ExperimentConfig(
+    name="3_subtraction",
+    datasets=[DATASETS["3_subtraction"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
+MULTIPLICATION_CONFIG = ExperimentConfig(
+    name="4_multiplication",
+    datasets=[DATASETS["4_multiplication"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
+SQUARE_CONFIG = ExperimentConfig(
+    name="5_square",
+    datasets=[DATASETS["5_square"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
+FEYNMAN_MILLION_CONFIG = ExperimentConfig(
+    name="feynman_million",
+    datasets=[DATASETS["feynman_million"]],
+    population_sizes=[65536],
+    num_observations=[1_000_000],
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    operator_sets=["square"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=30,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=240,
+)
+
 
 class Configs:
     TEST_CPU = TEST_CPU_CONFIG
     TEST_GPU = TEST_GPU_CONFIG
 
     # Paper experiments
+
+    # Experiment 1
+    CPU_SHOOTOUT = CPU_SHOOTOUT_CONFIG
+
+    # Experiment 2
     DAILY_DEMAND_CPU = DAILY_DEMAND_CPU_CONFIG
     AUTO_MPG_CPU = AUTO_MPG_CPU_CONFIG
     CALIFORNIA_CPU = CALIFORNIA_CPU_CONFIG
@@ -187,6 +350,16 @@ class Configs:
     AUTO_MPG_GPU = AUTO_MPG_GPU_CONFIG
     CALIFORNIA_GPU = CALIFORNIA_GPU_CONFIG
     FEYNMAN_GPU = FEYNMAN_GPU_CONFIG
+
+    # Experiment 3
+    FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
+    FEYNMAN_MILLION = FEYNMAN_MILLION_CONFIG
+
+    ADDITION = ADDITION_CONFIG
+    DIVISION = DIVISION_CONFIG
+    SUBTRACTION = SUBTRACTION_CONFIG
+    MULTIPLICATION = MULTIPLICATION_CONFIG
+    SQUARE = SQUARE_CONFIG
 
 
 cfg = Configs()

@@ -232,6 +232,17 @@ class OpSubGPU : public OperatorBase {
     }
   };
 
+  void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override final {
+    if (args.size() > 1) {
+      buf.col(out) = buf.col(args[0]);
+      for (usize i = 1; i < args.size(); i++) {
+        buf.col(out) -= buf.col(args[i]);
+      }
+    } else {
+      buf.col(out) -= buf.col(args[0]);
+    }
+  };
+
   bool has_gradient() const override final { return true; };
   void apply_grad(Ref<Array<CType>> out,
                   Ref<Array<CType>> d_out,

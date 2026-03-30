@@ -2752,6 +2752,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSubGPU::is_commutative)
       .def("apply",
           &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+      .def("apply_buf",
+          &goblin::OpSubGPU::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
       .def("has_gradient",
           &goblin::OpSubGPU::has_gradient)
       .def("apply_grad",

@@ -9,10 +9,9 @@ from typing import Never, TypedDict
 
 import numpy as np
 import pygom.gp as gp
+from shared.experiment_config import OPERATOR_SETS
+from shared.task import Task, TaskGenerator, TaskTransform
 from tqdm import tqdm
-
-from src.experiment.experiment_config import OPERATOR_SETS
-from src.experiment.task import Task, TaskGenerator, TaskTransform
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
 
@@ -127,7 +126,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
         random_state=task["seed"],
         budget_kwargs={
             # "max_evaluations": 1_000_000,
-            "max_duration": datetime.timedelta(hours=1),
+            "max_duration": datetime.timedelta(minutes=task["max_duration"]),
         },
         tracking_kwargs={
             "logpath": log_path,
