@@ -1702,6 +1702,9 @@ class OperatorBase:
     def __call__(self, args: np.ndarray) -> np.ndarray:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:  # overridable
+        pass
+
     def format(self, args: List[str]) -> str:  # overridable (pure virtual)
         pass
 
@@ -1764,6 +1767,9 @@ class OpAdd(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -1812,25 +1818,21 @@ class OpSubGPU(OperatorBase):
     def is_commutative(self) -> bool:
         pass
 
-    def apply(self, out: Ref[Array[float]], args: CRef[Arr2D[float]]) -> None:
+    def apply(self, out: np.ndarray, args: np.ndarray) -> None:
         pass
 
     def has_gradient(self) -> bool:
         pass
 
     def apply_grad(
-        self,
-        out: Ref[Array[float]],
-        d_out: Ref[Array[float]],
-        args: CRef[Arr2D[float]],
-        d_args: CRef[Arr2D[float]],
+        self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
         pass
 
     def gpu_operator_id(self) -> Optional[int]:
         pass
 
-    def format(self, args: std.span[str]) -> str:
+    def format(self, args: List[str]) -> str:
         pass
 
     def __init__(self) -> None:
@@ -1859,6 +1861,9 @@ class OpMul(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -1892,6 +1897,9 @@ class OpDiv(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -1921,6 +1929,9 @@ class OpSin(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -1954,6 +1965,9 @@ class OpCos(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -1983,6 +1997,9 @@ class OpExp(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -2016,6 +2033,9 @@ class OpLog(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -2045,6 +2065,9 @@ class OpSquare(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -2078,6 +2101,9 @@ class OpSqrt(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -2107,6 +2133,9 @@ class OpPow(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -2140,6 +2169,9 @@ class OpAbs(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -2171,6 +2203,9 @@ class OpMin(OperatorBase):
     ) -> None:
         pass
 
+    def gpu_operator_id(self) -> Optional[int]:
+        pass
+
     def format(self, args: List[str]) -> str:
         pass
 
@@ -2200,6 +2235,9 @@ class OpMax(OperatorBase):
     def apply_grad(
         self, out: np.ndarray, d_out: np.ndarray, args: np.ndarray, d_args: np.ndarray
     ) -> None:
+        pass
+
+    def gpu_operator_id(self) -> Optional[int]:
         pass
 
     def format(self, args: List[str]) -> str:
@@ -2725,9 +2763,6 @@ class SRProblem(GPInstanceBase):
         pass
 
     def continuous_init_upper_bounds(self) -> np.ndarray:
-        pass
-
-    def adapt(self, rng: Rng) -> bool:
         pass
 
     def evaluate(
@@ -4715,7 +4750,6 @@ class MixedGOMEA(MethodBase):
         pass
 
 # #endif
-
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/methods/classic/common.h included by goblin.h                                   //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -4779,6 +4813,36 @@ class MixedGOMEA(MethodBase):
 # clang-format on
 
 # #endif
+
+# <submodule test>
+class test:  # Proxy class that introduces typings for the *submodule* test
+    pass  # (This corresponds to a C++ namespace. All methods are static!)
+    """ The following declarations are used to create more readable test cases"""
+
+    @staticmethod
+    @overload
+    def val(x: float) -> float:
+        pass
+
+    @staticmethod
+    @overload
+    def val(x: int) -> float:
+        pass
+
+    @staticmethod
+    @overload
+    def val(x: float) -> float:
+        pass
+
+    @staticmethod
+    def idx(idx: int) -> float:
+        pass
+
+    @staticmethod
+    def op(op: Operator) -> float:
+        pass
+
+# </submodule test>
 
 # <submodule classic>
 class classic:  # Proxy class that introduces typings for the *submodule* classic

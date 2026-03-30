@@ -1037,7 +1037,7 @@ namespace goblin {
 class OperatorBase_trampoline : public OperatorBase
 {
 public:
-    NB_TRAMPOLINE(OperatorBase, 8);
+    NB_TRAMPOLINE(OperatorBase, 9);
 
     usize min_arity() const override
     {
@@ -1089,6 +1089,13 @@ public:
             "apply_grad", // function name (python)
             apply_grad, // function name (c++)
             out, d_out, args, d_args // params
+        );
+    }
+    std::optional<uint8_t> gpu_operator_id() const override
+    {
+        NB_OVERRIDE_NAME(
+            "gpu_operator_id", // function name (python)
+            gpu_operator_id // function name (c++)
         );
     }
     std::string format(const std::span<const std::string> & args) const override
@@ -2541,7 +2548,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassTemplateNode =
       nb::class_<goblin::TemplateNode>
           (m, "TemplateNode", "")
-      .def("__init__", [](goblin::TemplateNode * self, const std::optional<const std::vector<goblin::TemplateNode>> & children = std::nullopt)
+      .def("__init__", [](goblin::TemplateNode * self, const std::optional<const std::vector<goblin::TemplateNode>> & children = std::nullopt, size_t max_num_nodes = size_t())
       {
           new (self) goblin::TemplateNode();  // placement new
           auto r_ctor_ = self;
@@ -2549,10 +2556,12 @@ void py_init_module_pygoblin(nb::module_& m) {
               r_ctor_->children = children.value();
           else
               r_ctor_->children = std::vector<goblin::TemplateNode>();
+          r_ctor_->max_num_nodes = max_num_nodes;
       },
-      nb::arg("children").none() = nb::none()
+      nb::arg("children").none() = nb::none(), nb::arg("max_num_nodes") = size_t()
       )
       .def_rw("children", &goblin::TemplateNode::children, "")
+      .def_rw("max_num_nodes", &goblin::TemplateNode::max_num_nodes, "")
       .def_static("full_nary",
           &goblin::TemplateNode::full_nary, nb::arg("branching_factor"), nb::arg("depth"))
       .def("size",
@@ -2586,6 +2595,51 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::Template::is_valid)
       ;
   // #endif
+  // #ifndef _GOBLIN_GA_GP_TYPES_H
+  //
+
+
+  auto pyEnumKernelVersion =
+      nb::enum_<goblin::KernelVersion>(m, "KernelVersion", nb::is_arithmetic(), "")
+          .value("baseline", goblin::KernelVersion::Baseline, "")
+          .value("restrict", goblin::KernelVersion::Restrict, "")
+          .value("shared_memory", goblin::KernelVersion::SharedMemory, "")
+          .value("block_reduce", goblin::KernelVersion::BlockReduce, "")
+          .value("single_kernel", goblin::KernelVersion::SingleKernel, "")
+          .value("single_kernel_fmaf", goblin::KernelVersion::SingleKernelFMAF, "")
+          .value("single_kernel_inplace", goblin::KernelVersion::SingleKernelInplace, "")
+          .value("hybrid", goblin::KernelVersion::Hybrid, "");
+
+
+  m.def("to_string",
+      goblin::to_string, nb::arg("v"));
+
+
+  auto pyEnumNodeType =
+      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
+          .value("input", goblin::NodeType::Input, "")
+          .value("constant", goblin::NodeType::Constant, "")
+          .value("operator", goblin::NodeType::Operator, "")
+          .value("parameter", goblin::NodeType::Parameter, "");
+
+
+  auto pyEnumOperator =
+      nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
+          .value("add", goblin::Operator::Add, "")
+          .value("sub", goblin::Operator::Sub, "")
+          .value("mul", goblin::Operator::Mul, "")
+          .value("div", goblin::Operator::Div, "")
+          .value("sin", goblin::Operator::Sin, "")
+          .value("cos", goblin::Operator::Cos, "")
+          .value("exp", goblin::Operator::Exp, "")
+          .value("log", goblin::Operator::Log, "")
+          .value("square", goblin::Operator::Square, "")
+          .value("sqrt", goblin::Operator::Sqrt, "")
+          .value("pow", goblin::Operator::Pow, "")
+          .value("abs", goblin::Operator::Abs, "")
+          .value("min", goblin::Operator::Min, "")
+          .value("max", goblin::Operator::Max, "");
+  // #endif
 
 
   auto pyClassOperatorBase =
@@ -2608,6 +2662,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OperatorBase::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
       .def("__call__",
           &goblin::OperatorBase::operator(), nb::arg("args"))
+      .def("gpu_operator_id",
+          &goblin::OperatorBase::gpu_operator_id)
       .def("format",
           &goblin::OperatorBase::format, nb::arg("args"))
       ;
@@ -2654,6 +2710,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpAdd::has_gradient)
       .def("apply_grad",
           &goblin::OpAdd::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpAdd::gpu_operator_id)
       .def("format",
           &goblin::OpAdd::format, nb::arg("args"))
       ;
@@ -2682,6 +2740,29 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
+  auto pyClassOpSubGPU =
+      nb::class_<goblin::OpSubGPU, goblin::OperatorBase>
+          (m, "OpSubGPU", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("min_arity",
+          &goblin::OpSubGPU::min_arity)
+      .def("max_arity",
+          &goblin::OpSubGPU::max_arity)
+      .def("is_commutative",
+          &goblin::OpSubGPU::is_commutative)
+      .def("apply",
+          &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+      .def("has_gradient",
+          &goblin::OpSubGPU::has_gradient)
+      .def("apply_grad",
+          &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSubGPU::gpu_operator_id)
+      .def("format",
+          &goblin::OpSubGPU::format, nb::arg("args"))
+      ;
+
+
   auto pyClassOpMul =
       nb::class_<goblin::OpMul, goblin::OperatorBase>
           (m, "OpMul", "")
@@ -2700,6 +2781,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMul::has_gradient)
       .def("apply_grad",
           &goblin::OpMul::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMul::gpu_operator_id)
       .def("format",
           &goblin::OpMul::format, nb::arg("args"))
       ;
@@ -2723,6 +2806,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpDiv::has_gradient)
       .def("apply_grad",
           &goblin::OpDiv::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpDiv::gpu_operator_id)
       .def("format",
           &goblin::OpDiv::format, nb::arg("args"))
       ;
@@ -2746,6 +2831,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSin::has_gradient)
       .def("apply_grad",
           &goblin::OpSin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSin::gpu_operator_id)
       .def("format",
           &goblin::OpSin::format, nb::arg("args"))
       ;
@@ -2769,6 +2856,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpCos::has_gradient)
       .def("apply_grad",
           &goblin::OpCos::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpCos::gpu_operator_id)
       .def("format",
           &goblin::OpCos::format, nb::arg("args"))
       ;
@@ -2792,6 +2881,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpExp::has_gradient)
       .def("apply_grad",
           &goblin::OpExp::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpExp::gpu_operator_id)
       .def("format",
           &goblin::OpExp::format, nb::arg("args"))
       ;
@@ -2815,6 +2906,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpLog::has_gradient)
       .def("apply_grad",
           &goblin::OpLog::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpLog::gpu_operator_id)
       .def("format",
           &goblin::OpLog::format, nb::arg("args"))
       ;
@@ -2838,6 +2931,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSquare::has_gradient)
       .def("apply_grad",
           &goblin::OpSquare::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSquare::gpu_operator_id)
       .def("format",
           &goblin::OpSquare::format, nb::arg("args"))
       ;
@@ -2861,6 +2956,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpSqrt::has_gradient)
       .def("apply_grad",
           &goblin::OpSqrt::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpSqrt::gpu_operator_id)
       .def("format",
           &goblin::OpSqrt::format, nb::arg("args"))
       ;
@@ -2884,6 +2981,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpPow::has_gradient)
       .def("apply_grad",
           &goblin::OpPow::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpPow::gpu_operator_id)
       .def("format",
           &goblin::OpPow::format, nb::arg("args"))
       ;
@@ -2907,6 +3006,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpAbs::has_gradient)
       .def("apply_grad",
           &goblin::OpAbs::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpAbs::gpu_operator_id)
       .def("format",
           &goblin::OpAbs::format, nb::arg("args"))
       ;
@@ -2930,6 +3031,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMin::has_gradient)
       .def("apply_grad",
           &goblin::OpMin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMin::gpu_operator_id)
       .def("format",
           &goblin::OpMin::format, nb::arg("args"))
       ;
@@ -2953,6 +3056,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::OpMax::has_gradient)
       .def("apply_grad",
           &goblin::OpMax::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
+      .def("gpu_operator_id",
+          &goblin::OpMax::gpu_operator_id)
       .def("format",
           &goblin::OpMax::format, nb::arg("args"))
       ;
@@ -3041,7 +3146,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
 
 
-
   auto pyClassGPInstanceBase =
       nb::class_<goblin::GPInstanceBase, goblin::InstanceBase, goblin::GPInstanceBase_trampoline>
           (m, "GPInstanceBase", "")
@@ -3086,7 +3190,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::PyGPInstance::context)
       ;
   // #endif
-
 
 
   auto pyClassGrowInit =
@@ -3240,7 +3343,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
 
 
-
   auto pyClassSRQuality =
       nb::class_<goblin::SRQuality, goblin::MOQuality>
           (m, "SRQuality", "")
@@ -3265,8 +3367,8 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassSRProblem =
       nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
           (m, "SRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>, std::optional<usize>>(),
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon") = 1e-5, nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none())
+      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>, std::optional<usize>, std::optional<goblin::KernelVersion>>(),
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon") = 1e-5, nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none(), nb::arg("kernel_version").none() = nb::none())
       .def("adapt",
           &goblin::SRProblem::adapt, nb::arg("rng"))
       .def("discrete_domain_sizes",
@@ -3299,16 +3401,16 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::SRProblem::target_reached, nb::arg("archive"))
       .def("log_header",
           &goblin::SRProblem::log_header, nb::arg("os"))
-      .def("evaluate_test",
-          &goblin::SRProblem::evaluate_test, nb::arg("solution"))
       .def("log",
           &goblin::SRProblem::log, nb::arg("os"), nb::arg("solution"))
       .def("log_solution",
           &goblin::SRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
-      .def("gradient_steps",
-          &goblin::SRProblem::gradient_steps, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
+      .def("evaluate_test",
+          &goblin::SRProblem::evaluate_test, nb::arg("solution"))
       .def("context",
           &goblin::SRProblem::context)
+      .def("gradient_steps",
+          &goblin::SRProblem::gradient_steps, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
       .def_rw("ctx", &goblin::SRProblem::ctx, "")
       .def_rw("linear_scaling", &goblin::SRProblem::linear_scaling, "")
       .def_rw("objectives", &goblin::SRProblem::objectives, "")
@@ -4469,6 +4571,24 @@ void py_init_module_pygoblin(nb::module_& m) {
   //
   // #endif
   // #endif
+
+  { // <namespace test>
+      nb::module_ pyNstest = m.def_submodule("test", "The following declarations are used to create more readable test cases");
+      pyNstest.def("val",
+          nb::overload_cast<float>(goblin::test::Val), nb::arg("x"));
+
+      pyNstest.def("val",
+          nb::overload_cast<int>(goblin::test::Val), nb::arg("x"));
+
+      pyNstest.def("val",
+          nb::overload_cast<double>(goblin::test::Val), nb::arg("x"));
+
+      pyNstest.def("idx",
+          goblin::test::Idx, nb::arg("idx"));
+
+      pyNstest.def("op",
+          goblin::test::Op, nb::arg("op"));
+  } // </namespace test>
 
   { // <namespace classic>
       nb::module_ pyNsclassic = m.def_submodule("classic", "");

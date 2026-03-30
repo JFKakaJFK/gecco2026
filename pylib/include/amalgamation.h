@@ -3118,15 +3118,7 @@ class CompleteInit final : public DiscreteInitBase {
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/instance.h included by goblin.h                                              //
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GP_INSTANCE_H
-#define _GOBLIN_GP_INSTANCE_H
-
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//                       goblin/gp/context.h included by goblin/gp/instance.h                                   //
+//                       goblin/gp/context.h included by goblin.h                                               //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
@@ -5240,6 +5232,7 @@ class GPContext {
 #define _GOBLIN_GP_INSTANCE_H
 
 
+
 namespace goblin {
 
 class GPInstanceBase : public InstanceBase {
@@ -5981,7 +5974,6 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 #define _GOBLIN_GP_SR_H
 
 
-
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
 
@@ -6463,6 +6455,7 @@ GpuInfo get_gpu_info();
 #endif // GOBLIN_HAS_CUDA
 
 
+
 namespace goblin {
 
 class SRQuality : public MOQuality {
@@ -6634,16 +6627,6 @@ class SRProblem : public GPInstanceBase {
     _free_results_on_gpu();
   }
 #endif
-
-  usize num_discrete() const override final { return ctx.num_discrete; };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
-
-  usize num_continuous() const override final { return _num_continuous; };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final { return _continuous_init_lower_bounds; };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
 
   bool adapt(Rng& rng) override final {
     if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
@@ -12525,13 +12508,13 @@ class MixedGOMEA : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MIXED_GOMEA_H */
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/classic/common.h included by goblin.h                                   //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef _GOBLIN_CLASSIC_COMMON_H
 #define _GOBLIN_CLASSIC_COMMON_H
 
+#include <iterator>
 
 
 namespace goblin {
