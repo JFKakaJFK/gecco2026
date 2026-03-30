@@ -16,20 +16,20 @@ class OneMax final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     return std::make_tuple(discrete_values.array().cast<double>().sum(), 0.0);
   };
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -53,20 +53,20 @@ class ZeroMax final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
     return std::make_tuple(discrete_values.size() - discrete_values.array().cast<double>().sum(), 0.0);
   };
 
   std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
                                             CRefS<Vec<DType>> parent_discrete_values,
                                             CRefS<Vec<CType>> parent_continuous_values,
-                                            CRefS<Active> parent_discrete_active,
-                                            CRefS<Active> parent_continuous_active,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
                                             const CType parent_objective_value,
                                             const CType parent_constraint_value,
                                             const std::span<const usize>& discrete_indices,
@@ -90,8 +90,8 @@ class LeadingOnes final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     for (usize i = 0; i < dims; i++) {
       discrete_active(i) = true;
@@ -116,8 +116,8 @@ class TrailingZeros final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     for (usize i = dims; i > 0;) {
       i--;
@@ -147,15 +147,15 @@ class HLeadingOnes final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     CType ov = CType(0.0);
     eval_helper(discrete_values, discrete_active, 0, ov);
     return std::make_tuple(ov, 0.0);
   };
 
  private:
-  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Active> discrete_active, usize i, double& ov) {
+  void eval_helper(RefS<Vec<DType>> discrete_values, RefS<Array<BType>> discrete_active, usize i, double& ov) {
     discrete_active(i) = true;
     if (discrete_values(i) > 0) {
       ov += 1.0;
@@ -184,8 +184,8 @@ class DeceptiveTrap final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
 
     CType ov = CType(0.0);
@@ -211,8 +211,8 @@ class BimodalTrap final : public ObjectiveBase {
 
   std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                     RefS<Vec<CType>> continuous_values,
-                                    RefS<Active> discrete_active,
-                                    RefS<Active> continuous_active) override final {
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
     discrete_active.fill(true);
 
     CType ov = CType(0.0);

@@ -29,6 +29,7 @@ ci: clean tidy iwyu fmt configure build test bindings # docs pydocs
 
 reconfigure: clean configure
 
+# -DCMAKE_CXX_FLAGS="-ftime-report"
 # type ?= Release
 type ?= Debug
 cpu_only ?= OFF
@@ -49,6 +50,12 @@ fmt:
 tidy:
 	cmake -S . -B build-tidy -DCMAKE_CXX_CLANG_TIDY="$(which clang-tidy);-fix"
 
+cppcheck:
+	cppcheck \
+	    --suppress='*':lib/src/methods/amalgam.cpp \
+		--suppress='*':lib/src/methods/mo_gomea.cpp \
+		lib
+
 # requires IWYU (e.g. brew install include-what-you-use)
 iwyu:
 	if [ -z "$(shell which include-what-you-use)" ]; then \
@@ -68,13 +75,13 @@ bindings:
 
 docs:
 	@echo "TODO Generate the top-level docs"
-	cmake --build build --target docs
-	uvx python -m http.server 8080 --bind 127.0.0.1 --directory build/lib/docs/html
+	cmake --build build --target docs \
+	&& uvx python -m http.server 8080 --bind 127.0.0.1 --directory build/lib/docs/html
 
 pydocs: bindings
 	@echo "TODO Get the stubs to a point where they can be parsed without errors or use another documentation generator"
-	uv run --with pdoc pdoc pygom -o build/pygom/docs
-	uvx python -m http.server 8081 --bind 127.0.0.1 --directory build/pygom/docs
+	uv run --with pdoc pdoc pygom -o build/pygom/docs \
+	&& uvx python -m http.server 8081 --bind 127.0.0.1 --directory build/pygom/docs
 
 clean:
 	@rm -rf build build-iwyu build-tidy

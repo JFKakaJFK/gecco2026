@@ -14,17 +14,17 @@ class ObjectiveBase {
 
   virtual std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
-                                            RefS<Active> discrete_active,
-                                            RefS<Active> continuous_active) = 0;
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active) = 0;
 
   virtual std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
                                                     RefS<Vec<CType>> continuous_values,
-                                                    RefS<Active> discrete_active,
-                                                    RefS<Active> continuous_active,
+                                                    RefS<Array<BType>> discrete_active,
+                                                    RefS<Array<BType>> continuous_active,
                                                     CRefS<Vec<DType>> parent_discrete_values,
                                                     CRefS<Vec<CType>> parent_continuous_values,
-                                                    CRefS<Active> parent_discrete_active,
-                                                    CRefS<Active> parent_continuous_active,
+                                                    CRefS<Array<BType>> parent_discrete_active,
+                                                    CRefS<Array<BType>> parent_continuous_active,
                                                     const CType parent_objective_value,
                                                     const CType parent_constraint_value,
                                                     const std::span<const usize>& discrete_indices,

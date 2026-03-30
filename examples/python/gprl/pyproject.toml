@@ -1,0 +1,17 @@
+[project]
+name = "gprl"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "gymnasium[box2d]>=0.28.1",
+    "mo-gymnasium>=0.3.4",
+    "moviepy>=1.0.3",
+    "numpy>=1.21.6",
+    "pillow>=9.5.0",
+    "pygom",
+]
+
+[tool.uv.sources]
+pygom = { path = "../../../" }

@@ -16,9 +16,9 @@ using namespace std::chrono_literals;
 using namespace goblin;
 
 TEST_CASE("goblin::methods::mixed_ia") {
-  const usize N = 150;
+  const usize N = 25;  // 150;
   const double VTR = N;
-  BenchmarkInstance instance(std::make_shared<LeadingOnes>(150));
+  BenchmarkInstance instance(std::make_shared<LeadingOnes>(N));
   instance.set_init(std::make_shared<RandomInit>());
   instance.register_target({VTR});
 

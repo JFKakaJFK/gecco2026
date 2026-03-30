@@ -31,7 +31,7 @@ url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [tool.uv.sources]
-experiment-shared = { path = "../shared", editable = true }
+experiment-shared = { path = "../../shared", editable = true }
 torch = { index = "pytorch-cu130" }
 torchvision = { index = "pytorch-cu130" }
 torchaudio = { index = "pytorch-cu130" }

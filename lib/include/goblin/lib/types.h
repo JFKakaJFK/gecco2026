@@ -3,6 +3,8 @@
 
 #pragma once
 
+// #define EIGEN_RUNTIME_NO_MALLOC  // enable runtime allocation testing
+
 #include <Eigen/Dense>
 #include <cstdint>
 #include <span>
@@ -27,12 +29,6 @@ using BType = u8;  // not using bool avoids implicit bitset types
 using DType = u16;
 using CType = f64;
 
-// Is this a good idea?
-// template <typename T>
-// using Box = std::unique_ptr<T>;
-// template <typename T>
-// using Rc = std::shared_ptr<T>;
-
 template <typename T>
 using Vec = Eigen::VectorX<T>;
 template <typename T>
@@ -51,7 +47,11 @@ using RefS = Eigen::Ref<T, 0, Eigen::InnerStride<>>;
 template <typename T>
 using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
-using Active = Array<BType>;
+// Is this a good idea?
+// template <typename T>
+// using Box = std::unique_ptr<T>;
+// template <typename T>
+// using Rc = std::shared_ptr<T>;
 
 template <typename T>
 constexpr bool isna(const T& v) {

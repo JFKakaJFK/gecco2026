@@ -14,28 +14,28 @@ add_library(${PROJECT_NAME} OBJECT
     discrete/gomeaIMS.cpp
     discrete/Population.cpp
     discrete/utils.cpp
-    fitness/benchmarks-discrete/deceptiveTrap_t.cpp
-    fitness/benchmarks-discrete/asymmetricDeceptiveTrapBBO_t.cpp
-    fitness/benchmarks-discrete/bimodalDeceptiveTrapBBO_t.cpp
-    fitness/benchmarks-discrete/asymmetricDeceptiveTrap_t.cpp
-    fitness/benchmarks-discrete/hierarchicalIfAndOnlyIfBBO_t.cpp
-    fitness/benchmarks-discrete/bimodalDeceptiveTrap_t.cpp
-    fitness/benchmarks-discrete/deceptiveTrapBBO_t.cpp
-    fitness/benchmarks-discrete/hierarchicalDeceptiveTrapBBO_t.cpp
-    fitness/benchmarks-discrete/maxCut_t.cpp
-    fitness/benchmarks-discrete/oneMaxBBO_t.cpp
-    fitness/benchmarks-discrete/NKlandscapesBBO_t.cpp
-    fitness/benchmarks-discrete/oneMax_t.cpp
-    fitness/benchmarks-discrete/asymmetricHierarchicalDeceptiveTrapBBO_t.cpp
-    fitness/benchmarks-discrete/NKlandscapes_t.cpp
-    fitness/benchmarks-discrete/maxCutBBO_t.cpp
-    fitness/benchmarks-rv/sphereFunctionBBO_t.cpp
-    fitness/benchmarks-rv/rosenbrockFunction_t.cpp
-    fitness/benchmarks-rv/rosenbrockFunctionBBO_t.cpp
-    fitness/benchmarks-rv/SOREBChainStrong_t.cpp
-    fitness/benchmarks-rv/circlesInASquareBBO_t.cpp
-    fitness/benchmarks-rv/SOREBChainStrongBBO_t.cpp
-    fitness/benchmarks-rv/sphereFunction_t.cpp
+    # fitness/benchmarks-discrete/deceptiveTrap_t.cpp
+    # fitness/benchmarks-discrete/asymmetricDeceptiveTrapBBO_t.cpp
+    # fitness/benchmarks-discrete/bimodalDeceptiveTrapBBO_t.cpp
+    # fitness/benchmarks-discrete/asymmetricDeceptiveTrap_t.cpp
+    # fitness/benchmarks-discrete/hierarchicalIfAndOnlyIfBBO_t.cpp
+    # fitness/benchmarks-discrete/bimodalDeceptiveTrap_t.cpp
+    # fitness/benchmarks-discrete/deceptiveTrapBBO_t.cpp
+    # fitness/benchmarks-discrete/hierarchicalDeceptiveTrapBBO_t.cpp
+    # fitness/benchmarks-discrete/maxCut_t.cpp
+    # fitness/benchmarks-discrete/oneMaxBBO_t.cpp
+    # fitness/benchmarks-discrete/NKlandscapesBBO_t.cpp
+    # fitness/benchmarks-discrete/oneMax_t.cpp
+    # fitness/benchmarks-discrete/asymmetricHierarchicalDeceptiveTrapBBO_t.cpp
+    # fitness/benchmarks-discrete/NKlandscapes_t.cpp
+    # fitness/benchmarks-discrete/maxCutBBO_t.cpp
+    # fitness/benchmarks-rv/sphereFunctionBBO_t.cpp
+    # fitness/benchmarks-rv/rosenbrockFunction_t.cpp
+    # fitness/benchmarks-rv/rosenbrockFunctionBBO_t.cpp
+    # fitness/benchmarks-rv/SOREBChainStrong_t.cpp
+    # fitness/benchmarks-rv/circlesInASquareBBO_t.cpp
+    # fitness/benchmarks-rv/SOREBChainStrongBBO_t.cpp
+    # fitness/benchmarks-rv/sphereFunction_t.cpp
     fitness/bbo_fitness.cpp
     fitness/fitness.cpp
     fitness/gbo_fitness.cpp

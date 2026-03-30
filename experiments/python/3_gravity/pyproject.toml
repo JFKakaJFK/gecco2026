@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "duckdb>=1.3.2",
+    "experiment-shared",
     "matplotlib>=3.5.3",
     "numpy>=1.21.6",
     "pandas>=1.1.5",
@@ -22,6 +23,7 @@ dependencies = [
 
 [tool.uv.sources]
 pygom = { path = "../../../" }
+experiment-shared = { path = "../shared", editable = true }
 
 [dependency-groups]
 dev = [

@@ -740,7 +740,7 @@ class Population {
           fos_stats[k].solution_activation_rate.resize(cluster_FOS[k].size(), 0.0);
           fos_stats[k].variables_activation_rate.resize(cluster_FOS[k].size(), 0.0);
           for (usize i = 0; i < cluster_solutions[k].size(); i++) {
-            const RefS<Active> s_a = solutions[cluster_solutions[k][i]].discrete_active();
+            const RefS<Array<BType>> s_a = solutions[cluster_solutions[k][i]].discrete_active();
             for (usize fos_idx = 0; fos_idx < cluster_FOS[k].size(); fos_idx++) {
               Array<BType> subset_active = s_a(cluster_FOS[k][fos_idx].discrete);
               if (subset_active.any()) {

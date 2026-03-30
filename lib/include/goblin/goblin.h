@@ -60,6 +60,14 @@ inline bool has_gpu_support() {
 #include "goblin/methods/library.h"
 #include "goblin/methods/mo_binary.h"
 #include "goblin/methods/mixed.h"
+#include "goblin/methods/classic/common.h"
+#include "goblin/methods/classic/de.h"
+#include "goblin/methods/classic/es.h"
+#include "goblin/methods/classic/pso.h"
+#include "goblin/methods/classic/simple_ga.h"
+#include "goblin/methods/classic/standard_gp.h"
+
+#include "goblin/examples/voronoi.h"
 
 // clang-format on
 

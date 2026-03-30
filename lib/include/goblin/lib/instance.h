@@ -33,17 +33,20 @@ class CacheKey {
 
 class InstanceBase {
  public:
-  virtual usize num_objectives() const { return fitness().num_objectives(); };
+  usize num_objectives() const { return fitness().num_objectives(); };
 
-  virtual usize num_discrete() const = 0;
+  usize num_discrete() const { return discrete_domain_sizes().size(); };
   virtual CRef<Vec<DType>> discrete_domain_sizes() const = 0;
 
-  virtual usize num_continuous() const = 0;
+  usize num_continuous() const { return continuous_lower_bounds().size(); };
   virtual CRef<Vec<CType>> continuous_lower_bounds() const = 0;
   virtual CRef<Vec<CType>> continuous_upper_bounds() const = 0;
 
   virtual CRef<Vec<CType>> continuous_init_lower_bounds() const = 0;
   virtual CRef<Vec<CType>> continuous_init_upper_bounds() const = 0;
+
+  // TODO support ordinal discrete spaces (e.g. bool per discrete to indicate categorical/ordinal)
+  // TODO support permutation spaces (e.g. bool per continuous variable to indicate continuous/random keys)
 
   virtual void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) = 0;
   virtual void evaluate_partial(Rng& rng,
@@ -54,7 +57,7 @@ class InstanceBase {
     evaluate(rng, solutions, indices);
   };
 
-  void evaluate(SolutionSetBase& solutions, std::optional<u64> seed = std::nullopt) {
+  void evaluate_solutions(SolutionSetBase& solutions, std::optional<u64> seed = std::nullopt) {
     Rng rng = seeded_rng(seed);
     std::vector<usize> indices(solutions.size());
     std::iota(indices.begin(), indices.end(), 0);
@@ -129,7 +132,7 @@ class InstanceBase {
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";
-    fitness().log_header(os);
+    archive_fitness().log_header(os);
   };
 
   virtual void log_solution(std::ostream& os, const SolutionBase& solution) const {
@@ -169,7 +172,7 @@ class InstanceBase {
     os << '"';
     log_solution(os, solution);
     os << "\",";
-    fitness().log(os, solution.quality());
+    archive_fitness().log(os, solution.quality());
   };
 
   std::string format_solution(const SolutionBase& solution) const {
@@ -203,7 +206,9 @@ class InstanceBase {
     return indices.size();
   };
 
-  virtual ~InstanceBase() {};
+  virtual const InstanceBase& unwrap() const { return *this; }
+
+  virtual ~InstanceBase() = default;
 };
 
 /// Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still
@@ -213,12 +218,8 @@ class WrappedInstance : public InstanceBase {
  public:
   WrappedInstance(InstanceBase& instance) : inner(instance) {};
 
-  usize num_objectives() const override { return inner.num_objectives(); };
-
-  usize num_discrete() const override { return inner.num_discrete(); }
   CRef<Vec<DType>> discrete_domain_sizes() const override { return inner.discrete_domain_sizes(); }
 
-  usize num_continuous() const override { return inner.num_continuous(); }
   CRef<Vec<CType>> continuous_lower_bounds() const override { return inner.continuous_lower_bounds(); }
   CRef<Vec<CType>> continuous_upper_bounds() const override { return inner.continuous_upper_bounds(); }
 
@@ -285,6 +286,8 @@ class WrappedInstance : public InstanceBase {
   std::optional<CacheKey> solution_cache_key(const SolutionBase& solution) const override {
     return inner.solution_cache_key(solution);
   };
+
+  const InstanceBase& unwrap() const override { return inner.unwrap(); }
 
   virtual ~WrappedInstance() = default;
 

@@ -36,6 +36,9 @@
 #include "goblin/lib/types.h"
 #include "goblin/lib/init.h"
 
+#include <unsupported/Eigen/NonLinearOptimization>
+#include <unsupported/Eigen/NumericalDiff>
+
 namespace goblin {
 
 class SRQuality : public MOQuality {
@@ -208,16 +211,6 @@ class SRProblem : public GPInstanceBase {
   }
 #endif
 
-  usize num_discrete() const override final { return ctx.num_discrete; };
-  CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
-
-  usize num_continuous() const override final { return _num_continuous; };
-  CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
-  CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
-
-  CRef<Vec<CType>> continuous_init_lower_bounds() const override final { return _continuous_init_lower_bounds; };
-  CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
-
   bool adapt(Rng& rng) override final {
     if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
       // TODO refactor out into something like PyTorch's DataLoader/Sampler and allow more sophisticated sampling
@@ -240,6 +233,14 @@ class SRProblem : public GPInstanceBase {
     }
   };
 
+  CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
+
+  CRef<Vec<CType>> continuous_lower_bounds() const override final { return _continuous_lower_bounds; };
+  CRef<Vec<CType>> continuous_upper_bounds() const override final { return _continuous_upper_bounds; };
+
+  CRef<Vec<CType>> continuous_init_lower_bounds() const override final { return _continuous_init_lower_bounds; };
+  CRef<Vec<CType>> continuous_init_upper_bounds() const override final { return _continuous_init_upper_bounds; };
+
   void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
 #ifdef GOBLIN_HAS_CUDA
     if (_kernel_version.has_value()) {
@@ -252,7 +253,10 @@ class SRProblem : public GPInstanceBase {
 
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
-    assert(dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality()) != nullptr && "Quality mismatch");
+#ifndef NDEBUG
+    auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
+    assert(p != nullptr && "Quality mismatch");
+#endif
   };
 
   const FitnessBase& fitness() const override final { return _fitness; };
@@ -355,7 +359,8 @@ class SRProblem : public GPInstanceBase {
         os << o << "_test,";
       }
     }
-    fitness().log_header(os);
+
+    archive_fitness().log_header(os);
   };
 
   void log(std::ostream& os, const SolutionBase& solution) const override final {

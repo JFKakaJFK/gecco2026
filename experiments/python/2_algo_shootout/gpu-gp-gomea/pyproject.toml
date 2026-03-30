@@ -21,7 +21,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-experiment-shared = { path = "../shared", editable = true }
+experiment-shared = { path = "../../shared", editable = true }
 pygom = { path = "../../../../" }
 
 [dependency-groups]

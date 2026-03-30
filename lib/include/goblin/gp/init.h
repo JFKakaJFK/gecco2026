@@ -549,6 +549,7 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 
     Vec<DType> values(total);
 
+    std::vector<DType> perm;
     sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)));
     sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)));
     sample_complete(rng, non_const_terminals[idx],

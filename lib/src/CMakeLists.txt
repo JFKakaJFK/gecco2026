@@ -4,30 +4,40 @@ find_package(gomea_library REQUIRED) # gomea_library
 
 file(GLOB_RECURSE HEADER_LIST CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/include/*.h")
 
-set(LIB_SOURCES
-    ${HEADER_LIST}
-    gp/sr.cpp
-    lib/archive.cpp
-    lib/archive_adaptive.cpp
-    lib/archive_unbounded.cpp
-    lib/entropy.cpp
-    lib/fitness.cpp
-    lib/instance.cpp
-    lib/solution.cpp
-    methods/amalgam.cpp
-    methods/mo_gomea.cpp
+# if(SKBUILD OR GOBLIN_BUILD_PYLIB)
+#     add_library(${PROJECT_NAME}
+#         STATIC
+#         ${HEADER_LIST}
+#         lib/instance.cpp
+#         gp/sr.cpp
+#         methods/amalgam.cpp
+#         methods/mo_gomea.cpp
+#     )
+#     set_target_properties(lib PROPERTIES COMPILE_FLAGS "-O3")
+#     set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+# else()
+add_library(${PROJECT_NAME}
+        ${HEADER_LIST}
+        lib/archive.cpp
+        lib/archive_adaptive.cpp
+        lib/archive_unbounded.cpp
+        lib/instance.cpp
+        lib/fitness.cpp
+        lib/entropy.cpp
+        lib/solution.cpp
+        gp/sr.cpp
+        methods/amalgam.cpp
+        methods/library.cpp
+        methods/mo_gomea.cpp
 )
-
 if(GOBLIN_HAS_CUDA)
     find_package(CUDAToolkit REQUIRED)
-    list(APPEND LIB_SOURCES
+    target_sources(${PROJECT_NAME} PRIVATE
         gp/gpu_evaluation/evaluate.cu
         gp/gpu_evaluation/memory.cu
         gp/gpu_evaluation/misc.cu
     )
 endif()
-
-add_library(${PROJECT_NAME} ${LIB_SOURCES})
 
 # endif()
 # disable any warnings in the amalgam code
