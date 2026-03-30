@@ -65,7 +65,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native -fno-math-errno -fno-trapping-math -fno-signed-zeros"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
         )
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     set(
@@ -74,7 +74,7 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
-        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native -fno-math-errno -fno-trapping-math -fno-signed-zeros"
+        "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
     )
 
     # "temporary" fix for spurious warnings

@@ -348,7 +348,6 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
       active_indices.reserve(count);
       std::vector<usize> inactive_indices;
       inactive_indices.reserve(count);
-      std::vector<DType> perm;
 
       usize num_roots = ctx.output_roots.size() + ctx.subtree_roots.size();
       for (usize root_idx = 0; root_idx < num_roots; root_idx++) {
@@ -373,7 +372,7 @@ class RecursiveCompleteInit final : public DiscreteInitBase {
 
           // NOTE it could be better to maximize the number of active variables by sampling terminals only once (this
           // definitely holds for the root, but not necessarily for other nodes, so this is not done here)
-          perm.resize(problem.discrete_domain_sizes()(current));
+          std::vector<DType> perm(problem.discrete_domain_sizes()(current));
           std::iota(perm.begin(), perm.end(), 0);
 
           usize i = perm.size();
@@ -552,19 +551,18 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
     Vec<DType> values(total);
 
     std::vector<DType> perm;
-    sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)), perm);
-    sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)), perm);
+    sample_complete(rng, non_terminals[idx], values(Eigen::seqN(0, num_non_terminals)));
+    sample_complete(rng, const_terminals[idx], values(Eigen::seqN(num_non_terminals, num_const_terminals)));
     sample_complete(rng, non_const_terminals[idx],
-                    values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)), perm);
+                    values(Eigen::seqN(num_non_terminals + num_const_terminals, num_non_const_terminals)));
 
     std::shuffle(values.begin(), values.end(), rng);
 
     return values;
   };
 
-  void sample_complete(Rng& rng, const std::vector<DType>& pool, Ref<Vec<DType>> values,
-                       std::vector<DType>& perm) const {
-    perm.resize(pool.size());
+  void sample_complete(Rng& rng, const std::vector<DType>& pool, Ref<Vec<DType>> values) const {
+    std::vector<DType> perm(pool.size());
     std::iota(perm.begin(), perm.end(), 0);
 
     usize i = perm.size();

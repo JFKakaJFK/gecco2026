@@ -432,6 +432,7 @@ class SRProblem : public GPInstanceBase {
       ls_params.resize(2, ctx.num_outputs);
       for (usize o = 0; o < ctx.num_outputs; o++) {
         A_ls.col(1) = Y_pred.col(o);
+        Vec<ScalarType> b = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
         ls_params.col(o) = A_ls.colPivHouseholderQr().solve(Y_train.matrix().col(o));
       }
     }
