@@ -13,6 +13,7 @@
 namespace goblin {
 struct TemplateNode {
   std::vector<TemplateNode> children;
+  size_t max_num_nodes;
 
   static TemplateNode full_nary(usize branching_factor, usize depth) {
     TemplateNode root;

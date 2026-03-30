@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 
 #include "goblin/lib/archive.h"
+#include "goblin/lib/misc.h"
 
 using namespace goblin;
 

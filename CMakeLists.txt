@@ -1,11 +1,34 @@
 cmake_minimum_required(VERSION 3.15...4.0)
 
-project(goblin VERSION "0.1.0")
+project(goblin VERSION "0.1.0" LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # -std=c++xx instead of -std=g++xx
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+option(GOBLIN_CPU_ONLY "Disable CUDA and build CPU-only code" OFF)
+
+if(NOT GOBLIN_CPU_ONLY)
+    include(CheckLanguage)
+    check_language(CUDA)
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        set(GOBLIN_HAS_CUDA ON CACHE BOOL "CUDA is available" FORCE)
+        set(CMAKE_CUDA_STANDARD 20)
+        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+        set(CMAKE_CUDA_ARCHITECTURES "native")
+        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
+        message(STATUS "CUDA found: building with GPU support")
+    else()
+        set(GOBLIN_HAS_CUDA OFF CACHE BOOL "CUDA is available" FORCE)
+        message(STATUS "CUDA not found: building CPU-only")
+    endif()
+else()
+    set(GOBLIN_HAS_CUDA OFF CACHE BOOL "CUDA is available" FORCE)
+    message(STATUS "GOBLIN_CPU_ONLY=ON: building CPU-only")
+endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -35,7 +58,6 @@ endif()
 
 include(CheckCXXCompilerFlag)
 # sanitizers don't work e.g. on arm macos
-# set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined")
 if(GOBLIN_USE_ASAN)
     check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
     if(COMPILER_SUPPORTS_ASAN)
@@ -61,7 +83,7 @@ endif()
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(
         CMAKE_CXX_FLAGS_DEBUG
-        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g -fno-vectorize -fno-slp-vectorize" # -fsanitize=bounds -fsanitize=alignment"
+        "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
     )
     set(
         CMAKE_CXX_FLAGS_RELEASE
@@ -99,7 +121,6 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
 
     include(cmake/litgen_cmake.cmake)
 
-    set(NB_USE_SUBMODULE_DEPS ON) # hotfix for https://github.com/wjakob/nanobind/issues/1237
     litgen_find_nanobind()
     set(python_module_sources
         pylib/nanobind/module.cpp                  # The python module entry point

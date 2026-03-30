@@ -12,8 +12,16 @@ import pygom
 # TODO simplification & finetuning...
 
 
+_GPU_AVAILABLE = pygom.has_gpu_support()
+
+
 class SymbolicRegressor(BaseEstimator, RegressorMixin):
-    def __init__(self, **kwargs):
+    def __init__(
+        self,
+        kernel_version=None,
+        **kwargs,
+    ):
+        self.kernel_version = kernel_version
         self.kwargs = kwargs
         self.imputer = None
         self.front = []
@@ -37,7 +45,6 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             try:
                 return f(*[X[:, int(s[1:])] for s in symbols.keys()])
             except Exception as e:
-                print(e)
                 return np.repeat(float("nan"), X.shape[0])
 
         return fn
@@ -71,7 +78,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             template.add_subtree(pygom.TemplateNode.full_nary(branching_factor, depth))
         str2op = {
             "+": pygom.OpAdd(),
-            "-": pygom.OpSub(),
+            "-": pygom.OpSubGPU(),
             "*": pygom.OpMul(),
             "/": pygom.OpDiv(),
             "sin": pygom.OpSin(),
@@ -96,21 +103,32 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
 
         Y = y.reshape(-1, 1) if len(y.shape) == 1 else y
 
-        linear_scaling = self.kwargs.get("linear_scaling", True)
         init = vars(pygom)[self.kwargs.get("init", "HalfHalfInit")]()
+
+        temp = float(np.nanmax(np.abs(Y)))
+        constant_init_lower_bound = -temp
+        constant_init_upper_bound = temp
+
+        if self.kernel_version is not None and not _GPU_AVAILABLE:
+            raise RuntimeError(
+                "kernel_version requires a CUDA-enabled build of goblin (GOBLIN_HAS_CUDA)"
+            )
+
         problem = pygom.SRProblem(
             ctx,
             X,
             Y,
             objectives=self.kwargs.get("objectives", "mse"),
-            linear_scaling=linear_scaling,
+            linear_scaling=self.kwargs.get("linear_scaling", True),
             init=init,
             constant_init_lower_bound=self.kwargs.get(
-                "constant_init_lower_bound", float(-np.nanmax(Y))
+                "constant_init_lower_bound", constant_init_lower_bound
             ),
             constant_init_upper_bound=self.kwargs.get(
-                "constant_init_upper_bound", float(np.nanmax(Y))
+                "constant_init_upper_bound", constant_init_upper_bound
             ),
+            target_objectives=self.kwargs.get("target_objectives", None),
+            kernel_version=self.kernel_version,
         )
 
         if "algorithm" in self.kwargs:
@@ -181,7 +199,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
         if np.isnan(X).any():
             X = self.imputer.transform(X)
 
-        y_pred = self.__lambdify_expression(self.model)(X)
+        y_pred = np.asarray(self.__lambdify_expression(self.model)(X))
 
         if len(y_pred.shape) < 2:
             y_pred = y_pred.reshape(-1, 1)

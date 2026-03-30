@@ -2,20 +2,17 @@
 #ifndef _GOBLIN_GP_CONTEXT_H
 #define _GOBLIN_GP_CONTEXT_H
 
+#include <algorithm>
 #include <format>
-#include <functional>
 #include <iostream>
 #include <limits>
 #include <optional>
-#include <set>
 #include <string>
 #include <vector>
 #include <queue>
 #include <type_traits>
 #include <span>
 #include <stdexcept>
-#include <iterator>
-#include <ranges>
 
 #include "goblin/gp/operator.h"
 #include "goblin/gp/template.h"
@@ -310,12 +307,7 @@ class GPContext {
 
     // in the modular GP-GOMEA paper (https://arxiv.org/pdf/2505.01262v1) there is this concept of "discounted" size to
     // not punish re-using subfunctions by only counting the subfunction nodes once.
-    // unless subfunctions are enabled, the discounting has no effect
-    discount_size = discount_size && enable_subfunctions;
-    Array<u32> visited;
-    if (discount_size) {
-      visited = Array<u32>::Zero(num_discrete);
-    }
+    Array<u32> visited = Array<u32>::Zero(num_discrete);
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
@@ -380,9 +372,7 @@ class GPContext {
           }
 
           if (value_kind[value] == ValueKind::Arg) {
-            if (discount_size) {
-              visited(idx) = 0;
-            }
+            visited(idx) = 0;
 
             // we need to replace the argument with the corresponding child of the caller
             // and then replace the stack entry with with the actual argument
@@ -421,9 +411,7 @@ class GPContext {
                                     call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
                                     false);
           } else if (value_kind[value] == ValueKind::Subtree) {
-            if (discount_size) {
-              visited(idx) = 0;
-            }
+            visited(idx) = 0;
             assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
@@ -550,15 +538,8 @@ class GPContext {
 
           // the arguments are in the correct order on the stack, so we just need to get the last arity indices on the
           // arg_stack
-          // std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()}; // TODO why does this trigger
-          // the address sanitizer even when the result is explicitly evaluated before overwriting anything in the
-          // arg_stack?
-          std::vector<std::string> args;
-          for (usize k = 0; k < arity; k++) {
-            args.push_back(arg_stack[arg_stack.size() - arity + k]);
-          }
-          std::string op = operators[v_idx]->format(args);
-          arg_stack[arg_stack_idx] = op;
+          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
+          arg_stack[arg_stack_idx] = operators[v_idx]->format(args);
 
           // pop the now used arguments from the stack, but keep the op result
           arg_stack.resize(arg_stack_idx + 1);
@@ -902,6 +883,194 @@ class GPContext {
 
     return active;
   };
+  // Transforms trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation)
+  // 
+  // Subfunctions are resolved within this function, so the transformed trees will not contain
+  // any subfunction/argument nodes
+  // Multi-output trees are stored one after another at constant intervals determined by 'max_expression_size'.
+  // This value is probably much too large for most trees, however it is very difficult to determine the 
+  // maximum tree size when subfunctions are involved. Therefore a save maximum value is chosen.
+  template <typename S>
+  void to_gpu_representation(
+    S& solution,
+    std::vector<uint8_t>& node_type,
+    std::vector<float>& node_value,
+    usize& size,
+    bool discount_size = false
+  ) const {
+    // initially we haven't visited anything, so we set everything to be inactive
+    if constexpr (!std::is_const<S>()) {
+      solution.discrete_active().array() = false;
+      solution.continuous_active().array() = false;
+    }
+
+    Array<u32> visited = Array<u32>::Zero(num_discrete);
+
+    std::vector<usize> call_stack;
+    call_stack.reserve(max_expression_size);
+
+    // (node, call_stack_idx, is_post_order)
+    std::vector<std::tuple<usize, isize, bool>> node_stack;
+    node_stack.reserve(max_expression_size);
+
+    size = 0;
+
+    // Vectors to hold temporary type and value data
+    std::vector<uint8_t> temp_type;
+    std::vector<float> temp_value;
+    temp_type.reserve(max_expression_size);
+    temp_value.reserve(max_expression_size);
+
+    for (usize n : output_roots) {
+      // Ensure vectors are clear for next output tree
+      temp_type.clear();
+      temp_value.clear();
+
+      // housekeeping: reset the call stack and node_stack per output
+      call_stack.clear();
+      node_stack.clear();
+      node_stack.emplace_back(n, 0, false);
+
+      // While there are still nodes to visit
+      while(!node_stack.empty()) {
+        // Hit the max size, but still have more nodes to process
+        if (size + temp_type.size() == max_expression_size) {
+          return;
+        }
+
+        // Pop the top node from the stack
+        auto [idx, call_stack_idx, is_post_order] = node_stack.back();
+        usize node_stack_idx = node_stack.size() - 1;
+
+        // Mark current node as active
+        if constexpr (!std::is_const<S>()) {
+          solution.discrete_active()(idx) = true;
+        }
+
+        // Get the type and value for the current node
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
+        enum ValueKind type = value_kind[value];
+
+        bool update_tree = false;
+
+        // only look at the node if this is the first time we see it - in the post-order visit all
+        // we have to do is add it to the temp_type and temp_value
+        if (!is_post_order) {
+          if (discount_size) {
+            visited(idx) = 1;
+          }
+
+          if (type == ValueKind::Arg) {
+            visited(idx) = 0;
+
+            usize calling_node = call_stack[call_stack_idx];
+            isize num_frames = 1;
+
+            auto pidx = parent(idx);
+            while (pidx.has_value()) {
+              if (pidx.value() == calling_node) {
+                calling_node = call_stack[call_stack_idx - num_frames++];
+              }
+              pidx = parent(pidx.value());
+            }
+
+            auto& cnodes = children[calling_node];
+            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
+
+            node_stack.pop_back();
+            node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
+                                    call_stack_idx - num_frames,
+                                    false);
+          } else if (type == ValueKind::Subtree) {
+            visited(idx) = 0;
+            assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
+
+            call_stack.push_back(idx);
+
+            std::get<2>(node_stack[node_stack_idx]) = true;
+            node_stack.emplace_back(subtree_roots[v_idx],
+                                    call_stack.size() - 1,
+                                    false);
+          } else if (type == ValueKind::Operator) {
+            std::get<2>(node_stack[node_stack_idx]) = true;
+
+            usize arity = std::min(children[idx].size(), value_max_arity[value]);
+
+            for (usize i = arity; i > 0;) {
+              node_stack.emplace_back(children[idx][--i], call_stack_idx, false);
+            }
+          } else if (value_min_arity[value] > 0) {
+            throw std::runtime_error("Encountered unhandled non-leaf node.");
+          } else {
+            if constexpr (!std::is_const<S>()) {
+              if (value_kind[value] == ValueKind::Constant) {
+                solution.continuous_active()(const_repr == ConstantRepr::Pool ? v_idx : idx) = true;
+              }
+            }
+
+            update_tree = true;
+            node_stack.pop_back();
+          }
+        } else {
+          if (type == ValueKind::Subtree) {
+            call_stack.pop_back();
+          } else {
+            update_tree = true;
+          }
+
+          node_stack.pop_back();
+        }
+
+        if (update_tree) {
+          if (const_repr == ConstantRepr::Edges) {
+            if constexpr (!std::is_const<S>()) {
+              solution.continuous_active()(idx) = true;
+            }
+          }
+
+          temp_type.push_back(static_cast<uint8_t>(type));
+
+          if (type == ValueKind::Input) {
+            // Push the index of the input feature, will be used to access the input matrix on GPU
+            temp_value.push_back(v_idx);
+          } else if (type == ValueKind::Parameter) {
+            // Push the index of the parameter, will be used to access the parameter array on GPU
+            temp_value.push_back(v_idx);
+          } else if (type == ValueKind::Constant) {
+            usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+            // Push the constant value, will be used directly in the evaluation on GPU
+            temp_value.push_back(static_cast<float>(solution.continuous_values()(ci)));
+          } else if (type == ValueKind::Operator) {
+            // Push the operator index, will be used to apply the operator on GPU
+            auto gpu_id = this->operators[v_idx]->gpu_operator_id();
+            if (!gpu_id.has_value()) {
+              throw std::runtime_error("Operator not GPU-compatible");
+            }
+            temp_value.push_back(static_cast<float>(gpu_id.value()));
+          } else {
+            std::unreachable();  // if this triggers, a new ValueKind was added without handling it here
+          }
+
+          assert(temp_type.size() == temp_value.size() && "temp_type and temp_value are out of sync.");
+        }
+      }
+
+      size += temp_type.size();
+
+      // Pad vectors with placeholder values such that the data is at constant intervals in memory
+      temp_type.resize(max_expression_size, std::numeric_limits<uint8_t>::max());
+      temp_value.resize(max_expression_size, std::numeric_limits<float>::max());
+
+      // Append temporary vectors to final vectors
+      node_type.insert(node_type.end(), temp_type.begin(), temp_type.end());
+      node_value.insert(node_value.end(), temp_value.begin(), temp_value.end());
+    }
+
+    if (discount_size) {
+      size = visited.sum();
+    } 
+  }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
   // // indices

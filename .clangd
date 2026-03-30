@@ -1,0 +1,19 @@
+CompileFlags:
+    Add: [-std=c++23, -Wno-unknown-warning-option]
+    CompilationDatabase: None
+    Remove:
+        # nvcc flags
+        - -forward-unknown-to-host-compiler
+        - -arch=native
+        - -Xcompiler=-fPIC
+
+        # GCC C++20 modules flags
+        - ^-fmodules-ts$
+        - ^-fmodule-mapper=.*$
+        - ^-fdeps-format=.*$
+        - -m*
+        - -f*
+
+Diagnostics:
+    ClangTidy:
+        Add: ["readability-*"]

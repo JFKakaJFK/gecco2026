@@ -17,32 +17,34 @@ target_link_libraries(${test_target} PRIVATE ${deps})
 
 set(
     LIB_TEST_SOURCES
-    archive
-    fitness
-    solution
-    solution_extension
-    default_gradients
-    problem
     amalgam
-    so_gomea
-    mo_binary
-    tracked
-    ims
+    archive
+    archive_objectives
+    ctx_gpu_repr
+    ctx_introns
+    ctx_subfunction
+    default_gradients
     entropy
-    mixed
-    mo_mixed
-    mixed_rv
+    fitness
+    gp_operators
+    ims
+    launch_config
     mixed_ia
     mixed_mixed
-    gp_operators
+    mixed_rv
+    mixed
+    mo_binary
+    mo_mixed
+    problem
+    quality
+    solution
+    solution_extension
+    so_gomea
     sr
     sr_stats
     sr_precision
     sr_gradient_step
-    archive_objectives
-    ctx_subfunction
-    ctx_introns
-    quality
+    tracked
 )
 
 set(LIB_OPTIMIZED_TESTS
@@ -55,6 +57,10 @@ set(LIB_OPTIMIZED_TESTS
     ctx_introns
     mixed_ia
 )
+
+if(GOBLIN_HAS_CUDA)
+    list(APPEND LIB_TEST_SOURCES evaluate)
+endif()
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
     set(_target lib_test_${testcase})

@@ -1,13 +1,11 @@
+#include <optional>
 #include <print>
-#include <iostream>
+// #include <iostream>
 
-#define EIGEN_DONT_ALIGN
-#define EIGEN_MAX_ALIGN_BYTES 0
-#define EIGEN_DONT_VECTORIZE
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
 
-#include "goblin/bench/tracked.h"
+// #include "goblin/bench/tracked.h"
 #include "goblin/gp/sr.h"
 #include "goblin/methods/mixed.h"
 
@@ -223,3 +221,88 @@ TEST_CASE("goblin::gp::sr") {
     }
   }
 }
+
+#ifdef GOBLIN_HAS_CUDA
+
+TEST_CASE("goblin::ga-gp::sr::gpu_evaluation") {
+    auto tree = TemplateNode::full_nary(2, 3);
+    Template tmplate;
+
+    tmplate.add_output(tree);
+
+    REQUIRE_EQ(tree.size(), 15);
+
+    Arr2D<CType> X = Arr2D<CType>::Random(10, 3);
+    Arr2D<CType> Y(X.rows(), 1);
+    Y.col(0) = X.col(0) + X.col(1);
+
+    std::vector<std::shared_ptr<OperatorBase>> operators = {
+        std::make_shared<OpAdd>(), std::make_shared<OpSubGPU>(),
+        std::make_shared<OpMul>(), std::make_shared<OpDiv>(),
+    };
+
+    GPContext ctx(X.cols(), tmplate, operators);
+    SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"mse"},
+        /* objectives_to_optimize = */ std::nullopt,
+        /* linear_scaling = */ false,
+        /* init = */ std::nullopt,
+        /* constant_init_lower_bound = */ -1.0,
+        /* constant_init_upper_bound = */ 1.0,
+        /* target_objectives = */ std::nullopt,
+        /* gradient_mode = */ "forward",
+        /* gradient_epsilon = */ 1e-5,
+        /* archive_epsilon = */ 0.0,
+        /* always_inherit_continuous = */ std::nullopt,
+        /* batch_size = */ std::nullopt,
+        /* kernel_version = */ KernelVersion::SingleKernelInplace
+    );
+
+    Rng rng(1, 0);
+    AoSSet sset;
+
+    Solution s(
+        srp.archive_fitness().worst(), 
+        Vec<DType>::Zero(srp.num_discrete()),
+        Vec<CType>::Zero(srp.num_continuous())
+    );
+    sset.add(s);
+    sset.add(s);
+
+    REQUIRE_EQ(sset.size(), 2);
+
+    sset[0].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[0];  // +
+    sset[0].discrete_values()(ctx.children[ctx.output_roots[0]][0]) = 0;   // x0
+    sset[0].discrete_values()(ctx.children[ctx.output_roots[0]][1]) = 1;   // x1
+
+    sset[1].discrete_values()(ctx.output_roots[0]) = ctx.op_idx2value[2];  // *
+    sset[1].discrete_values()(ctx.children[ctx.output_roots[0]][0]) = 1;   // x1
+    sset[1].discrete_values()(ctx.children[ctx.output_roots[0]][1]) = 2;   // x2
+
+    std::vector<usize> indices{0, 1};
+    srp.evaluate(rng, sset, indices);
+
+    CHECK_EQ(sset[0].quality_as<SRQuality>().objectives(0), doctest::Approx(0.0));
+    CHECK_NE(sset[1].quality_as<SRQuality>().objectives(0), doctest::Approx(0.0));
+
+    sset.clear();
+
+    CType vtr = 1e-8;
+    srp.register_target({vtr});
+    Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
+
+    auto gomea = MixedGOMEA(
+        PopulationOptions(), 
+        RvOptions{.enabled = false},
+        IMSOptions(/* initial_population_size = */ 512, /* max_num_populations = */ 1)
+    );
+
+    auto [front, status] = Tracked::run(srp, gomea, budget, TrackingOptions("sr.csv"), /* seed = */ 42);
+
+    // std::println("Status {}: {}", format_as(status), gasrp1.format_solution(front.so_solution(0)));
+    INFO("Status: ", format_as(status), "\t|\tSolution: ", srp.format_solution(front->so_solution(0)));
+
+    CHECK_EQ(status, TerminationStatus::TargetReached);
+    CHECK_EQ(front->empty(), false);
+}
+
+#endif // GOBLIN_HAS_CUDA

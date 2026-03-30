@@ -2530,8 +2530,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INSTANCE_H
-  //
   // #ifndef _GOBLIN_GP_CONTEXT_H
   //
   // #ifndef _GOBLIN_GP_OPERATOR_H
@@ -3037,6 +3035,11 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this")
       ;
   // #endif
+  // #ifndef _GOBLIN_GP_INIT_H
+  //
+  // #ifndef _GOBLIN_GP_INSTANCE_H
+  //
+
 
 
   auto pyClassGPInstanceBase =
@@ -3083,8 +3086,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::PyGPInstance::context)
       ;
   // #endif
-  // #ifndef _GOBLIN_GP_INIT_H
-  //
+
 
 
   auto pyClassGrowInit =
@@ -3147,6 +3149,96 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_GP_SR_H
   //
+  // #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+  //
+
+
+  m.def("round_up",
+      goblin::round_up, nb::arg("value"), nb::arg("multiple"));
+
+  m.def("ceil_div",
+      goblin::ceil_div, nb::arg("a"), nb::arg("b"));
+
+
+  auto pyClassKernelDim =
+      nb::class_<goblin::KernelDim>
+          (m, "KernelDim", "")
+      .def_rw("x", &goblin::KernelDim::x, "")
+      .def_rw("y", &goblin::KernelDim::y, "")
+      .def_rw("z", &goblin::KernelDim::z, "")
+      .def(nb::init<>())
+      .def(nb::init<size_t, size_t, size_t>(),
+          nb::arg("_x"), nb::arg("_y") = 1, nb::arg("_z") = 1)
+      .def_static("determine",
+          &goblin::KernelDim::determine,
+          nb::arg("count"),
+          " Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)\n that minimises idle threads when covering `count` items.")
+      .def("check",
+          &goblin::KernelDim::check)
+      .def("__eq__",
+          &goblin::KernelDim::operator==, nb::arg("other"))
+      ;
+
+
+  auto pyClassKernelConfig =
+      nb::class_<goblin::KernelConfig>
+          (m, "KernelConfig", "")
+      .def_rw("grid", &goblin::KernelConfig::grid, "")
+      .def_rw("block", &goblin::KernelConfig::block, "")
+      .def(nb::init<>())
+      .def(nb::init<goblin::KernelDim, goblin::KernelDim>(),
+          nb::arg("_grid"), nb::arg("_block"))
+      .def_static("for_eval",
+          &goblin::KernelConfig::for_eval,
+          nb::arg("num_solutions"), nb::arg("num_datapoints"),
+          "One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce.")
+      .def_static("for_eval_single",
+          &goblin::KernelConfig::for_eval_single,
+          nb::arg("num_solutions"), nb::arg("num_datapoints"),
+          "One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants.")
+      .def_static("for_eval_hybrid",
+          &goblin::KernelConfig::for_eval_hybrid,
+          nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("blocks_per_individual"),
+          "Multiple blocks per solution; blocks split the datapoints. Used by Hybrid.")
+      .def_static("for_mse_simple",
+          &goblin::KernelConfig::for_mse_simple,
+          nb::arg("num_solutions"),
+          "One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory.")
+      .def_static("for_mse_block",
+          &goblin::KernelConfig::for_mse_block,
+          nb::arg("num_solutions"), nb::arg("num_partial"),
+          "One block per solution for the MSE reduction. Used by BlockReduce and Hybrid.")
+      .def("check",
+          &goblin::KernelConfig::check)
+      .def("__eq__",
+          &goblin::KernelConfig::operator==, nb::arg("other"))
+      ;
+
+
+  auto pyClassLaunchConfig =
+      nb::class_<goblin::LaunchConfig>
+          (m, "LaunchConfig", "")
+      .def_rw("eval", &goblin::LaunchConfig::eval, "")
+      .def_rw("mse", &goblin::LaunchConfig::mse, "")
+      .def_rw("kernel_version", &goblin::LaunchConfig::kernel_version, "")
+      .def_rw("num_solutions", &goblin::LaunchConfig::num_solutions, "")
+      .def_rw("num_datapoints", &goblin::LaunchConfig::num_datapoints, "")
+      .def_rw("solution_length", &goblin::LaunchConfig::solution_length, "")
+      .def_rw("blocks_per_individual", &goblin::LaunchConfig::blocks_per_individual, "")
+      .def_rw("datapoints_per_block", &goblin::LaunchConfig::datapoints_per_block, "")
+      .def_rw("datapoints_per_thread", &goblin::LaunchConfig::datapoints_per_thread, "")
+      .def(nb::init<>())
+      .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion>(),
+          nb::arg("eval"), nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::Baseline)
+      .def_static("determine",
+          &goblin::LaunchConfig::determine, nb::arg("kernel_version"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("solution_length"), nb::arg("num_sms").none())
+      .def("check",
+          &goblin::LaunchConfig::check)
+      .def("__eq__",
+          &goblin::LaunchConfig::operator==, nb::arg("other"))
+      ;
+  // #endif
+
 
 
   auto pyClassSRQuality =
@@ -3231,6 +3323,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("var_y_test", &goblin::SRProblem::var_Y_test, "")
       ;
   // #endif
+
+  m.def("has_gpu_support",
+      has_gpu_support);
   // #ifndef _GOBLIN_BENCH_FUNCTIONS_H
   //
 

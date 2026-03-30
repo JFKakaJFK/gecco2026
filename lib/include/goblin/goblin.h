@@ -22,12 +22,29 @@
 #include "goblin/lib/method.h"
 #include "goblin/lib/init.h"
 
-#include "goblin/gp/instance.h"
-#include "goblin/gp/template.h"
-#include "goblin/gp/operator.h"
 #include "goblin/gp/context.h"
 #include "goblin/gp/init.h"
+#include "goblin/gp/instance.h"
+#include "goblin/gp/operator.h"
 #include "goblin/gp/sr.h"
+#include "goblin/gp/template.h"
+
+#include "goblin/gp/gpu_evaluation/launch_config.h"
+#include "goblin/gp/gpu_evaluation/types.h"
+
+#ifdef GOBLIN_HAS_CUDA
+#include "goblin/gp/gpu_evaluation/evaluate.h"
+#include "goblin/gp/gpu_evaluation/memory.h"
+#include "goblin/gp/gpu_evaluation/misc.h"
+#endif
+
+inline bool has_gpu_support() {
+#ifdef GOBLIN_HAS_CUDA
+  return true;
+#else
+  return false;
+#endif
+}
 
 #include "goblin/bench/functions.h"
 #include "goblin/bench/functions/combinators.h"

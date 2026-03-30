@@ -1,14 +1,12 @@
 #include <print>
 #include <iostream>
 
-#define EIGEN_DONT_ALIGN
-#define EIGEN_MAX_ALIGN_BYTES 0
-#define EIGEN_DONT_VECTORIZE
 #include "doctest/doctest.h"
 #include <Eigen/Dense>
 
 #include "goblin/bench/tracked.h"
 #include "goblin/gp/sr.h"
+#include "goblin/lib/misc.h"
 #include "goblin/methods/mixed.h"
 
 using namespace std::chrono_literals;
