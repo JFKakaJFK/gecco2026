@@ -46,15 +46,13 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    grid_execution(cfg.TEST_GPU, output_directory)
-
     # grid_execution(cfg.FEYNMAN_MILLION, output_directory, dry_run=True)
 
-    # grid_execution(cfg.ADDITION, output_directory, dry_run=True)
-    # grid_execution(cfg.DIVISION, output_directory, dry_run=True)
-    # grid_execution(cfg.SUBTRACTION, output_directory, dry_run=True)
-    # grid_execution(cfg.MULTIPLICATION, output_directory, dry_run=True)
-    # grid_execution(cfg.SQUARE, output_directory, dry_run=True)
+    grid_execution(cfg.ADDITION, output_directory, dry_run=True)
+    grid_execution(cfg.DIVISION, output_directory, dry_run=True)
+    grid_execution(cfg.SUBTRACTION, output_directory, dry_run=True)
+    grid_execution(cfg.MULTIPLICATION, output_directory, dry_run=True)
+    grid_execution(cfg.SQUARE, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":
