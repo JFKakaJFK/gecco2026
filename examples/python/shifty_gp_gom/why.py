@@ -4,20 +4,19 @@ import numpy as np
 import pygom
 from mpmath.function_docs import shi
 from pygom import *
-from tqdm import tqdm
-
 from src.config import c, extract, instantiate, load_config
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
+from tqdm import tqdm
 
 REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "shifty_gom"
+RESULT_DIR = pathlib.Path("results") / "mutation"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -27,9 +26,9 @@ BUDGET = c.Budget(
     # max_generations=300,
     # max_evaluations=int(5e5)
     # max_evaluations=int(1e6)
-    # max_evaluations=int(2e6)
+    max_evaluations=int(2e6)
     # max_evaluations=int(5e6)
-    max_evaluations=int(1e7)
+    # max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
 )
 
@@ -67,15 +66,15 @@ def problems(rng):
         # # "1089_USCrime",
         # "210_cloud",
         # "522_pm10",
-        # "Airfoil",
-        # "Bike Sharing",
-        # "Concrete Compressive Strength",
-        # "Dow Chemical",
-        # "Tower",
+        "Airfoil",
+        "Bike Sharing",
+        "Concrete Compressive Strength",
+        "Dow Chemical",
+        "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
-        "feynman_I_9_18"
+        # "feynman_I_9_18"
     ]
 
     for problem in problems:
@@ -101,9 +100,12 @@ def problems(rng):
                 float(np.nanmax(y_fold[:, 0])),
             )
 
+            # lol: writing the node_proximity matrix for deep trees to the config file is a serious performance bottleneck
+            # depth 6: 16k line config files
+            # depth 9: >200k line config files
             for height in [
                 # 5  # ,
-                9
+                7
             ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
@@ -118,7 +120,9 @@ def problems(rng):
                         False,
                         # True
                     ]:
-                        for constant_representation in ["ercs", "none"]:
+                        for constant_representation in [
+                            "ercs",  # "none"
+                        ]:
                             ctx = c.GPContext(
                                 num_inputs=int(X_fold.shape[1]),
                                 expression_template=template,
@@ -304,11 +308,19 @@ def methods(info, ctx):
                 **copt_model_kwargs,
             )
 
-            for shifty_gom in [False, True]:
-                gn = ["", "(Shifty)"][shifty_gom]
+            # for shifty_gom in [False, True]:
+            #     gn = ["", "(Shifty)"][shifty_gom]
+            # for resample_inactive in [False, True]:
+            #     gn = ["", "(Resample)"][resample_inactive]
+            for mutation in ["", "weak", "strong"]:
+                discrete_mutation_probability = 0.0
+                if mutation == "weak":
+                    discrete_mutation_probability = 1.0 / ctx.num_discrete
+                elif mutation == "strong":
+                    discrete_mutation_probability = None
 
                 yield (
-                    f'"{similarity} {gn} {constant_representation}"',
+                    f'"{similarity} {mutation} {constant_representation}"',
                     c.MixedGOMEA(
                         discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
                         population_options=c.PopulationOptions(
@@ -319,7 +331,9 @@ def methods(info, ctx):
                             and "nfi"
                             not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
                             enable_mixed_forced_improvements="nmfi" not in copt,
-                            use_fancy_gpu_gp_gom=shifty_gom,
+                            # use_fancy_gpu_gp_gom=shifty_gom,
+                            # resample_inactive_donor_values=resample_inactive,
+                            discrete_mutation_probability=discrete_mutation_probability,
                             **copt_population_kwargs,
                         ),
                         rv_options=c.RvOptions(**rv_options),

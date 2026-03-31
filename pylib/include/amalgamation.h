@@ -10383,8 +10383,13 @@ struct PopulationOptions {
   usize gradient_step_frequency = 0;
   usize gradient_step_count = 10;
 
+  // If std::nullopt, then perform strong mutation (i.e. 1/subset size).
+  // Note that for single element subsets, this collapses to random search
+  std::optional<double> discrete_mutation_probability = 0.0;
+
   // TODO this whole file really needs a refactor lol
   bool use_fancy_gpu_gp_gom = false;
+  bool resample_inactive_donor_values = false;
 };
 
 template <typename SolutionSet>
@@ -11208,6 +11213,44 @@ class Population {
 
           std::tie(evaluation_needed, anything_changed) =
               problem.inherit_discrete(solutions[i], donors[cluster_donors[k][donor_idx]], *subsets[i]);
+
+          double p_mut =
+              options.discrete_mutation_probability.value_or(1.0 / static_cast<double>(subsets[i]->discrete.size()));
+          if (p_mut > 0.0) {
+            std::uniform_real_distribution<double> U(0.0, 1.0);
+            for (usize j : subsets[i]->discrete) {
+              if (U(rng) < p_mut) {
+                // assign a random value to the position
+                std::uniform_int_distribution<DType> d_j(0, problem.discrete_domain_sizes()(j) - 1);
+                auto v = d_j(rng);
+                solutions[i].discrete_values()(j) = v;
+                bool changed = v != parents[i].discrete_values()(j);
+                evaluation_needed |= changed && solutions[i].discrete_active()(j);
+                anything_changed |= changed;
+              }
+            }
+          }
+          if (options.resample_inactive_donor_values) {
+            // TODO: probably semantically misinformed for GP - random sampling typically doesn't correspond to a good
+            // distribution over trees
+            //
+            // Idea: so far drift/no-drift (keep old or inherit) were considered for inactive
+            // values, where drift seems preferrable (i.e. bias inactive variables towards what is good in other
+            // solutions) BUT the reasonable default of "assume we know nothing" has not yet been explored - effectively
+            // "perform random search if the donor doesn't have a value"
+            const auto& donor = donors[cluster_donors[k][donor_idx]];
+            for (usize j : subsets[i]->discrete) {
+              if (!donor.discrete_active()(j)) {
+                // assign a random value to the position
+                std::uniform_int_distribution<DType> d_j(0, problem.discrete_domain_sizes()(j) - 1);
+                auto v = d_j(rng);
+                solutions[i].discrete_values()(j) = v;
+                bool changed = v != parents[i].discrete_values()(j);
+                evaluation_needed |= changed && solutions[i].discrete_active()(j);
+                anything_changed |= changed;
+              }
+            }
+          }
 
           if (evaluation_needed) {  // parent will be updated during acceptance
             solutions_to_evaluate.push_back(i);

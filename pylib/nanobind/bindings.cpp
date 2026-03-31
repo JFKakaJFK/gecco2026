@@ -4236,7 +4236,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassPopulationOptions =
       nb::class_<goblin::PopulationOptions>
           (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, bool enable_mixed_forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10, bool use_fancy_gpu_gp_gom = false)
+      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, bool enable_mixed_forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10, std::optional<double> discrete_mutation_probability = 0.0, bool use_fancy_gpu_gp_gom = false, bool resample_inactive_donor_values = false)
       {
           new (self) goblin::PopulationOptions();  // placement new
           auto r_ctor_ = self;
@@ -4259,9 +4259,11 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->mutate_before_gradient_step = mutate_before_gradient_step;
           r_ctor_->gradient_step_frequency = gradient_step_frequency;
           r_ctor_->gradient_step_count = gradient_step_count;
+          r_ctor_->discrete_mutation_probability = discrete_mutation_probability;
           r_ctor_->use_fancy_gpu_gp_gom = use_fancy_gpu_gp_gom;
+          r_ctor_->resample_inactive_donor_values = resample_inactive_donor_values;
       },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("enable_mixed_forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10, nb::arg("use_fancy_gpu_gp_gom") = false
+      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("enable_mixed_forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10, nb::arg("discrete_mutation_probability").none() = 0.0, nb::arg("use_fancy_gpu_gp_gom") = false, nb::arg("resample_inactive_donor_values") = false
       )
       .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
       .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
@@ -4282,7 +4284,9 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("mutate_before_gradient_step", &goblin::PopulationOptions::mutate_before_gradient_step, "")
       .def_rw("gradient_step_frequency", &goblin::PopulationOptions::gradient_step_frequency, "")
       .def_rw("gradient_step_count", &goblin::PopulationOptions::gradient_step_count, "")
-      .def_rw("use_fancy_gpu_gp_gom", &goblin::PopulationOptions::use_fancy_gpu_gp_gom, "TODO this whole file really needs a refactor lol")
+      .def_rw("discrete_mutation_probability", &goblin::PopulationOptions::discrete_mutation_probability, " If std::nullopt, then perform strong mutation (i.e. 1/subset size).\n Note that for single element subsets, this collapses to random search")
+      .def_rw("use_fancy_gpu_gp_gom", &goblin::PopulationOptions::use_fancy_gpu_gp_gom, "")
+      .def_rw("resample_inactive_donor_values", &goblin::PopulationOptions::resample_inactive_donor_values, "")
       ;
 
 

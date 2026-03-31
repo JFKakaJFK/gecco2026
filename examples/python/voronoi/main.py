@@ -52,7 +52,7 @@ if __name__ == "__main__":
     )
 
     ea = SimpleGA(
-        population_size=250,
+        population_size=100,
         steady_state=True,
         # apply uniform/one-point crossover with different probabilities
         crossover=CombinedCrossover(

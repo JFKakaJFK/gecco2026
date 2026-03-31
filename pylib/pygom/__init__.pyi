@@ -4442,8 +4442,13 @@ class PopulationOptions:
     gradient_step_frequency: int = 0
     gradient_step_count: int = 10
 
+    # If std::nullopt, then perform strong mutation (i.e. 1/subset size).
+    # Note that for single element subsets, this collapses to random search
+    discrete_mutation_probability: Optional[float] = 0.0
+
     # TODO this whole file really needs a refactor lol
     use_fancy_gpu_gp_gom: bool = False
+    resample_inactive_donor_values: bool = False
     def __init__(
         self,
         donor_pool_size_multiplier: float = 2.0,
@@ -4465,7 +4470,9 @@ class PopulationOptions:
         mutate_before_gradient_step: bool = True,
         gradient_step_frequency: int = 0,
         gradient_step_count: int = 10,
+        discrete_mutation_probability: Optional[float] = 0.0,
         use_fancy_gpu_gp_gom: bool = False,
+        resample_inactive_donor_values: bool = False,
     ) -> None:
         """Auto-generated default constructor with named params"""
         pass

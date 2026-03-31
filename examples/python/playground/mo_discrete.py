@@ -1,6 +1,7 @@
 import pathlib
 
 from pygom import *
+
 from src.config import Config, c
 from src.plots import plot_scalability
 from src.postprocessing import load_results
@@ -68,15 +69,25 @@ def methods():
     )
 
     for metric in ["mi", "nmi"]:
-        yield (
-            f"{metric.upper()} LT".strip(),
-            c.MixedGOMEA(
-                ims_options=c.IMSOptions(
-                    initial_population_size=8, subgeneration_factor=2
+        for mutation in ["", "weak", "strong"]:
+            discrete_mutation_probability = 0.0
+            if mutation == "weak":
+                #     discrete_mutation_probability = 1.0 / problem.num_discrete()
+                continue
+            elif mutation == "strong":
+                discrete_mutation_probability = None
+            yield (
+                f'"{f"{metric.upper()} LT {mutation}".strip()}"',
+                c.MixedGOMEA(
+                    ims_options=c.IMSOptions(
+                        initial_population_size=8, subgeneration_factor=2
+                    ),
+                    population_options=c.PopulationOptions(
+                        discrete_mutation_probability=discrete_mutation_probability
+                    ),
+                    discrete_model=c.LinkageTreeFOS(metric=metric),
                 ),
-                discrete_model=c.LinkageTreeFOS(metric=metric),
-            ),
-        )
+            )
 
 
 if __name__ == "__main__":
@@ -96,7 +107,7 @@ if __name__ == "__main__":
     )
 
     preprocess = True
-    preprocess = False
+    # preprocess = False
 
     plot_dir = pathlib.Path("plots")
     plot_dir.mkdir(parents=True, exist_ok=True)

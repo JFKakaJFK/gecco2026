@@ -3,20 +3,19 @@ import pathlib
 import numpy as np
 import pygom
 from pygom import *
-from tqdm import tqdm
-
 from src.config import c, extract, instantiate, load_config
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
+from tqdm import tqdm
 
 REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "speed_check"
+RESULT_DIR = pathlib.Path("results") / "rvterm4"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -24,11 +23,11 @@ PLOT_DIR = RESULT_DIR / "plots"
 
 BUDGET = c.Budget(
     # max_generations=300,
-    max_evaluations=int(5e5)
+    # max_evaluations=int(5e5)
     # max_evaluations=int(1e6)
     # max_evaluations=int(2e6)
     # max_evaluations=int(5e6)
-    # max_evaluations=int(1e7)
+    max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
 )
 
@@ -67,10 +66,10 @@ def problems(rng):
         # "210_cloud",
         # "522_pm10",
         "Airfoil",
-        # "Bike Sharing",
-        # "Concrete Compressive Strength",
-        # "Dow Chemical",
-        "Tower",
+        "Bike Sharing",
+        "Concrete Compressive Strength",
+        "Dow Chemical",
+        # "Tower",
         # "Energy Cooling",
         # "Energy Heating",
         # "Yacht Hydrodynamics",
@@ -98,8 +97,8 @@ def problems(rng):
             )
 
             for height in [
-                # 5  # ,
-                7
+                5  # ,
+                # 7
             ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
@@ -135,13 +134,13 @@ def problems(rng):
                                 expression_template=template,
                                 operators=operators,
                                 constant_representation=constant_representation,
-                                use_apply_buf=False,
+                                use_apply_buf=True,
                             )
 
                             for batch_size in [  #
-                                None,
+                                # None,
                                 # 32,
-                                # 256
+                                256
                             ]:
                                 for run in range(REPEATS_PER_FOLD):
                                     seed = int(rng.integers(2**32))
@@ -221,8 +220,8 @@ def methods(info, ctx):
         ]
     if constant_representation == "pool":
         variants += [
-            # ", $Pool_{10}$ + LM",
-            # ", $Pool_{10}$ + RV (1:1)",
+            ", $Pool_{10}$ + LM",
+            ", $Pool_{10}$ + RV (1:1)",
             # ", $Pool_{10}$ + RV (1:2)",
             # ", $Pool_{10}$ + RVIA",
             # ", $Pool_{10}$ + RV (iu)",
@@ -321,10 +320,10 @@ def methods(info, ctx):
                         target_continuous_to_discrete_balance=0.5
                         if "1:2" in copt
                         else 1.0,
-                        forced_improvements="RV" in copt
-                        and "nfi"
+                        forced_improvements="nfi"
                         not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
-                        enable_mixed_forced_improvements="nmfi" not in copt,
+                        enable_mixed_forced_improvements="RV" in copt
+                        and "nmfi" not in copt,
                         **copt_population_kwargs,
                     ),
                     rv_options=c.RvOptions(**rv_options),

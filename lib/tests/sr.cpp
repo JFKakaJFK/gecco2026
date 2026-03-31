@@ -154,7 +154,8 @@ TEST_CASE("goblin::gp::sr") {
   std::vector<std::string> constant_reps = {"ercs", "pool", "edges", "none"};
   for (auto& crep : constant_reps) {
     for (usize ic = 0; ic <= 2; ic++) {
-      std::optional<bool> always_inherit_continuous = ic < 2 ? std::make_optional(ic > 0) : std::nullopt;
+      std::optional<bool> always_inherit_continuous =
+          crep != "edges" && crep != "none" && ic < 2 ? std::make_optional(ic > 0) : std::nullopt;
       GPContext pctx(
           /* num_inputs = */ X.cols(), tmplate, operators,
           /* num_parameters = */ 0, crep);
