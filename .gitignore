@@ -206,6 +206,4 @@ examples/python/playground/plots/symbolic_regression_convergence/
 *.html
 *.sqlite
 
-# Experiment results
 **/pmlb_cache
-**/results
