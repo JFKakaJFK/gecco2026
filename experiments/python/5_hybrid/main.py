@@ -47,6 +47,8 @@ def main():
     output_directory = Path("results") / run_date
 
     grid_execution(cfg.HYBRID_DAILY_DEMAND, output_directory, dry_run=True)
+    grid_execution(cfg.HYBRID_AUTO_MPG, output_directory, dry_run=True)
+    grid_execution(cfg.HYBRID_CALIFORNIA, output_directory, dry_run=True)
     grid_execution(cfg.HYBRID_FEYNMAN, output_directory, dry_run=True)
 
 

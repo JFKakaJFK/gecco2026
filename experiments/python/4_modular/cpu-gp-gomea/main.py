@@ -43,9 +43,9 @@ def main():
     # run_date = "2026-02-01_17:02:09"
     output_directory = Path("results") / run_date
 
-    grid_execution(cfg.MODULAR_DISTANCE_CPU, output_directory, dry_run=True)
-    grid_execution(cfg.MODULAR_DOT_PRODUCT_CPU, output_directory, dry_run=True)
-    grid_execution(cfg.MODULAR_GRAVITY_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.DISTANCE_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.DOT_PRODUCT_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.GRAVITY_CPU, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":

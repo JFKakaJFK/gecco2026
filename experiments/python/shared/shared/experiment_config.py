@@ -41,6 +41,7 @@ class TemplateConfig:
     branching_factor: int = 2
     depth: int = 4
     max_tree_len: int | None = None
+    subtrees: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -203,25 +204,6 @@ FEYNMAN_GPU_CONFIG = PaperExperimentConfig("feynman_I_9_18", True)
 ### Experiment 3: Exact Solution ###
 ####################################
 
-FEYNMAN_EXACT_CONFIG = ExperimentConfig(
-    # Problem Space
-    name="feynman",
-    datasets=[DATASETS["feynman_I_9_18"]],
-    population_sizes=[2**i for i in range(14, 17)],  # 128 - 1048576
-    num_observations=[100_000],
-    num_features=None,
-    templates=[TemplateConfig(2, 6)],
-    operator_sets=["square"],
-    # Execution Parameters
-    use_target=False,
-    num_folds=9,
-    num_iterations=1,
-    test_size=0,
-    cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=60,
-)
-
 ADDITION_CONFIG = ExperimentConfig(
     name="1_addition",
     datasets=[DATASETS["1_addition"]],
@@ -312,30 +294,198 @@ SQUARE_CONFIG = ExperimentConfig(
     max_duration=240,
 )
 
-FEYNMAN_MILLION_CONFIG = ExperimentConfig(
-    name="feynman_million",
-    datasets=[DATASETS["feynman_million"]],
-    population_sizes=[65536],
-    num_observations=[1_000_000],
+######################################
+### Experiment 4: Modular GP-GOMEA ###
+######################################
+
+MODULAR_DOT_PRODUCT_CPU = ExperimentConfig(
+    name="dot_product",
+    datasets=[DATASETS["feynman_I_11_19"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
     num_features=None,
-    templates=[TemplateConfig(2, 6), TemplateConfig(2, 8)],
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
     operator_sets=["square"],
-    # Execution Parameters
+    # Execution parameters
     use_target=False,
-    num_folds=30,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_DISTANCE_CPU = ExperimentConfig(
+    name="distance",
+    datasets=[DATASETS["feynman_I_8_14"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_GRAVITY_CPU = ExperimentConfig(
+    name="gravity",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_DOT_PRODUCT_GPU = ExperimentConfig(
+    name="dot_product",
+    datasets=[DATASETS["feynman_I_11_19"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=240,
+    max_duration=10,
+)
+
+MODULAR_DISTANCE_GPU = ExperimentConfig(
+    name="distance",
+    datasets=[DATASETS["feynman_I_8_14"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_GRAVITY_GPU = ExperimentConfig(
+    name="gravity",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[2**i for i in range(7, 17)],
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
+    operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+######################################
+### Experiment 5: Hybrid Kernel ###
+######################################
+
+HYBRID_DAILY_DEMAND_CONFIG = ExperimentConfig(
+    name="daily_demand",
+    datasets=[DATASETS["daily_demand"]],
+    population_sizes=[2**i for i in range(5, 11)],  # 32 - 1024
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    max_duration=10,
+)
+
+HYBRID_AUTO_MPG_CONFIG = ExperimentConfig(
+    name="auto_mpg",
+    datasets=[DATASETS["auto_mpg"]],
+    population_sizes=[2**i for i in range(5, 11)],  # 32 - 1024
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    max_duration=10,
+)
+
+HYBRID_CALIFORNIA_CONFIG = ExperimentConfig(
+    name="california_housing",
+    datasets=[DATASETS["california_housing"]],
+    population_sizes=[2**i for i in range(5, 11)],  # 32 - 1024
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    max_duration=10,
+)
+
+HYBRID_FEYNMAN_CONFIG = ExperimentConfig(
+    name="feynman_I_9_18",
+    datasets=[DATASETS["feynman_I_9_18"]],
+    population_sizes=[2**i for i in range(5, 11)],  # 32 - 1024
+    num_observations=None,
+    num_features=None,
+    templates=[TemplateConfig(2, 4), TemplateConfig(2, 6)],
+    operator_sets=["paper"],
+    # Execution Parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    max_duration=10,
 )
 
 
 class Configs:
     TEST_CPU = TEST_CPU_CONFIG
     TEST_GPU = TEST_GPU_CONFIG
-
-    # Paper experiments
 
     # Experiment 1
     CPU_SHOOTOUT = CPU_SHOOTOUT_CONFIG
@@ -352,14 +502,26 @@ class Configs:
     FEYNMAN_GPU = FEYNMAN_GPU_CONFIG
 
     # Experiment 3
-    FEYNMAN_EXACT = FEYNMAN_EXACT_CONFIG
-    FEYNMAN_MILLION = FEYNMAN_MILLION_CONFIG
-
     ADDITION = ADDITION_CONFIG
     DIVISION = DIVISION_CONFIG
     SUBTRACTION = SUBTRACTION_CONFIG
     MULTIPLICATION = MULTIPLICATION_CONFIG
     SQUARE = SQUARE_CONFIG
+
+    # Experiment 4
+    DOT_PRODUCT_CPU = MODULAR_DOT_PRODUCT_CPU
+    DISTANCE_CPU = MODULAR_DISTANCE_CPU
+    GRAVITY_CPU = MODULAR_GRAVITY_CPU
+
+    DOT_PRODUCT_GPU = MODULAR_DOT_PRODUCT_GPU
+    DISTANCE_GPU = MODULAR_DISTANCE_GPU
+    GRAVITY_GPU = MODULAR_GRAVITY_GPU
+
+    # Experiment 5
+    HYBRID_DAILY_DEMAND = HYBRID_DAILY_DEMAND_CONFIG
+    HYBRID_AUTO_MPG = HYBRID_AUTO_MPG_CONFIG
+    HYBRID_CALIFORNIA = HYBRID_CALIFORNIA_CONFIG
+    HYBRID_FEYNMAN = HYBRID_FEYNMAN_CONFIG
 
 
 cfg = Configs()
