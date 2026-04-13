@@ -27,6 +27,7 @@ class Task(TypedDict):
     num_features: int
     branching_factor: int
     depth: int
+    subtrees: tuple[tuple[int, int], ...]
     max_tree_len: int
     operator_set: str
     target_objectives: list[float] = None
@@ -186,6 +187,7 @@ def create_tasks(
                 "kernel": None,
                 "branching_factor": problem["template"].branching_factor,
                 "depth": problem["template"].depth,
+                "subtrees": problem["template"].subtrees,
                 "max_tree_len": problem["template"].max_tree_len,
                 "target_objectives": target_objectives,
                 "fold": fold,
