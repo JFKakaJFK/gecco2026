@@ -933,9 +933,12 @@ class GPContext {
 
       // While there are still nodes to visit
       while(!node_stack.empty()) {
-        // Hit the max size, but still have more nodes to process
+        // Hit the max size, but still have more nodes to process - clear the stack to break
+        // out of the loop and fall through to the padding code below, keeping the GPU buffer
+        // layout intact for all subsequent solutions in the batch.
         if (size + temp_type.size() == max_expression_size) {
-          return;
+          node_stack.clear();
+          break;
         }
 
         // Pop the top node from the stack
