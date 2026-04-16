@@ -121,6 +121,9 @@ def lambdify_expression(e):
     """Converts a `sympy` compatible expression string into a function accepting a dataset `X`."""
     e = str(e)
 
+    if e == "SIZE OVERFLOW":
+        return lambda X: np.repeat(float("nan"), X.shape[0])
+
     symbols = {x: sym.Symbol(x) for x in re.findall(r"(x\d+)", e)}
     expr = sym.sympify(e, locals=symbols)
     f = sym.lambdify(symbols.values(), expr, modules=[{"clip": np.clip}, "numpy"])

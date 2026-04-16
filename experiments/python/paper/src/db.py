@@ -9,12 +9,9 @@ DATASETS = ["daily_demand", "auto_mpg", "california_housing", "feynman"]
 
 
 def create_db_experiment_1(dir: pathlib.Path):
-    print("Starting experiment_1 db creation...")
-
     db_path = dir / "all_results.duckdb"
 
     if os.path.exists(db_path):
-        print("Removed previous database")
         os.remove(db_path)
 
     conn = duckdb.connect(db_path)
@@ -57,12 +54,9 @@ def create_db_experiment_1(dir: pathlib.Path):
 
 
 def create_db_experiment_2(dir: pathlib.Path):
-    print("Starting database creation...")
-
     db_path = dir / "all_results.duckdb"
 
     if os.path.exists(db_path):
-        print("Removed previous database")
         os.remove(db_path)
 
     conn = duckdb.connect(db_path)
@@ -88,15 +82,11 @@ def create_db_experiment_2(dir: pathlib.Path):
     """
     )
 
-    for csv_file in tqdm(
-        [
-            f
-            for f in glob.glob(f"{dir}/**/*.csv", recursive=True)
-            if "backup" not in f.split(os.sep)
-        ],
-        leave=False,
-        ascii=True,
-    ):
+    for csv_file in [
+        f
+        for f in glob.glob(f"{dir}/**/*.csv", recursive=True)
+        if "backup" not in f.split(os.sep)
+    ]:
         _, _, algorithm, dataset = csv_file.split(os.sep)
 
         conn.execute(
@@ -121,15 +111,11 @@ def create_db_experiment_2(dir: pathlib.Path):
         """
         )
 
-    for db_file in tqdm(
-        [
-            f
-            for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
-            if "backup" not in f.split(os.sep)
-        ],
-        leave=False,
-        ascii=True,
-    ):
+    for db_file in [
+        f
+        for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
+        if "backup" not in f.split(os.sep)
+    ]:
         file = db_file.split(os.sep)
 
         algorithm = file[-2]
@@ -166,13 +152,67 @@ def create_db_experiment_2(dir: pathlib.Path):
         conn.execute("DETACH src")
 
 
-def create_db_experiment_6(dir: pathlib.Path):
-    print("Starting database creation...")
-
+def create_db_experiment_3(dir: pathlib.Path):
     db_path = dir / "all_results.duckdb"
 
     if os.path.exists(db_path):
-        print("Removed previous database")
+        os.remove(db_path)
+
+    conn = duckdb.connect(db_path)
+
+    conn.execute("""
+    CREATE TABLE IF NOT EXISTS results (
+        log_config TEXT,
+        dataset TEXT,
+        total_time_seconds DOUBLE,
+        old_mse DOUBLE,
+        mse DOUBLE,
+        var_y DOUBLE,
+        fold INTEGER,
+        template_depth INTEGER,
+        population_size INTEGER,
+    );
+    """)
+
+    for db_file in [
+        f
+        for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
+        if "backup" not in f.split(os.sep)
+    ]:
+        parts = db_file.split(os.sep)
+        log_config = parts[-2]
+        dataset = parts[-1].split(".")[0]
+
+        conn.execute(f"ATTACH '{db_file}' AS src")
+
+        conn.execute(f"""
+            INSERT INTO results
+            SELECT
+                '{log_config}' AS log_config,
+                '{dataset}' AS dataset,
+                total_time_seconds,
+                old_mse,
+                mse,
+                var_y,
+                fold,
+                template_depth,
+                population_size,
+            FROM src.results
+            WHERE old_mse IS NOT NULL
+        """)
+
+        conn.execute("DETACH src")
+
+    conn.execute("ALTER TABLE results ADD COLUMN nmse DOUBLE")
+    conn.execute("UPDATE results SET nmse = old_mse / var_y")
+    conn.execute("ALTER TABLE results ADD COLUMN nmse_final DOUBLE")
+    conn.execute("UPDATE results SET nmse_final = mse / var_y WHERE mse IS NOT NULL")
+
+
+def create_db_experiment_6(dir: pathlib.Path):
+    db_path = dir / "all_results.duckdb"
+
+    if os.path.exists(db_path):
         os.remove(db_path)
 
     conn = duckdb.connect(db_path)
@@ -199,15 +239,11 @@ def create_db_experiment_6(dir: pathlib.Path):
     """
     )
 
-    for db_file in tqdm(
-        [
-            f
-            for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
-            if "backup" not in f.split(os.sep)
-        ],
-        leave=False,
-        ascii=True,
-    ):
+    for db_file in [
+        f
+        for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
+        if "backup" not in f.split(os.sep)
+    ]:
         file = db_file.split(os.sep)
 
         algorithm = file[-3]
@@ -244,67 +280,3 @@ def create_db_experiment_6(dir: pathlib.Path):
         """)
 
         conn.execute("DETACH src")
-
-
-def create_db_experiment_3(dir: pathlib.Path):
-    print("Starting experiment_3 db creation...")
-
-    db_path = dir / "all_results.duckdb"
-
-    if os.path.exists(db_path):
-        print("Removed previous database")
-        os.remove(db_path)
-
-    conn = duckdb.connect(db_path)
-
-    conn.execute("""
-    CREATE TABLE IF NOT EXISTS results (
-        log_config TEXT,
-        dataset TEXT,
-        total_time_seconds DOUBLE,
-        old_mse DOUBLE,
-        mse DOUBLE,
-        var_y DOUBLE,
-        fold INTEGER,
-        template_depth INTEGER,
-        population_size INTEGER,
-    );
-    """)
-
-    for db_file in tqdm(
-        [
-            f
-            for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
-            if "backup" not in f.split(os.sep)
-        ],
-        leave=False,
-        ascii=True,
-    ):
-        parts = db_file.split(os.sep)
-        log_config = parts[-2]
-        dataset = parts[-1].split(".")[0]
-
-        conn.execute(f"ATTACH '{db_file}' AS src")
-
-        conn.execute(f"""
-            INSERT INTO results
-            SELECT
-                '{log_config}' AS log_config,
-                '{dataset}' AS dataset,
-                total_time_seconds,
-                old_mse,
-                mse,
-                var_y,
-                fold,
-                template_depth,
-                population_size,
-            FROM src.results
-            WHERE old_mse IS NOT NULL
-        """)
-
-        conn.execute("DETACH src")
-
-    conn.execute("ALTER TABLE results ADD COLUMN nmse DOUBLE")
-    conn.execute("UPDATE results SET nmse = old_mse / var_y")
-    conn.execute("ALTER TABLE results ADD COLUMN nmse_final DOUBLE")
-    conn.execute("UPDATE results SET nmse_final = mse / var_y WHERE mse IS NOT NULL")
