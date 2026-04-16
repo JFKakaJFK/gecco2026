@@ -10,9 +10,9 @@ from src.preprocess import interpolate_onto_time_grid
 ALGORITHM_LABELS = {
     "cpu_results": "GP-GOMEA (CPU)",
     "gpu_results": "GP-GOMEA (GPU)",
-    "evogp_results": "EvoGP",
-    "operon_results": "Operon",
-    "kozax_results": "Kozax",
+    "evogp_results": "EvoGP (GPU)",
+    "operon_results": "Operon (CPU)",
+    "kozax_results": "Kozax (GPU)",
 }
 
 DATASET_LABELS = {
@@ -28,20 +28,26 @@ DATASET_LABELS = {
 }
 
 VAR_LABELS = {
-    "mse": "MSE",
+    "mse": "Training MSE",
+    "mse_val": "Validation MSE",
     "evaluations": "#Evaluations / Minute",
 }
 
 TIME_BUDGET_MINUTES = {
     "GP-GOMEA (CPU)": 60,
     "GP-GOMEA (GPU)": 10,
-    "EvoGP": 10,
-    "Operon": 60,
-    "Kozax": 10,
+    "EvoGP (GPU)": 10,
+    "Operon (CPU)": 60,
+    "Kozax (GPU)": 10,
+}
+
+KERNEL_LABELS = {
+    "hybrid": "Hybrid-Block",
+    "single_kernel_inplace": "Single-Block",
 }
 
 
-def plot_experiment_2(dir: pathlib.Path, var="mse"):
+def plot_experiment_2(dir: pathlib.Path, var="mse", exclude: list[str] | None = None):
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
 
@@ -64,8 +70,16 @@ def plot_experiment_2(dir: pathlib.Path, var="mse"):
     df["algorithm"] = df["algorithm"].map(ALGORITHM_LABELS).fillna(df["algorithm"])
     df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
 
+    if exclude:
+        df = df[~df["algorithm"].isin(exclude)]
+
     if var == "evaluations":
         df["evaluations"] /= df["algorithm"].map(TIME_BUDGET_MINUTES)
+
+    # Replace exact zeros with a small positive value so they remain visible
+    # on the log scale (zero is undefined on log axes).
+    if var in ("mse", "mse_val"):
+        df[var] = df[var].replace(0, 1e-28)
 
     dataset_order = [
         DATASET_LABELS[d]
@@ -99,7 +113,10 @@ def plot_experiment_2(dir: pathlib.Path, var="mse"):
         col_order=dataset_order,
         marker="o",
         palette=palette,
-        facet_kws={"sharey": var == "evaluations", "margin_titles": True},
+        facet_kws={
+            "sharey": True if var == "evaluations" else "col",
+            "margin_titles": True,
+        },
         height=2.5,
         aspect=1.0,
     )
@@ -140,11 +157,14 @@ def plot_experiment_2(dir: pathlib.Path, var="mse"):
     grid_right = max(p.x1 for p in positions)
     g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.025)
 
-    plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
-    plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)
+    suffix = (
+        ("_no_" + "_".join(e.replace(" ", "_") for e in exclude)) if exclude else ""
+    )
+    plt.savefig(plot_dir / f"{var}{suffix}.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{var}{suffix}.png", bbox_inches="tight", dpi=150)
 
 
-def plot_experiment_3(dir: pathlib.Path):
+def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
 
@@ -153,16 +173,18 @@ def plot_experiment_3(dir: pathlib.Path):
 
     conn = duckdb.connect(db_path)
 
-    df = conn.execute("""
+    df = conn.execute(f"""
     SELECT
         log_config,
         dataset,
         total_time_seconds,
-        nmse,
+        {nmse_col} AS nmse,
+        nmse_val,
         fold,
         template_depth,
         population_size,
     FROM results
+    WHERE {nmse_col} IS NOT NULL
     """).df()
 
     df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
@@ -277,6 +299,24 @@ def plot_experiment_3(dir: pathlib.Path):
             (df_interp["row_label"] == row_val) & (df_interp["dataset"] == col_val)
         ]
         _plot_median_band(ax, interp, color=cell_color)
+
+        # Validation NMSE dots at the last time tick per fold — only when
+        # the lines show training NMSE (redundant if lines already show val).
+        # if nmse_col != "nmse_val":
+        #     last_rows = raw.sort_values("total_time_seconds").groupby("fold").last().reset_index()
+        #     last_rows = last_rows[last_rows["nmse_val"].notna()]
+        #     for _, row in last_rows.iterrows():
+        #         marker = "*" if row["fold"] == best_fold else "o"
+        #         ax.scatter(
+        #             row["total_time_seconds"],
+        #             row["nmse_val"],
+        #             color=cell_color,
+        #             marker=marker,
+        #             s=40 if marker == "*" else 20,
+        #             zorder=5,
+        #             edgecolors="black",
+        #             linewidths=0.4,
+        #         )
 
     SOLVED_THRESHOLD = 10e-6
 
@@ -420,7 +460,8 @@ def plot_experiment_3(dir: pathlib.Path):
     between_y = (main_grid_bottom + bar_top) / 2
 
     fig.supxlabel("Time [s]", x=x_center, y=between_y)
-    fig.supylabel("NMSE", x=-0.05, y=(main_grid_bottom + main_grid_top) / 2)
+    supylabel = "Training NMSE" if nmse_col == "nmse" else "Validation NMSE"
+    fig.supylabel(supylabel, x=-0.05, y=(main_grid_bottom + main_grid_top) / 2)
 
     # NMSE legend between main grid and bar plots
     _legend_color = "gray"
@@ -457,7 +498,32 @@ def plot_experiment_3(dir: pathlib.Path):
         )
         for k in range(len(row_meta))
     ]
-    all_handles = [fold_line, best_worst_line, median_line, iqr_patch] + setup_handles
+    base_handles = [fold_line, best_worst_line, median_line, iqr_patch]
+    # if nmse_col != "nmse_val":
+    #     val_dot = plt.Line2D(
+    #         [],
+    #         [],
+    #         color=_legend_color,
+    #         marker="o",
+    #         markersize=4,
+    #         markeredgecolor="black",
+    #         markeredgewidth=0.4,
+    #         linestyle="None",
+    #         label="Val. NMSE",
+    #     )
+    #     val_dot_best = plt.Line2D(
+    #         [],
+    #         [],
+    #         color=_legend_color,
+    #         marker="*",
+    #         markersize=6,
+    #         markeredgecolor="black",
+    #         markeredgewidth=0.4,
+    #         linestyle="None",
+    #         label="Val. NMSE (best fold)",
+    #     )
+    #     base_handles += [val_dot, val_dot_best]
+    all_handles = base_handles + setup_handles
     fig.legend(
         handles=all_handles,
         loc="center",
@@ -466,8 +532,111 @@ def plot_experiment_3(dir: pathlib.Path):
         title=None,
     )
 
-    plt.savefig(plot_dir / "nmse_over_time.svg", bbox_inches="tight")
-    plt.savefig(plot_dir / "nmse_over_time.png", bbox_inches="tight", dpi=150)
+    plt.savefig(plot_dir / f"{nmse_col}_over_time.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{nmse_col}_over_time.png", bbox_inches="tight", dpi=150)
+
+
+def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
+    db_path = dir / "all_results.duckdb"
+    plot_dir = dir / "plots"
+
+    if not os.path.exists(plot_dir):
+        os.mkdir(plot_dir)
+
+    conn = duckdb.connect(db_path)
+
+    df = conn.execute(f"""
+    SELECT
+        kernel,
+        dataset,
+        template_depth,
+        population_size,
+        run,
+        {var}
+    FROM results
+    """).df()
+
+    df["kernel"] = df["kernel"].map(KERNEL_LABELS).fillna(df["kernel"])
+    df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    if var == "evaluations":
+        df["evaluations"] /= 10  # 10-minute time budget for GPU runs
+
+    dataset_order = [
+        DATASET_LABELS[d]
+        for d in [
+            "daily_demand",
+            "auto_mpg",
+            "california_housing",
+            "feynman",
+        ]
+    ]
+
+    kernel_order = list(KERNEL_LABELS.values())
+    var_label = VAR_LABELS.get(var, var)
+
+    palette = sns.color_palette("colorblind", n_colors=len(kernel_order))
+
+    g = sns.relplot(
+        data=df,
+        x="population_size",
+        y=var,
+        hue="kernel",
+        hue_order=kernel_order,
+        col="dataset",
+        row="template_depth",
+        kind="line",
+        errorbar=("pi", 50),
+        estimator="median",
+        col_order=dataset_order,
+        marker="o",
+        palette=palette,
+        facet_kws={
+            "sharey": True if (var == "evaluations") else "col",
+            "margin_titles": True,
+        },
+        height=2.5,
+        aspect=1.0,
+    )
+
+    g.set_titles(col_template="{col_name}", row_template="")
+    for i, row_name in enumerate(g.row_names):
+        g.axes[i, 0].annotate(
+            f"{var_label}\nDepth {row_name}",
+            xy=(0, 0.5),
+            xycoords="axes fraction",
+            xytext=(-50, 0),
+            textcoords="offset points",
+            ha="center",
+            va="center",
+            rotation=90,
+            multialignment="center",
+        )
+
+    for ax in g.axes.flat:
+        ax.set_xscale("log", base=2)
+        ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.5)
+        ax.set_axisbelow(True)
+
+    g.set(yscale="log")
+    g.set_axis_labels("", "")
+
+    sns.move_legend(
+        g,
+        loc="lower center",
+        bbox_to_anchor=(0.42, -0.05),
+        ncol=len(kernel_order),
+        title=None,
+    )
+
+    g.figure.canvas.draw()
+    positions = [ax.get_position() for ax in g.axes.flat]
+    grid_left = min(p.x0 for p in positions)
+    grid_right = max(p.x1 for p in positions)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.025)
+
+    plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)
 
 
 def plot_experiment_6(dir: pathlib.Path, var: str = "mse"):

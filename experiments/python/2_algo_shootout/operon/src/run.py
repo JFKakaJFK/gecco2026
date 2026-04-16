@@ -82,6 +82,8 @@ def run_one_task(task: Task) -> dict:
         max_evaluations=1_000_000_000,
         tournament_size=20,
         model_selection_criterion="mean_squared_error",
+        add_model_scale_term=False,
+        add_model_intercept_term=False,
         max_time=task["max_duration"] * 60,  # assumed to be seconds, sp multiply by 60
         random_state=task["seed"],
     )

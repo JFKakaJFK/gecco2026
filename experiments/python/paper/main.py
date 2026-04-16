@@ -3,19 +3,37 @@ import pathlib
 from src.db import (
     create_db_experiment_2,
     create_db_experiment_3,
+    create_db_experiment_5,
     create_db_experiment_6,
 )
-from src.plot import plot_experiment_2, plot_experiment_3, plot_experiment_6
+from src.plot import (
+    plot_experiment_2,
+    plot_experiment_3,
+    plot_experiment_5,
+    plot_experiment_6,
+)
+from src.validate import validate_experiment_2, validate_experiment_3
 
 if __name__ == "__main__":
     # Experiment 2
+    # validate_experiment_2(pathlib.Path("results/2_algo_shootout"))
     create_db_experiment_2(pathlib.Path("results/2_algo_shootout"))
-    plot_experiment_2(pathlib.Path("results/2_algo_shootout"), var="mse")
-    plot_experiment_2(pathlib.Path("results/2_algo_shootout"), var="evaluations")
+    for var in ("mse", "mse_val", "evaluations"):
+        plot_experiment_2(pathlib.Path("results/2_algo_shootout"), var=var)
+        plot_experiment_2(
+            pathlib.Path("results/2_algo_shootout"), var=var, exclude=["Operon (CPU)"]
+        )
 
     # Experiment 3
+    # validate_experiment_3(pathlib.Path("results/3_gravity"))
     create_db_experiment_3(pathlib.Path("results/3_gravity"))
     plot_experiment_3(pathlib.Path("results/3_gravity"))
+    plot_experiment_3(pathlib.Path("results/3_gravity"), nmse_col="nmse_val")
+
+    # Experiment 5
+    create_db_experiment_5(pathlib.Path("results/5_hybrid_block"))
+    plot_experiment_5(pathlib.Path("results/5_hybrid_block"), var="mse")
+    plot_experiment_5(pathlib.Path("results/5_hybrid_block"), var="evaluations")
 
     # Experiment 6
     create_db_experiment_6(pathlib.Path("results/6_restart/cpu_results"))
