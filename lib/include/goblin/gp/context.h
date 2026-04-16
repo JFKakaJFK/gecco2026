@@ -891,13 +891,14 @@ class GPContext {
   // This value is probably much too large for most trees, however it is very difficult to determine the 
   // maximum tree size when subfunctions are involved. Therefore a save maximum value is chosen.
   template <typename S>
-  void to_gpu_representation(
+  bool to_gpu_representation(
     S& solution,
     std::vector<uint8_t>& node_type,
     std::vector<float>& node_value,
     usize& size,
     bool discount_size = false
   ) const {
+    bool overflowed = false;
     // initially we haven't visited anything, so we set everything to be inactive
     if constexpr (!std::is_const<S>()) {
       solution.discrete_active().array() = false;
@@ -937,6 +938,7 @@ class GPContext {
         // out of the loop and fall through to the padding code below, keeping the GPU buffer
         // layout intact for all subsequent solutions in the batch.
         if (size + temp_type.size() == max_expression_size) {
+          overflowed = true;
           node_stack.clear();
           break;
         }
@@ -1072,7 +1074,9 @@ class GPContext {
 
     if (discount_size) {
       size = visited.sum();
-    } 
+    }
+
+    return overflowed;
   }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter

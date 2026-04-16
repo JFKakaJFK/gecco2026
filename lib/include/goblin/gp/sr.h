@@ -534,9 +534,11 @@ class SRProblem : public GPInstanceBase {
     // Transform solutions to GPU compatible representation
     std::vector<u8> node_type;
     std::vector<float> node_value;
+    std::vector<bool> overflowed(num_solutions, false);
 
+    size_t k = 0;
     for (auto i : indices) {
-      ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
+      overflowed[k++] = ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
     }
 
     __goblin_runtime_assert(node_type.size() == node_value.size());
@@ -558,11 +560,17 @@ class SRProblem : public GPInstanceBase {
     std::vector<float> result(num_solutions);
     copy_from_device(result.data(), d_result, num_solutions);
 
-    size_t k = 0;
+    k = 0;
     for (auto i : indices) {
       auto& quality = solutions[i].quality_as<SRQuality>();
-      quality.constraint_value = 0.0;
-      quality.objectives(0) = result[k++];
+      if (overflowed[k]) {
+        quality.objectives.array() = std::numeric_limits<CType>::infinity();
+        quality.constraint_value = 1.0;
+      } else {
+        quality.constraint_value = 0.0;
+        quality.objectives(0) = result[k];
+      }
+      k++;
     }
   }
 
