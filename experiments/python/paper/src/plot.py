@@ -11,20 +11,33 @@ ALGORITHM_LABELS = {
     "cpu_results": "GP-GOMEA (CPU)",
     "gpu_results": "GP-GOMEA (GPU)",
     "evogp_results": "EvoGP (GPU)",
-    "operon_results": "Operon (CPU)",
     "kozax_results": "Kozax (GPU)",
+    "operon_results": "Operon (CPU)",
 }
 
 DATASET_LABELS = {
     "daily_demand": "Daily Demand",
     "auto_mpg": "Auto MPG",
     "california_housing": "California Housing",
-    "feynman": "Feynman",
+    "feynman": "Feynman I.9.18",
     "1_addition": "Addition",
     "2_division": "Division",
     "3_subtraction": "Subtraction",
     "4_multiplication": "Multiplication",
-    "5_square": "Square",
+    "5_square": "Squaring",
+    "feynman_I_8_14": "Distance",
+    "feynman_I_11_19": "Dot Product",
+    "feynman_I_9_18": "Gravity",
+}
+
+DEVICE_LABELS = {
+    "cpu": "CPU",
+    "gpu": "GPU",
+}
+
+DEVICE_TIME_BUDGET_MINUTES = {
+    "CPU": 60,
+    "GPU": 10,
 }
 
 VAR_LABELS = {
@@ -164,6 +177,127 @@ def plot_experiment_2(dir: pathlib.Path, var="mse", exclude: list[str] | None = 
     plt.savefig(plot_dir / f"{var}{suffix}.png", bbox_inches="tight", dpi=150)
 
 
+def plot_experiment_2_gomea(dir: pathlib.Path, var="mse"):
+    """Like plot_experiment_2 but restricted to CPU/GPU GP-GOMEA only.
+    Both template depths are shown in a single row; algorithm x depth combinations
+    are distinguished by colour using tab20 pairs (one pair per algorithm,
+    one shade per depth)."""
+    db_path = dir / "all_results.duckdb"
+    plot_dir = dir / "plots"
+
+    if not os.path.exists(plot_dir):
+        os.mkdir(plot_dir)
+
+    conn = duckdb.connect(db_path)
+
+    df = conn.execute(f"""
+    SELECT
+        dataset,
+        template_depth,
+        population_size,
+        algorithm,
+        run,
+        {var}
+    FROM results
+    """).df()
+
+    df["algorithm"] = df["algorithm"].map(ALGORITHM_LABELS).fillna(df["algorithm"])
+    df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    gomea_algorithms = ["GP-GOMEA (CPU)", "GP-GOMEA (GPU)"]
+    df = df[df["algorithm"].isin(gomea_algorithms)]
+
+    if var == "evaluations":
+        df["evaluations"] /= df["algorithm"].map(TIME_BUDGET_MINUTES)
+
+    if var in ("mse", "mse_val"):
+        df[var] = df[var].replace(0, 1e-28)
+
+    dataset_order = [
+        DATASET_LABELS[d]
+        for d in [
+            "daily_demand",
+            "auto_mpg",
+            "california_housing",
+            "feynman",
+        ]
+    ]
+
+    algorithm_order = [v for v in gomea_algorithms if v in df["algorithm"].unique()]
+    depth_order = sorted(df["template_depth"].unique())
+
+    # Combined hue: one tab20 pair per algorithm, one shade per depth
+    _tab20 = sns.color_palette("tab20", n_colors=20)
+    palette = {
+        f"{alg} (D={d})": _tab20[i * 2 + j]
+        for i, alg in enumerate(algorithm_order)
+        for j, d in enumerate(depth_order)
+    }
+    df["hue_label"] = df["algorithm"] + " (D=" + df["template_depth"].astype(str) + ")"
+    hue_order = [f"{alg} (D={d})" for alg in algorithm_order for d in depth_order]
+
+    var_label = VAR_LABELS.get(var, var)
+
+    g = sns.relplot(
+        data=df,
+        x="population_size",
+        y=var,
+        hue="hue_label",
+        hue_order=hue_order,
+        col="dataset",
+        col_order=dataset_order,
+        kind="line",
+        errorbar=("pi", 50),
+        estimator="median",
+        marker="o",
+        palette=palette,
+        facet_kws={
+            "sharey": True if var == "evaluations" else "col",
+            "margin_titles": True,
+        },
+        height=2.5,
+        aspect=1.0,
+    )
+
+    g.set_titles(col_template="{col_name}")
+    g.axes[0, 0].annotate(
+        var_label,
+        xy=(0, 0.5),
+        xycoords="axes fraction",
+        xytext=(-50, 0),
+        textcoords="offset points",
+        ha="center",
+        va="center",
+        rotation=90,
+        multialignment="center",
+    )
+
+    for ax in g.axes.flat:
+        ax.set_xscale("log", base=2)
+        ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.5)
+        ax.set_axisbelow(True)
+
+    g.set(yscale="log")
+    g.set_axis_labels("", "")
+
+    sns.move_legend(
+        g,
+        loc="lower center",
+        bbox_to_anchor=(0.42, -0.05),
+        ncol=len(hue_order),
+        title=None,
+    )
+
+    g.figure.canvas.draw()
+    positions = [ax.get_position() for ax in g.axes.flat]
+    grid_left = min(p.x0 for p in positions)
+    grid_right = max(p.x1 for p in positions)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.065)
+
+    plt.savefig(plot_dir / f"{var}_gomea.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{var}_gomea.png", bbox_inches="tight", dpi=150)
+
+
 def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
@@ -195,7 +329,7 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     def _row_label(log_config: str, template_depth: int) -> str:
         log_base = log_config.split("_")[1]
         pop = pop_per_config[log_config]
-        pop_str = str(int(pop))
+        pop_str = f"{int(pop):,}"
         return f"$C = \\log_{{{log_base}}}$\n$P = {pop_str}$\n$D = {template_depth}$"
 
     df["row_label"] = df.apply(
@@ -258,7 +392,7 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
             else:
                 ls, lw, alpha, zorder = ":", 0.8 * linewidth_scale, 0.6, 1
             target_ax.plot(
-                fold_data["total_time_seconds"],
+                fold_data["total_time_seconds"] / 60,
                 fold_data["nmse"],
                 color=color,
                 alpha=alpha,
@@ -272,9 +406,10 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
         median = grouped.median()
         q25 = grouped.quantile(0.25)
         q75 = grouped.quantile(0.75)
-        target_ax.fill_between(median.index, q25, q75, color=color, alpha=0.25)
+        time_minutes = median.index / 60
+        target_ax.fill_between(time_minutes, q25, q75, color=color, alpha=0.25)
         target_ax.plot(
-            median.index,
+            time_minutes,
             median,
             color=color,
             linewidth=1.5 * linewidth_scale,
@@ -320,7 +455,9 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
 
     SOLVED_THRESHOLD = 10e-6
 
-    g.set_titles(col_template="{col_name}", row_template="")
+    g.set_titles(
+        col_template="{col_name}", row_template="", size=plt.rcParams["font.size"] + 5
+    )
 
     # Per-row D label in axes coords — unaffected by later figure resize
     for i, meta in enumerate(row_meta):
@@ -396,16 +533,18 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
                 & (counts["dataset"] == dataset_order[j])
             ]
             count = int(subset["solved"].iloc[0]) if len(subset) > 0 else 0
+            pct = count / n_folds_total * 100
             ax.barh(
                 x_centers[k],
-                count,
+                pct,
                 height=bar_width * 0.9,
                 color=setting_colors[(meta["log_config"], meta["depth"])],
             )
 
         ax.set_ylim(-0.5, 0.5)
-        ax.set_xlim(0, n_folds_total)
-        ax.set_xticks(range(0, n_folds_total + 1, 3))
+        ax.set_xlim(0, 100)
+        ax.set_xticks([0, 25, 50, 75, 100])
+        ax.xaxis.set_major_formatter(plt.matplotlib.ticker.PercentFormatter())
         ax.set_yticks([])
         ax.grid(True, axis="x", linestyle="--", linewidth=0.5, alpha=0.5)
         ax.set_axisbelow(True)
@@ -439,7 +578,7 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     fig.text(
         x_left - 0.02,
         success_y,
-        "#Solved\n (NMSE $\\leq$ 10e-6)",
+        "%Solved\n (NMSE $\\leq$ 10e-6)",
         ha="center",
         va="center",
         rotation=90,
@@ -459,7 +598,7 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     bar_top = max(p.y1 for p in bar_positions)
     between_y = (main_grid_bottom + bar_top) / 2
 
-    fig.supxlabel("Time [s]", x=x_center, y=between_y)
+    fig.supxlabel("Time [min]", x=x_center, y=between_y)
     supylabel = "Training NMSE" if nmse_col == "nmse" else "Validation NMSE"
     fig.supylabel(supylabel, x=-0.05, y=(main_grid_bottom + main_grid_top) / 2)
 
@@ -530,10 +669,115 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
         bbox_to_anchor=(x_center, between_y - 0.02),
         ncol=len(all_handles),
         title=None,
+        fontsize=plt.rcParams["font.size"] + 2,
     )
 
     plt.savefig(plot_dir / f"{nmse_col}_over_time.svg", bbox_inches="tight")
     plt.savefig(plot_dir / f"{nmse_col}_over_time.png", bbox_inches="tight", dpi=150)
+
+
+def plot_experiment_4(dir: pathlib.Path, var: str = "mse"):
+    db_path = dir / "all_results.duckdb"
+    plot_dir = dir / "plots"
+
+    if not os.path.exists(plot_dir):
+        os.mkdir(plot_dir)
+
+    conn = duckdb.connect(db_path)
+
+    df = conn.execute(f"""
+    SELECT
+        device,
+        dataset,
+        template_depth,
+        population_size,
+        run,
+        {var}
+    FROM results
+    """).df()
+
+    df["device"] = df["device"].map(DEVICE_LABELS).fillna(df["device"])
+    df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    if var == "evaluations":
+        df["evaluations"] /= df["device"].map(DEVICE_TIME_BUDGET_MINUTES)
+
+    dataset_order = [
+        DATASET_LABELS[d]
+        for d in ["feynman_I_8_14", "feynman_I_11_19", "feynman_I_9_18"]
+    ]
+
+    device_order = list(DEVICE_LABELS.values())
+    depth_order = sorted(df["template_depth"].unique())
+    var_label = VAR_LABELS.get(var, var)
+
+    _tab20 = sns.color_palette("tab20", n_colors=20)
+    palette = {
+        f"{dev} (D={d})": _tab20[i * 2 + j]
+        for i, dev in enumerate(device_order)
+        for j, d in enumerate(depth_order)
+    }
+    df["hue_label"] = df["device"] + " (D=" + df["template_depth"].astype(str) + ")"
+    hue_order = [f"{dev} (D={d})" for dev in device_order for d in depth_order]
+
+    g = sns.relplot(
+        data=df,
+        x="population_size",
+        y=var,
+        hue="hue_label",
+        hue_order=hue_order,
+        col="dataset",
+        kind="line",
+        errorbar=("pi", 50),
+        estimator="median",
+        col_order=dataset_order,
+        marker="o",
+        palette=palette,
+        facet_kws={
+            "sharey": True if (var == "evaluations") else "col",
+            "margin_titles": True,
+        },
+        height=2.5,
+        aspect=1.0,
+    )
+
+    g.set_titles(col_template="{col_name}")
+    g.axes[0, 0].annotate(
+        var_label,
+        xy=(0, 0.5),
+        xycoords="axes fraction",
+        xytext=(-50, 0),
+        textcoords="offset points",
+        ha="center",
+        va="center",
+        rotation=90,
+        multialignment="center",
+    )
+
+    for ax in g.axes.flat:
+        ax.set_xscale("log", base=2)
+        ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.5)
+        ax.set_axisbelow(True)
+
+    g.set(yscale="log")
+    g.set_axis_labels("", "")
+
+    sns.move_legend(
+        g,
+        loc="lower center",
+        bbox_to_anchor=(0.42, -0.05),
+        ncol=len(hue_order),
+        title=None,
+    )
+
+    g.figure.canvas.draw()
+    positions = [ax.get_position() for ax in g.axes.flat]
+    grid_left = min(p.x0 for p in positions)
+    grid_right = max(p.x1 for p in positions)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.065)
+
+    plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)
 
 
 def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
@@ -573,18 +817,26 @@ def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
     ]
 
     kernel_order = list(KERNEL_LABELS.values())
+    depth_order = sorted(df["template_depth"].unique())
     var_label = VAR_LABELS.get(var, var)
 
-    palette = sns.color_palette("colorblind", n_colors=len(kernel_order))
+    # Combined hue: one tab20 pair per kernel, one shade per depth
+    _tab20 = sns.color_palette("tab20", n_colors=20)
+    palette = {
+        f"{k} (D={d})": _tab20[i * 2 + j]
+        for i, k in enumerate(kernel_order)
+        for j, d in enumerate(depth_order)
+    }
+    df["hue_label"] = df["kernel"] + " (D=" + df["template_depth"].astype(str) + ")"
+    hue_order = [f"{k} (D={d})" for k in kernel_order for d in depth_order]
 
     g = sns.relplot(
         data=df,
         x="population_size",
         y=var,
-        hue="kernel",
-        hue_order=kernel_order,
+        hue="hue_label",
+        hue_order=hue_order,
         col="dataset",
-        row="template_depth",
         kind="line",
         errorbar=("pi", 50),
         estimator="median",
@@ -599,19 +851,18 @@ def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
         aspect=1.0,
     )
 
-    g.set_titles(col_template="{col_name}", row_template="")
-    for i, row_name in enumerate(g.row_names):
-        g.axes[i, 0].annotate(
-            f"{var_label}\nDepth {row_name}",
-            xy=(0, 0.5),
-            xycoords="axes fraction",
-            xytext=(-50, 0),
-            textcoords="offset points",
-            ha="center",
-            va="center",
-            rotation=90,
-            multialignment="center",
-        )
+    g.set_titles(col_template="{col_name}")
+    g.axes[0, 0].annotate(
+        var_label,
+        xy=(0, 0.5),
+        xycoords="axes fraction",
+        xytext=(-50, 0),
+        textcoords="offset points",
+        ha="center",
+        va="center",
+        rotation=90,
+        multialignment="center",
+    )
 
     for ax in g.axes.flat:
         ax.set_xscale("log", base=2)
@@ -625,7 +876,7 @@ def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
         g,
         loc="lower center",
         bbox_to_anchor=(0.42, -0.05),
-        ncol=len(kernel_order),
+        ncol=len(hue_order),
         title=None,
     )
 
@@ -633,7 +884,7 @@ def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
     positions = [ax.get_position() for ax in g.axes.flat]
     grid_left = min(p.x0 for p in positions)
     grid_right = max(p.x1 for p in positions)
-    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.025)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.065)
 
     plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
     plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)

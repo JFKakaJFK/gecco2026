@@ -118,11 +118,17 @@ def create_tasks(
             X, y = fetch_california_housing(return_X_y=True)
         case "synthetic":
             assert dataset.equation is not None
+            kwargs = {}
+            if dataset.lb is not None:
+                kwargs["lb"] = dataset.lb
+            if dataset.ub is not None:
+                kwargs["ub"] = dataset.ub
             X, y = synthetic_problem(
                 dataset.equation,
                 dataset.observations,
                 noise=0.0,
                 seed=42,
+                **kwargs,
             )
         case "uci":
             d = ucimlrepo.fetch_ucirepo(id=int(dataset.name))

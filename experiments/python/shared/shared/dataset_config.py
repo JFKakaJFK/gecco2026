@@ -12,6 +12,8 @@ class DatasetConfig:
     features: int
     equation: str | None = None
     target: float | list[float] | None = None
+    lb: float | None = None
+    ub: float | None = None
 
     def target_objectives(self) -> list[float] | None:
         if isinstance(self.target, float):
@@ -70,6 +72,58 @@ DATASETS: dict[str, DatasetConfig] = {
         observations=100_000,
         features=9,
         equation="(x0*x1*x2)/((x3-x4)**2+(x5-x6)**2+(x7-x8)**2)",
+    ),
+    # Modular synthetic datasets (1000 samples, U[0,1] inputs)
+    # Expression 1: 8x sin(x_i + x_0)
+    "modular_1": DatasetConfig(
+        name="modular_1",
+        dataset_type="synthetic",
+        observations=1_000,
+        features=9,
+        equation="sin(x1+x0)+sin(x2+x0)+sin(x3+x0)+sin(x4+x0)+sin(x5+x0)+sin(x6+x0)+sin(x7+x0)+sin(x8+x0)",
+        lb=0.0,
+        ub=1.0,
+    ),
+    # Expression 2: sin(x2*x3) + 7x sin(x_i * x_0)
+    "modular_2": DatasetConfig(
+        name="modular_2",
+        dataset_type="synthetic",
+        observations=1_000,
+        features=8,
+        equation="sin(x2*x3)+sin(x1*x0)+sin(x2*x0)+sin(x3*x0)+sin(x4*x0)+sin(x5*x0)+sin(x6*x0)+sin(x7*x0)",
+        lb=0.0,
+        ub=1.0,
+    ),
+    # Expression 3: 4x sqrt(|sin(x_i * x_0)|)
+    "modular_3": DatasetConfig(
+        name="modular_3",
+        dataset_type="synthetic",
+        observations=1_000,
+        features=5,
+        equation="sqrt(Abs(sin(x1*x0)))+sqrt(Abs(sin(x2*x0)))+sqrt(Abs(sin(x3*x0)))+sqrt(Abs(sin(x4*x0)))",
+        lb=0.0,
+        ub=1.0,
+    ),
+    # Expression 4: f0(f1(x0,x1),f1(x2,x3)) + f1(f0(x0,x1),f0(x2,x3))
+    # with f0(a,b)=sin(a+b), f1(a,b)=cos(a*b)
+    "modular_4": DatasetConfig(
+        name="modular_4",
+        dataset_type="synthetic",
+        observations=1_000,
+        features=4,
+        equation="sin(cos(x0*x1)+cos(x2*x3))+cos(sin(x0+x1)*sin(x2+x3))",
+        lb=0.0,
+        ub=1.0,
+    ),
+    # Expression 5: 4x f0(permuted inputs), f0(a,b,c)=cos(a*sin(b/c))
+    "modular_5": DatasetConfig(
+        name="modular_5",
+        dataset_type="synthetic",
+        observations=1_000,
+        features=3,
+        equation="cos(x0*sin(x1/x2))+cos(x0*sin(x2/x1))+cos(x1*sin(x0/x2))+cos(x1*sin(x2/x0))",
+        lb=0.1,
+        ub=1.0,
     ),
     "feynman_million": DatasetConfig(
         name="feynman_million",

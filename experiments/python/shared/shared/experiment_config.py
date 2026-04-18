@@ -20,6 +20,7 @@ OPERATOR_SETS: dict[str, str] = {
     "trig": "+,-,*,/,sin,cos",
     "square": "+,-,*,/,square,sqrt",
     "exp": "+,-,*,/,exp,log",
+    "modular": "+,-,*,/,sin,cos,log,sqrt",
     "paper": "+,-,*,/,sin,cos,square,sqrt,exp,log,pow",
     "all": "+,-,*,/,sin,cos,square,sqrt,exp,log,pow,abs,min,max",
 }
@@ -352,6 +353,111 @@ MODULAR_GRAVITY_CPU = ExperimentConfig(
     max_duration=60,
 )
 
+MODULAR_1_CPU_CONFIG = ExperimentConfig(
+    name="modular_1",
+    datasets=[DATASETS["modular_1"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_2_CPU_CONFIG = ExperimentConfig(
+    name="modular_2",
+    datasets=[DATASETS["modular_2"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_3_CPU_CONFIG = ExperimentConfig(
+    name="modular_3",
+    datasets=[DATASETS["modular_3"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_4_CPU_CONFIG = ExperimentConfig(
+    name="modular_4",
+    datasets=[DATASETS["modular_4"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
+MODULAR_5_CPU_CONFIG = ExperimentConfig(
+    name="modular_5",
+    datasets=[DATASETS["modular_5"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=True),
+    gpu=GPUConfig(enabled=False),
+    max_duration=60,
+)
+
 MODULAR_DOT_PRODUCT_GPU = ExperimentConfig(
     name="dot_product",
     datasets=[DATASETS["feynman_I_11_19"]],
@@ -396,6 +502,111 @@ MODULAR_GRAVITY_GPU = ExperimentConfig(
     num_features=None,
     templates=[TemplateConfig(2, 6), TemplateConfig(2, 4, subtrees=((2, 3), (2, 3)))],
     operator_sets=["square"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_1_GPU_CONFIG = ExperimentConfig(
+    name="modular_1",
+    datasets=[DATASETS["modular_1"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_2_GPU_CONFIG = ExperimentConfig(
+    name="modular_2",
+    datasets=[DATASETS["modular_2"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_3_GPU_CONFIG = ExperimentConfig(
+    name="modular_3",
+    datasets=[DATASETS["modular_3"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_4_GPU_CONFIG = ExperimentConfig(
+    name="modular_4",
+    datasets=[DATASETS["modular_4"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
+    # Execution parameters
+    use_target=False,
+    num_folds=9,
+    num_iterations=1,
+    test_size=0,
+    cpu=CPUConfig(enabled=False),
+    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    max_duration=10,
+)
+
+MODULAR_5_GPU_CONFIG = ExperimentConfig(
+    name="modular_5",
+    datasets=[DATASETS["modular_5"]],
+    population_sizes=[2**i for i in range(10, 16)],
+    num_observations=None,
+    num_features=None,
+    templates=[
+        TemplateConfig(2, 7),
+        TemplateConfig(2, 4, subtrees=((2, 4), (2, 4), (2, 4))),
+    ],
+    operator_sets=["modular"],
     # Execution parameters
     use_target=False,
     num_folds=9,
@@ -513,6 +724,12 @@ class Configs:
     DISTANCE_CPU = MODULAR_DISTANCE_CPU
     GRAVITY_CPU = MODULAR_GRAVITY_CPU
 
+    MODULAR_1_CPU = MODULAR_1_CPU_CONFIG
+    MODULAR_2_CPU = MODULAR_2_CPU_CONFIG
+    MODULAR_3_CPU = MODULAR_3_CPU_CONFIG
+    MODULAR_4_CPU = MODULAR_4_CPU_CONFIG
+    MODULAR_5_CPU = MODULAR_5_CPU_CONFIG
+
     DOT_PRODUCT_GPU = MODULAR_DOT_PRODUCT_GPU
     DISTANCE_GPU = MODULAR_DISTANCE_GPU
     GRAVITY_GPU = MODULAR_GRAVITY_GPU
@@ -522,6 +739,12 @@ class Configs:
     HYBRID_AUTO_MPG = HYBRID_AUTO_MPG_CONFIG
     HYBRID_CALIFORNIA = HYBRID_CALIFORNIA_CONFIG
     HYBRID_FEYNMAN = HYBRID_FEYNMAN_CONFIG
+
+    MODULAR_1_GPU = MODULAR_1_GPU_CONFIG
+    MODULAR_2_GPU = MODULAR_2_GPU_CONFIG
+    MODULAR_3_GPU = MODULAR_3_GPU_CONFIG
+    MODULAR_4_GPU = MODULAR_4_GPU_CONFIG
+    MODULAR_5_GPU = MODULAR_5_GPU_CONFIG
 
 
 cfg = Configs()

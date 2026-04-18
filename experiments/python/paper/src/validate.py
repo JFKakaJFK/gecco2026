@@ -52,6 +52,9 @@ DATASET_KEY_MAP = {
     "3_subtraction": "3_subtraction",
     "4_multiplication": "4_multiplication",
     "5_square": "5_square",
+    "feynman_I_8_14": "feynman_I_8_14",
+    "feynman_I_11_19": "feynman_I_11_19",
+    "feynman_I_9_18": "feynman_I_9_18",
 }
 
 
@@ -69,7 +72,12 @@ def _load_raw_dataset(dataset_key: str) -> tuple[np.ndarray, np.ndarray]:
         case "sklearn":
             X, y = fetch_california_housing(return_X_y=True)
         case "synthetic":
-            X, y = synthetic_problem(cfg.equation, cfg.observations, noise=0.0, seed=42)
+            kwargs = {}
+            if cfg.lb is not None:
+                kwargs["lb"] = cfg.lb
+            if cfg.ub is not None:
+                kwargs["ub"] = cfg.ub
+            X, y = synthetic_problem(cfg.equation, cfg.observations, noise=0.0, seed=42, **kwargs)
         case "uci":
             d = ucimlrepo.fetch_ucirepo(id=int(cfg.name))
             X = d.data.features.to_numpy()
@@ -274,6 +282,49 @@ def validate_experiment_2(dir: pathlib.Path, seed: int = 42) -> None:
         if dataset not in dataset_fold_map:
             continue
         add_mse_val_to_csv(csv_file, dataset, dataset_fold_map[dataset], seed)
+
+
+def validate_experiment_4(dir: pathlib.Path, seed: int = 42) -> None:
+    """Add mse_val to all source result duckdb files for experiment 4."""
+    print("Validating experiment 4...")
+
+    dataset_fold_map = {
+        "feynman_I_8_14": 9,
+        "feynman_I_11_19": 9,
+        "feynman_I_9_18": 9,
+    }
+
+    for db_file in glob.glob(f"{dir}/**/*.duckdb", recursive=True):
+        if "backup" in db_file.split(os.sep) or "all_results" in db_file:
+            continue
+        # Dataset name is stored inside the duckdb, not the filename
+        conn = duckdb.connect(db_file)
+        datasets = [r[0] for r in conn.execute("SELECT DISTINCT dataset FROM results").fetchall()]
+        conn.close()
+        for dataset in datasets:
+            if dataset not in dataset_fold_map:
+                continue
+            add_mse_val_to_duckdb(db_file, dataset, dataset_fold_map[dataset], seed)
+
+
+def validate_experiment_5(dir: pathlib.Path, seed: int = 42) -> None:
+    """Add mse_val to all source result duckdb files for experiment 5."""
+    print("Validating experiment 5...")
+
+    dataset_fold_map = {
+        "daily_demand": 30,
+        "auto_mpg": 30,
+        "california_housing": 30,
+        "feynman": 30,
+    }
+
+    for db_file in glob.glob(f"{dir}/**/*.duckdb", recursive=True):
+        if "backup" in db_file.split(os.sep) or "all_results" in db_file:
+            continue
+        dataset = pathlib.Path(db_file).stem
+        if dataset not in dataset_fold_map:
+            continue
+        add_mse_val_to_duckdb(db_file, dataset, dataset_fold_map[dataset], seed)
 
 
 def validate_experiment_3(dir: pathlib.Path, seed: int = 42) -> None:

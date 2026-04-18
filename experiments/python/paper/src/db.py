@@ -215,7 +215,75 @@ def create_db_experiment_3(dir: pathlib.Path):
     conn.execute("ALTER TABLE results ADD COLUMN nmse_final DOUBLE")
     conn.execute("UPDATE results SET nmse_final = mse / var_y WHERE mse IS NOT NULL")
     conn.execute("ALTER TABLE results ADD COLUMN nmse_val DOUBLE")
-    conn.execute("UPDATE results SET nmse_val = mse_val / var_y_val WHERE mse_val IS NOT NULL")
+    conn.execute(
+        "UPDATE results SET nmse_val = mse_val / var_y_val WHERE mse_val IS NOT NULL"
+    )
+
+
+def create_db_experiment_4(dir: pathlib.Path):
+    db_path = dir / "all_results.duckdb"
+
+    if os.path.exists(db_path):
+        os.remove(db_path)
+
+    conn = duckdb.connect(db_path)
+
+    conn.execute(
+        """
+    CREATE TABLE IF NOT EXISTS results (
+        device TEXT,
+        dataset TEXT,
+        total_time_seconds DOUBLE,
+        expression TEXT,
+        mse DOUBLE,
+        mse_val DOUBLE,
+        evaluations UBIGINT,
+        fold INTEGER,
+        num_observations INTEGER,
+        num_features INTEGER,
+        population_size INTEGER,
+        operator_set TEXT,
+        template_depth INTEGER,
+        run INTEGER,
+        seed UBIGINT,
+    );
+    """
+    )
+
+    for db_file in [
+        f
+        for f in glob.glob(f"{dir}/**/*.duckdb", recursive=True)
+        if "backup" not in f.split(os.sep) and "all_results" not in f
+    ]:
+        parts = db_file.split(os.sep)
+        device_folder = parts[-2]  # "cpu_results" or "gpu_results"
+        device = "gpu" if "gpu" in device_folder else "cpu"
+        mse_col = "mse" if device == "gpu" else "mse_train"
+
+        conn.execute(f"ATTACH '{db_file}' AS src")
+
+        conn.execute(f"""
+            INSERT INTO results
+            SELECT
+                '{device}' AS device,
+                dataset,
+                total_time_seconds,
+                expressions AS expression,
+                {mse_col} AS mse,
+                mse_val,
+                evaluations,
+                fold,
+                num_observations,
+                num_features,
+                population_size,
+                operator_set,
+                template_depth,
+                run,
+                seed,
+            FROM src.results
+        """)
+
+        conn.execute("DETACH src")
 
 
 def create_db_experiment_5(dir: pathlib.Path):
@@ -234,6 +302,7 @@ def create_db_experiment_5(dir: pathlib.Path):
         total_time_seconds DOUBLE,
         expression TEXT,
         mse DOUBLE,
+        mse_val DOUBLE,
         evaluations UBIGINT,
         fold INTEGER,
         num_observations INTEGER,
@@ -264,6 +333,7 @@ def create_db_experiment_5(dir: pathlib.Path):
                 total_time_seconds,
                 expressions AS expression,
                 mse,
+                mse_val,
                 evaluations,
                 fold,
                 num_observations,
