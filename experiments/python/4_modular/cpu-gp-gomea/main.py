@@ -47,6 +47,12 @@ def main():
     grid_execution(cfg.DOT_PRODUCT_CPU, output_directory, dry_run=True)
     grid_execution(cfg.GRAVITY_CPU, output_directory, dry_run=True)
 
+    grid_execution(cfg.MODULAR_1_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.MODULAR_2_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.MODULAR_3_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.MODULAR_4_CPU, output_directory, dry_run=True)
+    grid_execution(cfg.MODULAR_5_CPU, output_directory, dry_run=True)
+
 
 if __name__ == "__main__":
     main()
