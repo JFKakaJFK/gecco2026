@@ -730,14 +730,6 @@ class CombinedFOS final : public LinkageModelBase {
     }
   }
 
-  // Overload for Python bindings: raw const pointers avoid nanobind unique_ptr ownership transfer
-  CombinedFOS(const std::vector<const LinkageModelBase*>& linkage_models) {
-    models.reserve(linkage_models.size());
-    for (const auto* m : linkage_models) {
-      models.push_back(m->clone());
-    }
-  }
-
   void add_model(const LinkageModelBase& model) { models.push_back(model.clone()); }
 
   // Explicitly disallow copies to tell the Python binding generation that

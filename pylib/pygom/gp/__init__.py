@@ -161,13 +161,17 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                         )
                     )
 
+                combined_fos = pygom.CombinedFOS([])
+                for lt in linkage_trees:
+                    combined_fos.add_model(lt)
+
                 alg = pygom.MixedGOMEA(
                     population_options=pygom.PopulationOptions(
                         **self.kwargs.get("population_kwargs", {})
                     ),
                     ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
                     rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
-                    discrete_model=pygom.CombinedFOS(linkage_trees),  # combine the LTs
+                    discrete_model=combined_fos,
                     continuous_model=vars(pygom)[
                         self.kwargs.get("continuous_model", "FullFOS")
                     ](**self.kwargs.get("continuous_model_kwargs", {})),

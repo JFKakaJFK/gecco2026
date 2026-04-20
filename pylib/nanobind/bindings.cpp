@@ -2424,9 +2424,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           (m, "CombinedFOS", nb::is_final(), "\n(final class)")
       .def(nb::init<const std::vector<std::unique_ptr<goblin::LinkageModelBase>> &>(),
           nb::arg("linkage_models"))
-      .def(nb::init<const std::vector<const goblin::LinkageModelBase*> &>(),
-          nb::arg("linkage_models"),
-          "Overload for Python bindings: raw const pointers avoid nanobind unique_ptr ownership transfer")
       .def("add_model",
           &goblin::CombinedFOS::add_model, nb::arg("model"))
       .def(nb::init<goblin::CombinedFOS &&>(),
