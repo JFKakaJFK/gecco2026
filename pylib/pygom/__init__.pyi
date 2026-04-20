@@ -1330,6 +1330,11 @@ class CombinedFOS(LinkageModelBase):
     def __init__(self, linkage_models: List[LinkageModelBase]) -> None:
         pass
 
+    @overload
+    def __init__(self, linkage_models: List[LinkageModelBase]) -> None:
+        """Overload for Python bindings: raw const pointers avoid nanobind unique_ptr ownership transfer"""
+        pass
+
     def add_model(self, model: LinkageModelBase) -> None:
         pass
 
