@@ -167,7 +167,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     ),
                     ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
                     rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
-                    discrete_model=pygom.CombinedFos(linkage_trees),  # combine the LTs
+                    discrete_model=pygom.CombinedFOS(linkage_trees),  # combine the LTs
                     continuous_model=vars(pygom)[
                         self.kwargs.get("continuous_model", "FullFOS")
                     ](**self.kwargs.get("continuous_model_kwargs", {})),
