@@ -4985,13 +4985,14 @@ class GPContext {
   // This value is probably much too large for most trees, however it is very difficult to determine the
   // maximum tree size when subfunctions are involved. Therefore a save maximum value is chosen.
   template <typename S>
-  void to_gpu_representation(
+  bool to_gpu_representation(
     S& solution,
     std::vector<uint8_t>& node_type,
     std::vector<float>& node_value,
     usize& size,
     bool discount_size = false
   ) const {
+    bool overflowed = false;
     // initially we haven't visited anything, so we set everything to be inactive
     if constexpr (!std::is_const<S>()) {
       solution.discrete_active().array() = false;
@@ -5027,9 +5028,13 @@ class GPContext {
 
       // While there are still nodes to visit
       while(!node_stack.empty()) {
-        // Hit the max size, but still have more nodes to process
+        // Hit the max size, but still have more nodes to process - clear the stack to break
+        // out of the loop and fall through to the padding code below, keeping the GPU buffer
+        // layout intact for all subsequent solutions in the batch.
         if (size + temp_type.size() == max_expression_size) {
-          return;
+          overflowed = true;
+          node_stack.clear();
+          break;
         }
 
         // Pop the top node from the stack
@@ -5164,6 +5169,8 @@ class GPContext {
     if (discount_size) {
       size = visited.sum();
     }
+
+    return overflowed;
   }
 
   // // TODO allow gradients w.r.t. specific continuous indices OR parameter
@@ -6962,9 +6969,11 @@ class SRProblem : public GPInstanceBase {
     // Transform solutions to GPU compatible representation
     std::vector<u8> node_type;
     std::vector<float> node_value;
+    std::vector<bool> overflowed(num_solutions, false);
 
+    size_t k = 0;
     for (auto i : indices) {
-      ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
+      overflowed[k++] = ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
     }
 
     __goblin_runtime_assert(node_type.size() == node_value.size());
@@ -6986,11 +6995,17 @@ class SRProblem : public GPInstanceBase {
     std::vector<float> result(num_solutions);
     copy_from_device(result.data(), d_result, num_solutions);
 
-    size_t k = 0;
+    k = 0;
     for (auto i : indices) {
       auto& quality = solutions[i].quality_as<SRQuality>();
-      quality.constraint_value = 0.0;
-      quality.objectives(0) = result[k++];
+      if (overflowed[k]) {
+        quality.objectives.array() = std::numeric_limits<CType>::infinity();
+        quality.constraint_value = 1.0;
+      } else {
+        quality.constraint_value = 0.0;
+        quality.objectives(0) = result[k];
+      }
+      k++;
     }
   }
 
@@ -11697,7 +11712,7 @@ class Population {
 
     // this condition does not make sense for continuous only problems as it is way more strict than the NIS/FI
     // mechanisms which force convergence if no progress is made
-    return problem.num_discrete() > 0 && no_improvement_stretch >= std::log2(solutions.size());  // && no_evaluations_performed;
+    return problem.num_discrete() > 0 && no_improvement_stretch >= std::log10(solutions.size());  // && no_evaluations_performed;
   };
 
   bool all_solutions_identical() const {

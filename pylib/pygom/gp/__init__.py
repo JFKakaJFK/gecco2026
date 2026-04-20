@@ -136,32 +136,74 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                 **self.kwargs.get("algorithm_kwargs", {})
             )
         else:
-            discrete_model_kwargs = {**self.kwargs.get("discrete_model_kwargs", {})}
-            if (
-                discrete_model_kwargs.get("metric", "node_proximity")
-                == "node_proximity"
-            ):
-                discrete_model_kwargs["custom_similarity"] = np.array(
-                    ctx.normalized_node_proximity().tolist()
+            # Check for modular tree -> use custom LT-FOS
+            if ctx.subtree_roots:
+                # to use node proximity instead of MI
+                node_proximity = np.array(ctx.normalized_node_proximity().tolist())
+
+                # create a separate LT FOS per modular tree that is restricted to the corresponding tree indices
+                linkage_trees = []
+                for subtree in ctx.subtree_roots:
+                    indices = ctx.nodes[subtree]
+                    linkage_trees.append(
+                        pygom.LinkageTreeFOS(
+                            custom_similarity=node_proximity[indices, indices],
+                            subset=indices,
+                            filter_root=False,  # according to Joe's paper subtree LTs should contain the full subtree
+                        )
+                    )
+                for output in ctx.output_roots:
+                    indices = ctx.nodes[output]
+                    linkage_trees.append(
+                        pygom.LinkageTreeFOS(
+                            custom_similarity=node_proximity[indices, indices],
+                            subset=indices,
+                        )
+                    )
+
+                alg = pygom.MixedGOMEA(
+                    population_options=pygom.PopulationOptions(
+                        **self.kwargs.get("population_kwargs", {})
+                    ),
+                    ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
+                    rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
+                    discrete_model=pygom.CombinedFos(linkage_trees),  # combine the LTs
+                    continuous_model=vars(pygom)[
+                        self.kwargs.get("continuous_model", "FullFOS")
+                    ](**self.kwargs.get("continuous_model_kwargs", {})),
+                    sampling_model=vars(pygom)[
+                        self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
+                    ](**self.kwargs.get("sampling_model_kwargs", {})),
+                    repr=self.kwargs.get("repr", "aos"),
                 )
 
-            alg = pygom.MixedGOMEA(
-                population_options=pygom.PopulationOptions(
-                    **self.kwargs.get("population_kwargs", {})
-                ),
-                ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
-                rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
-                discrete_model=vars(pygom)[
-                    self.kwargs.get("discrete_model", "LinkageTreeFOS")
-                ](**discrete_model_kwargs),
-                continuous_model=vars(pygom)[
-                    self.kwargs.get("continuous_model", "FullFOS")
-                ](**self.kwargs.get("continuous_model_kwargs", {})),
-                sampling_model=vars(pygom)[
-                    self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
-                ](**self.kwargs.get("sampling_model_kwargs", {})),
-                repr=self.kwargs.get("repr", "aos"),
-            )
+            else:
+                discrete_model_kwargs = {**self.kwargs.get("discrete_model_kwargs", {})}
+                if (
+                    discrete_model_kwargs.get("metric", "node_proximity")
+                    == "node_proximity"
+                ):
+                    discrete_model_kwargs["custom_similarity"] = np.array(
+                        ctx.normalized_node_proximity().tolist()
+                    )
+
+                alg = pygom.MixedGOMEA(
+                    population_options=pygom.PopulationOptions(
+                        **self.kwargs.get("population_kwargs", {})
+                    ),
+                    ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
+                    rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
+                    discrete_model=vars(pygom)[
+                        self.kwargs.get("discrete_model", "LinkageTreeFOS")
+                    ](**discrete_model_kwargs),
+                    continuous_model=vars(pygom)[
+                        self.kwargs.get("continuous_model", "FullFOS")
+                    ](**self.kwargs.get("continuous_model_kwargs", {})),
+                    sampling_model=vars(pygom)[
+                        self.kwargs.get("sampling_model", "AMaLGaMSamplingModel")
+                    ](**self.kwargs.get("sampling_model_kwargs", {})),
+                    repr=self.kwargs.get("repr", "aos"),
+                )
 
         seed = self.kwargs.get("random_state", self.kwargs.get("seed"))
 

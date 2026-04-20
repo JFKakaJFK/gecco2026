@@ -197,7 +197,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
         tracking_kwargs={
             "logpath": log_path,
             "log_info": log_info,
-            "report_intermediate_results": False,
+            "report_intermediate_results": True,
             # "max_generations_until_next_report": 1,
             # "generation_factor": 1,
             # "max_evaluations_until_next_report": 100_000,
