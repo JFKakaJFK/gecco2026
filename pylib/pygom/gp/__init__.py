@@ -147,8 +147,8 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     indices = ctx.nodes[subtree]
                     linkage_trees.append(
                         pygom.LinkageTreeFOS(
-                            custom_similarity=node_proximity[indices, indices],
-                            subset=indices,
+                            custom_similarity=node_proximity[np.ix_(indices, indices)],
+                            subset=pygom.Subset(discrete=indices),
                             filter_root=False,  # according to Joe's paper subtree LTs should contain the full subtree
                         )
                     )
@@ -156,8 +156,8 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     indices = ctx.nodes[output]
                     linkage_trees.append(
                         pygom.LinkageTreeFOS(
-                            custom_similarity=node_proximity[indices, indices],
-                            subset=indices,
+                            custom_similarity=node_proximity[np.ix_(indices, indices)],
+                            subset=pygom.Subset(discrete=indices),
                         )
                     )
 
