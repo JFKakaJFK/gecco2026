@@ -28,6 +28,11 @@ DATASET_LABELS = {
     "feynman_I_8_14": "Distance",
     "feynman_I_11_19": "Dot Product",
     "feynman_I_9_18": "Gravity",
+    "modular_1": "Modular 1",
+    "modular_2": "Modular 2",
+    "modular_3": "Modular 3",
+    "modular_4": "Modular 4",
+    "modular_5": "Modular 5",
 }
 
 DEVICE_LABELS = {
@@ -55,8 +60,8 @@ TIME_BUDGET_MINUTES = {
 }
 
 KERNEL_LABELS = {
-    "hybrid": "Hybrid-Block",
     "single_kernel_inplace": "Single-Block",
+    "hybrid": "Dynamic-Block",
 }
 
 
@@ -638,30 +643,6 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
         for k in range(len(row_meta))
     ]
     base_handles = [fold_line, best_worst_line, median_line, iqr_patch]
-    # if nmse_col != "nmse_val":
-    #     val_dot = plt.Line2D(
-    #         [],
-    #         [],
-    #         color=_legend_color,
-    #         marker="o",
-    #         markersize=4,
-    #         markeredgecolor="black",
-    #         markeredgewidth=0.4,
-    #         linestyle="None",
-    #         label="Val. NMSE",
-    #     )
-    #     val_dot_best = plt.Line2D(
-    #         [],
-    #         [],
-    #         color=_legend_color,
-    #         marker="*",
-    #         markersize=6,
-    #         markeredgecolor="black",
-    #         markeredgewidth=0.4,
-    #         linestyle="None",
-    #         label="Val. NMSE (best fold)",
-    #     )
-    #     base_handles += [val_dot, val_dot_best]
     all_handles = base_handles + setup_handles
     fig.legend(
         handles=all_handles,
@@ -676,7 +657,12 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
     plt.savefig(plot_dir / f"{nmse_col}_over_time.png", bbox_inches="tight", dpi=150)
 
 
-def plot_experiment_4(dir: pathlib.Path, var: str = "mse"):
+def _plot_experiment_4(
+    dir: pathlib.Path,
+    var: str,
+    dataset_keys: list[str],
+    filename_suffix: str,
+) -> None:
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
 
@@ -702,13 +688,11 @@ def plot_experiment_4(dir: pathlib.Path, var: str = "mse"):
     if var == "evaluations":
         df["evaluations"] /= df["device"].map(DEVICE_TIME_BUDGET_MINUTES)
 
-    dataset_order = [
-        DATASET_LABELS[d]
-        for d in ["feynman_I_8_14", "feynman_I_11_19", "feynman_I_9_18"]
-    ]
+    dataset_order = [DATASET_LABELS[d] for d in dataset_keys]
 
-    device_order = list(DEVICE_LABELS.values())
-    depth_order = sorted(df["template_depth"].unique())
+    df_subset = df[df["dataset"].isin(dataset_order)]
+    device_order = [v for v in DEVICE_LABELS.values() if v in df_subset["device"].unique()]
+    depth_order = sorted(df_subset["template_depth"].unique())
     var_label = VAR_LABELS.get(var, var)
 
     _tab20 = sns.color_palette("tab20", n_colors=20)
@@ -776,8 +760,27 @@ def plot_experiment_4(dir: pathlib.Path, var: str = "mse"):
     grid_right = max(p.x1 for p in positions)
     g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.065)
 
-    plt.savefig(plot_dir / f"{var}.svg", bbox_inches="tight")
-    plt.savefig(plot_dir / f"{var}.png", bbox_inches="tight", dpi=150)
+    plt.savefig(plot_dir / f"{var}{filename_suffix}.svg", bbox_inches="tight")
+    plt.savefig(plot_dir / f"{var}{filename_suffix}.png", bbox_inches="tight", dpi=150)
+    plt.close()
+
+
+def plot_experiment_4_feynman(dir: pathlib.Path, var: str = "mse") -> None:
+    _plot_experiment_4(
+        dir,
+        var,
+        dataset_keys=["feynman_I_8_14", "feynman_I_11_19", "feynman_I_9_18"],
+        filename_suffix="",
+    )
+
+
+def plot_experiment_4_modular(dir: pathlib.Path, var: str = "mse") -> None:
+    _plot_experiment_4(
+        dir,
+        var,
+        dataset_keys=["modular_1", "modular_2", "modular_3", "modular_4", "modular_5"],
+        filename_suffix="_modular",
+    )
 
 
 def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):

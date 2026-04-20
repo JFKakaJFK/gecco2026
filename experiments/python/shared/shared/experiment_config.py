@@ -371,7 +371,7 @@ MODULAR_1_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
-    max_duration=60,
+    max_duration=240,
 )
 
 MODULAR_2_CPU_CONFIG = ExperimentConfig(
@@ -392,7 +392,7 @@ MODULAR_2_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
-    max_duration=60,
+    max_duration=240,
 )
 
 MODULAR_3_CPU_CONFIG = ExperimentConfig(
@@ -413,7 +413,7 @@ MODULAR_3_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
-    max_duration=60,
+    max_duration=240,
 )
 
 MODULAR_4_CPU_CONFIG = ExperimentConfig(
@@ -434,7 +434,7 @@ MODULAR_4_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
-    max_duration=60,
+    max_duration=240,
 )
 
 MODULAR_5_CPU_CONFIG = ExperimentConfig(
@@ -455,7 +455,7 @@ MODULAR_5_CPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=True),
     gpu=GPUConfig(enabled=False),
-    max_duration=60,
+    max_duration=240,
 )
 
 MODULAR_DOT_PRODUCT_GPU = ExperimentConfig(
@@ -530,7 +530,7 @@ MODULAR_1_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=10,
+    max_duration=30,
 )
 
 MODULAR_2_GPU_CONFIG = ExperimentConfig(
@@ -551,7 +551,7 @@ MODULAR_2_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=10,
+    max_duration=30,
 )
 
 MODULAR_3_GPU_CONFIG = ExperimentConfig(
@@ -572,7 +572,7 @@ MODULAR_3_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=10,
+    max_duration=30,
 )
 
 MODULAR_4_GPU_CONFIG = ExperimentConfig(
@@ -593,7 +593,7 @@ MODULAR_4_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=10,
+    max_duration=30,
 )
 
 MODULAR_5_GPU_CONFIG = ExperimentConfig(
@@ -614,7 +614,7 @@ MODULAR_5_GPU_CONFIG = ExperimentConfig(
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=10,
+    max_duration=30,
 )
 
 ######################################

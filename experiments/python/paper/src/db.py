@@ -262,6 +262,9 @@ def create_db_experiment_4(dir: pathlib.Path):
 
         conn.execute(f"ATTACH '{db_file}' AS src")
 
+        src_cols = {r[0] for r in conn.execute("DESCRIBE src.results").fetchall()}
+        mse_val_expr = "mse_val" if "mse_val" in src_cols else "NULL::DOUBLE AS mse_val"
+
         conn.execute(f"""
             INSERT INTO results
             SELECT
@@ -270,7 +273,7 @@ def create_db_experiment_4(dir: pathlib.Path):
                 total_time_seconds,
                 expressions AS expression,
                 {mse_col} AS mse,
-                mse_val,
+                {mse_val_expr},
                 evaluations,
                 fold,
                 num_observations,

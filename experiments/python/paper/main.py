@@ -11,7 +11,8 @@ from src.plot import (
     plot_experiment_2,
     plot_experiment_2_gomea,
     plot_experiment_3,
-    plot_experiment_4,
+    plot_experiment_4_feynman,
+    plot_experiment_4_modular,
     plot_experiment_5,
     plot_experiment_6,
 )
@@ -40,10 +41,11 @@ if __name__ == "__main__":
     plot_experiment_3(pathlib.Path("results/3_gravity"), nmse_col="nmse_val")
 
     # Experiment 4
-    validate_experiment_4(pathlib.Path("results/4_modular"))
+    # validate_experiment_4(pathlib.Path("results/4_modular"))
     create_db_experiment_4(pathlib.Path("results/4_modular"))
     for var in ("mse", "mse_val", "evaluations"):
-        plot_experiment_4(pathlib.Path("results/4_modular"), var=var)
+        plot_experiment_4_feynman(pathlib.Path("results/4_modular"), var=var)
+        plot_experiment_4_modular(pathlib.Path("results/4_modular"), var=var)
 
     # Experiment 5
     # validate_experiment_5(pathlib.Path("results/5_hybrid_block"))

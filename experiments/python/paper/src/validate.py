@@ -55,6 +55,11 @@ DATASET_KEY_MAP = {
     "feynman_I_8_14": "feynman_I_8_14",
     "feynman_I_11_19": "feynman_I_11_19",
     "feynman_I_9_18": "feynman_I_9_18",
+    "modular_1": "modular_1",
+    "modular_2": "modular_2",
+    "modular_3": "modular_3",
+    "modular_4": "modular_4",
+    "modular_5": "modular_5",
 }
 
 
@@ -77,7 +82,9 @@ def _load_raw_dataset(dataset_key: str) -> tuple[np.ndarray, np.ndarray]:
                 kwargs["lb"] = cfg.lb
             if cfg.ub is not None:
                 kwargs["ub"] = cfg.ub
-            X, y = synthetic_problem(cfg.equation, cfg.observations, noise=0.0, seed=42, **kwargs)
+            X, y = synthetic_problem(
+                cfg.equation, cfg.observations, noise=0.0, seed=42, **kwargs
+            )
         case "uci":
             d = ucimlrepo.fetch_ucirepo(id=int(cfg.name))
             X = d.data.features.to_numpy()
@@ -119,7 +126,9 @@ class _EvalTimeout(Exception):
     pass
 
 
-def _eval_mse(expr: str, X_val: np.ndarray, y_val: np.ndarray, timeout: int = 10) -> float | None:
+def _eval_mse(
+    expr: str, X_val: np.ndarray, y_val: np.ndarray, timeout: int = 10
+) -> float | None:
     """
     Evaluate expression on validation data and return MSE, or None on failure/timeout.
 
@@ -202,9 +211,7 @@ def add_mse_val_to_duckdb(
     """)
 
     # Set var_y_val per fold
-    var_df = pd.DataFrame(
-        [{"fold": f, "var_y_val": v} for f, v in var_y_val.items()]
-    )
+    var_df = pd.DataFrame([{"fold": f, "var_y_val": v} for f, v in var_y_val.items()])
     conn.register("_var_y_val_mapping", var_df)
     conn.execute("""
         UPDATE results
@@ -292,6 +299,11 @@ def validate_experiment_4(dir: pathlib.Path, seed: int = 42) -> None:
         "feynman_I_8_14": 9,
         "feynman_I_11_19": 9,
         "feynman_I_9_18": 9,
+        "modular_1": 9,
+        "modular_2": 9,
+        "modular_3": 9,
+        "modular_4": 9,
+        "modular_5": 9,
     }
 
     for db_file in glob.glob(f"{dir}/**/*.duckdb", recursive=True):
@@ -299,7 +311,10 @@ def validate_experiment_4(dir: pathlib.Path, seed: int = 42) -> None:
             continue
         # Dataset name is stored inside the duckdb, not the filename
         conn = duckdb.connect(db_file)
-        datasets = [r[0] for r in conn.execute("SELECT DISTINCT dataset FROM results").fetchall()]
+        datasets = [
+            r[0]
+            for r in conn.execute("SELECT DISTINCT dataset FROM results").fetchall()
+        ]
         conn.close()
         for dataset in datasets:
             if dataset not in dataset_fold_map:
