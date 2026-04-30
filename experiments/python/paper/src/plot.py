@@ -48,6 +48,10 @@ DEVICE_TIME_BUDGET_MINUTES = {
 VAR_LABELS = {
     "mse": "Training MSE",
     "mse_val": "Validation MSE",
+    "nmse": "Training NMSE",
+    "nmse_val": "Validation NMSE",
+    "r2": "Training R²",
+    "r2_val": "Validation R²",
     "evaluations": "#Evaluations / Minute",
 }
 
@@ -285,13 +289,14 @@ def plot_experiment_2_gomea(dir: pathlib.Path, var="mse"):
     g.set(yscale="log")
     g.set_axis_labels("", "")
 
-    sns.move_legend(
-        g,
-        loc="lower center",
-        bbox_to_anchor=(0.42, -0.05),
-        ncol=len(hue_order),
-        title=None,
-    )
+    if g.legend:
+        sns.move_legend(
+            g,
+            loc="lower center",
+            bbox_to_anchor=(0.42, -0.05),
+            ncol=len(hue_order),
+            title=None,
+        )
 
     g.figure.canvas.draw()
     positions = [ax.get_position() for ax in g.axes.flat]
@@ -691,7 +696,9 @@ def _plot_experiment_4(
     dataset_order = [DATASET_LABELS[d] for d in dataset_keys]
 
     df_subset = df[df["dataset"].isin(dataset_order)]
-    device_order = [v for v in DEVICE_LABELS.values() if v in df_subset["device"].unique()]
+    device_order = [
+        v for v in DEVICE_LABELS.values() if v in df_subset["device"].unique()
+    ]
     depth_order = sorted(df_subset["template_depth"].unique())
     var_label = VAR_LABELS.get(var, var)
 
@@ -743,16 +750,20 @@ def _plot_experiment_4(
         ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.5)
         ax.set_axisbelow(True)
 
-    g.set(yscale="log")
+    if var in ("r2", "r2_val"):
+        g.set(ylim=(0.8, 1.0))
+    else:
+        g.set(yscale="log")
     g.set_axis_labels("", "")
 
-    sns.move_legend(
-        g,
-        loc="lower center",
-        bbox_to_anchor=(0.42, -0.05),
-        ncol=len(hue_order),
-        title=None,
-    )
+    if g.legend:
+        sns.move_legend(
+            g,
+            loc="lower center",
+            bbox_to_anchor=(0.42, -0.05),
+            ncol=len(hue_order),
+            title=None,
+        )
 
     g.figure.canvas.draw()
     positions = [ax.get_position() for ax in g.axes.flat]
@@ -875,13 +886,14 @@ def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
     g.set(yscale="log")
     g.set_axis_labels("", "")
 
-    sns.move_legend(
-        g,
-        loc="lower center",
-        bbox_to_anchor=(0.42, -0.05),
-        ncol=len(hue_order),
-        title=None,
-    )
+    if g.legend:
+        sns.move_legend(
+            g,
+            loc="lower center",
+            bbox_to_anchor=(0.42, -0.05),
+            ncol=len(hue_order),
+            title=None,
+        )
 
     g.figure.canvas.draw()
     positions = [ax.get_position() for ax in g.axes.flat]

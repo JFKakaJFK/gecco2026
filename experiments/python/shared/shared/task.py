@@ -68,8 +68,8 @@ def lambdify_expression(e: str | sym.Expr):
 def synthetic_problem(
     expr: str,
     size: int = 1000,
-    lb: float = 1.0,
-    ub: float = 5.0,
+    lb: float | list[float] = 1.0,
+    ub: float | list[float] = 5.0,
     noise: float = 0.01,
     seed: int | None = None,
 ):
@@ -77,13 +77,16 @@ def synthetic_problem(
     Creates a synthetic problem by sampling a random dataset,
     applying the function and possibly adding noise.
     """
-    assert ub > lb, "Invalid initialization bounds"
-
     rng = np.random.Generator(np.random.Philox(seed=seed))
 
     num_inputs = max([int(x) + 1 for x in re.findall(r"x(\d+)", expr)])
 
-    X = rng.random(size=(size, num_inputs)) * (ub - lb) + lb
+    lb_arr = np.broadcast_to(np.asarray(lb, dtype=float), num_inputs)
+    ub_arr = np.broadcast_to(np.asarray(ub, dtype=float), num_inputs)
+
+    assert np.all(ub_arr > lb_arr), "Invalid initialization bounds"
+
+    X = rng.random(size=(size, num_inputs)) * (ub_arr - lb_arr) + lb_arr
     y = lambdify_expression(expr)(X)
 
     if noise > 0:

@@ -2311,6 +2311,13 @@ class GPContext:
         """A helper that prints the expression in a human readable format"""
         pass
 
+    def subtrees_to_sympy(self, solution: SolutionBase) -> List[str]:
+        """Returns a sympy-like string for each subexpression tree in isolation.
+        Subtree references within a subtree are inlined (subtrees can only call
+        earlier ones). Arg nodes (enable_subfunctions=True) appear as arg0, arg1, ...
+        """
+        pass
+
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
 

@@ -235,8 +235,13 @@ def create_db_experiment_4(dir: pathlib.Path):
         dataset TEXT,
         total_time_seconds DOUBLE,
         expression TEXT,
+        subtrees TEXT,
         mse DOUBLE,
         mse_val DOUBLE,
+        nmse DOUBLE,
+        nmse_val DOUBLE,
+        r2 DOUBLE,
+        r2_val DOUBLE,
         evaluations UBIGINT,
         fold INTEGER,
         num_observations INTEGER,
@@ -264,6 +269,10 @@ def create_db_experiment_4(dir: pathlib.Path):
 
         src_cols = {r[0] for r in conn.execute("DESCRIBE src.results").fetchall()}
         mse_val_expr = "mse_val" if "mse_val" in src_cols else "NULL::DOUBLE AS mse_val"
+        var_y_expr = "var_y" if "var_y" in src_cols else "NULL::DOUBLE AS var_y"
+        var_y_val_expr = (
+            "var_y_val" if "var_y_val" in src_cols else "NULL::DOUBLE AS var_y_val"
+        )
 
         conn.execute(f"""
             INSERT INTO results
@@ -272,8 +281,13 @@ def create_db_experiment_4(dir: pathlib.Path):
                 dataset,
                 total_time_seconds,
                 expressions AS expression,
+                subtrees,
                 {mse_col} AS mse,
                 {mse_val_expr},
+                {mse_col} / NULLIF(({var_y_expr}), 0) AS nmse,
+                ({mse_val_expr}) / NULLIF(({var_y_val_expr}), 0) AS nmse_val,
+                1.0 - {mse_col} / NULLIF(({var_y_expr}), 0) AS r2,
+                1.0 - ({mse_val_expr}) / NULLIF(({var_y_val_expr}), 0) AS r2_val,
                 evaluations,
                 fold,
                 num_observations,

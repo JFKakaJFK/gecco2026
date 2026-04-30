@@ -99,6 +99,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                 str2op[op] for op in self.kwargs.get("operators", "+,-,*,/").split(",")
             ],
             constant_representation=self.kwargs.get("constant_representation", "ercs"),
+            enable_subfunctions=True,
         )
 
         Y = y.reshape(-1, 1) if len(y.shape) == 1 else y

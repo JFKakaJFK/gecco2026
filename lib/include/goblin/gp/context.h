@@ -288,6 +288,74 @@ class GPContext {
     }
   }
 
+  // Returns a sympy-like string for each subexpression tree in isolation.
+  // Subtree references within a subtree are inlined (subtrees can only call
+  // earlier ones). Arg nodes (enable_subfunctions=true) appear as arg0, arg1, ...
+  std::vector<std::string> subtrees_to_sympy(const SolutionBase& solution) const {
+    std::vector<std::string> subtree_exprs(num_subexpressions, "SIZE OVERFLOW");
+    std::vector<std::string> arg_stack;
+    arg_stack.reserve(max_expression_size);
+
+    std::vector<std::pair<usize, bool>> stack;
+    std::vector<usize> postorder;
+
+    for (usize si = 0; si < num_subexpressions; si++) {
+      postorder.clear();
+      stack.clear();
+      stack.emplace_back(subtree_roots[si], false);
+
+      while (!stack.empty()) {
+        auto [idx, post] = stack.back();
+        stack.pop_back();
+
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+
+        if (!post && value_kind[value] == ValueKind::Operator) {
+          stack.emplace_back(idx, true);
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          for (usize i = arity; i > 0;) {
+            stack.emplace_back(children[idx][--i], false);
+          }
+        } else {
+          postorder.push_back(idx);
+        }
+      }
+
+      arg_stack.clear();
+      for (usize idx : postorder) {
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
+
+        if (value_kind[value] == ValueKind::Input) {
+          arg_stack.push_back(std::format("x{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          arg_stack.push_back(std::format("{}", solution.continuous_values()(ci)));
+        } else if (value_kind[value] == ValueKind::Parameter) {
+          arg_stack.push_back(std::format("c{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Arg) {
+          arg_stack.push_back(std::format("arg{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Subtree) {
+          arg_stack.push_back(subtree_exprs[v_idx]);
+        } else if (value_kind[value] == ValueKind::Operator) {
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          usize base = arg_stack.size() - arity;
+          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
+          arg_stack[base] = operators[v_idx]->format(args);
+          arg_stack.resize(base + 1);
+        }
+
+        if (const_repr == ConstantRepr::Edges) {
+          arg_stack.back() = std::format("({} * ({}))", solution.continuous_values()(idx), arg_stack.back());
+        }
+      }
+
+      subtree_exprs[si] = arg_stack.empty() ? "" : arg_stack.back();
+    }
+
+    return subtree_exprs;
+  };
+
   // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
   // without references if the total number of nodes exceeds the `max_expression_size` or `std::nullopt` otherwise.
   //

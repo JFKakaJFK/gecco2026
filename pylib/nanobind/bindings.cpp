@@ -3097,6 +3097,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::debug_log_expressions,
           nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
           "A helper that prints the expression in a human readable format")
+      .def("subtrees_to_sympy",
+          &goblin::GPContext::subtrees_to_sympy,
+          nb::arg("solution"),
+          " Returns a sympy-like string for each subexpression tree in isolation.\n Subtree references within a subtree are inlined (subtrees can only call\n earlier ones). Arg nodes (enable_subfunctions=True) appear as arg0, arg1, ...")
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
       .def("normalized_root_proximity",

@@ -350,6 +350,9 @@ class SRProblem : public GPInstanceBase {
   };
 
   void log_header(std::ostream& os) const override final {
+    for (usize i = 0; i < ctx.num_subexpressions; i++) {
+      os << "subtree_" << i << ",";
+    }
     os << "expressions,";
     for (auto& o : objectives) {
       os << o << "_train,";
@@ -364,6 +367,9 @@ class SRProblem : public GPInstanceBase {
   };
 
   void log(std::ostream& os, const SolutionBase& solution) const override final {
+    for (const auto& expr : ctx.subtrees_to_sympy(solution)) {
+      os << '"' << expr << "\",";
+    }
     os << '"';
     log_solution(os, solution);
     os << "\",";

@@ -525,12 +525,12 @@ MODULAR_1_GPU_CONFIG = ExperimentConfig(
     operator_sets=["modular"],
     # Execution parameters
     use_target=False,
-    num_folds=9,
+    num_folds=3,
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
     gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
-    max_duration=30,
+    max_duration=10,
 )
 
 MODULAR_2_GPU_CONFIG = ExperimentConfig(
