@@ -90,7 +90,7 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::simple_tree") {
         expected_size = 9;
     }
 
-    ctx.to_gpu_representation(s, node_type, node_value, size);
+    ctx.to_gpu_representation(s, node_type, node_value, true, size);
 
     CHECK_EQ(node_type.size(), expected_node_type.size());
     CHECK_EQ(node_value.size(), expected_node_value.size());
@@ -183,7 +183,7 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::multi_output") {
         expected_size = 4;
     }
 
-    ctx.to_gpu_representation(s, node_type, node_value, size);
+    ctx.to_gpu_representation(s, node_type, node_value, true, size);
 
     CHECK_EQ(node_type.size(), expected_node_type.size());
     CHECK_EQ(node_value.size(), expected_node_value.size());
@@ -267,7 +267,7 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions") {
         // Fn[0](Arg[1], Arg[0])
         s.discrete_values()(sub1_root)  = 5; // Fn[0]
         s.discrete_values()(sub1_left)  = 4; // Arg[1]
-        s.discrete_values()(sub1_right) = 3; // Arg[2]
+        s.discrete_values()(sub1_right) = 3; // Arg[0]
 
         // Fn[1](x0, x1) = ... = x1 - x0
         s.discrete_values()(out_root)  = 4; // Fn[1]
@@ -303,15 +303,14 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions") {
         s.discrete_values()(ctx.children[out_right][0]) = 1; // x1
         s.discrete_values()(ctx.children[out_right][1]) = 0; // x0
 
-        // resolves to: fn0(x1, x0) = x1 - x0  =>  postfix [x1, x0, Sub]
         expect(
-            {I, I, O, I, I, O, O,}, 
+            {I, I, O, I, I, O, O}, 
             {Idx(0), Idx(1), Sub, Idx(1), Idx(0), Sub, Sub}
         );
-        expected_size = 7;
+        expected_size = 5;
     }
 
-    ctx.to_gpu_representation(s, node_type, node_value, size);
+    ctx.to_gpu_representation(s, node_type, node_value, true, size);
 
     CHECK_EQ(node_type.size(), expected_node_type.size());
     CHECK_EQ(node_value.size(), expected_node_value.size());
@@ -402,7 +401,7 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions_multi_output") {
 
         expect_output({I, I, O}, {Idx(0), Idx(1), Sub});
         expect_output({I, I, O}, {Idx(1), Idx(0), Sub});
-        expected_size = 6;
+        expected_size = 5;
     }
 
     SUBCASE("subfunction in one output, direct operator in other") {
@@ -421,7 +420,7 @@ TEST_CASE("goblin::gp::ctx_gpu_repr::subfunctions_multi_output") {
         expected_size = 6;
     }
 
-    ctx.to_gpu_representation(s, node_type, node_value, size);
+    ctx.to_gpu_representation(s, node_type, node_value, true, size);
 
     CHECK_EQ(node_type.size(), expected_node_type.size());
     CHECK_EQ(node_value.size(), expected_node_value.size());

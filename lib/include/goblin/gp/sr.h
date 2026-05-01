@@ -544,17 +544,13 @@ class SRProblem : public GPInstanceBase {
 
     size_t k = 0;
     for (auto i : indices) {
-      overflowed[k++] = ctx.to_gpu_representation(solutions[i], node_type, node_value, expression_size);
+      overflowed[k++] = ctx.to_gpu_representation(solutions[i], node_type, node_value, true, expression_size);
     }
 
     __goblin_runtime_assert(node_type.size() == node_value.size());
 
     const size_t solution_length = ctx.max_expression_size;
     const LaunchConfig config = LaunchConfig::determine(_kernel_version.value(), num_solutions, _num_datapoints, solution_length, _num_sms);
-
-    // const LaunchConfig config = (_kernel_version.value() == KernelVersion::SingleKernelInplace)
-        // ? LaunchConfig::determine_auto(num_solutions, X_train.rows(), solution_length, _num_sms)
-        // : LaunchConfig::determine(_kernel_version.value(), num_solutions, X_train.rows(), solution_length);
 
     config.check();
 
