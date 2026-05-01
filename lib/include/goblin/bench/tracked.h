@@ -521,6 +521,7 @@ class Tracked final : public WrappedInstance {
             "eval_time_seconds,"
             "current_population_size,"
             "current_population_generation,"
+            "current_population_restarts,"
             << config.log_info_headers
             << debug_headers <<
             "seed,"
@@ -535,20 +536,22 @@ class Tracked final : public WrappedInstance {
       }
     }
 
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "",
+                pop_restarts = "";
     auto pop_info = method.current_population();
     if (pop_info.has_value()) {
-      auto [p_size, p_gen] = pop_info.value();
+      auto [p_size, p_gen, p_restarts] = pop_info.value();
       pop_size = std::to_string(p_size);
       pop_gen = std::to_string(p_gen);
+      pop_restarts = std::to_string(p_restarts);
     }
     Seconds alg_time = alg_timer.elapsed();
     Seconds eval_time = eval_timer.elapsed();
     Seconds total_time = alg_time + eval_time;
 
-    auto common =
-        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
+    auto common = std::format("{},{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen,
+                              total_time.count(), alg_time.count(), eval_time.count(), pop_size, pop_gen, pop_restarts,
+                              config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
       const auto& s = solutions[i];

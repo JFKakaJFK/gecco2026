@@ -40,31 +40,34 @@ def load_results(
         constraint_value="DOUBLE",
     )
 
-    # sample first file and check if columns are not present to  avoid the binder exception
-    columns_checked = False
-    for d in result_dirs:
-        dp = pathlib.Path(d)
-        for fn in dp.rglob(f"{file_pattern}.csv"):
-            with open(fn, "r") as f:
-                try:
-                    columns = f.readline().split(",")
-                    for col in columns:
-                        if col in default_types:
-                            if col not in types:
-                                types[col] = default_types[col]
-                    columns_checked = True
-                except Exception:
-                    pass
+    def check_types():
+        nonlocal types
+        # sample first file and check if columns are not present to  avoid the binder exception
+        columns_checked = False
+        for d in result_dirs:
+            dp = pathlib.Path(d)
+            for fn in dp.rglob(f"{file_pattern}.csv"):
+                with open(fn, "r") as f:
+                    try:
+                        columns = f.readline().split(",")
+                        for col in columns:
+                            if col in default_types:
+                                if col not in types:
+                                    types[col] = default_types[col]
+                        columns_checked = True
+                    except Exception:
+                        pass
+                if columns_checked:
+                    break
             if columns_checked:
                 break
-        if columns_checked:
-            break
-    assert columns_checked, "No results found"
+        assert columns_checked, "No results found"
 
     if conn is None:
         conn = duckdb.connect(":memory:")
 
     if parquet_dir is None:
+        check_types()
         conn.sql(
             f"""
             SET preserve_insertion_order=false;
@@ -83,6 +86,7 @@ def load_results(
                 shutil.rmtree(parquet_dir)
             pdir.mkdir(parents=True, exist_ok=True)
 
+            check_types()
             conn.sql(f"""
                 COPY (
                     SELECT * FROM

@@ -1,66 +1,61 @@
+#include <cassert>
 #include "goblin/lib/archive.h"
 
 namespace goblin {
 
 std::tuple<bool, bool> AdaptiveGridArchive::update_archive(const SolutionBase& solution, bool strict) {
   std::vector<usize> sorted_dominations;
-  bool so_elite = update_so_solutions(solution);
+  auto [is_so_elite, is_dominated] = update_so_solutions(solution);
+  if (is_dominated) {
+    return std::make_tuple(false, false);
+  }
+
   for (usize i = 0; i < _solutions.size(); i++) {
     auto o = _fitness.cmp(solution.quality(), _solutions[i].quality(), std::nullopt);
     if (o == Ordering::Better) {
       sorted_dominations.push_back(i);
     } else if (o == Ordering::Worse) {
+      assert(!is_so_elite && "If a new elite is dominated by another solution, the archive state is corrupt.");
       return std::make_tuple(false, false);
     } else if (o == Ordering::Equal || same_box(solution, _solutions[i])) {
-      // same or non-dominated and same box
+      // box is already occupied and the solution is not better
+      bool replace = is_so_elite;
 
-      if (so_elite || !sorted_dominations.empty()) {
-        // both cases are non-standard
-        // - we always keep so elite improvements, even if in the same box as
-        // some other solution
-        // - if the box is occupied but the new solution already dominates
-        // another we keep the new one
+      // if discrete: check if diversity in parameter space is added
+      if (!replace && solution.num_discrete() > 0) {
+        usize max_dist = std::numeric_limits<usize>::max();
+        usize max_other_dist = std::numeric_limits<usize>::max();
+        usize dist, other_dist;
+        for (usize j = 0; j < _solutions.size(); j++) {
+          if (j == i)
+            continue;
+          dist = 0;
+          other_dist = 0;
+          for (usize k = 0; k < solution.num_discrete(); k++) {
+            if (solution.discrete_active()[k] && solution.discrete_values()[k] != _solutions[j].discrete_values()[k]) {
+              dist++;
+            }
+            if (_solutions[i].discrete_active()[k] &&
+                _solutions[i].discrete_values()[k] != _solutions[j].discrete_values()[k]) {
+              other_dist++;
+            }
+          }
+          if (dist < max_dist) {
+            max_dist = dist;
+          }
+          if (other_dist < max_other_dist) {
+            max_other_dist = dist;
+          }
+        }
+        if (max_dist > max_other_dist) {
+          replace = true;
+        }
+      }
+
+      if (replace) {
         sorted_dominations.push_back(i);
       } else {
-        bool replace = false;
-
-        // if discrete: check if diversity in parameter space is added
-        if (solution.num_discrete() > 0) {
-          usize max_dist = std::numeric_limits<usize>::max();
-          usize max_other_dist = std::numeric_limits<usize>::max();
-          usize dist, other_dist;
-          for (usize j = 0; j < _solutions.size(); j++) {
-            if (j == i)
-              continue;
-            dist = 0;
-            other_dist = 0;
-            for (usize k = 0; k < solution.num_discrete(); k++) {
-              if (solution.discrete_active()[k] &&
-                  solution.discrete_values()[k] != _solutions[j].discrete_values()[k]) {
-                dist++;
-              }
-              if (_solutions[i].discrete_active()[k] &&
-                  _solutions[i].discrete_values()[k] != _solutions[j].discrete_values()[k]) {
-                other_dist++;
-              }
-            }
-            if (dist < max_dist) {
-              max_dist = dist;
-            }
-            if (other_dist < max_other_dist) {
-              max_other_dist = dist;
-            }
-          }
-          if (max_dist > max_other_dist) {
-            replace = true;
-          }
-        }
-
-        if (replace) {
-          sorted_dominations.push_back(i);
-        } else {
-          return std::make_tuple(!strict, false);
-        }
+        return std::make_tuple(!strict, false);
       }
     }
   }
@@ -160,22 +155,24 @@ bool AdaptiveGridArchive::same_box(const SolutionBase& lhs, const SolutionBase& 
   return false;
 };
 
-bool AdaptiveGridArchive::update_so_solutions(const SolutionBase& solution) {
+std::tuple<bool, bool> AdaptiveGridArchive::update_so_solutions(const SolutionBase& solution) {
   if (_so_solutions.empty()) {
     _so_solutions.reserve(fitness().num_objectives());
     for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
       _so_solutions.add(solution);
     }
-    return true;
+    return std::make_tuple(true, false);
   } else {
     for (usize obj = 0; obj < fitness().num_objectives(); obj++) {
       if (fitness().cmp(solution.quality(), _so_solutions[obj].quality(), obj) == Ordering::Better) {
         _so_solutions[obj] = solution;
-        return true;
+        return std::make_tuple(true, false);
+      }
+      if (fitness().cmp(solution.quality(), _so_solutions[obj].quality(), std::nullopt) == Ordering::Worse) {
+        return std::make_tuple(false, true);
       }
     }
+    return std::make_tuple(false, false);
   }
-  return false;
 };
-
 };  // namespace goblin

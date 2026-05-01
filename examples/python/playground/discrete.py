@@ -4,11 +4,12 @@ import pathlib
 import pandas as pd
 import pygom
 from pygom import *
+from tqdm import tqdm
+
 from src.config import Config, c
 from src.plots import plot_convergence_so, plot_scalability
 from src.postprocessing import load_results
 from src.run import run_all, run_one
-from tqdm import tqdm
 
 REPEATS = 30
 REPEATS = 100
@@ -105,6 +106,16 @@ def methods():
     # yield (
     #     '"Library (GIGA, U)"',
     #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
+    # )
+    # yield (
+    #     '"Mixed (GIGA)"',
+    #     c.MixedGOMEA(
+    #         discrete_model=c.LinkageTreeFOS(
+    #             metric="random",
+    #             filter_root=True,
+    #         ),
+    #         population_options=c.PopulationOptions(gene_invariant=True),
+    #     ),
     # )
 
     for sn, selection in [

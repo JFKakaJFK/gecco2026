@@ -225,8 +225,9 @@ class EABase : public MethodBase {
   };
 
   std::optional<u64> current_generation() const override { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override {
-    return std::make_tuple(population_size, generation);
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+    const u64 num_restarts = 0;
+    return std::make_tuple(population_size, generation, num_restarts);
   };
 };
 

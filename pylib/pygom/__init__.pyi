@@ -315,7 +315,7 @@ class SolutionBase:
 
     def clear_extensions(self) -> None:  # overridable (pure virtual)
         pass
-    # Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
+    # Instead of vector, should this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
     # copies?? (size, begin, end, proxy to underlying collection)
     def num_extensions(self) -> int:  # overridable (pure virtual)
         pass
@@ -1335,6 +1335,11 @@ class CombinedFOS(LinkageModelBase):
         pass
 
     @overload
+    def __init__(self, other: CombinedFOS) -> None:
+        """Copy operations must copy the underlying models manually..."""
+        pass
+
+    @overload
     def __init__(self, param_0: CombinedFOS) -> None:
         """But moving is allowed"""
         pass
@@ -1390,8 +1395,8 @@ class MethodBase:
         """
         pass
 
-    def current_population(self) -> Optional[Tuple[int, int]]:  # overridable
-        """/ Size and generations of the currently active population if available for multi-start schemes"""
+    def current_population(self) -> Optional[Tuple[int, int, int]]:  # overridable
+        """/ Size, generations and restarts of the currently active population if available for multi-start schemes"""
         pass
 
     def __init__(self) -> None:
@@ -2465,7 +2470,7 @@ class SRQuality(MOQuality):
     #  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
     #  part of what defines a solution or its accuracy - as indicated by the name, it is never
     #  used to make any decisions and only tracked for analysis purposes. By making it mutable
-    #  it an be lazily computed only when requested.
+    #  it can be lazily computed only when requested.
     #   */
     # / Optional test set accuracy
     test_quality: Optional[MOQuality] = None
@@ -4426,6 +4431,7 @@ class PopulationOptions:
     )
     # of all subset variables being identical between the solution and donor
     subset_logfile: Optional[str] = None
+    intermediate_population_logfile: Optional[str] = None
     generation: int = 0
     initial_generations_until_next_fos_log: int = (
         5  # > 0, subset stats are logged every
@@ -4446,6 +4452,8 @@ class PopulationOptions:
     # Note that for single element subsets, this collapses to random search
     discrete_mutation_probability: Optional[float] = 0.0
 
+    gene_invariant: bool = False
+
     # TODO this whole file really needs a refactor lol
     use_fancy_gpu_gp_gom: bool = False
     resample_inactive_donor_values: bool = False
@@ -4460,6 +4468,7 @@ class PopulationOptions:
         strict_elite_acceptance: bool = False,
         donor_search_proportion: float = 0.0,
         subset_logfile: Optional[str] = None,
+        intermediate_population_logfile: Optional[str] = None,
         generation: int = 0,
         initial_generations_until_next_fos_log: int = 5,
         fos_log_factor: int = 2,
@@ -4471,6 +4480,7 @@ class PopulationOptions:
         gradient_step_frequency: int = 0,
         gradient_step_count: int = 10,
         discrete_mutation_probability: Optional[float] = 0.0,
+        gene_invariant: bool = False,
         use_fancy_gpu_gp_gom: bool = False,
         resample_inactive_donor_values: bool = False,
     ) -> None:
@@ -4511,7 +4521,7 @@ class MixedGOMEA(MethodBase):
     def current_generation(self) -> Optional[int]:
         pass
 
-    def current_population(self) -> Optional[Tuple[int, int]]:
+    def current_population(self) -> Optional[Tuple[int, int, int]]:
         pass
 
 # #endif
@@ -4659,7 +4669,7 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         def current_generation(self) -> Optional[int]:  # overridable
             pass
 
-        def current_population(self) -> Optional[Tuple[int, int]]:  # overridable
+        def current_population(self) -> Optional[Tuple[int, int, int]]:  # overridable
             pass
 
     class DEStrategyBase:

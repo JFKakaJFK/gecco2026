@@ -732,11 +732,26 @@ class CombinedFOS final : public LinkageModelBase {
 
   void add_model(const LinkageModelBase& model) { models.push_back(model.clone()); }
 
-  // Explicitly disallow copies to tell the Python binding generation that
-  // a vector of unique pointers cannot be copied
-  // (the other option would be to explicitly define a version that clones the data)
-  CombinedFOS(const CombinedFOS&) = delete;
-  CombinedFOS& operator=(const CombinedFOS&) = delete;
+  // Copy operations must copy the underlying models manually...
+  CombinedFOS(const CombinedFOS& other) {
+    models.clear();
+    models.reserve(other.models.size());
+    for (const auto& m : other.models) {
+      models.push_back(m->clone());
+    }
+  };
+  CombinedFOS& operator=(const CombinedFOS& other) {
+    if (this != &other) {
+      {
+        models.clear();
+        models.reserve(other.models.size());
+        for (const auto& m : other.models) {
+          models.push_back(m->clone());
+        }
+      };
+    }
+    return *this;
+  };
 
   // But moving is allowed
   CombinedFOS(CombinedFOS&&) = default;

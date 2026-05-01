@@ -24,8 +24,8 @@ class MethodBase {
   /// hook for tracking the progress over generations
   virtual std::optional<u64> current_generation() const { return std::nullopt; };
 
-  /// Size and generations of the currently active population if available for multi-start schemes
-  virtual std::optional<std::tuple<usize, u64>> current_population() const { return std::nullopt; };
+  /// Size, generations and restarts of the currently active population if available for multi-start schemes
+  virtual std::optional<std::tuple<usize, u64, u64>> current_population() const { return std::nullopt; };
 
   virtual ~MethodBase() {};
 };

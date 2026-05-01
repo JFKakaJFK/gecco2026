@@ -41,7 +41,7 @@ class SRQuality : public MOQuality {
   The test accuracy uses interior mutability (i.e. it ignores const) since it is not
   part of what defines a solution or its accuracy - as indicated by the name, it is never
   used to make any decisions and only tracked for analysis purposes. By making it mutable
-  it an be lazily computed only when requested.
+  it can be lazily computed only when requested.
    */
   /// Optional test set accuracy
   mutable std::optional<MOQuality> test_quality = std::nullopt;

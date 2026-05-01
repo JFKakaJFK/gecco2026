@@ -506,7 +506,7 @@ struct Subset {
 };
 
 inline bool operator==(const Subset& lhs, const Subset& rhs) {
-  return lhs.continuous == rhs.discrete && lhs.continuous == rhs.continuous;
+  return lhs.discrete == rhs.discrete && lhs.continuous == rhs.continuous;
 }
 inline bool operator!=(const Subset& lhs, const Subset& rhs) {
   return !(lhs == rhs);
@@ -609,7 +609,7 @@ class SolutionBase {
   virtual bool remove_extension(const SolutionExtensionKey& key) = 0;
   virtual void clear_extensions() = 0;
 
-  // Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
+  // Instead of vector, should this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
   // copies?? (size, begin, end, proxy to underlying collection)
   virtual usize num_extensions() const = 0;
   virtual std::vector<std::reference_wrapper<const SolutionExtensionBase>> extensions() const = 0;
@@ -1333,7 +1333,8 @@ class AdaptiveGridArchive : public ArchiveBase {
 
  private:
   bool same_box(const SolutionBase& lhs, const SolutionBase& rhs);
-  bool update_so_solutions(const SolutionBase& solution);
+  // is_so_elite, is_dominated
+  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution);
 
   const ArchiveFitnessBase& _fitness;
   [[maybe_unused]] usize _capacity;
@@ -2882,11 +2883,26 @@ class CombinedFOS final : public LinkageModelBase {
 
   void add_model(const LinkageModelBase& model) { models.push_back(model.clone()); }
 
-  // Explicitly disallow copies to tell the Python binding generation that
-  // a vector of unique pointers cannot be copied
-  // (the other option would be to explicitly define a version that clones the data)
-  CombinedFOS(const CombinedFOS&) = delete;
-  CombinedFOS& operator=(const CombinedFOS&) = delete;
+  // Copy operations must copy the underlying models manually...
+  CombinedFOS(const CombinedFOS& other) {
+    models.clear();
+    models.reserve(other.models.size());
+    for (const auto& m : other.models) {
+      models.push_back(m->clone());
+    }
+  };
+  CombinedFOS& operator=(const CombinedFOS& other) {
+    if (this != &other) {
+      {
+        models.clear();
+        models.reserve(other.models.size());
+        for (const auto& m : other.models) {
+          models.push_back(m->clone());
+        }
+      };
+    }
+    return *this;
+  };
 
   // But moving is allowed
   CombinedFOS(CombinedFOS&&) = default;
@@ -2971,8 +2987,8 @@ class MethodBase {
   /// hook for tracking the progress over generations
   virtual std::optional<u64> current_generation() const { return std::nullopt; };
 
-  /// Size and generations of the currently active population if available for multi-start schemes
-  virtual std::optional<std::tuple<usize, u64>> current_population() const { return std::nullopt; };
+  /// Size, generations and restarts of the currently active population if available for multi-start schemes
+  virtual std::optional<std::tuple<usize, u64, u64>> current_population() const { return std::nullopt; };
 
   virtual ~MethodBase() {};
 };
@@ -4222,8 +4238,16 @@ class GPContext {
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
+    //
+    // call_stack_context[i] is the call_stack_idx of the node at call_stack[i], i.e. the context
+    // of the tree *containing* that call site. When an Arg chains through multiple levels, each
+    // jump must go to the caller of the *subtree* that holds the intermediate Arg — not simply
+    // one position back in call_stack, because multiple call_stack entries can live in the same
+    // subtree (e.g. when an Arg resolves to an operator that itself contains another SubtreeA call).
     std::vector<usize> call_stack;
+    std::vector<isize> call_stack_context;
     call_stack.reserve(max_expression_size);
+    call_stack_context.reserve(max_expression_size);
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
@@ -4242,13 +4266,14 @@ class GPContext {
 
       // housekeeping: reset the call stack and node_stack per output
       call_stack.clear();
+      call_stack_context.clear();
       node_stack.clear();
       node_stack.emplace_back(n, 0, false);
 
       // nodes are visited up to twice - once in-order, and once post-order after the children have been taken care of
       while (!node_stack.empty()) {
         // we hit the max size, but have a next node since this is inside the loop
-        if (size + tree.size() == max_expression_size) {
+        if (size + tree.size() >= max_expression_size) {
           return std::nullopt;
         }
 
@@ -4287,42 +4312,42 @@ class GPContext {
               visited(idx) = 0;
             }
 
-            // we need to replace the argument with the corresponding child of the caller
-            // and then replace the stack entry with with the actual argument
-            //
-            // but the caller might need some resolving if it is not the root of a tree
-            // (every function call adds to the call_stack, so it is not necessarily true that the previous call stack
-            // entry corresponds to the caller of the current subtree - it might just be an ancestor in the current tree
-            // that also calls another subfunction...)
+            // Walk up the call chain, following argument remappings at each level.
+            // An intermediate caller may reorder arguments (e.g. Fn[1](Arg[1], Arg[0])),
+            // so we cannot jump straight to the top-level caller with the original arg index.
+            // We step one level at a time until we reach a concrete (non-Arg) node.
+            usize resolved_v_idx = v_idx;
+            isize resolved_csi = call_stack_idx;
 
-            // get the previous call stack entry
-            usize calling_node = call_stack[call_stack_idx];
+            while (true) {
+              usize caller = call_stack[resolved_csi];
 
-            // since we move up the call chain, we need to go at least one call/frame backward, but maybe more
-            isize num_frames = 1;
+              auto& cnodes = children[caller];
+              usize child = cnodes[resolved_v_idx % cnodes.size()];
+              assert(idx != child && "Self reference found.");
 
-            // check if the calling node is an ancestor of the current node - if so, we need to move up the hierarchy to
-            // find the ancestor clostest to the root that is on the call_stack... (the first call into this subtree
-            // must have the actual caller)
-            auto pidx = parent(idx);
-            while (pidx.has_value()) {
-              if (pidx.value() == calling_node) {
-                // note: this works since we don't allow cycles by restricting the domain, i.e. there can only ever be
-                // one "active" call to this subfunction, guaranteeing that the calling node of the highest ancestor is
-                // the actual calling node.
-                calling_node = call_stack[call_stack_idx - num_frames++];
+              DType child_value = domain2value(child, solution.discrete_values()(child));
+              if (value_kind[child_value] != ValueKind::Arg) {
+                // reached a concrete node — replace this Arg on the stack with it.
+                // The resolved child lives in the same tree as call_stack[resolved_csi], whose
+                // tree-level call_stack_idx is stored in call_stack_context[resolved_csi].
+                assert(
+                    root[idx] <= root[child] &&
+                    "Caller and child must originate from a hierarchically higher tree to ensure there are no cycles.");
+                node_stack.pop_back();
+                node_stack.emplace_back(child, call_stack_context[resolved_csi], false);
+                break;
               }
-              pidx = parent(pidx.value());
+
+              // the resolved node is itself an Arg in the caller's context — mark it active
+              // // (it IS used: it determines which node the chain ultimately resolves to) and
+              // jump to the call_stack_idx of the tree containing call_stack[resolved_csi].
+              if constexpr (!std::is_const<S>()) {
+                solution.discrete_active()(child) = true;
+              }
+              resolved_v_idx = value_idx[child_value];
+              resolved_csi = call_stack_context[resolved_csi];
             }
-
-            // now that we have the caller, we can finally replace the stack entry with with the actual argument
-            auto& cnodes = children[calling_node];
-            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
-
-            node_stack.pop_back();
-            node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                    call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
-                                    false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             if (discount_size) {
               visited(idx) = 0;
@@ -4330,8 +4355,10 @@ class GPContext {
             assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
-            // first update the call stack
+            // first update the call stack; record call_stack_idx so Arg resolution can correctly
+            // jump back to the tree containing this call site (not just one position in call_stack)
             call_stack.push_back(idx);
+            call_stack_context.push_back(call_stack_idx);
 
             // then replace the stack entry with the called subtree
             std::get<2>(node_stack[node_stack_idx]) =
@@ -4371,6 +4398,7 @@ class GPContext {
           if (value_kind[value] == ValueKind::Subtree) {
             // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
             call_stack.pop_back();
+            call_stack_context.pop_back();
           } else {
             // this is a non-reference post-order visit, so we need to update the tree
             update_tree = true;
@@ -5673,7 +5701,7 @@ class SRQuality : public MOQuality {
   The test accuracy uses interior mutability (i.e. it ignores const) since it is not
   part of what defines a solution or its accuracy - as indicated by the name, it is never
   used to make any decisions and only tracked for analysis purposes. By making it mutable
-  it an be lazily computed only when requested.
+  it can be lazily computed only when requested.
    */
   /// Optional test set accuracy
   mutable std::optional<MOQuality> test_quality = std::nullopt;
@@ -8079,6 +8107,7 @@ class Tracked final : public WrappedInstance {
             "eval_time_seconds,"
             "current_population_size,"
             "current_population_generation,"
+            "current_population_restarts,"
             << config.log_info_headers
             << debug_headers <<
             "seed,"
@@ -8093,20 +8122,22 @@ class Tracked final : public WrappedInstance {
       }
     }
 
-    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "";
+    std::string gen = generation.has_value() ? std::to_string(generation.value()) : "", pop_size = "", pop_gen = "",
+                pop_restarts = "";
     auto pop_info = method.current_population();
     if (pop_info.has_value()) {
-      auto [p_size, p_gen] = pop_info.value();
+      auto [p_size, p_gen, p_restarts] = pop_info.value();
       pop_size = std::to_string(p_size);
       pop_gen = std::to_string(p_gen);
+      pop_restarts = std::to_string(p_restarts);
     }
     Seconds alg_time = alg_timer.elapsed();
     Seconds eval_time = eval_timer.elapsed();
     Seconds total_time = alg_time + eval_time;
 
-    auto common =
-        std::format("{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen, total_time.count(),
-                    alg_time.count(), eval_time.count(), pop_size, pop_gen, config.log_info_values, debug_values, seed);
+    auto common = std::format("{},{},{},{},{},{},{},{},{},{}{}{},", format_as(status), evaluations, gen,
+                              total_time.count(), alg_time.count(), eval_time.count(), pop_size, pop_gen, pop_restarts,
+                              config.log_info_values, debug_values, seed);
 
     for (usize i = 0; i < solutions.size(); i++) {
       const auto& s = solutions[i];
@@ -8266,6 +8297,8 @@ class IMS final : public MethodBase {
     sizes.reserve(opts.max_num_populations);
     generations.clear();
     generations.reserve(opts.max_num_populations);
+    restarts.clear();
+    restarts.reserve(opts.max_num_populations);
     std::vector<bool> running;
     running.reserve(opts.max_num_populations);
     std::vector<usize> generations_since_last_improvement;
@@ -8317,6 +8350,7 @@ class IMS final : public MethodBase {
         populations.push_back(create_population(
             problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
         generations.push_back(0);
+        restarts.push_back(0);
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
       } else if (!running[p_idx] && opts.restart_stale_populations &&
@@ -8324,6 +8358,7 @@ class IMS final : public MethodBase {
         // std::println("[IMS]: Restarting population {}", p_idx);
         populations[p_idx].restart();
         generations[p_idx] = 0;
+        restarts[p_idx]++;
         generations_since_last_improvement[p_idx] = 0;
         running[p_idx] = true;
       }
@@ -8426,8 +8461,8 @@ class IMS final : public MethodBase {
 
   std::optional<u64> current_generation() const override final { return total_generations; };
 
-  std::optional<std::tuple<usize, u64>> current_population() const override {
-    return std::make_tuple(sizes[p_idx], generations[p_idx]);
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+    return std::make_tuple(sizes[p_idx], generations[p_idx], restarts[p_idx]);
   };
 
  private:
@@ -8440,6 +8475,7 @@ class IMS final : public MethodBase {
   usize p_idx;
   std::vector<usize> sizes;
   std::vector<u64> generations;
+  std::vector<u64> restarts;
 };
 
 };  // namespace goblin
@@ -9296,8 +9332,6 @@ inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
     by_fitness.reserve(indices.size());
     for (auto& front : fronts) {
       // TODO re-order fronts to maximize scattering in parameter space?
-      //
-      // TODO bug: we don't reduce the size to the selection size...
       for (usize i : front) {
         by_fitness.push_back(indices[i]);
       }
@@ -9630,7 +9664,6 @@ class RvState {
                                              const SolutionBase& parent,
                                              std::optional<usize> objective,
                                              bool strict) {
-    thread_local static std::uniform_real_distribution<double> p(0.0, 1.0);
     if (objective.has_value()) {
       // improvement in the extreme direction or sideways improvement in another
       // objective
@@ -9642,7 +9675,8 @@ class RvState {
                                            objective) == Ordering::Better);
       }
 
-      if (!strict && options.p_accept > 0.0 && p(rng) < options.p_accept) {
+      std::uniform_real_distribution<double> U(0.0, 1.0);
+      if (!strict && options.p_accept > 0.0 && U(rng) < options.p_accept) {
         return std::make_tuple(true, true, false);
       }
     } else {
@@ -9658,7 +9692,6 @@ class RvState {
 
   template <typename Derived>
   void sample(Rng& rng, const InstanceBase& problem, usize k, usize fos_idx, Eigen::MatrixBase<Derived>&& out) {
-    thread_local static std::uniform_real_distribution<CType> U(0.0, 1.0);
     const usize TRIES = 100;
 
     const auto& s = subsets[k][fos_idx].continuous;
@@ -9677,6 +9710,7 @@ class RvState {
     }
 
     // otherwise we sample uniformally in the init bounds
+    std::uniform_real_distribution<CType> U(0.0, 1.0);
     for (usize j = 0; j < s.size(); j++) {
       out(j) *= U(rng) * (problem.continuous_init_upper_bounds()(s[j]) - problem.continuous_init_lower_bounds()(s[j])) +
                 problem.continuous_init_lower_bounds()(s[j]);
@@ -10369,6 +10403,7 @@ struct PopulationOptions {
   double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
                                          // of all subset variables being identical between the solution and donor
   std::optional<std::string> subset_logfile = std::nullopt;
+  std::optional<std::string> intermediate_population_logfile = std::nullopt;
   u64 generation = 0;
   u64 initial_generations_until_next_fos_log = 5;  // > 0, subset stats are logged every
   u64 fos_log_factor = 2;                          // 1 is linear, 2 is exponential log spacing
@@ -10386,6 +10421,8 @@ struct PopulationOptions {
   // If std::nullopt, then perform strong mutation (i.e. 1/subset size).
   // Note that for single element subsets, this collapses to random search
   std::optional<double> discrete_mutation_probability = 0.0;
+
+  bool gene_invariant = false;
 
   // TODO this whole file really needs a refactor lol
   bool use_fancy_gpu_gp_gom = false;
@@ -10409,7 +10446,8 @@ class Population {
         discrete_model(discrete_model.clone()),
         rv_state(rv_options, continuous_model, sampling_model),
         options(options),
-        local_archive(global_archive.clone()),
+        local_archive(
+            global_archive.clone()),  // fine, local archive gets decoupled immediately and reset for each (re)start
         size(size),
         num_clusters(num_clusters),
         donor_pool_size(std::min(size,
@@ -10423,6 +10461,8 @@ class Population {
                             options.continuous_mutation_decay_patience.value() > 0);
     __goblin_runtime_assert(0.0 <= options.continuous_mutation_probability &&
                             options.continuous_mutation_probability <= 1.0);
+
+    local_archive->clear();  // to make archive decoupling explicit
   };
 
   void restart() { solutions.clear(); };
@@ -10570,12 +10610,13 @@ class Population {
         }
       }
     } else {
+      usize gom_step = 0;
       usize subset_idx = 0;
       std::uniform_real_distribution<double> U(0.0, 1.0);
       bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
         // std::println("LOOP");
-        bool do_discrete_step;
+        bool do_discrete_step, was_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
         } else if (!can_do_discrete_step) {
@@ -10609,6 +10650,8 @@ class Population {
           __assert_invariants();
           if (evals < 1) {
             // std::println("RV STEP SKIPPED !!!!");
+          } else {
+            was_discrete_step = false;
           }
           evaluations += evals;
           continuous_evaluations += evals;
@@ -10621,6 +10664,8 @@ class Population {
           evaluations += evals;
           discrete_evaluations += evals;
 
+          was_discrete_step = true;
+
           if (evals < 1) {
             // std::println("GP STEP SKIPPED !!!!");
           }
@@ -10632,10 +10677,16 @@ class Population {
           __assert_invariants();
         }
 
+        if (options.intermediate_population_logfile.has_value()) {
+          debug_log(problem, options.intermediate_population_logfile.value(), "gom_step,step_type,",
+                    std::format("{},{},", gom_step, was_discrete_step ? "D" : "C"), solutions);
+        }
+
         if (should_terminate(evaluations).has_value()) {
           return evaluations;
         }
 
+        gom_step++;
         can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
@@ -10653,7 +10704,7 @@ class Population {
       __assert_invariants();
     }
 
-    if (options.forced_improvements && is_discrete) {
+    if (options.forced_improvements && is_discrete && !options.gene_invariant) {
       // std::println("FI STEP");
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
       __assert_invariants();
@@ -10694,6 +10745,7 @@ class Population {
         return true;
       }
       // since we only have relative comparisons, this roughly is equal to the usual fitness variance == 0.0 condition
+      // (it is exact for threshold 0.0, and very similar otherwise)
       if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged())) {
         return true;
       }
@@ -10701,7 +10753,9 @@ class Population {
 
     // this condition does not make sense for continuous only problems as it is way more strict than the NIS/FI
     // mechanisms which force convergence if no progress is made
-    return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
+    // return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
+    // return false;
+    return problem.num_discrete() > 0 && no_improvement_stretch >= 1 + std::log2(solutions.size());
   };
 
   bool all_solutions_identical() const {
@@ -11155,6 +11209,136 @@ class Population {
     return solutions_to_evaluate.size();
   };
 
+  /// GI-GOM as per https://arxiv.org/pdf/2506.15222 (well, shuffling for FOS/index combinations is slightly less
+  /// randomized) => not multi-objective, or parallelized for now
+  u64 discrete_gi_gom_step(Rng& rng, usize subset_idx) {
+    // TODO maybe what is sent to evaluate shouldn't be a population + indices, but vectors of "eval items", i.e. cheap
+    // view structs pointing to the solution to evaluate + possibly a subset & parent
+
+#ifndef NDEBUG
+    const usize l = problem.num_discrete();
+    const usize max_domain_size = problem.discrete_domain_sizes().maxCoeff();
+    Arr2D<usize> val_counts_before = Arr2D<usize>::Zero(l, max_domain_size);
+    for (usize i = 0; i < solutions.size(); i++) {
+      for (usize j = 0; j < l; j++) {
+        val_counts_before(j, solutions[i].discrete_values()(j))++;
+      }
+    }
+#endif /* NDEBUG */
+
+    const usize n = solutions.size();
+    u64 evaluations = 0;
+    std::vector<usize> indices(n);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    for (usize i : permute(rng, n)) {
+      auto k = solution_clusters[i];
+      auto fos_idx = subset_orders(i, subset_idx);
+
+      // due to filtering/max_subset_size, some clusters might have more
+      // subsets...
+      if (fos_idx < cluster_FOS[k].size()) {
+        std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
+        subsets[i] = &cluster_FOS[k][fos_idx];
+        assert(subsets[i]->discrete.size() > 0);
+
+        // select mate via tournament selection
+        usize mate = i, other_candidate = i, pool_idx = 0;
+        bool check_other_candidate = solutions.size() > 2;
+        while (pool_idx < n && mate == i && (!check_other_candidate || other_candidate == i)) {
+          // do a partial Fisher-Yates shuffle
+          std::swap(indices[pool_idx], indices[std::uniform_int_distribution<usize>(pool_idx, n - 1)(rng)]);
+
+          usize mate_idx = indices[pool_idx++];
+          if (mate_idx == i) {
+            continue;
+          }
+
+          if (mate == i) {
+            mate = mate_idx;
+          } else {
+            other_candidate = mate_idx;
+          }
+        }
+        if (check_other_candidate && problem.fitness().cmp(solutions[other_candidate].quality(),
+                                                           solutions[mate].quality(), objective) == Ordering::Better) {
+          mate = other_candidate;
+        }
+
+        // exchange material
+        SolutionSet backups, offsprings;
+        solutions_to_evaluate.clear();
+
+        backups.add(solutions[i]);
+        backups.add(solutions[mate]);
+
+        offsprings.add(solutions[i]);
+        offsprings.add(solutions[mate]);
+
+        auto [evaluation_needed, changed] = problem.inherit_discrete(offsprings[0], solutions[mate], *subsets[i]);
+        if (evaluation_needed) {
+          subsets[0] = &cluster_FOS[k][fos_idx];
+          solutions_to_evaluate.push_back(0);
+        }
+        auto [evaluation_needed_mate, _] = problem.inherit_discrete(offsprings[1], solutions[i], *subsets[i]);
+        if (evaluation_needed_mate) {
+          subsets[1] = &cluster_FOS[k][fos_idx];
+          solutions_to_evaluate.push_back(1);
+        }
+
+        if (!changed) {
+          continue;
+        }
+
+        // evaluate & update archive
+        if (!solutions_to_evaluate.empty()) {
+          problem.evaluate_partial(rng, offsprings, backups, subsets, solutions_to_evaluate);
+          evaluations += solutions_to_evaluate.size();
+
+          if (evaluation_needed) {
+            local_archive->update(offsprings[0], false);
+          }
+          if (evaluation_needed_mate) {
+            local_archive->update(offsprings[1], false);
+          }
+        }
+
+        // accept
+        bool p_better =
+            problem.fitness().cmp(solutions[i].quality(), solutions[mate].quality(), objective) == Ordering::Better;
+
+        bool accept = false;
+        if (p_better) {
+          accept = problem.fitness().cmp(offsprings[0].quality(), solutions[i].quality(), objective) != Ordering::Worse;
+        } else {
+          accept =
+              problem.fitness().cmp(offsprings[1].quality(), solutions[mate].quality(), objective) != Ordering::Worse;
+        }
+
+        if (accept) {
+          solutions[i] = offsprings[0];
+          solutions[mate] = offsprings[1];
+
+          // to make an invariant for normal gom happy
+          parents[i] = offsprings[0];
+          parents[mate] = offsprings[1];
+        }
+      }
+    }
+
+#ifndef NDEBUG
+    Arr2D<usize> val_counts_after = Arr2D<usize>::Zero(l, max_domain_size);
+    for (usize i = 0; i < solutions.size(); i++) {
+      for (usize j = 0; j < l; j++) {
+        val_counts_after(j, solutions[i].discrete_values()(j))++;
+      }
+    }
+    assert((val_counts_before == val_counts_after).all() && "Gene invariance was violated!");
+#endif /* NDEBUG */
+
+    return evaluations;
+  };
+
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
     if (options.use_fancy_gpu_gp_gom) {
       if (auto ptr = dynamic_cast<const GPInstanceBase*>(&problem.unwrap()); ptr != nullptr) {
@@ -11162,6 +11346,10 @@ class Population {
       } else {
         throw std::runtime_error("GP specialization enabled for a non GP instance.");
       }
+    }
+
+    if (options.gene_invariant) {
+      return discrete_gi_gom_step(rng, subset_idx);
     }
 
     std::vector<usize> donor_pool;
@@ -11219,14 +11407,18 @@ class Population {
           if (p_mut > 0.0) {
             std::uniform_real_distribution<double> U(0.0, 1.0);
             for (usize j : subsets[i]->discrete) {
-              if (U(rng) < p_mut) {
+              auto ds_j = problem.discrete_domain_sizes()(j);
+              if (ds_j > 1 && U(rng) < p_mut) {
                 // assign a random value to the position
-                std::uniform_int_distribution<DType> d_j(0, problem.discrete_domain_sizes()(j) - 1);
-                auto v = d_j(rng);
+                std::uniform_int_distribution<DType> d_j(0, ds_j - 1);
+                auto v_p = parents[i].discrete_values()(j);
+                auto v = v_p;
+                while (v == v_p) {
+                  v = d_j(rng);
+                }
                 solutions[i].discrete_values()(j) = v;
-                bool changed = v != parents[i].discrete_values()(j);
-                evaluation_needed |= changed && solutions[i].discrete_active()(j);
-                anything_changed |= changed;
+                evaluation_needed |= solutions[i].discrete_active()(j);
+                anything_changed = true;
               }
             }
           }
@@ -11689,7 +11881,7 @@ class MixedGOMEA : public MethodBase {
     return std::visit([](const auto& r) { return r.current_generation(); }, ims_runner.value());
   };
 
-  std::optional<std::tuple<usize, u64>> current_population() const override {
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
     if (!ims_runner.has_value()) {
       return std::nullopt;
     }
@@ -11936,8 +12128,9 @@ class EABase : public MethodBase {
   };
 
   std::optional<u64> current_generation() const override { return generation; };
-  std::optional<std::tuple<usize, u64>> current_population() const override {
-    return std::make_tuple(population_size, generation);
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+    const u64 num_restarts = 0;
+    return std::make_tuple(population_size, generation, num_restarts);
   };
 };
 

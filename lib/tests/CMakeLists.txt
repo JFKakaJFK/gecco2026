@@ -30,6 +30,7 @@ set(
     ims
     entropy
     mixed
+    mixed_giga
     mo_mixed
     mixed_rv
     mixed_ia

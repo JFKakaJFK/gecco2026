@@ -320,8 +320,16 @@ class GPContext {
 
     // to resolve subfunction arguments, we need to know the calling node
     // (and if that is another argument, we need the calling node of that tree and so on...)
+    //
+    // call_stack_context[i] is the call_stack_idx of the node at call_stack[i], i.e. the context
+    // of the tree *containing* that call site. When an Arg chains through multiple levels, each
+    // jump must go to the caller of the *subtree* that holds the intermediate Arg — not simply
+    // one position back in call_stack, because multiple call_stack entries can live in the same
+    // subtree (e.g. when an Arg resolves to an operator that itself contains another SubtreeA call).
     std::vector<usize> call_stack;
+    std::vector<isize> call_stack_context;
     call_stack.reserve(max_expression_size);
+    call_stack_context.reserve(max_expression_size);
 
     // for each we need to visit, we need the node index, the call stack idx and whether the node already was visited
     // (for functions the first time is in-order, and the second time is post-order)
@@ -340,13 +348,14 @@ class GPContext {
 
       // housekeeping: reset the call stack and node_stack per output
       call_stack.clear();
+      call_stack_context.clear();
       node_stack.clear();
       node_stack.emplace_back(n, 0, false);
 
       // nodes are visited up to twice - once in-order, and once post-order after the children have been taken care of
       while (!node_stack.empty()) {
         // we hit the max size, but have a next node since this is inside the loop
-        if (size + tree.size() == max_expression_size) {
+        if (size + tree.size() >= max_expression_size) {
           return std::nullopt;
         }
 
@@ -385,42 +394,42 @@ class GPContext {
               visited(idx) = 0;
             }
 
-            // we need to replace the argument with the corresponding child of the caller
-            // and then replace the stack entry with with the actual argument
-            //
-            // but the caller might need some resolving if it is not the root of a tree
-            // (every function call adds to the call_stack, so it is not necessarily true that the previous call stack
-            // entry corresponds to the caller of the current subtree - it might just be an ancestor in the current tree
-            // that also calls another subfunction...)
+            // Walk up the call chain, following argument remappings at each level.
+            // An intermediate caller may reorder arguments (e.g. Fn[1](Arg[1], Arg[0])),
+            // so we cannot jump straight to the top-level caller with the original arg index.
+            // We step one level at a time until we reach a concrete (non-Arg) node.
+            usize resolved_v_idx = v_idx;
+            isize resolved_csi = call_stack_idx;
 
-            // get the previous call stack entry
-            usize calling_node = call_stack[call_stack_idx];
+            while (true) {
+              usize caller = call_stack[resolved_csi];
 
-            // since we move up the call chain, we need to go at least one call/frame backward, but maybe more
-            isize num_frames = 1;
+              auto& cnodes = children[caller];
+              usize child = cnodes[resolved_v_idx % cnodes.size()];
+              assert(idx != child && "Self reference found.");
 
-            // check if the calling node is an ancestor of the current node - if so, we need to move up the hierarchy to
-            // find the ancestor clostest to the root that is on the call_stack... (the first call into this subtree
-            // must have the actual caller)
-            auto pidx = parent(idx);
-            while (pidx.has_value()) {
-              if (pidx.value() == calling_node) {
-                // note: this works since we don't allow cycles by restricting the domain, i.e. there can only ever be
-                // one "active" call to this subfunction, guaranteeing that the calling node of the highest ancestor is
-                // the actual calling node.
-                calling_node = call_stack[call_stack_idx - num_frames++];
+              DType child_value = domain2value(child, solution.discrete_values()(child));
+              if (value_kind[child_value] != ValueKind::Arg) {
+                // reached a concrete node — replace this Arg on the stack with it.
+                // The resolved child lives in the same tree as call_stack[resolved_csi], whose
+                // tree-level call_stack_idx is stored in call_stack_context[resolved_csi].
+                assert(
+                    root[idx] <= root[child] &&
+                    "Caller and child must originate from a hierarchically higher tree to ensure there are no cycles.");
+                node_stack.pop_back();
+                node_stack.emplace_back(child, call_stack_context[resolved_csi], false);
+                break;
               }
-              pidx = parent(pidx.value());
+
+              // the resolved node is itself an Arg in the caller's context — mark it active
+              // // (it IS used: it determines which node the chain ultimately resolves to) and
+              // jump to the call_stack_idx of the tree containing call_stack[resolved_csi].
+              if constexpr (!std::is_const<S>()) {
+                solution.discrete_active()(child) = true;
+              }
+              resolved_v_idx = value_idx[child_value];
+              resolved_csi = call_stack_context[resolved_csi];
             }
-
-            // now that we have the caller, we can finally replace the stack entry with with the actual argument
-            auto& cnodes = children[calling_node];
-            assert(idx != cnodes[v_idx % cnodes.size()] && "Self reference found.");
-
-            node_stack.pop_back();
-            node_stack.emplace_back(cnodes[v_idx % cnodes.size()],
-                                    call_stack_idx - num_frames,  // use the stack index of the (resolved) caller
-                                    false);
           } else if (value_kind[value] == ValueKind::Subtree) {
             if (discount_size) {
               visited(idx) = 0;
@@ -428,8 +437,10 @@ class GPContext {
             assert(root[idx] != subtree_roots[v_idx] && "Cyclic subtree call detected.");
             // we need to replace the actual subtree with the called subtree
 
-            // first update the call stack
+            // first update the call stack; record call_stack_idx so Arg resolution can correctly
+            // jump back to the tree containing this call site (not just one position in call_stack)
             call_stack.push_back(idx);
+            call_stack_context.push_back(call_stack_idx);
 
             // then replace the stack entry with the called subtree
             std::get<2>(node_stack[node_stack_idx]) =
@@ -469,6 +480,7 @@ class GPContext {
           if (value_kind[value] == ValueKind::Subtree) {
             // in the previous in-order visit, this node was pushed on the call stack so it has to be removed now
             call_stack.pop_back();
+            call_stack_context.pop_back();
           } else {
             // this is a non-reference post-order visit, so we need to update the tree
             update_tree = true;

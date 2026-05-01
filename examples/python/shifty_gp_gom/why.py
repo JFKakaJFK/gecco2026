@@ -4,19 +4,20 @@ import numpy as np
 import pygom
 from mpmath.function_docs import shi
 from pygom import *
+from tqdm import tqdm
+
 from src.config import c, extract, instantiate, load_config
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
 from src.postprocessing import load_results
 from src.run import compute_run_path, run_tasks
-from tqdm import tqdm
 
 REPEATS_PER_DATASET = 30
 NUM_FOLDS = 5
 
 REPEATS_PER_FOLD = REPEATS_PER_DATASET // NUM_FOLDS
 
-RESULT_DIR = pathlib.Path("results") / "mutation"
+RESULT_DIR = pathlib.Path("results") / "gi_gom"
 DATA_DIR = RESULT_DIR / "data"
 LOG_DIR = RESULT_DIR / "raw"
 PARQUET_DIR = RESULT_DIR / "processed"
@@ -26,9 +27,9 @@ BUDGET = c.Budget(
     # max_generations=300,
     # max_evaluations=int(5e5)
     # max_evaluations=int(1e6)
-    max_evaluations=int(2e6)
+    # max_evaluations=int(2e6)
     # max_evaluations=int(5e6)
-    # max_evaluations=int(1e7)
+    max_evaluations=int(1e7)
     # max_time_seconds=30 * 60
 )
 
@@ -104,8 +105,8 @@ def problems(rng):
             # depth 6: 16k line config files
             # depth 9: >200k line config files
             for height in [
-                # 5  # ,
-                7
+                5  # ,
+                # 7
             ]:
                 template = c.Template(
                     [c.TemplateNode.full_nary(branching_factor=2, depth=height - 1)], []
@@ -136,59 +137,71 @@ def problems(rng):
                                 # 32,
                                 256,
                             ]:
-                                for run in range(REPEATS_PER_FOLD):
-                                    seed = int(rng.integers(2**32))
+                                for gi in [False, True]:
+                                    init = (
+                                        c.HalfHalfInit(p_terminal=0.5, p_constant=0.5)
+                                        if not gi
+                                        else c.CompleteInit()
+                                    )
 
-                                    instance = c.SRProblem(
-                                        ctx,
-                                        X_train=c.np.load(str(X_path.absolute())),
-                                        Y_train=c.np.load(str(y_path.absolute())),
-                                        X_test=c.np.load(str(X_test_path.absolute())),
-                                        Y_test=c.np.load(str(y_test_path.absolute())),
-                                        objectives="nmse",  # = MSE / var(y_train)
-                                        linear_scaling=linear_scaling,
-                                        init=c.HalfHalfInit(
-                                            p_terminal=0.5, p_constant=0.5
-                                        ),
-                                        constant_init_lower_bound=min_y,
-                                        constant_init_upper_bound=max_y,
-                                        # early termination condition for "perfect" expression recovery
-                                        # target_objectives=[1e-8]
-                                        # if is_synthetic
-                                        # else [0.0],
-                                        # target_objectives=[
-                                        #     # R2 >= 0.999 for black-box problems
-                                        #     # and (N)MSE < 1e-8 for synthetic problems
-                                        #     0.0001 if not is_synthetic else 1e-8
-                                        # ],  # if is_synthetic else None,
-                                        gradient_mode="forward",
-                                        # gradient_mode="central",
-                                        archive_epsilon=0.0,  # if is_synthetic else 1e-6,
-                                        batch_size=batch_size,  # <= 64 is too noisy...
-                                    )
-                                    yield (
-                                        dict(
-                                            problem_name=f"{problem}{'N=' + str(kwargs.get('synthetic_problem_kwargs', {}).get('noise', 0.0)) if len(kwargs) else ''}",
-                                            fold=fold,
-                                            run=run,
-                                            template_height=height,
-                                            operator_set=operator_set,
+                                    for run in range(REPEATS_PER_FOLD):
+                                        seed = int(rng.integers(2**32))
+
+                                        instance = c.SRProblem(
+                                            ctx,
+                                            X_train=c.np.load(str(X_path.absolute())),
+                                            Y_train=c.np.load(str(y_path.absolute())),
+                                            X_test=c.np.load(
+                                                str(X_test_path.absolute())
+                                            ),
+                                            Y_test=c.np.load(
+                                                str(y_test_path.absolute())
+                                            ),
+                                            objectives="nmse",  # = MSE / var(y_train)
                                             linear_scaling=linear_scaling,
-                                            constant_representation=constant_representation,
-                                            batch_size=batch_size,
-                                        ),
-                                        seed,
-                                        # c.cached(
-                                        instance,
-                                        # cache_size=10_000,
-                                        # ),
-                                        ctx,
-                                    )
+                                            init=init,
+                                            constant_init_lower_bound=min_y,
+                                            constant_init_upper_bound=max_y,
+                                            # early termination condition for "perfect" expression recovery
+                                            # target_objectives=[1e-8]
+                                            # if is_synthetic
+                                            # else [0.0],
+                                            # target_objectives=[
+                                            #     # R2 >= 0.999 for black-box problems
+                                            #     # and (N)MSE < 1e-8 for synthetic problems
+                                            #     0.0001 if not is_synthetic else 1e-8
+                                            # ],  # if is_synthetic else None,
+                                            gradient_mode="forward",
+                                            # gradient_mode="central",
+                                            archive_epsilon=0.0,  # if is_synthetic else 1e-6,
+                                            batch_size=batch_size,  # <= 64 is too noisy...
+                                        )
+                                        yield (
+                                            dict(
+                                                problem_name=f"{problem}{'N=' + str(kwargs.get('synthetic_problem_kwargs', {}).get('noise', 0.0)) if len(kwargs) else ''}",
+                                                fold=fold,
+                                                run=run,
+                                                template_height=height,
+                                                operator_set=operator_set,
+                                                linear_scaling=linear_scaling,
+                                                constant_representation=constant_representation,
+                                                batch_size=batch_size,
+                                                gi=gi,
+                                            ),
+                                            seed,
+                                            # c.cached(
+                                            instance,
+                                            # cache_size=10_000,
+                                            # ),
+                                            ctx,
+                                        )
 
 
 def methods(info, ctx):
     # the GPContext provides lookup tables, one of them being the normalized pairwise node proximity
     ctx = instantiate(ctx, ctx=vars(pygom))
+
+    gi = info["gi"]
 
     # IMS options
     initial_population_size = 64
@@ -312,50 +325,49 @@ def methods(info, ctx):
             #     gn = ["", "(Shifty)"][shifty_gom]
             # for resample_inactive in [False, True]:
             #     gn = ["", "(Resample)"][resample_inactive]
-            for mutation in ["", "weak", "strong"]:
-                discrete_mutation_probability = 0.0
-                if mutation == "weak":
-                    discrete_mutation_probability = 1.0 / ctx.num_discrete
-                elif mutation == "strong":
-                    discrete_mutation_probability = None
+            # for mutation in ["", "weak", "strong"]:
+            #     discrete_mutation_probability = 0.0
+            #     if mutation == "weak":
+            #         discrete_mutation_probability = 1.0 / ctx.num_discrete
+            #     elif mutation == "strong":
+            #         discrete_mutation_probability = None
 
-                yield (
-                    f'"{similarity} {mutation} {constant_representation}"',
-                    c.MixedGOMEA(
-                        discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
-                        population_options=c.PopulationOptions(
-                            target_continuous_to_discrete_balance=0.5
-                            if "1:2" in copt
-                            else 1.0,
-                            forced_improvements="RV" in copt
-                            and "nfi"
-                            not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
-                            enable_mixed_forced_improvements="nmfi" not in copt,
-                            # use_fancy_gpu_gp_gom=shifty_gom,
-                            # resample_inactive_donor_values=resample_inactive,
-                            discrete_mutation_probability=discrete_mutation_probability,
-                            **copt_population_kwargs,
-                        ),
-                        rv_options=c.RvOptions(**rv_options),
-                        continuous_model=c.FullFOS(),
-                        sampling_model=c.AMaLGaMSamplingModel(
-                            distribution_multiplier_decrease=1.0
-                            if "nSDR" in copt
-                            else 0.9,
-                            distribution_multiplier_increase=1.0
-                            if "nSDR" in copt
-                            else 1.0 / 0.9,
-                        ),
-                        # IMS options
-                        ims_options=c.IMSOptions(
-                            initial_population_size=initial_population_size,
-                            max_num_populations=max_num_populations,
-                            subgeneration_factor=subgeneration_factor,
-                            restart_stale_populations=restart_stale_populations,
-                            reevaluate_solutions_after_adaption=True,
-                        ),
+            yield (
+                f'"{similarity}{["", " GI "][gi]}{constant_representation}"',
+                c.MixedGOMEA(
+                    discrete_model=c.LinkageTreeFOS(**discrete_model_kwargs),
+                    population_options=c.PopulationOptions(
+                        target_continuous_to_discrete_balance=0.5
+                        if "1:2" in copt
+                        else 1.0,
+                        forced_improvements="RV" in copt
+                        and "nfi"
+                        not in copt,  # not used per default as per https://arxiv.org/pdf/1904.02050
+                        enable_mixed_forced_improvements="nmfi" not in copt,
+                        # use_fancy_gpu_gp_gom=shifty_gom,
+                        # resample_inactive_donor_values=resample_inactive,
+                        # discrete_mutation_probability=discrete_mutation_probability,
+                        gene_invariant=gi,
+                        **copt_population_kwargs,
                     ),
-                )
+                    rv_options=c.RvOptions(**rv_options),
+                    continuous_model=c.FullFOS(),
+                    sampling_model=c.AMaLGaMSamplingModel(
+                        distribution_multiplier_decrease=1.0 if "nSDR" in copt else 0.9,
+                        distribution_multiplier_increase=1.0
+                        if "nSDR" in copt
+                        else 1.0 / 0.9,
+                    ),
+                    # IMS options
+                    ims_options=c.IMSOptions(
+                        initial_population_size=initial_population_size,
+                        max_num_populations=max_num_populations,
+                        subgeneration_factor=subgeneration_factor,
+                        restart_stale_populations=restart_stale_populations,
+                        reevaluate_solutions_after_adaption=True,
+                    ),
+                ),
+            )
 
 
 def all_tasks():

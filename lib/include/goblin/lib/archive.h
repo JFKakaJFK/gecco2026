@@ -149,7 +149,8 @@ class AdaptiveGridArchive : public ArchiveBase {
 
  private:
   bool same_box(const SolutionBase& lhs, const SolutionBase& rhs);
-  bool update_so_solutions(const SolutionBase& solution);
+  // is_so_elite, is_dominated
+  std::tuple<bool, bool> update_so_solutions(const SolutionBase& solution);
 
   const ArchiveFitnessBase& _fitness;
   [[maybe_unused]] usize _capacity;

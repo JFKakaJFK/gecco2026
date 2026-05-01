@@ -87,6 +87,8 @@ class IMS final : public MethodBase {
     sizes.reserve(opts.max_num_populations);
     generations.clear();
     generations.reserve(opts.max_num_populations);
+    restarts.clear();
+    restarts.reserve(opts.max_num_populations);
     std::vector<bool> running;
     running.reserve(opts.max_num_populations);
     std::vector<usize> generations_since_last_improvement;
@@ -138,6 +140,7 @@ class IMS final : public MethodBase {
         populations.push_back(create_population(
             problem, *archive, size, opts.initial_num_clusters + p_idx * opts.additional_clusters_per_start));
         generations.push_back(0);
+        restarts.push_back(0);
         generations_since_last_improvement.push_back(0);
         running.push_back(true);
       } else if (!running[p_idx] && opts.restart_stale_populations &&
@@ -145,6 +148,7 @@ class IMS final : public MethodBase {
         // std::println("[IMS]: Restarting population {}", p_idx);
         populations[p_idx].restart();
         generations[p_idx] = 0;
+        restarts[p_idx]++;
         generations_since_last_improvement[p_idx] = 0;
         running[p_idx] = true;
       }
@@ -247,8 +251,8 @@ class IMS final : public MethodBase {
 
   std::optional<u64> current_generation() const override final { return total_generations; };
 
-  std::optional<std::tuple<usize, u64>> current_population() const override {
-    return std::make_tuple(sizes[p_idx], generations[p_idx]);
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+    return std::make_tuple(sizes[p_idx], generations[p_idx], restarts[p_idx]);
   };
 
  private:
@@ -261,6 +265,7 @@ class IMS final : public MethodBase {
   usize p_idx;
   std::vector<usize> sizes;
   std::vector<u64> generations;
+  std::vector<u64> restarts;
 };
 
 };  // namespace goblin

@@ -541,8 +541,6 @@ inline std::vector<usize> sort_by_quality_decreasing(const FitnessBase& fitness,
     by_fitness.reserve(indices.size());
     for (auto& front : fronts) {
       // TODO re-order fronts to maximize scattering in parameter space?
-      //
-      // TODO bug: we don't reduce the size to the selection size...
       for (usize i : front) {
         by_fitness.push_back(indices[i]);
       }
@@ -875,7 +873,6 @@ class RvState {
                                              const SolutionBase& parent,
                                              std::optional<usize> objective,
                                              bool strict) {
-    thread_local static std::uniform_real_distribution<double> p(0.0, 1.0);
     if (objective.has_value()) {
       // improvement in the extreme direction or sideways improvement in another
       // objective
@@ -887,7 +884,8 @@ class RvState {
                                            objective) == Ordering::Better);
       }
 
-      if (!strict && options.p_accept > 0.0 && p(rng) < options.p_accept) {
+      std::uniform_real_distribution<double> U(0.0, 1.0);
+      if (!strict && options.p_accept > 0.0 && U(rng) < options.p_accept) {
         return std::make_tuple(true, true, false);
       }
     } else {
@@ -903,7 +901,6 @@ class RvState {
 
   template <typename Derived>
   void sample(Rng& rng, const InstanceBase& problem, usize k, usize fos_idx, Eigen::MatrixBase<Derived>&& out) {
-    thread_local static std::uniform_real_distribution<CType> U(0.0, 1.0);
     const usize TRIES = 100;
 
     const auto& s = subsets[k][fos_idx].continuous;
@@ -922,6 +919,7 @@ class RvState {
     }
 
     // otherwise we sample uniformally in the init bounds
+    std::uniform_real_distribution<CType> U(0.0, 1.0);
     for (usize j = 0; j < s.size(); j++) {
       out(j) *= U(rng) * (problem.continuous_init_upper_bounds()(s[j]) - problem.continuous_init_lower_bounds()(s[j])) +
                 problem.continuous_init_lower_bounds()(s[j]);

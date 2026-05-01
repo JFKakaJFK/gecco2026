@@ -298,6 +298,7 @@ struct PopulationOptions {
   double donor_search_proportion = 0.0;  // the fraction of solutions to consider before skipping an evaluation in case
                                          // of all subset variables being identical between the solution and donor
   std::optional<std::string> subset_logfile = std::nullopt;
+  std::optional<std::string> intermediate_population_logfile = std::nullopt;
   u64 generation = 0;
   u64 initial_generations_until_next_fos_log = 5;  // > 0, subset stats are logged every
   u64 fos_log_factor = 2;                          // 1 is linear, 2 is exponential log spacing
@@ -315,6 +316,8 @@ struct PopulationOptions {
   // If std::nullopt, then perform strong mutation (i.e. 1/subset size).
   // Note that for single element subsets, this collapses to random search
   std::optional<double> discrete_mutation_probability = 0.0;
+
+  bool gene_invariant = false;
 
   // TODO this whole file really needs a refactor lol
   bool use_fancy_gpu_gp_gom = false;
@@ -338,7 +341,8 @@ class Population {
         discrete_model(discrete_model.clone()),
         rv_state(rv_options, continuous_model, sampling_model),
         options(options),
-        local_archive(global_archive.clone()),
+        local_archive(
+            global_archive.clone()),  // fine, local archive gets decoupled immediately and reset for each (re)start
         size(size),
         num_clusters(num_clusters),
         donor_pool_size(std::min(size,
@@ -352,6 +356,8 @@ class Population {
                             options.continuous_mutation_decay_patience.value() > 0);
     __goblin_runtime_assert(0.0 <= options.continuous_mutation_probability &&
                             options.continuous_mutation_probability <= 1.0);
+
+    local_archive->clear();  // to make archive decoupling explicit
   };
 
   void restart() { solutions.clear(); };
@@ -499,12 +505,13 @@ class Population {
         }
       }
     } else {
+      usize gom_step = 0;
       usize subset_idx = 0;
       std::uniform_real_distribution<double> U(0.0, 1.0);
       bool can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       do {
         // std::println("LOOP");
-        bool do_discrete_step;
+        bool do_discrete_step, was_discrete_step;
         if (!is_continuous || !rv_state.options.enabled) {
           do_discrete_step = can_do_discrete_step;
         } else if (!can_do_discrete_step) {
@@ -538,6 +545,8 @@ class Population {
           __assert_invariants();
           if (evals < 1) {
             // std::println("RV STEP SKIPPED !!!!");
+          } else {
+            was_discrete_step = false;
           }
           evaluations += evals;
           continuous_evaluations += evals;
@@ -550,6 +559,8 @@ class Population {
           evaluations += evals;
           discrete_evaluations += evals;
 
+          was_discrete_step = true;
+
           if (evals < 1) {
             // std::println("GP STEP SKIPPED !!!!");
           }
@@ -561,10 +572,16 @@ class Population {
           __assert_invariants();
         }
 
+        if (options.intermediate_population_logfile.has_value()) {
+          debug_log(problem, options.intermediate_population_logfile.value(), "gom_step,step_type,",
+                    std::format("{},{},", gom_step, was_discrete_step ? "D" : "C"), solutions);
+        }
+
         if (should_terminate(evaluations).has_value()) {
           return evaluations;
         }
 
+        gom_step++;
         can_do_discrete_step = is_discrete && subset_idx < max_discrete_subset_count;
       } while (can_do_discrete_step);  // (subset_idx < max_discrete_subset_count);
     }
@@ -582,7 +599,7 @@ class Population {
       __assert_invariants();
     }
 
-    if (options.forced_improvements && is_discrete) {
+    if (options.forced_improvements && is_discrete && !options.gene_invariant) {
       // std::println("FI STEP");
       evaluations += forced_improvements(rng, should_terminate, max_discrete_subset_count);
       __assert_invariants();
@@ -623,6 +640,7 @@ class Population {
         return true;
       }
       // since we only have relative comparisons, this roughly is equal to the usual fitness variance == 0.0 condition
+      // (it is exact for threshold 0.0, and very similar otherwise)
       if (problem.num_discrete() == 0 && (avg_dist_to_local_so_elite() == 0.0 || rv_state.converged())) {
         return true;
       }
@@ -632,7 +650,7 @@ class Population {
     // mechanisms which force convergence if no progress is made
     // return problem.num_discrete() > 0 && no_improvement_stretch >= max_nis;  // && no_evaluations_performed;
     // return false;
-    return problem.num_discrete() > 0 && no_improvement_stretch >= std::log2(solutions.size());
+    return problem.num_discrete() > 0 && no_improvement_stretch >= 1 + std::log2(solutions.size());
   };
 
   bool all_solutions_identical() const {
@@ -1086,6 +1104,136 @@ class Population {
     return solutions_to_evaluate.size();
   };
 
+  /// GI-GOM as per https://arxiv.org/pdf/2506.15222 (well, shuffling for FOS/index combinations is slightly less
+  /// randomized) => not multi-objective, or parallelized for now
+  u64 discrete_gi_gom_step(Rng& rng, usize subset_idx) {
+    // TODO maybe what is sent to evaluate shouldn't be a population + indices, but vectors of "eval items", i.e. cheap
+    // view structs pointing to the solution to evaluate + possibly a subset & parent
+
+#ifndef NDEBUG
+    const usize l = problem.num_discrete();
+    const usize max_domain_size = problem.discrete_domain_sizes().maxCoeff();
+    Arr2D<usize> val_counts_before = Arr2D<usize>::Zero(l, max_domain_size);
+    for (usize i = 0; i < solutions.size(); i++) {
+      for (usize j = 0; j < l; j++) {
+        val_counts_before(j, solutions[i].discrete_values()(j))++;
+      }
+    }
+#endif /* NDEBUG */
+
+    const usize n = solutions.size();
+    u64 evaluations = 0;
+    std::vector<usize> indices(n);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    for (usize i : permute(rng, n)) {
+      auto k = solution_clusters[i];
+      auto fos_idx = subset_orders(i, subset_idx);
+
+      // due to filtering/max_subset_size, some clusters might have more
+      // subsets...
+      if (fos_idx < cluster_FOS[k].size()) {
+        std::optional<usize> objective = k < problem.fitness().num_objectives() ? std::make_optional(k) : std::nullopt;
+        subsets[i] = &cluster_FOS[k][fos_idx];
+        assert(subsets[i]->discrete.size() > 0);
+
+        // select mate via tournament selection
+        usize mate = i, other_candidate = i, pool_idx = 0;
+        bool check_other_candidate = solutions.size() > 2;
+        while (pool_idx < n && mate == i && (!check_other_candidate || other_candidate == i)) {
+          // do a partial Fisher-Yates shuffle
+          std::swap(indices[pool_idx], indices[std::uniform_int_distribution<usize>(pool_idx, n - 1)(rng)]);
+
+          usize mate_idx = indices[pool_idx++];
+          if (mate_idx == i) {
+            continue;
+          }
+
+          if (mate == i) {
+            mate = mate_idx;
+          } else {
+            other_candidate = mate_idx;
+          }
+        }
+        if (check_other_candidate && problem.fitness().cmp(solutions[other_candidate].quality(),
+                                                           solutions[mate].quality(), objective) == Ordering::Better) {
+          mate = other_candidate;
+        }
+
+        // exchange material
+        SolutionSet backups, offsprings;
+        solutions_to_evaluate.clear();
+
+        backups.add(solutions[i]);
+        backups.add(solutions[mate]);
+
+        offsprings.add(solutions[i]);
+        offsprings.add(solutions[mate]);
+
+        auto [evaluation_needed, changed] = problem.inherit_discrete(offsprings[0], solutions[mate], *subsets[i]);
+        if (evaluation_needed) {
+          subsets[0] = &cluster_FOS[k][fos_idx];
+          solutions_to_evaluate.push_back(0);
+        }
+        auto [evaluation_needed_mate, _] = problem.inherit_discrete(offsprings[1], solutions[i], *subsets[i]);
+        if (evaluation_needed_mate) {
+          subsets[1] = &cluster_FOS[k][fos_idx];
+          solutions_to_evaluate.push_back(1);
+        }
+
+        if (!changed) {
+          continue;
+        }
+
+        // evaluate & update archive
+        if (!solutions_to_evaluate.empty()) {
+          problem.evaluate_partial(rng, offsprings, backups, subsets, solutions_to_evaluate);
+          evaluations += solutions_to_evaluate.size();
+
+          if (evaluation_needed) {
+            local_archive->update(offsprings[0], false);
+          }
+          if (evaluation_needed_mate) {
+            local_archive->update(offsprings[1], false);
+          }
+        }
+
+        // accept
+        bool p_better =
+            problem.fitness().cmp(solutions[i].quality(), solutions[mate].quality(), objective) == Ordering::Better;
+
+        bool accept = false;
+        if (p_better) {
+          accept = problem.fitness().cmp(offsprings[0].quality(), solutions[i].quality(), objective) != Ordering::Worse;
+        } else {
+          accept =
+              problem.fitness().cmp(offsprings[1].quality(), solutions[mate].quality(), objective) != Ordering::Worse;
+        }
+
+        if (accept) {
+          solutions[i] = offsprings[0];
+          solutions[mate] = offsprings[1];
+
+          // to make an invariant for normal gom happy
+          parents[i] = offsprings[0];
+          parents[mate] = offsprings[1];
+        }
+      }
+    }
+
+#ifndef NDEBUG
+    Arr2D<usize> val_counts_after = Arr2D<usize>::Zero(l, max_domain_size);
+    for (usize i = 0; i < solutions.size(); i++) {
+      for (usize j = 0; j < l; j++) {
+        val_counts_after(j, solutions[i].discrete_values()(j))++;
+      }
+    }
+    assert((val_counts_before == val_counts_after).all() && "Gene invariance was violated!");
+#endif /* NDEBUG */
+
+    return evaluations;
+  };
+
   u64 discrete_gom_step(Rng& rng, usize subset_idx) {
     if (options.use_fancy_gpu_gp_gom) {
       if (auto ptr = dynamic_cast<const GPInstanceBase*>(&problem.unwrap()); ptr != nullptr) {
@@ -1093,6 +1241,10 @@ class Population {
       } else {
         throw std::runtime_error("GP specialization enabled for a non GP instance.");
       }
+    }
+
+    if (options.gene_invariant) {
+      return discrete_gi_gom_step(rng, subset_idx);
     }
 
     std::vector<usize> donor_pool;
@@ -1624,7 +1776,7 @@ class MixedGOMEA : public MethodBase {
     return std::visit([](const auto& r) { return r.current_generation(); }, ims_runner.value());
   };
 
-  std::optional<std::tuple<usize, u64>> current_population() const override {
+  std::optional<std::tuple<usize, u64, u64>> current_population() const override {
     if (!ims_runner.has_value()) {
       return std::nullopt;
     }
