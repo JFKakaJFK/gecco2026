@@ -23,6 +23,8 @@ def create_db(dir: pathlib.Path):
         alg_time_seconds DOUBLE,
         eval_time_seconds DOUBLE,
         expressions TEXT,
+        unresolved_expressions TEXT,
+        subtrees TEXT[],
         mse_train DOUBLE,
         dataset TEXT,
         fold INTEGER,
@@ -62,11 +64,31 @@ def create_db(dir: pathlib.Path):
         re.VERBOSE,
     )
 
+    subtree_col_re = re.compile(r"^subtree_(\d+)$")
+
     for csv_path in tqdm(dir.rglob("*.csv"), leave=False, ascii=True):
         match = filename_re.match(csv_path.name)
         if not match:
             print(f"Skipping unrecognized file: {csv_path.name}")
             continue
+
+        col_names = [
+            d[0]
+            for d in conn.execute(
+                f"SELECT * FROM read_csv_auto('{csv_path.as_posix()}') LIMIT 0"
+            ).description
+        ]
+
+        subtree_cols = sorted(
+            [c for c in col_names if subtree_col_re.match(c)],
+            key=lambda c: int(subtree_col_re.match(c).group(1)),
+        )
+        subtrees_expr = f"[{', '.join(subtree_cols)}]" if subtree_cols else "[]::TEXT[]"
+        unresolved_expr = (
+            "unresolved_expressions"
+            if "unresolved_expressions" in col_names
+            else "NULL"
+        )
 
         conn.execute(
             f"""
@@ -79,6 +101,8 @@ def create_db(dir: pathlib.Path):
             alg_time_seconds,
             eval_time_seconds,
             expressions,
+            {unresolved_expr} AS unresolved_expressions,
+            {subtrees_expr} AS subtrees,
             mse_train,
             dataset,
             fold,
@@ -96,7 +120,7 @@ def create_db(dir: pathlib.Path):
             continuous_active,
             objectives,
             constraint_value,
-            var_y 
+            var_y
         FROM read_csv_auto('{csv_path.as_posix()}')
         """
         )

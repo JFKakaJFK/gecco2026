@@ -353,6 +353,7 @@ class SRProblem : public GPInstanceBase {
     for (usize i = 0; i < ctx.num_subexpressions; i++) {
       os << "subtree_" << i << ",";
     }
+    os << "unresolved_expressions,";
     os << "expressions,";
     for (auto& o : objectives) {
       os << o << "_train,";
@@ -371,9 +372,12 @@ class SRProblem : public GPInstanceBase {
       os << '"' << expr << "\",";
     }
     os << '"';
+    log_solution_unresolved(os, solution);
+    os << "\",";
+    os << '"';
     log_solution(os, solution);
     os << "\",";
-
+    
     const auto& q = solution.quality_as<SRQuality>();
     for (usize i = 0; i < objectives.size(); i++) {
       os << q.objectives(i) << ',';
@@ -399,6 +403,25 @@ class SRProblem : public GPInstanceBase {
         const auto& q = solution.quality_as<SRQuality>();
         if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
           os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+        } else {
+          os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
+        }
+      } else {
+        os << exprs[i];
+      }
+    }
+  };
+
+  void log_solution_unresolved(std::ostream& os, const SolutionBase& solution) const {
+    auto exprs = ctx.to_sympy_unresolved(solution);
+    for (usize i = 0; i < exprs.size(); i++) {
+      if (i > 0) {
+        os << " , ";
+      }
+      if (linear_scaling) {
+        const auto& q = solution.quality_as<SRQuality>();
+        if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
+          os << exprs[i];
         } else {
           os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
         }

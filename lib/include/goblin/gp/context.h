@@ -293,6 +293,8 @@ class GPContext {
   // Subtree references within a subtree are inlined (subtrees can only call
   // earlier ones). Arg nodes (enable_subfunctions=true) appear as arg0, arg1, ...
   std::vector<std::string> subtrees_to_sympy(const SolutionBase& solution) const {
+    auto subtree_arities = _compute_subtree_arities(solution);
+
     std::vector<std::string> subtree_exprs(num_subexpressions, "SIZE OVERFLOW");
     std::vector<std::string> arg_stack;
     arg_stack.reserve(max_expression_size);
@@ -310,10 +312,13 @@ class GPContext {
         stack.pop_back();
 
         DType value = domain2value(idx, solution.discrete_values()(idx));
+        bool is_operator = value_kind[value] == ValueKind::Operator;
+        bool is_subtree = value_kind[value] == ValueKind::Subtree;
 
-        if (!post && value_kind[value] == ValueKind::Operator) {
+        if (!post && (is_operator || is_subtree)) {
           stack.emplace_back(idx, true);
-          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          usize arity = is_operator ? std::min(children[idx].size(), value_max_arity[value])
+                                    : std::min(subtree_arities[value_idx[value]], children[idx].size());
           for (usize i = arity; i > 0;) {
             stack.emplace_back(children[idx][--i], false);
           }
@@ -337,7 +342,21 @@ class GPContext {
         } else if (value_kind[value] == ValueKind::Arg) {
           arg_stack.push_back(std::format("arg{:d}", v_idx));
         } else if (value_kind[value] == ValueKind::Subtree) {
-          arg_stack.push_back(subtree_exprs[v_idx]);
+          usize arity = std::min(subtree_arities[v_idx], children[idx].size());
+          usize base = arg_stack.size() - arity;
+          std::string call;
+          if (arity == 0) {
+            call = std::format("f{:d}", v_idx);
+          } else {
+            call = std::format("f{:d}(", v_idx);
+            for (usize a = 0; a < arity; a++) {
+              if (a > 0) call += ", ";
+              call += arg_stack[base + a];
+            }
+            call += ")";
+          }
+          arg_stack.resize(base);
+          arg_stack.push_back(std::move(call));
         } else if (value_kind[value] == ValueKind::Operator) {
           usize arity = std::min(children[idx].size(), value_max_arity[value]);
           usize base = arg_stack.size() - arity;
@@ -355,6 +374,85 @@ class GPContext {
     }
 
     return subtree_exprs;
+  };
+
+  std::vector<std::string> to_sympy_unresolved(const SolutionBase& solution) const {
+    auto subtree_arities = _compute_subtree_arities(solution);
+
+    std::vector<std::string> exprs(num_outputs, "SIZE OVERFLOW");
+    std::vector<std::string> arg_stack;
+    arg_stack.reserve(max_expression_size);
+
+    std::vector<std::pair<usize, bool>> stack;
+    std::vector<usize> postorder;
+
+    for (usize oi = 0; oi < num_outputs; oi++) {
+      postorder.clear();
+      stack.clear();
+      stack.emplace_back(output_roots[oi], false);
+
+      while (!stack.empty()) {
+        auto [idx, post] = stack.back();
+        stack.pop_back();
+
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        bool is_operator = value_kind[value] == ValueKind::Operator;
+        bool is_subtree = value_kind[value] == ValueKind::Subtree;
+
+        if (!post && (is_operator || is_subtree)) {
+          stack.emplace_back(idx, true);
+          usize arity = is_operator ? std::min(children[idx].size(), value_max_arity[value])
+                                    : std::min(subtree_arities[value_idx[value]], children[idx].size());
+          for (usize i = arity; i > 0;) {
+            stack.emplace_back(children[idx][--i], false);
+          }
+        } else {
+          postorder.push_back(idx);
+        }
+      }
+
+      arg_stack.clear();
+      for (usize idx : postorder) {
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        usize v_idx = value_idx[value];
+
+        if (value_kind[value] == ValueKind::Input) {
+          arg_stack.push_back(std::format("x{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Constant) {
+          usize ci = const_repr == ConstantRepr::Pool ? v_idx : idx;
+          arg_stack.push_back(std::format("{}", solution.continuous_values()(ci)));
+        } else if (value_kind[value] == ValueKind::Parameter) {
+          arg_stack.push_back(std::format("c{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Arg) {
+          arg_stack.push_back(std::format("arg{:d}", v_idx));
+        } else if (value_kind[value] == ValueKind::Subtree) {
+          usize arity = std::min(subtree_arities[v_idx], children[idx].size());
+          usize base = arg_stack.size() - arity;
+          std::string call = std::format("f{:d}(", v_idx);
+          for (usize a = 0; a < arity; a++) {
+            if (a > 0) call += ", ";
+            call += arg_stack[base + a];
+          }
+          call += ")";
+          arg_stack.resize(base);
+          arg_stack.push_back(std::move(call));
+        } else if (value_kind[value] == ValueKind::Operator) {
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          usize base = arg_stack.size() - arity;
+          std::span<const std::string> args{arg_stack.end() - arity, arg_stack.end()};
+          arg_stack[base] = operators[v_idx]->format(args);
+          arg_stack.resize(base + 1);
+        }
+
+        if (const_repr == ConstantRepr::Edges) {
+          arg_stack.back() = std::format("({} * ({}))", solution.continuous_values()(idx), arg_stack.back());
+        }
+      }
+
+      exprs[oi] = arg_stack.empty() ? "" : arg_stack.back();
+    }
+
+    return exprs;
   };
 
   // Returns all trees in postfix/reverse polish notation (https://en.wikipedia.org/wiki/Reverse_Polish_notation) and
@@ -1292,6 +1390,38 @@ class GPContext {
                                           // node (without subtrees)
 
  private:
+  // Returns the number of arguments each subtree actually uses (max Arg v_idx + 1).
+  // Processed in index order so that called sub-subtrees' arities are known when needed.
+  // Subtree call nodes are not entered; instead their argument children are scanned so
+  // that Arg nodes passed as arguments count toward the caller's arity.
+  std::vector<usize> _compute_subtree_arities(const SolutionBase& solution) const {
+    std::vector<usize> arities(num_subexpressions, 0);
+    std::vector<usize> scan_stack;
+    for (usize si = 0; si < num_subexpressions; si++) {
+      scan_stack.clear();
+      scan_stack.push_back(subtree_roots[si]);
+      while (!scan_stack.empty()) {
+        usize idx = scan_stack.back();
+        scan_stack.pop_back();
+        DType value = domain2value(idx, solution.discrete_values()(idx));
+        if (value_kind[value] == ValueKind::Arg) {
+          arities[si] = std::max(arities[si], value_idx[value] + 1);
+        } else if (value_kind[value] == ValueKind::Operator) {
+          usize arity = std::min(children[idx].size(), value_max_arity[value]);
+          for (usize i = 0; i < arity; i++) {
+            scan_stack.push_back(children[idx][i]);
+          }
+        } else if (value_kind[value] == ValueKind::Subtree) {
+          usize num_args = std::min(arities[value_idx[value]], children[idx].size());
+          for (usize i = 0; i < num_args; i++) {
+            scan_stack.push_back(children[idx][i]);
+          }
+        }
+      }
+    }
+    return arities;
+  }
+
   Arr2D<DType> _value2domain;
   std::vector<usize> _parent;  // node -> parent or invalid index for root nodes
 

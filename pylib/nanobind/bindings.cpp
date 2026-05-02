@@ -3101,6 +3101,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::GPContext::subtrees_to_sympy,
           nb::arg("solution"),
           " Returns a sympy-like string for each subexpression tree in isolation.\n Subtree references within a subtree are inlined (subtrees can only call\n earlier ones). Arg nodes (enable_subfunctions=True) appear as arg0, arg1, ...")
+      .def("to_sympy_unresolved",
+          &goblin::GPContext::to_sympy_unresolved, nb::arg("solution"))
       .def("to_sympy",
           &goblin::GPContext::to_sympy, nb::arg("solution"))
       .def("normalized_root_proximity",
@@ -3411,6 +3413,8 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::SRProblem::log, nb::arg("os"), nb::arg("solution"))
       .def("log_solution",
           &goblin::SRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
+      .def("log_solution_unresolved",
+          &goblin::SRProblem::log_solution_unresolved, nb::arg("os"), nb::arg("solution"))
       .def("evaluate_test",
           &goblin::SRProblem::evaluate_test, nb::arg("solution"))
       .def("context",

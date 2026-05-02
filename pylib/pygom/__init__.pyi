@@ -2318,6 +2318,9 @@ class GPContext:
         """
         pass
 
+    def to_sympy_unresolved(self, solution: SolutionBase) -> List[str]:
+        pass
+
     def to_sympy(self, solution: SolutionBase) -> List[str]:
         pass
 
@@ -2817,6 +2820,9 @@ class SRProblem(GPInstanceBase):
         pass
 
     def log_solution(self, os: io.IOBase, solution: SolutionBase) -> None:
+        pass
+
+    def log_solution_unresolved(self, os: io.IOBase, solution: SolutionBase) -> None:
         pass
 
     def evaluate_test(self, solution: SolutionBase) -> None:
