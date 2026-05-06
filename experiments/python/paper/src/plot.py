@@ -445,24 +445,6 @@ def plot_experiment_3(dir: pathlib.Path, nmse_col: str = "nmse"):
         ]
         _plot_median_band(ax, interp, color=cell_color)
 
-        # Validation NMSE dots at the last time tick per fold — only when
-        # the lines show training NMSE (redundant if lines already show val).
-        # if nmse_col != "nmse_val":
-        #     last_rows = raw.sort_values("total_time_seconds").groupby("fold").last().reset_index()
-        #     last_rows = last_rows[last_rows["nmse_val"].notna()]
-        #     for _, row in last_rows.iterrows():
-        #         marker = "*" if row["fold"] == best_fold else "o"
-        #         ax.scatter(
-        #             row["total_time_seconds"],
-        #             row["nmse_val"],
-        #             color=cell_color,
-        #             marker=marker,
-        #             s=40 if marker == "*" else 20,
-        #             zorder=5,
-        #             edgecolors="black",
-        #             linewidths=0.4,
-        #         )
-
     SOLVED_THRESHOLD = 10e-6
 
     g.set_titles(
@@ -687,6 +669,11 @@ def _plot_experiment_4(
     FROM results
     """).df()
 
+    # Replace exact zeros with a small positive value so they remain visible
+    # on the log scale (zero is undefined on log axes).
+    if var in ("mse", "mse_val", "nmse", "nmse_val"):
+        df[var] = df[var].replace(0, 1e-31)
+
     df["device"] = df["device"].map(DEVICE_LABELS).fillna(df["device"])
     df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
 
@@ -776,22 +763,20 @@ def _plot_experiment_4(
     plt.close()
 
 
-def plot_experiment_4_feynman(dir: pathlib.Path, var: str = "mse") -> None:
-    _plot_experiment_4(
-        dir,
-        var,
-        dataset_keys=["feynman_I_8_14", "feynman_I_11_19", "feynman_I_9_18"],
-        filename_suffix="",
-    )
-
-
-def plot_experiment_4_modular(dir: pathlib.Path, var: str = "mse") -> None:
-    _plot_experiment_4(
-        dir,
-        var,
-        dataset_keys=["modular_1", "modular_2", "modular_3", "modular_4", "modular_5"],
-        filename_suffix="_modular",
-    )
+def plot_experiment_4(dir: pathlib.Path) -> None:
+    for var in ("mse", "mse_val", "nmse", "nmse_val", "r2", "r2_val", "evaluations"):
+        _plot_experiment_4(
+            dir,
+            var,
+            dataset_keys=[
+                "modular_1",
+                "modular_2",
+                "modular_3",
+                "modular_4",
+                "modular_5",
+            ],
+            filename_suffix="_modular",
+        )
 
 
 def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
