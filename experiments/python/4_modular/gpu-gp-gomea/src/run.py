@@ -172,6 +172,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
         gpu_accelerated=task["accelerated"],
         kernel_version=KERNELS[task["kernel"]],
         linear_scaling=False,
+        constant_representation="none",
         ims_kwargs={
             "initial_population_size": task["population_size"],
             "max_num_populations": 1,

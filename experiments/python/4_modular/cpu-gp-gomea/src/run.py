@@ -106,6 +106,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
 
     est = gp.SymbolicRegressor(
         linear_scaling=False,
+        constant_representation="none",
         ims_kwargs={
             "initial_population_size": task["population_size"],
             "max_num_populations": 1,
