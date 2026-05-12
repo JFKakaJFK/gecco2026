@@ -16,7 +16,7 @@
     X(800) X(832) X(864) X(896) X(928) X(960) X(992) X(1024)
 
 #define MAX_STACK_DEPTH 16
-#define MAX_NUM_NODES 512
+#define MAX_NUM_NODES 10'000
 #define MAX_ARITY 2
 
 namespace goblin {
