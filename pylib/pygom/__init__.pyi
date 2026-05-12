@@ -689,10 +689,11 @@ class TerminationStatus(enum.IntEnum):
     time_limit_reached = enum.auto()  # (= 0)
     generation_limit_reached = enum.auto()  # (= 1)
     evaluation_limit_reached = enum.auto()  # (= 2)
-    target_reached = enum.auto()  # (= 3)
-    converged = enum.auto()  # (= 4)
-    aborted = enum.auto()  # (= 5)
-    running = enum.auto()  # (= 6)
+    no_improvement_limit_reached = enum.auto()  # (= 3)
+    target_reached = enum.auto()  # (= 4)
+    converged = enum.auto()  # (= 5)
+    aborted = enum.auto()  # (= 6)
+    running = enum.auto()  # (= 7)
 
 class Budget:
     max_evaluations: Optional[int] = None
@@ -4058,6 +4059,7 @@ class IMSOptions:
     )
     additional_clusters_per_start: int = 1
     generations_without_improvement_until_restart: Optional[int] = None
+    generations_without_improvement_until_stopping: Optional[int] = None
 
     reevaluate_solutions_after_adaption: bool = True
 
@@ -4075,6 +4077,7 @@ class IMSOptions:
         so_parameter_space_clustering: bool = False,
         additional_clusters_per_start: int = 1,
         generations_without_improvement_until_restart: Optional[int] = None,
+        generations_without_improvement_until_stopping: Optional[int] = None,
         reevaluate_solutions_after_adaption: bool = True,
         population_logfile: Optional[str] = None,
         population_log_resolution: str = "archive",

@@ -100,6 +100,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             ],
             constant_representation=self.kwargs.get("constant_representation", "ercs"),
             enable_subfunctions=True,
+            max_expression_size=10_000,  # TODO: remove
         )
 
         Y = y.reshape(-1, 1) if len(y.shape) == 1 else y
@@ -140,7 +141,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
             # Check for modular tree -> use custom LT-FOS
             if ctx.subtree_roots:
                 # to use node proximity instead of MI
-                node_proximity = np.array(ctx.normalized_node_proximity().tolist())
+                # node_proximity = np.array(ctx.normalized_node_proximity().tolist()) # TODO: enable again
 
                 # create a separate LT FOS per modular tree that is restricted to the corresponding tree indices
                 linkage_trees = []
@@ -148,7 +149,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     indices = ctx.nodes[subtree]
                     linkage_trees.append(
                         pygom.LinkageTreeFOS(
-                            custom_similarity=node_proximity[np.ix_(indices, indices)],
+                            # custom_similarity=node_proximity[np.ix_(indices, indices)], # TODO: enable again
                             subset=pygom.Subset(discrete=indices),
                             filter_root=False,  # according to Joe's paper subtree LTs should contain the full subtree
                         )
@@ -157,7 +158,7 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     indices = ctx.nodes[output]
                     linkage_trees.append(
                         pygom.LinkageTreeFOS(
-                            custom_similarity=node_proximity[np.ix_(indices, indices)],
+                            # custom_similarity=node_proximity[np.ix_(indices, indices)], # TODO: enable again
                             subset=pygom.Subset(discrete=indices),
                         )
                     )

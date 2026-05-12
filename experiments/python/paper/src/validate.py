@@ -296,9 +296,6 @@ def validate_experiment_4(dir: pathlib.Path, seed: int = 42) -> None:
     print("Validating experiment 4...")
 
     dataset_fold_map = {
-        "feynman_I_8_14": 9,
-        "feynman_I_11_19": 9,
-        "feynman_I_9_18": 9,
         "modular_1": 9,
         "modular_2": 9,
         "modular_3": 9,

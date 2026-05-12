@@ -18,6 +18,7 @@ enum struct TerminationStatus : u8 {
   TimeLimitReached,
   GenerationLimitReached,
   EvaluationLimitReached,
+  NoImprovementLimitReached,
   TargetReached,
   Converged,
   Aborted,
@@ -32,6 +33,8 @@ inline constexpr std::string_view format_as(const TerminationStatus& s) noexcept
       return std::string_view{"GenerationLimitReached"};
     case TerminationStatus::EvaluationLimitReached:
       return std::string_view{"EvaluationLimitReached"};
+    case TerminationStatus::NoImprovementLimitReached:
+      return std::string_view("NoImprovementLimitReached");
     case TerminationStatus::TargetReached:
       return std::string_view{"TargetReached"};
     case TerminationStatus::Converged:

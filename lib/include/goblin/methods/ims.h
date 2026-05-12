@@ -32,6 +32,7 @@ struct IMSOptions {
   bool so_parameter_space_clustering = false;  // TODO remove or implement parameter space clustering
   usize additional_clusters_per_start = 1;
   std::optional<usize> generations_without_improvement_until_restart = std::nullopt;
+  std::optional<usize> generations_without_improvement_until_stopping = std::nullopt;
 
   bool reevaluate_solutions_after_adaption = true;
 
@@ -220,11 +221,19 @@ class IMS final : public MethodBase {
             }
           }
         }
-        if (populations[p_idx].converged() ||
-            (opts.restart_stale_populations &&
-             generations_since_last_improvement[p_idx] >
-                 opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-          running[p_idx] = false;
+        // TODO: uncomment
+        // if (populations[p_idx].converged() || 
+        //     (opts.restart_stale_populations &&
+        //      generations_since_last_improvement[p_idx] >
+        //          opts.generations_without_improvement_until_restart.value_or(total_generations))) {
+        //   running[p_idx] = false;
+        // }
+
+        // TODO: remove
+        if (opts.generations_without_improvement_until_stopping.has_value() &&
+            generations_since_last_improvement[p_idx] >=
+                opts.generations_without_improvement_until_stopping.value()) {
+          return std::make_tuple(archive, TerminationStatus::NoImprovementLimitReached);
         }
       }
 

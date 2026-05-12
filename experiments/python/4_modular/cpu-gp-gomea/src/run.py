@@ -110,7 +110,8 @@ def run_one_task(task: Task, log_path: Path) -> None:
         ims_kwargs={
             "initial_population_size": task["population_size"],
             "max_num_populations": 1,
-            "restart_stale_populations": True,
+            "restart_stale_populations": False,  # TODO: change to True
+            "generations_without_improvement_until_stopping": 100,  # TODO: remove
         },
         rv_kwargs={"enabled": False},
         discrete_model_kwargs={

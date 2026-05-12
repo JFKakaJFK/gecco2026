@@ -2077,6 +2077,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("time_limit_reached", goblin::TerminationStatus::TimeLimitReached, "")
           .value("generation_limit_reached", goblin::TerminationStatus::GenerationLimitReached, "")
           .value("evaluation_limit_reached", goblin::TerminationStatus::EvaluationLimitReached, "")
+          .value("no_improvement_limit_reached", goblin::TerminationStatus::NoImprovementLimitReached, "")
           .value("target_reached", goblin::TerminationStatus::TargetReached, "")
           .value("converged", goblin::TerminationStatus::Converged, "")
           .value("aborted", goblin::TerminationStatus::Aborted, "")
@@ -4103,7 +4104,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   auto pyClassIMSOptions =
       nb::class_<goblin::IMSOptions>
           (m, "IMSOptions", "")
-      .def("__init__", [](goblin::IMSOptions * self, usize initial_population_size = 2, usize max_num_populations = 25, usize subgeneration_factor = 4, bool restart_stale_populations = false, bool stop_covered_populations = false, usize initial_num_clusters = 1, std::optional<usize> archive_capacity = 100, bool so_parameter_space_clustering = false, usize additional_clusters_per_start = 1, std::optional<usize> generations_without_improvement_until_restart = std::nullopt, bool reevaluate_solutions_after_adaption = true, std::optional<std::string> population_logfile = std::nullopt, std::string population_log_resolution = "archive")
+      .def("__init__", [](goblin::IMSOptions * self, usize initial_population_size = 2, usize max_num_populations = 25, usize subgeneration_factor = 4, bool restart_stale_populations = false, bool stop_covered_populations = false, usize initial_num_clusters = 1, std::optional<usize> archive_capacity = 100, bool so_parameter_space_clustering = false, usize additional_clusters_per_start = 1, std::optional<usize> generations_without_improvement_until_restart = std::nullopt, std::optional<usize> generations_without_improvement_until_stopping = std::nullopt, bool reevaluate_solutions_after_adaption = true, std::optional<std::string> population_logfile = std::nullopt, std::string population_log_resolution = "archive")
       {
           new (self) goblin::IMSOptions();  // placement new
           auto r_ctor_ = self;
@@ -4117,11 +4118,12 @@ void py_init_module_pygoblin(nb::module_& m) {
           r_ctor_->so_parameter_space_clustering = so_parameter_space_clustering;
           r_ctor_->additional_clusters_per_start = additional_clusters_per_start;
           r_ctor_->generations_without_improvement_until_restart = generations_without_improvement_until_restart;
+          r_ctor_->generations_without_improvement_until_stopping = generations_without_improvement_until_stopping;
           r_ctor_->reevaluate_solutions_after_adaption = reevaluate_solutions_after_adaption;
           r_ctor_->population_logfile = population_logfile;
           r_ctor_->population_log_resolution = population_log_resolution;
       },
-      nb::arg("initial_population_size") = 2, nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 4, nb::arg("restart_stale_populations") = false, nb::arg("stop_covered_populations") = false, nb::arg("initial_num_clusters") = 1, nb::arg("archive_capacity").none() = 100, nb::arg("so_parameter_space_clustering") = false, nb::arg("additional_clusters_per_start") = 1, nb::arg("generations_without_improvement_until_restart").none() = nb::none(), nb::arg("reevaluate_solutions_after_adaption") = true, nb::arg("population_logfile").none() = nb::none(), nb::arg("population_log_resolution") = "archive"
+      nb::arg("initial_population_size") = 2, nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 4, nb::arg("restart_stale_populations") = false, nb::arg("stop_covered_populations") = false, nb::arg("initial_num_clusters") = 1, nb::arg("archive_capacity").none() = 100, nb::arg("so_parameter_space_clustering") = false, nb::arg("additional_clusters_per_start") = 1, nb::arg("generations_without_improvement_until_restart").none() = nb::none(), nb::arg("generations_without_improvement_until_stopping").none() = nb::none(), nb::arg("reevaluate_solutions_after_adaption") = true, nb::arg("population_logfile").none() = nb::none(), nb::arg("population_log_resolution") = "archive"
       )
       .def_rw("initial_population_size", &goblin::IMSOptions::initial_population_size, "")
       .def_rw("max_num_populations", &goblin::IMSOptions::max_num_populations, "")
@@ -4133,6 +4135,7 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("so_parameter_space_clustering", &goblin::IMSOptions::so_parameter_space_clustering, "TODO remove or implement parameter space clustering")
       .def_rw("additional_clusters_per_start", &goblin::IMSOptions::additional_clusters_per_start, "")
       .def_rw("generations_without_improvement_until_restart", &goblin::IMSOptions::generations_without_improvement_until_restart, "")
+      .def_rw("generations_without_improvement_until_stopping", &goblin::IMSOptions::generations_without_improvement_until_stopping, "")
       .def_rw("reevaluate_solutions_after_adaption", &goblin::IMSOptions::reevaluate_solutions_after_adaption, "")
       .def_rw("population_logfile", &goblin::IMSOptions::population_logfile, "")
       .def_rw("population_log_resolution", &goblin::IMSOptions::population_log_resolution, "")

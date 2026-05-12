@@ -2,6 +2,7 @@ import os
 import pathlib
 
 import duckdb
+import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -66,6 +67,11 @@ TIME_BUDGET_MINUTES = {
 KERNEL_LABELS = {
     "single_kernel_inplace": "Single-Block",
     "hybrid": "Dynamic-Block",
+}
+
+TEMPLATE_DEPTH_LABELS = {
+    4: "4x4",
+    7: "7x1",
 }
 
 
@@ -691,12 +697,23 @@ def _plot_experiment_4(
 
     _tab20 = sns.color_palette("tab20", n_colors=20)
     palette = {
-        f"{dev} (D={d})": _tab20[i * 2 + j]
+        f"{dev} ({TEMPLATE_DEPTH_LABELS.get(d, d)})": _tab20[i * 2 + j]
         for i, dev in enumerate(device_order)
         for j, d in enumerate(depth_order)
     }
-    df["hue_label"] = df["device"] + " (D=" + df["template_depth"].astype(str) + ")"
-    hue_order = [f"{dev} (D={d})" for dev in device_order for d in depth_order]
+    df["hue_label"] = (
+        df["device"]
+        + " ("
+        + df["template_depth"]
+        .map(TEMPLATE_DEPTH_LABELS)
+        .fillna(df["template_depth"].astype(str))
+        + ")"
+    )
+    hue_order = [
+        f"{dev} ({TEMPLATE_DEPTH_LABELS.get(d, d)})"
+        for dev in device_order
+        for d in depth_order
+    ]
 
     g = sns.relplot(
         data=df,
@@ -763,6 +780,272 @@ def _plot_experiment_4(
     plt.close()
 
 
+def _plot_experiment_4_time_to_threshold(
+    dir: pathlib.Path,
+    dataset_keys: list[str],
+    filename_suffix: str,
+    threshold: float = 10e-6,
+) -> None:
+    db_path = dir / "all_results.duckdb"
+    plot_dir = dir / "plots"
+
+    if not os.path.exists(plot_dir):
+        os.mkdir(plot_dir)
+
+    conn = duckdb.connect(db_path)
+
+    df = conn.execute(f"""
+    SELECT
+        device,
+        dataset,
+        template_depth,
+        population_size,
+        run,
+        fold,
+        MIN(total_time_seconds) AS time_to_threshold
+    FROM results
+    WHERE nmse_val <= {threshold}
+    GROUP BY device, dataset, template_depth, population_size, run, fold
+    """).df()
+
+    df["device"] = df["device"].map(DEVICE_LABELS).fillna(df["device"])
+    df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    dataset_order = [DATASET_LABELS[d] for d in dataset_keys]
+    df_subset = df[df["dataset"].isin(dataset_order)]
+    device_order = [
+        v for v in DEVICE_LABELS.values() if v in df_subset["device"].unique()
+    ]
+    depth_order = sorted(df_subset["template_depth"].unique())
+
+    _tab20 = sns.color_palette("tab20", n_colors=20)
+    palette = {
+        f"{dev} ({TEMPLATE_DEPTH_LABELS.get(d, d)})": _tab20[i * 2 + j]
+        for i, dev in enumerate(device_order)
+        for j, d in enumerate(depth_order)
+    }
+    df["hue_label"] = (
+        df["device"]
+        + " ("
+        + df["template_depth"]
+        .map(TEMPLATE_DEPTH_LABELS)
+        .fillna(df["template_depth"].astype(str))
+        + ")"
+    )
+    hue_order = [
+        f"{dev} ({TEMPLATE_DEPTH_LABELS.get(d, d)})"
+        for dev in device_order
+        for d in depth_order
+    ]
+
+    g = sns.relplot(
+        data=df,
+        x="population_size",
+        y="time_to_threshold",
+        hue="hue_label",
+        hue_order=hue_order,
+        col="dataset",
+        kind="line",
+        errorbar=("pi", 50),
+        estimator="median",
+        col_order=dataset_order,
+        marker="o",
+        palette=palette,
+        facet_kws={
+            "sharey": True,
+            "margin_titles": True,
+        },
+        height=2.5,
+        aspect=1.0,
+    )
+
+    g.set_titles(col_template="{col_name}")
+    g.axes[0, 0].annotate(
+        "Time to Threshold (s)",
+        xy=(0, 0.5),
+        xycoords="axes fraction",
+        xytext=(-50, 0),
+        textcoords="offset points",
+        ha="center",
+        va="center",
+        rotation=90,
+        multialignment="center",
+    )
+
+    for ax in g.axes.flat:
+        ax.set_xscale("log", base=2)
+        ax.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.5)
+        ax.set_axisbelow(True)
+
+    g.set(yscale="log")
+    g.set_axis_labels("", "")
+
+    if g.legend:
+        sns.move_legend(
+            g,
+            loc="lower center",
+            bbox_to_anchor=(0.42, -0.05),
+            ncol=len(hue_order),
+            title=None,
+        )
+
+    g.figure.canvas.draw()
+    positions = [ax.get_position() for ax in g.axes.flat]
+    grid_left = min(p.x0 for p in positions)
+    grid_right = max(p.x1 for p in positions)
+    g.figure.supxlabel("Population Size", x=(grid_left + grid_right) / 2, y=0.065)
+
+    plt.savefig(
+        plot_dir / f"time_to_threshold{filename_suffix}.svg", bbox_inches="tight"
+    )
+    plt.savefig(
+        plot_dir / f"time_to_threshold{filename_suffix}.png",
+        bbox_inches="tight",
+        dpi=150,
+    )
+    plt.close()
+
+
+def _plot_experiment_4_success_rate(
+    dir: pathlib.Path,
+    dataset_keys: list[str],
+    filename_suffix: str,
+    threshold: float = 10e-6,
+) -> None:
+    db_path = dir / "all_results.duckdb"
+    plot_dir = dir / "plots"
+
+    if not os.path.exists(plot_dir):
+        os.mkdir(plot_dir)
+
+    conn = duckdb.connect(db_path)
+
+    df = conn.execute(f"""
+    SELECT
+        device,
+        dataset,
+        template_depth,
+        population_size,
+        run,
+        100.0 * SUM(CASE WHEN min_nmse_val <= {threshold} THEN 1 ELSE 0 END)
+            / COUNT(*) AS pct_reached
+    FROM (
+        SELECT device, dataset, template_depth, population_size, run, fold,
+            MIN(nmse_val) AS min_nmse_val
+        FROM results
+        GROUP BY device, dataset, template_depth, population_size, run, fold
+    )
+    GROUP BY device, dataset, template_depth, population_size, run
+    """).df()
+
+    df["device"] = df["device"].map(DEVICE_LABELS).fillna(df["device"])
+    df["dataset"] = df["dataset"].map(DATASET_LABELS).fillna(df["dataset"])
+
+    dataset_order = [DATASET_LABELS[d] for d in dataset_keys]
+    pop_size_order = sorted(df["population_size"].unique())
+    device_order = [v for v in DEVICE_LABELS.values() if v in df["device"].unique()]
+    depth_order = sorted(df["template_depth"].unique())
+    config_order = [(dev, d) for dev in device_order for d in depth_order]
+
+    pop_colors = dict(
+        zip(
+            pop_size_order,
+            ["#7B2D8B", "#1F77B4", "#17BECF", "#2CA02C", "#BCBD22", "#FF7F0E"],
+        )
+    )
+    config_hatches = dict(zip(config_order, ["", "\\\\", "xxx", "////"]))
+    config_labels = {
+        (dev, d): f"{dev} ({TEMPLATE_DEPTH_LABELS.get(d, d)})"
+        for dev, d in config_order
+    }
+
+    bar_width = 0.15
+    pop_gap = 0.08
+    dataset_gap = 0.6
+    n_configs = len(config_order)
+    pop_slot = n_configs * bar_width + pop_gap
+    dataset_width = len(pop_size_order) * pop_slot - pop_gap
+    total_width = (
+        len(dataset_order) * dataset_width + (len(dataset_order) - 1) * dataset_gap
+    )
+
+    fig, ax = plt.subplots(figsize=(max(12, total_width * 0.85), 5))
+
+    dataset_centers = []
+    for di, dataset in enumerate(dataset_order):
+        group_x = di * (dataset_width + dataset_gap)
+        dataset_centers.append(group_x + dataset_width / 2)
+
+        df_ds = df[df["dataset"] == dataset]
+
+        for pi, pop_size in enumerate(pop_size_order):
+            pop_x = group_x + pi * pop_slot
+            df_ps = df_ds[df_ds["population_size"] == pop_size]
+
+            for ci, cfg in enumerate(config_order):
+                dev, depth = cfg
+                bar_x = pop_x + ci * bar_width + bar_width / 2
+                row = df_ps[
+                    (df_ps["device"] == dev) & (df_ps["template_depth"] == depth)
+                ]
+                height = float(row["pct_reached"].iloc[0]) if len(row) > 0 else 0.0
+                ax.bar(
+                    bar_x,
+                    height,
+                    width=bar_width * 0.92,
+                    color=pop_colors[pop_size],
+                    hatch=config_hatches[cfg],
+                    edgecolor="black",
+                    linewidth=0.5,
+                )
+
+    ax.set_xticks(dataset_centers)
+    ax.set_xticklabels(dataset_order)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("%Solved (NMSE $\\leq 10^-6$)")
+    ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.5)
+    ax.set_axisbelow(True)
+
+    pop_handles = [
+        mpatches.Patch(
+            facecolor=pop_colors[ps],
+            edgecolor="black",
+            linewidth=0.5,
+            label=f"$2^{{{int(ps).bit_length() - 1}}}$",
+        )
+        for ps in pop_size_order
+    ]
+    config_handles = [
+        mpatches.Patch(
+            facecolor="white",
+            hatch=config_hatches[cfg],
+            edgecolor="black",
+            linewidth=0.5,
+            label=config_labels[cfg],
+        )
+        for cfg in config_order
+    ]
+
+    pop_legend = ax.legend(
+        handles=pop_handles,
+        title="Population size",
+        loc="upper left",
+    )
+    ax.add_artist(pop_legend)
+    ax.legend(
+        handles=config_handles,
+        title="Configuration",
+        loc="upper right",
+    )
+
+    plt.tight_layout()
+    plt.savefig(plot_dir / f"success_rate{filename_suffix}.svg", bbox_inches="tight")
+    plt.savefig(
+        plot_dir / f"success_rate{filename_suffix}.png", bbox_inches="tight", dpi=150
+    )
+    plt.close()
+
+
 def plot_experiment_4(dir: pathlib.Path) -> None:
     for var in ("mse", "mse_val", "nmse", "nmse_val", "r2", "r2_val", "evaluations"):
         _plot_experiment_4(
@@ -777,6 +1060,28 @@ def plot_experiment_4(dir: pathlib.Path) -> None:
             ],
             filename_suffix="_modular",
         )
+    _plot_experiment_4_time_to_threshold(
+        dir,
+        dataset_keys=[
+            "modular_1",
+            "modular_2",
+            "modular_3",
+            "modular_4",
+            "modular_5",
+        ],
+        filename_suffix="_modular",
+    )
+    _plot_experiment_4_success_rate(
+        dir,
+        dataset_keys=[
+            "modular_1",
+            "modular_2",
+            "modular_3",
+            "modular_4",
+            "modular_5",
+        ],
+        filename_suffix="_modular",
+    )
 
 
 def plot_experiment_5(dir: pathlib.Path, var: str = "mse"):
