@@ -106,6 +106,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
 
     est = gp.SymbolicRegressor(
         linear_scaling=False,
+        population_kwargs={"forced_improvements": False},
         constant_representation="none",
         ims_kwargs={
             "initial_population_size": task["population_size"],
@@ -115,7 +116,7 @@ def run_one_task(task: Task, log_path: Path) -> None:
         },
         rv_kwargs={"enabled": False},
         discrete_model_kwargs={
-            "metric": "node_proximity",
+            # "metric": "node_proximity", # TODO: uncomment
             "merge_continuous": False,
             "num_continuous_bins": 25,
             "normalize_initial_linkage_bias": False,
