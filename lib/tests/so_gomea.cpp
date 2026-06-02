@@ -10,6 +10,13 @@
 
 using namespace goblin;
 
+void print_front(InstanceBase& problem, const ArchiveBase& archive) {
+  for (usize i = 0; i < archive.size(); i++) {
+    std::cout << problem.format_solution(archive[i]) << " @ " << archive.fitness().format(archive[i].quality())
+              << std::endl;
+  }
+};
+
 TEST_CASE("goblin::methods::so::gomea") {
   BenchmarkInstance one_max(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<OneMax>(5)});
   one_max.register_target({5});
@@ -29,6 +36,7 @@ TEST_CASE("goblin::methods::so::gomea") {
   auto [front, _] = dgomea.run(one_max, budget);
 
   REQUIRE(front->empty() == false);
+  print_front(one_max, *front);
   REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == 5.0);
 
   std::cout << "GI-GOMEA" << std::endl;
@@ -37,6 +45,7 @@ TEST_CASE("goblin::methods::so::gomea") {
   front = std::get<0>(dgomea.run(one_max, budget));
 
   REQUIRE(front->empty() == false);
+  print_front(one_max, *front);
   REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == 5.0);
 
   BenchmarkInstance sphere(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<Sphere>(2)});
@@ -50,5 +59,6 @@ TEST_CASE("goblin::methods::so::gomea") {
   front = std::get<0>(rvgomea.run(sphere, budget));
 
   REQUIRE(front->empty() == false);
+  print_front(one_max, *front);
   REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] <= 1e-8);
 }

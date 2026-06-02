@@ -647,6 +647,100 @@ def example_node_proximity():
     )
 
 
+def example_templates():
+    for h in [  # 5,
+        7
+    ]:
+        template = Template(
+            [TemplateNode.full_nary(branching_factor=2, depth=h - 1)], []
+        )
+        ctx = GPContext(
+            num_inputs=1,
+            expression_template=template,
+            operators=[],
+            constant_representation="none",
+        )
+        template_structure = ctx2graph(ctx)
+
+        node_proximity = ctx.normalized_node_proximity()
+
+        fig, axes = plt.subplot_mosaic(
+            """
+            T
+            """,
+            # figsize=(12, 8),
+            figsize=(32, 8),
+            # gridspec_kw=dict(width_ratios=[1.5, 1, 1], wspace=0.25),
+        )
+
+        # axes["T"].set_axis_off()
+
+        pos = draw_nx(
+            template_structure,
+            axes["T"],
+            # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+            xscale=1,
+            yscale=1,
+            dy=0.1,
+            dx=2,
+            # label_offset=(0, 0),
+            node_size=500,
+            margins=0.05,
+        )
+        # nx.draw_networkx_labels(
+        #     template_structure,
+        #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+        #     {n: f"${{}}_{n}$" for n in template_structure},
+        #     ax=axes["T"],
+        # )
+        axes["T"].set_xlabel(f"Template (H={h})")
+
+        # S = node_proximity.copy()
+        # S[np.triu_indices_from(S)] = ((S - 1.0) * -(1 + 2 * d))[np.triu_indices_from(S)]
+
+        # D = node_proximity.copy()
+        # D = (D - 1.0) * -(1 + 2 * d)
+
+        # sns.heatmap(
+        #     D,
+        #     annot=D,
+        #     mask=np.eye(
+        #         D.shape[0], dtype=np.bool_
+        #     ),  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        #     # fmt="s",
+        #     cmap="Blues",
+        #     vmin=0,
+        #     vmax=4,
+        #     square=True,
+        #     annot_kws=dict(fontsize="x-small"),
+        #     ax=axes["D"],
+        #     cbar=False,
+        # )
+        # axes["D"].set_title("Node Distance")
+
+        # sns.heatmap(
+        #     node_proximity,
+        #     annot=node_proximity,
+        #     mask=np.eye(
+        #         node_proximity.shape[0], dtype=np.bool_
+        #     ),  # np.zeros_like(node_proximity, dtype=np.bool_) + np.triu(np.ones_like(node_proximity, dtype=np.bool_)),
+        #     # fmt="s",
+        #     cmap="Blues",
+        #     vmin=0,
+        #     vmax=1,
+        #     square=True,
+        #     annot_kws=dict(fontsize="x-small"),
+        #     ax=axes["N"],
+        #     cbar=False,
+        # )
+        # axes["N"].set_title("Node Proximity")
+
+        fig.align_labels()
+        # fig.align_titles()
+
+        fig.savefig(f"template_{h}.pdf", dpi=600, transparent=True, bbox_inches="tight")
+
+
 def example_peter_proximity():
     d = 2
     template = Template([TemplateNode.full_nary(branching_factor=2, depth=d)], [])
@@ -1815,9 +1909,10 @@ def linkage_example2():
 
 
 if __name__ == "__main__":
+    example_templates()
     # example_solution()
     # plt.show()
-    example_node_proximity()
+    # example_node_proximity()
     # plt.show()
     # example_node_proximity2()
     # example_peter_proximity()

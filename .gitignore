@@ -1,5 +1,7 @@
 # Using https://github.com/github/gitignore/blob/master/Python.gitignore + C++.gitignore
 
+lib/include/goblin/gp/typed.h
+
 profile.json.gz
 *.csv
 *.yaml

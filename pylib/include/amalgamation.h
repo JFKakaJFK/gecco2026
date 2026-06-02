@@ -12033,7 +12033,7 @@ class TruncationSelection : public SelectionStrategyBase {
           std::vector<usize> f2s(front.begin(), front.end());
           auto [selected, _] = greedy_scattered_subset_selection(
               [&](const usize lhs, const usize rhs) {
-                return fitness.distance(solutions[f2s[lhs]].quality(), solutions[f2s[lhs]].quality(), std::nullopt);
+                return fitness.distance(solutions[f2s[lhs]].quality(), solutions[f2s[rhs]].quality(), std::nullopt);
               },
               /* pool_size = */ f2s.size(),
               /* target_size = */ target_size - selection.size(),
