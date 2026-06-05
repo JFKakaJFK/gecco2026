@@ -741,7 +741,7 @@ def _plot_experiment_4(
         var_label,
         xy=(0, 0.5),
         xycoords="axes fraction",
-        xytext=(-50, 0),
+        xytext=(-45, 0),
         textcoords="offset points",
         ha="center",
         va="center",
@@ -764,7 +764,7 @@ def _plot_experiment_4(
         sns.move_legend(
             g,
             loc="lower center",
-            bbox_to_anchor=(0.42, -0.05),
+            bbox_to_anchor=(0.46, -0.05),
             ncol=len(hue_order),
             title=None,
         )
@@ -784,7 +784,7 @@ def _plot_experiment_4_time_to_threshold(
     dir: pathlib.Path,
     dataset_keys: list[str],
     filename_suffix: str,
-    threshold: float = 10e-6,
+    threshold: float = 10e-12,
 ) -> None:
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
@@ -861,10 +861,10 @@ def _plot_experiment_4_time_to_threshold(
 
     g.set_titles(col_template="{col_name}")
     g.axes[0, 0].annotate(
-        "Time to Threshold (s)",
+        "Time to Threshold (s)\n (NMSE $\\leq 10e-12$)",
         xy=(0, 0.5),
         xycoords="axes fraction",
-        xytext=(-50, 0),
+        xytext=(-45, 0),
         textcoords="offset points",
         ha="center",
         va="center",
@@ -884,7 +884,7 @@ def _plot_experiment_4_time_to_threshold(
         sns.move_legend(
             g,
             loc="lower center",
-            bbox_to_anchor=(0.42, -0.05),
+            bbox_to_anchor=(0.48, -0.05),
             ncol=len(hue_order),
             title=None,
         )
@@ -910,7 +910,7 @@ def _plot_experiment_4_success_rate(
     dir: pathlib.Path,
     dataset_keys: list[str],
     filename_suffix: str,
-    threshold: float = 10e-6,
+    threshold: float = 10e-12,
 ) -> None:
     db_path = dir / "all_results.duckdb"
     plot_dir = dir / "plots"
@@ -960,11 +960,10 @@ def _plot_experiment_4_success_rate(
     }
 
     bar_width = 0.15
-    pop_gap = 0.08
-    dataset_gap = 0.6
+    dataset_gap = 0.4
     n_configs = len(config_order)
-    pop_slot = n_configs * bar_width + pop_gap
-    dataset_width = len(pop_size_order) * pop_slot - pop_gap
+    pop_slot = n_configs * bar_width
+    dataset_width = len(pop_size_order) * pop_slot
     total_width = (
         len(dataset_order) * dataset_width + (len(dataset_order) - 1) * dataset_gap
     )
@@ -995,14 +994,15 @@ def _plot_experiment_4_success_rate(
                     width=bar_width * 0.92,
                     color=pop_colors[pop_size],
                     hatch=config_hatches[cfg],
-                    edgecolor="black",
+                    # edgecolor="black",
                     linewidth=0.5,
                 )
 
     ax.set_xticks(dataset_centers)
     ax.set_xticklabels(dataset_order)
+    ax.set_xlim(-bar_width * 0.5, total_width + bar_width * 0.5)
     ax.set_ylim(0, 100)
-    ax.set_ylabel("%Solved (NMSE $\\leq 10^-6$)")
+    ax.set_ylabel("%Solved (NMSE $\\leq 10e-12$)")
     ax.grid(True, axis="y", linestyle="--", linewidth=0.5, alpha=0.5)
     ax.set_axisbelow(True)
 
@@ -1029,7 +1029,7 @@ def _plot_experiment_4_success_rate(
     pop_legend = ax.legend(
         handles=pop_handles,
         title="Population size",
-        loc="upper left",
+        loc="center right",
     )
     ax.add_artist(pop_legend)
     ax.legend(
