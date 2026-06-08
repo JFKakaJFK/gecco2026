@@ -35,6 +35,8 @@ set(
     mixed_rv
     mixed_ia
     mixed_mixed
+    mixed_mo_rv
+    mo_rv_gomea
     gp_operators
     sr
     sr_stats
@@ -58,12 +60,12 @@ set(LIB_OPTIMIZED_TESTS
 )
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
-    set(_target lib_test_${testcase})
-    add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
-    target_link_libraries(${_target} PRIVATE ${deps})
-    add_test(NAME ${_target} COMMAND ${_target})
+  set(_target lib_test_${testcase})
+  add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
+  target_link_libraries(${_target} PRIVATE ${deps})
+  add_test(NAME ${_target} COMMAND ${_target})
 
-    # if(testcase IN_LIST LIB_OPTIMIZED_TESTS)
-    #     target_compile_options(${_target} PRIVATE -O2 -g1)
-    # endif()
+  # if(testcase IN_LIST LIB_OPTIMIZED_TESTS)
+  #     target_compile_options(${_target} PRIVATE -O2 -g1)
+  # endif()
 endforeach()

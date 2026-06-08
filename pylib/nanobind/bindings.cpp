@@ -2370,6 +2370,24 @@ void py_init_module_pygoblin(nb::module_& m) {
       ;
 
 
+  auto pyClassStaticFOS =
+      nb::class_<goblin::StaticFOS, goblin::LinkageModelBase>
+          (m, "StaticFOS", nb::is_final(), "\n(final class)")
+      .def(nb::init<FOS>(),
+          nb::arg("fos"))
+      .def("clone",
+          &goblin::StaticFOS::clone)
+      .def("init",
+          &goblin::StaticFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
+      .def("subsets",
+          &goblin::StaticFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+      .def("is_static",
+          &goblin::StaticFOS::is_static)
+      .def("get",
+          &goblin::StaticFOS::get)
+      ;
+
+
   auto pyClassFullFOS =
       nb::class_<goblin::FullFOS, goblin::LinkageModelBase>
           (m, "FullFOS", nb::is_final(), "\n(final class)")
@@ -3253,6 +3271,23 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("evaluate_partial",
           &goblin::ObjectiveBase::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
       ;
+
+
+  auto pyClassMOFunctionBase =
+      nb::class_<goblin::MOFunctionBase, goblin::MOFunctionBase_trampoline>
+          (m, "MOFunctionBase", "")
+      .def(nb::init<>()) // implicit default constructor
+      .def("num_objectives",
+          &goblin::MOFunctionBase::num_objectives)
+      .def("num_discrete",
+          &goblin::MOFunctionBase::num_discrete)
+      .def("num_continuous",
+          &goblin::MOFunctionBase::num_continuous)
+      .def("evaluate",
+          &goblin::MOFunctionBase::evaluate, nb::arg("solution"))
+      .def("evaluate_partial",
+          &goblin::MOFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"), nb::arg("subset"))
+      ;
   // #endif
   // #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
   //
@@ -3301,6 +3336,22 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::Inverted::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
       .def("evaluate_partial",
           &goblin::Inverted::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
+      ;
+
+
+  auto pyClassTranslated =
+      nb::class_<goblin::Translated, goblin::ObjectiveBase>
+          (m, "Translated", nb::is_final(), "\n(final class)")
+      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, RefS<Vec<CType>>>(),
+          nb::arg("objective"), nb::arg("translation_vector"))
+      .def("num_discrete",
+          &goblin::Translated::num_discrete)
+      .def("num_continuous",
+          &goblin::Translated::num_continuous)
+      .def("evaluate",
+          &goblin::Translated::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
+      .def("evaluate_partial",
+          &goblin::Translated::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
       ;
 
 
@@ -3598,6 +3649,102 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("evaluate",
           &goblin::CirclesInASquare::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
       ;
+
+
+  auto pyClassZDT1 =
+      nb::class_<goblin::ZDT1, goblin::MOFunctionBase>
+          (m, "ZDT1", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 30)
+      .def("num_objectives",
+          &goblin::ZDT1::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT1::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT1::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT1::evaluate, nb::arg("solution"))
+      ;
+
+
+  auto pyClassZDT2 =
+      nb::class_<goblin::ZDT2, goblin::MOFunctionBase>
+          (m, "ZDT2", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 30)
+      .def("num_objectives",
+          &goblin::ZDT2::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT2::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT2::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT2::evaluate, nb::arg("solution"))
+      ;
+
+
+  auto pyClassZDT3 =
+      nb::class_<goblin::ZDT3, goblin::MOFunctionBase>
+          (m, "ZDT3", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 30)
+      .def("num_objectives",
+          &goblin::ZDT3::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT3::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT3::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT3::evaluate, nb::arg("solution"))
+      ;
+
+
+  auto pyClassZDT4 =
+      nb::class_<goblin::ZDT4, goblin::MOFunctionBase>
+          (m, "ZDT4", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 10)
+      .def("num_objectives",
+          &goblin::ZDT4::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT4::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT4::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT4::evaluate, nb::arg("solution"))
+      ;
+
+
+  auto pyClassZDT5 =
+      nb::class_<goblin::ZDT5, goblin::MOFunctionBase>
+          (m, "ZDT5", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 11)
+      .def("num_objectives",
+          &goblin::ZDT5::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT5::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT5::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT5::evaluate, nb::arg("solution"))
+      ;
+
+
+  auto pyClassZDT6 =
+      nb::class_<goblin::ZDT6, goblin::MOFunctionBase>
+          (m, "ZDT6", "")
+      .def(nb::init<usize>(),
+          nb::arg("dims") = 10)
+      .def("num_objectives",
+          &goblin::ZDT6::num_objectives)
+      .def("num_discrete",
+          &goblin::ZDT6::num_discrete)
+      .def("num_continuous",
+          &goblin::ZDT6::num_continuous)
+      .def("evaluate",
+          &goblin::ZDT6::evaluate, nb::arg("solution"))
+      ;
   // #endif
   // #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
   //
@@ -3618,23 +3765,6 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
   // #ifndef _GOBLIN_BENCH_PROBLEM_H
   //
-
-
-  auto pyClassMOFunctionBase =
-      nb::class_<goblin::MOFunctionBase, goblin::MOFunctionBase_trampoline>
-          (m, "MOFunctionBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_objectives",
-          &goblin::MOFunctionBase::num_objectives)
-      .def("num_discrete",
-          &goblin::MOFunctionBase::num_discrete)
-      .def("num_continuous",
-          &goblin::MOFunctionBase::num_continuous)
-      .def("evaluate",
-          &goblin::MOFunctionBase::evaluate, nb::arg("solution"))
-      .def("evaluate_partial",
-          &goblin::MOFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"), nb::arg("subset"))
-      ;
 
 
   auto pyClassPyFunctionBase =
@@ -3995,6 +4125,21 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::MOBinaryGOMEA::current_generation)
       .def("run",
           &goblin::MOBinaryGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
+      ;
+  // #endif
+  // #ifndef _GOBLIN_MO_RV_GOMEA_H
+  //
+
+
+  auto pyClassMoRvGOMEA =
+      nb::class_<goblin::MoRvGOMEA, goblin::MethodBase>
+          (m, "MoRvGOMEA", nb::is_final(), "\n(final class)")
+      .def(nb::init<std::optional<usize>, usize, usize, usize, double, double, double, std::optional<usize>, std::optional<usize>, std::variant<std::string, goblin::StaticFOS>, std::optional<usize>, bool, bool, bool>(),
+          nb::arg("initial_population_size").none() = nb::none(), nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 8, nb::arg("target_archive_size") = 100, nb::arg("selection_percentile") = 0.35, nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("max_no_improvement_stretch").none() = nb::none(), nb::arg("initial_num_clusters").none() = nb::none(), nb::arg("linkage_model") = "LinkageTree", nb::arg("max_subset_size").none() = nb::none(), nb::arg("boundary_repair") = false, nb::arg("forced_improvements") = false, nb::arg("partial_evaluations") = true)
+      .def("current_generation",
+          &goblin::MoRvGOMEA::current_generation)
+      .def("run",
+          &goblin::MoRvGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
       ;
   // #endif
   // #ifndef _GOBLIN_MIXED_GOMEA_H

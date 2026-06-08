@@ -30,19 +30,24 @@ add_library(${PROJECT_NAME}
         methods/amalgam.cpp
         methods/library.cpp
         methods/mo_gomea.cpp
+        methods/mo_rv_gomea/FOS.cpp
+        methods/mo_rv_gomea/MO_optimization.cpp
+        methods/mo_rv_gomea/Optimization.cpp
+        methods/mo_rv_gomea/Tools.cpp
+        methods/mo_rv_gomea/mo_rv_gomea.cpp
     )
 # endif()
 
-# disable any warnings in the amalgam code
+# disable any warnings in the amalgam/mo_binary/mo_rv code
 # also there is a memory bug in initializePopulationsAndFitnessValues() amalgam.cpp:1915...
 set_source_files_properties(
     methods/amalgam.cpp
-    PROPERTIES
-        COMPILE_FLAGS "-w -fno-sanitize=address,undefined"
-)
-# disable any warnings in the mo gomea code
-set_source_files_properties(
     methods/mo_gomea.cpp
+    methods/mo_rv_gomea/FOS.cpp
+    methods/mo_rv_gomea/MO_optimization.cpp
+    methods/mo_rv_gomea/Optimization.cpp
+    methods/mo_rv_gomea/Tools.cpp
+    methods/mo_rv_gomea/mo_rv_gomea.cpp
     PROPERTIES
         COMPILE_FLAGS "-w -fno-sanitize=address,undefined"
 )

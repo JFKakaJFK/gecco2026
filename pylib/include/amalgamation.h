@@ -2258,6 +2258,34 @@ class UnivariateFOS final : public LinkageModelBase {
   Subset subset;
 };
 
+class StaticFOS final : public LinkageModelBase {
+ public:
+  StaticFOS(FOS fos) : fos(fos) {
+    // TODO check if all subsets are ordered sets
+  }
+
+  std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<StaticFOS>(*this); }
+
+  void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
+    // TODO check if all set indices are valid & possibly warn if some variables do not appear in any subset?
+  }
+
+  FOS subsets(Rng& rng,
+              InstanceBase& problem,
+              SolutionSetBase& solutions,
+              const std::span<const usize> indices,
+              std::optional<std::reference_wrapper<const Mat<CType>>> covariance = std::nullopt) const override final {
+    return fos;
+  };
+
+  bool is_static() const override final { return true; };
+
+  const FOS& get() const { return fos; }
+
+ private:
+  FOS fos;
+};
+
 class FullFOS final : public LinkageModelBase {
  public:
   FullFOS(std::optional<Subset> subset = std::nullopt) : subset(subset.value_or(Subset{})) {}
@@ -6158,6 +6186,7 @@ class SRProblem : public GPInstanceBase {
 #define _GOBLIN_BENCH_FUNCTIONS_H
 
 
+
 namespace goblin {
 
 class ObjectiveBase {
@@ -6186,6 +6215,21 @@ class ObjectiveBase {
   };
 
   virtual ~ObjectiveBase() {};
+};
+
+class MOFunctionBase {
+ public:
+  virtual usize num_objectives() const = 0;
+  virtual usize num_discrete() const = 0;
+  virtual usize num_continuous() const = 0;
+
+  virtual void evaluate(SolutionBase& solution) = 0;
+
+  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
+    evaluate(solution);
+  };
+
+  virtual ~MOFunctionBase() {};
 };
 
 };  // namespace goblin
@@ -6326,6 +6370,50 @@ class Inverted final : public ObjectiveBase {
 
  private:
   std::shared_ptr<ObjectiveBase> fn;
+};
+
+class Translated final : public ObjectiveBase {
+ public:
+  Translated(std::shared_ptr<ObjectiveBase> objective, RefS<Vec<CType>> translation_vector)
+      : fn(objective), tv(translation_vector) {};
+
+  usize num_discrete() const override final { return fn->num_discrete(); };
+  usize num_continuous() const override final { return fn->num_continuous(); };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
+    // TODO this does not forward modifications to the actual solutions
+    // (non-issue for my use cases so far, but still a violation of the api...)
+    Vec<CType> c_tl = continuous_values + tv;
+    return fn->evaluate(discrete_values, c_tl, discrete_active, continuous_active);
+  };
+
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
+    // TODO this does not forward modifications to the actual solutions
+    // (non-issue for my use cases so far, but still a violation of the api...)
+    Vec<CType> c_tl = continuous_values + tv;
+    Vec<CType> cp_tl = parent_continuous_values + tv;
+    return fn->evaluate_partial(discrete_values, c_tl, discrete_active, continuous_active, parent_discrete_values,
+                                cp_tl, parent_discrete_active, parent_continuous_active, parent_objective_value,
+                                parent_constraint_value, discrete_indices, continuous_indices);
+  };
+
+ private:
+  std::shared_ptr<ObjectiveBase> fn;
+  Vec<CType> tv;
 };
 
 class Rotated final : public ObjectiveBase {
@@ -7045,6 +7133,7 @@ class BimodalTrap final : public ObjectiveBase {
 #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 #define _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
 
+#include <bit>
 
 
 namespace goblin {
@@ -7216,6 +7305,225 @@ class CirclesInASquare final : public ObjectiveBase {
   usize dims;
 };
 
+class ZDT1 : public MOFunctionBase {
+  usize dims;
+
+ public:
+  ZDT1(usize dims = 30) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT1 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = solution.continuous_values()(0);
+
+    CType g = 0.0;
+    for (usize i = 1; i < dims; i++) {
+      g += solution.continuous_values()(i) / static_cast<CType>(dims - 1);
+    }
+    g = 1.0 + 9.0 * g;
+
+    CType h = 1.0 - std::sqrt(solution.continuous_values()(0) / g);
+
+    q.objectives(1) = g * h;
+  }
+};
+
+class ZDT2 : public MOFunctionBase {
+  usize dims;
+
+ public:
+  ZDT2(usize dims = 30) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT2 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = solution.continuous_values()(0);
+
+    CType g = 0.0;
+    for (usize i = 1; i < dims; i++) {
+      g += solution.continuous_values()(i) / static_cast<CType>(dims - 1);
+    }
+    g = 1.0 + 9.0 * g;
+
+    CType h = solution.continuous_values()(0) / g;
+    h = 1.0 - h * h;
+
+    q.objectives(1) = g * h;
+  }
+};
+
+class ZDT3 : public MOFunctionBase {
+  usize dims;
+
+ public:
+  ZDT3(usize dims = 30) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT3 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = solution.continuous_values()(0);
+
+    CType g = 0.0;
+    for (usize i = 1; i < dims; i++) {
+      g += solution.continuous_values()(i) / static_cast<CType>(dims - 1);
+    }
+    g = 1.0 + 9.0 * g;
+
+    CType h = solution.continuous_values()(0) / g;
+    h = 1.0 - std::sqrt(h) - h * std::sin(10.0 * std::numbers::pi * solution.continuous_values()(0));
+
+    q.objectives(1) = g * h;
+  }
+};
+
+class ZDT4 : public MOFunctionBase {
+  usize dims;
+
+ public:
+  ZDT4(usize dims = 10) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT4 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = solution.continuous_values()(0);
+
+    CType g = 1.0 + 10.0 * static_cast<CType>(dims - 1);
+    for (usize i = 1; i < dims; i++) {
+      g += solution.continuous_values()(i) * solution.continuous_values()(i) -
+           10.0 * std::cos(4.0 * std::numbers::pi * solution.continuous_values()(i));
+    }
+
+    CType h = 1.0 - std::sqrt(solution.continuous_values()(0) / g);
+
+    q.objectives(1) = g * h;
+  }
+};
+
+class ZDT5 : public MOFunctionBase {
+  usize dims;
+
+  u32 u(CType x, u32 num_bits) const {
+    u64 bits;
+    std::memcpy(&bits, &x, sizeof(bits));  // interpret the memory as bytes
+
+    bits &= ((1ULL << 52) - 1);  // extract 52 fraction bits
+    bits >>= 52 - num_bits;      // truncate to target number of bits
+
+    return std::popcount(bits);  // count number of ones in the remaining bitstring
+  };
+
+  CType v(u32 num_ones) const { return num_ones < 5 ? 2.0 + static_cast<CType>(num_ones) : 1.0; };
+
+ public:
+  ZDT5(usize dims = 11) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT5 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = 1.0 + static_cast<CType>(u(solution.continuous_values()(0), 30));
+
+    CType g = 0.0;
+    for (usize i = 1; i < dims; i++) {
+      g += v(u(solution.continuous_values()(i), 5));
+    }
+
+    CType h = 1.0 / q.objectives(0);
+
+    q.objectives(1) = g * h;
+  }
+};
+
+class ZDT6 : public MOFunctionBase {
+  usize dims;
+
+ public:
+  ZDT6(usize dims = 10) : dims(dims) {
+    if (dims < 2) {
+      throw std::runtime_error("ZDT6 requires at least 2 parameters.");
+    }
+  };
+
+  usize num_objectives() const override final { return 2; }
+  usize num_discrete() const override final { return 0; }
+  usize num_continuous() const override final { return dims; }
+
+  void evaluate(SolutionBase& solution) override final {
+    solution.discrete_active().fill(false);
+    solution.continuous_active().fill(true);
+    auto& q = solution.quality_as<MOQuality>();
+
+    q.constraint_value = 0.0;
+    q.objectives(0) = 1.0 - std::exp(-4.0 * solution.continuous_values()(0)) *
+                                std::pow(std::sin(6.0 * std::numbers::pi * solution.continuous_values()(0)), 6);
+
+    CType g = 0.0;
+    for (usize i = 1; i < dims; i++) {
+      g += solution.continuous_values()(i);
+    }
+    g = 1.0 + 9.0 * std::pow(g / static_cast<double>(dims - 1), 0.25);
+
+    CType h = q.objectives(0) / g;
+    h = 1.0 - h * h;
+
+    q.objectives(1) = g * h;
+  }
+};
+
 };  // namespace goblin
 
 #endif /* _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H */
@@ -7283,21 +7591,6 @@ class LeadingSpheres final : public ObjectiveBase {
 
 
 namespace goblin {
-
-class MOFunctionBase {
- public:
-  virtual usize num_objectives() const = 0;
-  virtual usize num_discrete() const = 0;
-  virtual usize num_continuous() const = 0;
-
-  virtual void evaluate(SolutionBase& solution) = 0;
-
-  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
-    evaluate(solution);
-  };
-
-  virtual ~MOFunctionBase() {};
-};
 
 class PyFunctionBase : MOFunctionBase {
  public:
@@ -7490,7 +7783,9 @@ class BenchmarkInstance final : public InstanceBase {
 
   void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
     _target.clear();
-    __goblin_runtime_assert(discrete.rows() == continuous.rows());
+    if (num_discrete() > 0 && num_continuous() > 0) {
+      __goblin_runtime_assert(discrete.rows() == continuous.rows());
+    }
     __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
     __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
     for (isize i = 0; i < discrete.rows(); i++) {
@@ -8800,6 +9095,111 @@ class MOBinaryGOMEA final : public MethodBase {
 };  // namespace goblin
 
 #endif /* _GOBLIN_MO_BINARY_GOMEA_H */
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//                       goblin/methods/mo_rv_gomea.h included by goblin.h                                      //
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#ifndef _GOBLIN_MO_RV_GOMEA_H
+#define _GOBLIN_MO_RV_GOMEA_H
+
+
+
+
+namespace goblin {
+
+class MoRvGOMEA final : public MethodBase {
+ public:
+  MoRvGOMEA(
+      /// Initial population size
+      std::optional<usize> initial_population_size = std::nullopt,
+      /// Maximum number of populations
+      usize max_num_populations = 25,
+      /// Number of generations performed before starting larger populations
+      usize subgeneration_factor = 8,
+      /// The target number of solutions in the approximation front
+      usize target_archive_size = 100,
+      /// Selection percentile of solutions to use to estimate sampling distributions
+      double selection_percentile = 0.35,
+      /// The distribution shrinking factor used to adapt the sampling distribution scale (increasing factor is always
+      /// 1/shrinking factor)
+      double distribution_multiplier_decrease = 0.9,
+      /// The standard deviation threshold used to trigger variance scaling
+      double std_deviation_ratio_threshold = 1.0,
+      /// The maximum number of subsequent generations without and improvement with distribution multiplier <= 1.0
+      std::optional<usize> max_no_improvement_stretch = std::nullopt,
+      /// The initial number of mixing components
+      std::optional<usize> initial_num_clusters = std::nullopt,
+      /// The linkage model to use, either a static FOS or one of `"LinkageTree" (default), "Full", "Univariate",
+      /// "StaticLinkageTree", "BFLT" (Bounded Fixed Linkage Tree), "RandomBFLT", "RandomLinkageTree",
+      /// "StaticRandomLinkageTree"`
+      std::variant<std::string, StaticFOS> linkage_model = "LinkageTree",
+      /// The maximum number of variables in a subset
+      std::optional<usize> max_subset_size = std::nullopt,
+      /// Determines if boundary repair is used for box-constrained problems
+      bool boundary_repair = false,
+      /// Enables the forced improvements mechanism
+      bool forced_improvements = false,
+      /// If disabled all evaluations are full evaluations
+      bool partial_evaluations = true)
+      : initial_population_size(initial_population_size),
+        max_num_populations(max_num_populations),
+        subgeneration_factor(subgeneration_factor),
+        target_archive_size(target_archive_size),
+        selection_percentile(selection_percentile),
+        distribution_multiplier_decrease(distribution_multiplier_decrease),
+        std_deviation_ratio_threshold(std_deviation_ratio_threshold),
+        max_no_improvement_stretch(max_no_improvement_stretch),
+        initial_num_clusters(initial_num_clusters),
+        linkage_model(linkage_model),
+        max_subset_size(max_subset_size),
+        boundary_repair(boundary_repair),
+        forced_improvements(forced_improvements),
+        partial_evaluations(partial_evaluations) {
+    if (initial_population_size.value_or(1) < 1) {
+      throw std::runtime_error("Initial population size must be >= 1.");
+    }
+
+    if (initial_num_clusters.value_or(1) < 1) {
+      throw std::runtime_error("Number of clusters must be >= 1.");
+    }
+
+    if (target_archive_size < 1) {
+      throw std::runtime_error("Target archive size must be >= 1.");
+    }
+
+    if (selection_percentile <= 0.0 || selection_percentile >= 1.0) {
+      throw std::runtime_error("Selection percentile must be in (0, 1].");
+    }
+  };
+
+  std::optional<u64> current_generation() const override final;
+
+  std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> run(
+      InstanceBase& problem,
+      const Budget& budget,
+      std::optional<u64> seed = std::nullopt,
+      std::optional<usize> population_size = std::nullopt) override final;
+
+ private:
+  std::optional<usize> initial_population_size{};
+  usize max_num_populations{};
+  usize subgeneration_factor{};
+  usize target_archive_size{};
+  double selection_percentile{};
+  double distribution_multiplier_decrease{};
+  double std_deviation_ratio_threshold{};
+  std::optional<usize> max_no_improvement_stretch{};
+  std::optional<usize> initial_num_clusters{};
+  std::variant<std::string, StaticFOS> linkage_model{};
+  std::optional<usize> max_subset_size{};
+  bool boundary_repair{};
+  bool forced_improvements{};
+  bool partial_evaluations{};
+};
+
+};  // namespace goblin
+
+#endif /* _GOBLIN_MO_RV_GOMEA_H */
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/methods/mixed.h included by goblin.h                                            //

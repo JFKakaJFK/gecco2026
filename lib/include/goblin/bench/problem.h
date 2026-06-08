@@ -16,21 +16,6 @@
 
 namespace goblin {
 
-class MOFunctionBase {
- public:
-  virtual usize num_objectives() const = 0;
-  virtual usize num_discrete() const = 0;
-  virtual usize num_continuous() const = 0;
-
-  virtual void evaluate(SolutionBase& solution) = 0;
-
-  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
-    evaluate(solution);
-  };
-
-  virtual ~MOFunctionBase() {};
-};
-
 class PyFunctionBase : MOFunctionBase {
  public:
   virtual usize num_objectives() const override = 0;
@@ -222,7 +207,9 @@ class BenchmarkInstance final : public InstanceBase {
 
   void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
     _target.clear();
-    __goblin_runtime_assert(discrete.rows() == continuous.rows());
+    if (num_discrete() > 0 && num_continuous() > 0) {
+      __goblin_runtime_assert(discrete.rows() == continuous.rows());
+    }
     __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
     __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
     for (isize i = 0; i < discrete.rows(); i++) {

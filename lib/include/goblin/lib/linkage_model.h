@@ -107,6 +107,34 @@ class UnivariateFOS final : public LinkageModelBase {
   Subset subset;
 };
 
+class StaticFOS final : public LinkageModelBase {
+ public:
+  StaticFOS(FOS fos) : fos(fos) {
+    // TODO check if all subsets are ordered sets
+  }
+
+  std::unique_ptr<LinkageModelBase> clone() const override final { return std::make_unique<StaticFOS>(*this); }
+
+  void init(Rng& rng, InstanceBase& problem, SolutionSetBase& solutions, VariableSet variables) override final {
+    // TODO check if all set indices are valid & possibly warn if some variables do not appear in any subset?
+  }
+
+  FOS subsets(Rng& rng,
+              InstanceBase& problem,
+              SolutionSetBase& solutions,
+              const std::span<const usize> indices,
+              std::optional<std::reference_wrapper<const Mat<CType>>> covariance = std::nullopt) const override final {
+    return fos;
+  };
+
+  bool is_static() const override final { return true; };
+
+  const FOS& get() const { return fos; }
+
+ private:
+  FOS fos;
+};
+
 class FullFOS final : public LinkageModelBase {
  public:
   FullFOS(std::optional<Subset> subset = std::nullopt) : subset(subset.value_or(Subset{})) {}

@@ -3698,6 +3698,7 @@ void run(void) {
 
 namespace goblin {
 std::optional<u64> MOBinaryGOMEA::current_generation() const {
+  // const std::lock_guard<std::mutex> lock(mo_gomea_impl::global_instance_mutex);
   u64 g = 0;
   for (usize i = 0; i < mo_gomea_impl::number_of_populations; i++) {
     g += static_cast<u64>(mo_gomea_impl::array_of_number_of_generations[i]);

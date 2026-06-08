@@ -42,6 +42,7 @@
 #include "goblin/methods/amalgam.h"
 #include "goblin/methods/library.h"
 #include "goblin/methods/mo_binary.h"
+#include "goblin/methods/mo_rv_gomea.h"
 #include "goblin/methods/mixed.h"
 #include "goblin/methods/classic/common.h"
 #include "goblin/methods/classic/de.h"

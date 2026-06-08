@@ -140,6 +140,50 @@ class Inverted final : public ObjectiveBase {
   std::shared_ptr<ObjectiveBase> fn;
 };
 
+class Translated final : public ObjectiveBase {
+ public:
+  Translated(std::shared_ptr<ObjectiveBase> objective, RefS<Vec<CType>> translation_vector)
+      : fn(objective), tv(translation_vector) {};
+
+  usize num_discrete() const override final { return fn->num_discrete(); };
+  usize num_continuous() const override final { return fn->num_continuous(); };
+
+  std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                    RefS<Vec<CType>> continuous_values,
+                                    RefS<Array<BType>> discrete_active,
+                                    RefS<Array<BType>> continuous_active) override final {
+    // TODO this does not forward modifications to the actual solutions
+    // (non-issue for my use cases so far, but still a violation of the api...)
+    Vec<CType> c_tl = continuous_values + tv;
+    return fn->evaluate(discrete_values, c_tl, discrete_active, continuous_active);
+  };
+
+  std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                            RefS<Vec<CType>> continuous_values,
+                                            RefS<Array<BType>> discrete_active,
+                                            RefS<Array<BType>> continuous_active,
+                                            CRefS<Vec<DType>> parent_discrete_values,
+                                            CRefS<Vec<CType>> parent_continuous_values,
+                                            CRefS<Array<BType>> parent_discrete_active,
+                                            CRefS<Array<BType>> parent_continuous_active,
+                                            const CType parent_objective_value,
+                                            const CType parent_constraint_value,
+                                            const std::span<const usize>& discrete_indices,
+                                            const std::span<const usize>& continuous_indices) override final {
+    // TODO this does not forward modifications to the actual solutions
+    // (non-issue for my use cases so far, but still a violation of the api...)
+    Vec<CType> c_tl = continuous_values + tv;
+    Vec<CType> cp_tl = parent_continuous_values + tv;
+    return fn->evaluate_partial(discrete_values, c_tl, discrete_active, continuous_active, parent_discrete_values,
+                                cp_tl, parent_discrete_active, parent_continuous_active, parent_objective_value,
+                                parent_constraint_value, discrete_indices, continuous_indices);
+  };
+
+ private:
+  std::shared_ptr<ObjectiveBase> fn;
+  Vec<CType> tv;
+};
+
 class Rotated final : public ObjectiveBase {
  public:
   Rotated(std::shared_ptr<ObjectiveBase> objective,

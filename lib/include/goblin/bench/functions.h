@@ -1,9 +1,12 @@
+#pragma once
 #ifndef _GOBLIN_BENCH_FUNCTIONS_H
 #define _GOBLIN_BENCH_FUNCTIONS_H
 
-#pragma once
-#include "goblin/lib/types.h"
 #include <tuple>
+
+#include "goblin/lib/types.h"
+#include "goblin/lib/subset.h"
+#include "goblin/lib/solution.h"
 
 namespace goblin {
 
@@ -33,6 +36,21 @@ class ObjectiveBase {
   };
 
   virtual ~ObjectiveBase() {};
+};
+
+class MOFunctionBase {
+ public:
+  virtual usize num_objectives() const = 0;
+  virtual usize num_discrete() const = 0;
+  virtual usize num_continuous() const = 0;
+
+  virtual void evaluate(SolutionBase& solution) = 0;
+
+  virtual void evaluate_partial(SolutionBase& solution, const SolutionBase& parent, const Subset& subset) {
+    evaluate(solution);
+  };
+
+  virtual ~MOFunctionBase() {};
 };
 
 };  // namespace goblin
