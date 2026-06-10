@@ -24,33 +24,11 @@ from tqdm import tqdm
 
 JobQueue = list[tuple[Callable[[Task, Path], None], list[Never], dict[str, Task | str]]]
 
-# Some kernels have a limit to the amount of work they can do
-BASELINE_LIMIT = 3e9  # roughly 12GB of memory required
-BLOCK_REDUCE_LIMIT = 1024**2
 
 KERNELS: dict[KernelType, KV] = {
-    "baseline": KV.baseline,
-    "restrict": KV.restrict,
-    "shared_memory": KV.shared_memory,
-    "block_reduce": KV.block_reduce,
-    "single_kernel": KV.single_kernel,
-    "single_kernel_fmaf": KV.single_kernel_fmaf,
-    "single_kernel_inplace": KV.single_kernel_inplace,
-    "hybrid": KV.hybrid,
+    "single_block": KV.single_block,
+    "dynamic_block": KV.dynamic_block,
 }
-
-MAIN_KV: tuple[KV, ...] = (
-    KV.shared_memory,
-    KV.block_reduce,
-    KV.single_kernel_inplace,
-    KV.hybrid,
-)
-BASELINE_KV: tuple[KV, ...] = (KV.baseline, KV.restrict, KV.shared_memory)
-SINGLE_KV: tuple[KV, ...] = (
-    KV.single_kernel,
-    KV.single_kernel_fmaf,
-    KV.single_kernel_inplace,
-)
 
 
 class LogInfo(TypedDict):
@@ -188,12 +166,12 @@ def run_one_task(task: Task, log_path: Path) -> None:
         random_state=task["seed"],
         budget_kwargs={
             # "max_evaluations": 1_000_000,
-            "max_duration": datetime.timedelta(minutes=task["max_duration"]),
+            "max_duration": datetime.timedelta(seconds=task["max_duration"]),
         },
         tracking_kwargs={
             "logpath": log_path,
             "log_info": log_info,
-            "report_intermediate_results": False,
+            "report_intermediate_results": True,
             # "max_generations_until_next_report": 1,
             # "generation_factor": 1,
             # "max_evaluations_until_next_report": 100_000,
@@ -353,17 +331,6 @@ def run_gpu_tasks(
     for task in tasks:
         task_name = task_to_file_name(task)
         kernel = task["kernel"]
-
-        # Determine the amount of work, and if the kernel can perform all that work
-        num_obs = task["num_observations"]
-        num_work = task["population_size"] * num_obs
-        skip_kernel = (kernel in BASELINE_KV and num_work >= BASELINE_LIMIT) or (
-            kernel == KV.block_reduce and num_obs >= BLOCK_REDUCE_LIMIT
-        )
-
-        if skip_kernel:
-            print(f"skipping kernel: {task['kernel']}")
-            continue
 
         kernel_str: str = str(kernel).replace("KernelVersion.", "")
 

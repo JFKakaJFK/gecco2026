@@ -224,7 +224,7 @@ TEST_CASE("goblin::gp::sr") {
 
 #ifdef GOBLIN_HAS_CUDA
 
-TEST_CASE("goblin::ga-gp::sr::gpu_evaluation") {
+TEST_CASE("goblin::gp::sr::gpu_evaluation") {
     auto tree = TemplateNode::full_nary(2, 3);
     Template tmplate;
 
@@ -254,7 +254,7 @@ TEST_CASE("goblin::ga-gp::sr::gpu_evaluation") {
         /* archive_epsilon = */ 0.0,
         /* always_inherit_continuous = */ std::nullopt,
         /* batch_size = */ std::nullopt,
-        /* kernel_version = */ KernelVersion::SingleKernelInplace
+        /* kernel_version = */ KernelVersion::SingleBlock
     );
 
     Rng rng(1, 0);

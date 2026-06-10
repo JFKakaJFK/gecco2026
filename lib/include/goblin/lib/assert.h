@@ -8,5 +8,5 @@
 #define __goblin_runtime_assert(x)                                                                             \
   if (!(x)) {                                                                                                  \
     throw std::runtime_error(std::format("{}:{}:\n\t Runtime assertion `{}` failed", __FILE__, __LINE__, #x)); \
-  } else  // eats up semicolon
+  }  // eats up semicolon
 #endif

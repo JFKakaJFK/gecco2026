@@ -1,12 +1,8 @@
 #pragma once
-#ifndef _GOBLIN_GA_GP_HELPER_H
-#define _GOBLIN_GA_GP_HELPER_H
+#ifndef _GOBLIN_GA_GP_MEMORY_H
+#define _GOBLIN_GA_GP_MEMORY_H
 
 namespace goblin {
-
-#ifdef __CUDACC__
-void check(cudaError_t err, char const* func, char const* file, int line);
-#endif
 
 template <typename T>
 T* allocate_on_gpu(size_t count);
@@ -26,6 +22,6 @@ void free_on_gpu(T* d_ptr);
 template <typename T>
 void zero_mem_on_gpu(T* d_ptr, size_t count);
 
-};  // namespace goblin
+}  // namespace goblin
 
-#endif /* _GOBLIN_GA_GP_HELPER_H */
+#endif /* _GOBLIN_GA_GP_MEMORY_H */

@@ -9,32 +9,26 @@ namespace goblin {
 
 using u8 = std::uint8_t;
 
+// SingleBlock: one block per solution; threads partition the datapoints within that block.
+// DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.
 enum class KernelVersion : u8 {
-    Baseline,
-    Restrict,
-    SharedMemory,
-    BlockReduce,
-    SingleKernel,
-    SingleKernelFMAF,
-    SingleKernelInplace,
-    Hybrid
+    SingleBlock,
+    DynamicBlock
 };
 
 constexpr std::string_view to_string(KernelVersion v) {
     switch (v) {
-        case KernelVersion::Baseline:            return "Baseline";
-        case KernelVersion::Restrict:            return "Restrict";
-        case KernelVersion::SharedMemory:        return "SharedMemory";
-        case KernelVersion::BlockReduce:         return "BlockReduce";
-        case KernelVersion::SingleKernel:        return "SingleKernel";
-        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
-        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
-        case KernelVersion::Hybrid:              return "Hybrid";
+        case KernelVersion::SingleBlock:    return "SingleBlock";
+        case KernelVersion::DynamicBlock:   return "DynamicBlock";
     }
 
     return "Unknown KernelVersion";
 }
 
+// Trees are encoded as parallel arrays (type[], value[]) in postfix order.
+// Input: value holds the feature index.
+// Constant: value holds the literal constant.
+// Operator: value is the Operator enum cast to float.
 enum class NodeType : u8 {
     Input,
     Constant,
@@ -59,7 +53,7 @@ enum class Operator : u8 {
     Max
 };
 
-// The following declarations are used to create more readable test cases
+// Helpers for writing readable test trees using the same float encoding as the runtime.
 namespace test {
     constexpr u8 C = static_cast<u8>(NodeType::Constant);
     constexpr u8 I = static_cast<u8>(NodeType::Input);

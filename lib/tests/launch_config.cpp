@@ -12,7 +12,7 @@ using namespace goblin;
 
 
 
-TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
+TEST_CASE("goblin::gp::gpu_evaluation::misc::kernel_dim::determine") {
     struct TestCase {
         size_t count;
         KernelDim expected;
@@ -48,108 +48,7 @@ TEST_CASE("goblin::ga-gp::misc::kernel_dim_determine") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::misc::kernel_config_for_eval") {
-    struct TestCase {
-        size_t num_solutions;
-        size_t num_datapoints;
-        KernelConfig expected;
-    };
-
-    std::vector<TestCase> test_cases = {
-        { 1, 1, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 32, 1, KernelConfig(KernelDim(32), KernelDim(32)) },
-        { 1, 32, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 32, 32, KernelConfig(KernelDim(32), KernelDim(32)) },
-        { 1, 1025, KernelConfig(KernelDim(1, 3), KernelDim(352)) },
-        { 32, 1025, KernelConfig(KernelDim(32, 3), KernelDim(352)) },
-        { 2048, 100000, KernelConfig(KernelDim(2048, 125), KernelDim(800)) },
-        { 4096, 1000000, KernelConfig(KernelDim(4096, 1250), KernelDim(800)) }
-    };
-
-
-    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
-        INFO("Test case index: ", i);
-
-        KernelConfig result = KernelConfig::for_eval(tc.num_solutions, tc.num_datapoints);
-
-        INFO("Grid X: ", result.grid.x, " | ", tc.expected.grid.x);
-        INFO("Grid Y: ", result.grid.y, " | ", tc.expected.grid.y);
-        INFO("Grid Z: ", result.grid.z, " | ", tc.expected.grid.z);
-
-        INFO("Block X: ", result.block.x, " | ", tc.expected.block.x);
-        INFO("Block Y: ", result.block.y, " | ", tc.expected.block.y);
-        INFO("Block Z: ", result.block.z, " | ", tc.expected.block.z);
-
-        CHECK_EQ(result, tc.expected);
-    }
-}
-
-TEST_CASE("goblin::ga-gp::misc::kernel_config_for_mse_simple") {
-    struct TestCase {
-        size_t num_solutions;
-        KernelConfig expected;
-    };
-
-    std::vector<TestCase> test_cases = {
-        { 1, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 32, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 2048, KernelConfig(KernelDim(2), KernelDim(1024)) },
-    };
-
-
-    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
-        INFO("Test case index: ", i);
-
-        KernelConfig result = KernelConfig::for_mse_simple(tc.num_solutions);
-
-        INFO("Grid X: ", result.grid.x, " | ", tc.expected.grid.x);
-        INFO("Grid Y: ", result.grid.y, " | ", tc.expected.grid.y);
-        INFO("Grid Z: ", result.grid.z, " | ", tc.expected.grid.z);
-
-        INFO("Block X: ", result.block.x, " | ", tc.expected.block.x);
-        INFO("Block Y: ", result.block.y, " | ", tc.expected.block.y);
-        INFO("Block Z: ", result.block.z, " | ", tc.expected.block.z);
-
-        CHECK_EQ(result, tc.expected);
-    }
-}
-
-TEST_CASE("goblin::ga-gp::misc::kernel_config_for_mse_block") {
-    struct TestCase {
-        size_t num_solutions;
-        size_t num_partial;
-        KernelConfig expected;
-    };
-
-    std::vector<TestCase> test_cases = {
-        { 1, 1, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 32, 1, KernelConfig(KernelDim(32), KernelDim(32)) },
-        { 1, 32, KernelConfig(KernelDim(1), KernelDim(32)) },
-        { 32, 32, KernelConfig(KernelDim(32), KernelDim(32)) },
-        { 1, 1024, KernelConfig(KernelDim(1), KernelDim(1024)) },
-        { 32, 1024, KernelConfig(KernelDim(32), KernelDim(1024)) },
-        { 2048, 1024, KernelConfig(KernelDim(2048), KernelDim(1024)) },
-    };
-
-
-    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
-        INFO("Test case index: ", i);
-
-        KernelConfig result = KernelConfig::for_mse_block(tc.num_solutions, tc.num_partial);
-
-        INFO("Grid X: ", result.grid.x, " | ", tc.expected.grid.x);
-        INFO("Grid Y: ", result.grid.y, " | ", tc.expected.grid.y);
-        INFO("Grid Z: ", result.grid.z, " | ", tc.expected.grid.z);
-
-        INFO("Block X: ", result.block.x, " | ", tc.expected.block.x);
-        INFO("Block Y: ", result.block.y, " | ", tc.expected.block.y);
-        INFO("Block Z: ", result.block.z, " | ", tc.expected.block.z);
-
-        CHECK_EQ(result, tc.expected);
-    }
-}
-
-TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
+TEST_CASE("goblin::gp::gpu_evaluation::misc::kernel_config::single_block") {
     struct TestCase {
         size_t num_solutions;
         size_t num_datapoints;
@@ -170,7 +69,7 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
     for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
         INFO("Test case index: ", i);
 
-        KernelConfig result = KernelConfig::for_eval_single(tc.num_solutions, tc.num_datapoints);
+        KernelConfig result = KernelConfig::single_block(tc.num_solutions, tc.num_datapoints);
 
         INFO("Grid X: ", result.grid.x, " | ", tc.expected.grid.x);
         INFO("Grid Y: ", result.grid.y, " | ", tc.expected.grid.y);
@@ -184,7 +83,42 @@ TEST_CASE("goblin::ga-gp::misc::kernel_config_for_single") {
     }
 }
 
-TEST_CASE("goblin::ga-gp::misc::launch_config_determine") {
+TEST_CASE("goblin::gp::gpu_evaluation::misc::kernel_config::dynamic_block_reduction") {
+    struct TestCase {
+        size_t num_solutions;
+        size_t num_partial;
+        KernelConfig expected;
+    };
+
+    std::vector<TestCase> test_cases = {
+        { 1, 1, KernelConfig(KernelDim(1), KernelDim(32)) },
+        { 32, 1, KernelConfig(KernelDim(32), KernelDim(32)) },
+        { 1, 32, KernelConfig(KernelDim(1), KernelDim(32)) },
+        { 32, 32, KernelConfig(KernelDim(32), KernelDim(32)) },
+        { 1, 1024, KernelConfig(KernelDim(1), KernelDim(1024)) },
+        { 32, 1024, KernelConfig(KernelDim(32), KernelDim(1024)) },
+        { 2048, 1024, KernelConfig(KernelDim(2048), KernelDim(1024)) },
+    };
+
+
+    for (auto&& [i, tc] : std::views::enumerate(std::as_const(test_cases))) {
+        INFO("Test case index: ", i);
+
+        KernelConfig result = KernelConfig::dynamic_block_reduction(tc.num_solutions, tc.num_partial);
+
+        INFO("Grid X: ", result.grid.x, " | ", tc.expected.grid.x);
+        INFO("Grid Y: ", result.grid.y, " | ", tc.expected.grid.y);
+        INFO("Grid Z: ", result.grid.z, " | ", tc.expected.grid.z);
+
+        INFO("Block X: ", result.block.x, " | ", tc.expected.block.x);
+        INFO("Block Y: ", result.block.y, " | ", tc.expected.block.y);
+        INFO("Block Z: ", result.block.z, " | ", tc.expected.block.z);
+
+        CHECK_EQ(result, tc.expected);
+    }
+}
+
+TEST_CASE("goblin::gp::gpu_evaluation::misc::launch_config::determine") {
     struct TestCase {
         size_t num_solutions;
         size_t num_datapoints;
@@ -194,148 +128,73 @@ TEST_CASE("goblin::ga-gp::misc::launch_config_determine") {
     };
 
     std::vector<TestCase> test_cases = {
-        { 1, 1, KernelVersion::Baseline, std::nullopt, LaunchConfig(
+        { 1, 1, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 1, KernelVersion::Baseline, std::nullopt, LaunchConfig(
+        { 32, 1, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 1, 32, KernelVersion::Baseline, std::nullopt, LaunchConfig(
+        { 1, 32, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 32, KernelVersion::Baseline, std::nullopt, LaunchConfig(
+        { 32, 32, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 1, 1025, KernelVersion::Baseline, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1, 3), KernelDim(352)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
-        ) },
-        { 32, 1025, KernelVersion::Baseline, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32, 3), KernelDim(352)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::Baseline
-        ) },
-        { 2048, 100000, KernelVersion::Baseline, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(2048, 125), KernelDim(800)),
-            KernelConfig(KernelDim(2), KernelDim(1024)),
-            KernelVersion::Baseline
-        ) },
-        { 1, 1, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 32, 1, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 1, 32, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 32, 32, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 1, 1025, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1, 3), KernelDim(352)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 32, 1025, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32, 3), KernelDim(352)),
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 1, 4096, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1, 4), KernelDim(1024)),
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelVersion::BlockReduce
-        ) },
-        { 2048, 100000, KernelVersion::BlockReduce, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(2048, 125), KernelDim(800)),
-            KernelConfig(KernelDim(2048), KernelDim(128)),
-            KernelVersion::BlockReduce
-        ) },
-        { 1, 1, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernel
-        ) },
-        { 32, 1, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernel
-        ) },
-        { 1, 32, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernel
-        ) },
-        { 32, 32, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
-            KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernel
-        ) },
-        { 1, 1025, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
+        { 1, 1025, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernel
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 1025, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
+        { 32, 1025, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernel
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 1, 4096, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
+        { 1, 4096, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernel
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 2048, 100000, KernelVersion::SingleKernel, std::nullopt, LaunchConfig(
+        { 2048, 100000, KernelVersion::SingleBlock, std::nullopt, LaunchConfig(
             KernelConfig(KernelDim(2048), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernel
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 1, 1, KernelVersion::Hybrid, 1, LaunchConfig(
+        { 1, 1, KernelVersion::DynamicBlock, 1, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernelInplace
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 1, KernelVersion::Hybrid, 32, LaunchConfig(
+        { 32, 1, KernelVersion::DynamicBlock, 32, LaunchConfig(
             KernelConfig(KernelDim(32), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernelInplace
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 1, KernelVersion::Hybrid, 64, LaunchConfig(
+        { 32, 1, KernelVersion::DynamicBlock, 64, LaunchConfig(
             KernelConfig(KernelDim(32, 2), KernelDim(32)),
-            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::Hybrid
+            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::DynamicBlock
         ) },
-        { 1, 32, KernelVersion::Hybrid, 1, LaunchConfig(
+        { 1, 32, KernelVersion::DynamicBlock, 1, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(32)),
-            KernelConfig(), KernelVersion::SingleKernelInplace
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 32, KernelVersion::Hybrid, 64, LaunchConfig(
+        { 32, 32, KernelVersion::DynamicBlock, 64, LaunchConfig(
             KernelConfig(KernelDim(32, 2), KernelDim(32)),
-            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::Hybrid
+            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::DynamicBlock
         ) },
-        { 1, 1025, KernelVersion::Hybrid, 1, LaunchConfig(
+        { 1, 1025, KernelVersion::DynamicBlock, 1, LaunchConfig(
             KernelConfig(KernelDim(1), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernelInplace
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
-        { 32, 1025, KernelVersion::Hybrid, 128, LaunchConfig(
+        { 32, 1025, KernelVersion::DynamicBlock, 128, LaunchConfig(
             KernelConfig(KernelDim(32, 4), KernelDim(288)),
-            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::Hybrid
+            KernelConfig(KernelDim(32), KernelDim(32)), KernelVersion::DynamicBlock
         ) },
-        { 1, 4096, KernelVersion::Hybrid, 120, LaunchConfig(
+        { 1, 4096, KernelVersion::DynamicBlock, 120, LaunchConfig(
             KernelConfig(KernelDim(1, 120), KernelDim(64)),
-            KernelConfig(KernelDim(1), KernelDim(128)), KernelVersion::Hybrid
+            KernelConfig(KernelDim(1), KernelDim(128)), KernelVersion::DynamicBlock
         ) },
-        { 2048, 100000, KernelVersion::Hybrid, 100, LaunchConfig(
+        { 2048, 100000, KernelVersion::DynamicBlock, 100, LaunchConfig(
             KernelConfig(KernelDim(2048), KernelDim(1024)),
-            KernelConfig(), KernelVersion::SingleKernelInplace
+            KernelConfig(), KernelVersion::SingleBlock
         ) },
     };
 

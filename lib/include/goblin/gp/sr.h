@@ -3,7 +3,6 @@
 #define _GOBLIN_GP_SR_H
 
 #include <limits>
-#include <set>
 #include <cassert>
 #include <memory>
 #include <tuple>
@@ -11,7 +10,6 @@
 #include <vector>
 #include <string>
 #include <optional>
-#include <print>
 
 #include <unsupported/Eigen/NonLinearOptimization>
 #include <unsupported/Eigen/NumericalDiff>
@@ -25,36 +23,29 @@
 #endif // GOBLIN_HAS_CUDA
 
 #include "goblin/gp/context.h"
-#include "goblin/gp/operator.h"
-#include "goblin/gp/template.h"
 #include "goblin/gp/init.h"
 #include "goblin/gp/instance.h"
 #include "goblin/lib/archive.h"
 #include "goblin/lib/assert.h"
-#include "goblin/lib/instance.h"
 #include "goblin/lib/solution.h"
 #include "goblin/lib/types.h"
 #include "goblin/lib/init.h"
 
-#include <unsupported/Eigen/NonLinearOptimization>
-#include <unsupported/Eigen/NumericalDiff>
-
 namespace goblin {
+
+const CType VARIANCE_BOUND = 1e-12;
+const CType DEFAULT_GRADIENT_EPSILON = 1e-5;
 
 class SRQuality : public MOQuality {
  public:
   std::unique_ptr<QualityBase> clone() const override { return std::make_unique<SRQuality>(*this); };
 
-  /// Linear scaling parameters
-  Arr2D<CType> ls_params{};
+  // Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.
+  // Scaled prediction: intercept + slope * raw_tree_output.
+  Arr2D<CType> ls_params;
 
-  /*
-  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
-  part of what defines a solution or its accuracy - as indicated by the name, it is never
-  used to make any decisions and only tracked for analysis purposes. By making it mutable
-  it an be lazily computed only when requested.
-   */
-  /// Optional test set accuracy
+  // Lazily computed test-set accuracy, populated on first request via evaluate_test().
+  // Declared mutable because it is not part of solution identity and never drives decisions.
   mutable std::optional<MOQuality> test_quality = std::nullopt;
 };
 
@@ -72,46 +63,41 @@ class SRFitness : public MOFitness {
   };
 };
 
+// Symbolic regression problem: fits a GP tree to minimise one or more objectives
+// (e.g. MSE, NMSE, tree size) over (X_train, Y_train) with optional linear scaling
+// of the raw tree output.  GPU evaluation is available when GOBLIN_HAS_CUDA is defined.
 class SRProblem : public GPInstanceBase {
-  using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
-                             // at compile time delegate to different ScalarTypes (float, double, mpfr, autodiff
-                             // versions) while still having a nice Python API...
+  // TODO template ScalarType and add a wrapper class so the Python API can delegate
+  // at compile time to float, double, mpfr, or autodiff without changing the interface.
+  using ScalarType = CType;
 
  public:
+  // TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes
+  // adding custom objectives hard.  Dependency injection would be cleaner but risks
+  // recomputing the tree output multiple times.  Leaving hardcoded until a better design
+  // is found (see how other GP/SR libraries handle this).
   SRProblem(GPContext ctx,
             Arr2D<CType> X_train,
             Arr2D<CType> Y_train,
             std::optional<Arr2D<CType>> X_test = std::nullopt,
             std::optional<Arr2D<CType>> Y_test = std::nullopt,
-            std::variant<std::string, std::vector<std::string>> objectives =
-                "mse",  /// The objectives that should be recorded in the archive, and by default the objectives that
-                        /// are optimized.
-
-            // TODO I really don't like this API - it is the way it is because this way is convenient for
-            // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
-            // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
-            // objective value") would potentially mean recomputing the output multiple times, and passing a
-            // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
-            // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
-            // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
-            // do it to see if there are better solutions.
-
-            std::optional<usize> objectives_to_optimize =
-                std::nullopt,  /// The number of objectives to optimize in case those differ from the `objectives`
-                               /// parameter, corresponds to the first `objectives_to_optimize` entries in `objectives`.
+            // Objectives recorded in the archive (and optimised by default).
+            std::variant<std::string, std::vector<std::string>> objectives = "mse",
+            // Restrict optimisation to the first N entries of `objectives`; the rest
+            // are tracked in the archive only.
+            std::optional<usize> objectives_to_optimize = std::nullopt,
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
             std::optional<std::vector<CType>> target_objectives = std::nullopt,
             std::string gradient_mode = "forward",
-            CType gradient_epsilon = 1e-5,
+            CType gradient_epsilon = DEFAULT_GRADIENT_EPSILON,
             CType archive_epsilon = 0.0,
             std::optional<bool> always_inherit_continuous = std::nullopt,
             std::optional<usize> batch_size = std::nullopt,
-            std::optional<KernelVersion> kernel_version =
-                std::nullopt  /// When set, evaluation runs on the GPU using the specified kernel. Requires GOBLIN_HAS_CUDA.
-            )
+            // When set, evaluation runs on the GPU with the specified kernel. Requires GOBLIN_HAS_CUDA.
+            std::optional<KernelVersion> kernel_version = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -153,10 +139,9 @@ class SRProblem : public GPInstanceBase {
     __goblin_runtime_assert(static_cast<usize>(this->Y_train.cols()) == ctx.num_outputs);
 
     var_Y_train = (this->Y_train.rowwise() - this->Y_train.colwise().mean()).square().colwise().mean();
-    // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
-    // normalizing...)
+    // Near-zero variance means R² is undefined; clamp to 1.0 so NMSE falls back to MSE.
     for (isize i = 0; i < var_Y_train.size(); i++) {
-      if (std::abs(var_Y_train(i)) < CType(1e-12)) {
+      if (std::abs(var_Y_train(i)) < VARIANCE_BOUND) {
         var_Y_train(i) = 1.0;
       }
     }
@@ -171,10 +156,8 @@ class SRProblem : public GPInstanceBase {
       __goblin_runtime_assert(this->X_test.rows() == this->Y_test.rows());
 
       var_Y_test = (this->Y_test.rowwise() - this->Y_test.colwise().mean()).square().colwise().mean();
-      // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
-      // normalizing...)
       for (isize i = 0; i < var_Y_test.size(); i++) {
-        if (std::abs(var_Y_test(i)) < CType(1e-12)) {
+        if (std::abs(var_Y_test(i)) < VARIANCE_BOUND) {
           var_Y_test(i) = 1.0;
         }
       }
@@ -213,13 +196,9 @@ class SRProblem : public GPInstanceBase {
 
   bool adapt(Rng& rng) override final {
     if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
-      // TODO refactor out into something like PyTorch's DataLoader/Sampler and allow more sophisticated sampling
-      // strategies Surprisingly (?) PyTorch does not have any fancy strategies that take the data distribution into
-      // account (https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler) I'd expect something like a
-      // "parallel greedy scattered subset selection" to perform well since each batch tries to represent the whole
-      // training data distribution (i.e. in random order, assign the furthest row to the current batch until all rows
-      // are assigned to a batch, where the number of batches is ceil(dataset_size / batch_size) - so basically
-      // stratified sampling)
+      // TODO refactor into a DataLoader/Sampler abstraction with configurable sampling strategies.
+      // (Random permutation is simplest; stratified/scattered subsets may better represent the
+      // training distribution but earlier experiments on another codebase showed little benefit.)
       auto perm = permute(rng, X_train.rows());
       perm.resize(_batch_size.value());
 
@@ -228,9 +207,9 @@ class SRProblem : public GPInstanceBase {
 
       var_Y_batch = (Y_batch.rowwise() - Y_batch.colwise().mean()).square().colwise().mean();
       return true;
-    } else {
-      return false;
-    }
+    }        
+    
+    return false;
   };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
@@ -254,7 +233,7 @@ class SRProblem : public GPInstanceBase {
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
 #ifndef NDEBUG
-    auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
+    auto *p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
     assert(p != nullptr && "Quality mismatch");
 #endif
   };
@@ -270,11 +249,12 @@ class SRProblem : public GPInstanceBase {
                                                                         ctx.const_repr == ConstantRepr::Edges) &&
                                     ctx.const_repr != ConstantRepr::None;
 
-    // the pool size is not tied to the number of discrete variables, so the full pool instead of the paired values is
-    // inherited...
+    // Pool constants are not index-paired with discrete variables, so the full pool is inherited.
     const bool inherit_by_index = ctx.const_repr != ConstantRepr::Pool;
 
-    bool any_active_changed = false, anything_changed = false;
+    bool any_active_changed = false;
+    bool anything_changed = false;
+
     for (usize i : subset.discrete) {
       if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
         any_active_changed |= offspring.discrete_active()(i);
@@ -285,10 +265,7 @@ class SRProblem : public GPInstanceBase {
       // TODO for GCS: inherit child arities + permutations
 
       if (inherit_continuous && inherit_by_index) {
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
-        //
-        // yes, the indices here should be from the discrete subset!
+        // TODO floating-point equality here is not robust; consider a relative+absolute threshold.
         if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
           any_active_changed |= offspring.continuous_active()(i);
           anything_changed = true;
@@ -298,13 +275,9 @@ class SRProblem : public GPInstanceBase {
     }
 
     if (inherit_continuous && !inherit_by_index) {
-      // note: arguably just inheriting all continuous variables even if the inherited discrete values might not even be
-      // constants is not the best idea - but earlier experiments on another codebase suggested that more
-      // appropriate/interpolating continuous mixing doesn't really work and here it also is more for completeness and
-      // not used by default...
+      // Inheriting all continuous variables even when the paired discrete slot is not a constant
+      // is imprecise, but earlier experiments showed interpolating continuous mixing doesn't help.
       for (usize i = 0; i < num_continuous(); i++) {
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
         if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
           any_active_changed |= offspring.continuous_active()(i);
           anything_changed = true;
@@ -344,9 +317,9 @@ class SRProblem : public GPInstanceBase {
   bool target_reached(const ArchiveBase& archive) const override final {
     if (!_target.empty()) {
       return archive.covers(_target);
-    } else {
-      return false;
     }
+    
+    return false;
   };
 
   void log_header(std::ostream& os) const override final {
@@ -355,11 +328,11 @@ class SRProblem : public GPInstanceBase {
     }
     os << "unresolved_expressions,";
     os << "expressions,";
-    for (auto& o : objectives) {
+    for (const auto& o : objectives) {
       os << o << "_train,";
     }
     if (Y_test.size() > 0) {
-      for (auto& o : objectives) {
+      for (const auto& o : objectives) {
         os << o << "_test,";
       }
     }
@@ -377,7 +350,7 @@ class SRProblem : public GPInstanceBase {
     os << '"';
     log_solution(os, solution);
     os << "\",";
-    
+
     const auto& q = solution.quality_as<SRQuality>();
     for (usize i = 0; i < objectives.size(); i++) {
       os << q.objectives(i) << ',';
@@ -402,7 +375,7 @@ class SRProblem : public GPInstanceBase {
       if (linear_scaling) {
         const auto& q = solution.quality_as<SRQuality>();
         if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
-          os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+          os << exprs[i];  // unevaluated solution — no scaling params yet
         } else {
           os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
         }
@@ -434,9 +407,9 @@ class SRProblem : public GPInstanceBase {
   void evaluate_test(const SolutionBase& solution) const {
     const auto& q = solution.quality_as<SRQuality>();
     if (Y_test.size() > 0 && !q.test_quality.has_value()) {
-      Solution copy = solution;  // copy is needed since active variables are not mutable...
+      Solution copy = solution;  // copy needed because active variables are not mutable
 
-      Array<ScalarType> params;  // TODO fit FC params...
+      Array<ScalarType> params;  // TODO fit FC params
       auto& cq = copy.quality_as<SRQuality>();
       eval_one(copy, X_test, Y_test, var_Y_test, params, false, cq, cq.ls_params);
 
@@ -459,10 +432,12 @@ class SRProblem : public GPInstanceBase {
   std::vector<std::string> objectives;
   Arr2D<ScalarType> X_train;
   Arr2D<ScalarType> Y_train;
+  // Variance per output column, precomputed for NMSE normalisation.
+  // Near-zero entries are clamped to 1.0 so NMSE degrades gracefully to MSE.
   Array<ScalarType> var_Y_train;
-  Arr2D<ScalarType> X_batch{};
-  Arr2D<ScalarType> Y_batch{};
-  Array<ScalarType> var_Y_batch{};
+  Arr2D<ScalarType> X_batch;
+  Arr2D<ScalarType> Y_batch;
+  Array<ScalarType> var_Y_batch;
   Arr2D<ScalarType> X_test;
   Arr2D<ScalarType> Y_test;
   Array<ScalarType> var_Y_test;
@@ -471,7 +446,6 @@ class SRProblem : public GPInstanceBase {
   // --- CPU evaluation ---
 
   void _evaluate_cpu(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) {
-    // initialize the first batch if needed
     if (_batch_size.has_value() && X_batch.size() == 0) {
       adapt(rng);
     }
@@ -479,7 +453,7 @@ class SRProblem : public GPInstanceBase {
     Array<ScalarType> params;
     for (auto i : indices) {
       auto& q = solutions[i].quality_as<SRQuality>();
-      q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
+      q.test_quality = std::nullopt;  // invalidate cached test quality on every train evaluation
       if (_batch_size.has_value()) {
         eval_one(solutions[i], X_batch, Y_batch, var_Y_batch, params, true, q, q.ls_params);
       } else {
@@ -488,7 +462,6 @@ class SRProblem : public GPInstanceBase {
     }
   }
 
-  // solution, X, Y, train/test, quality to write to
   void eval_one(SolutionBase& solution,
                 const Arr2D<ScalarType>& X,
                 const Arr2D<ScalarType>& Y,
@@ -523,8 +496,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);
+            CType slope = ls_params(1, o);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean();
           }
         } else {
@@ -534,8 +507,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);
+            CType slope = ls_params(1, o);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean() / var_Y(o);
           }
         } else {
@@ -560,7 +533,6 @@ class SRProblem : public GPInstanceBase {
       return;
     }
 
-    // Transform solutions to GPU compatible representation
     std::vector<u8> node_type;
     std::vector<float> node_value;
     std::vector<bool> overflowed(num_solutions, false);
@@ -618,22 +590,19 @@ class SRProblem : public GPInstanceBase {
 
     if (_num_solutions_allocated < num_elements) {
       _free_solution_on_gpu();
-      d_type = allocate_and_copy(node_type.data(), node_type.size());
+      d_type  = allocate_and_copy(node_type.data(), node_type.size());
       d_value = allocate_and_copy(node_value.data(), node_value.size());
       _num_solutions_allocated = num_elements;
     } else {
-      copy_to_gpu(d_type, node_type.data(), node_type.size());
+      copy_to_gpu(d_type,  node_type.data(),  node_type.size());
       copy_to_gpu(d_value, node_value.data(), node_value.size());
     }
   }
 
   void _allocate_results_on_gpu(const LaunchConfig& config) {
-    if (config.kernel_version != KernelVersion::SingleKernel &&
-        config.kernel_version != KernelVersion::SingleKernelFMAF &&
-        config.kernel_version != KernelVersion::SingleKernelInplace) {
+    if (config.kernel_version != KernelVersion::SingleBlock) {
       const size_t num_partials =
-          (config.kernel_version == KernelVersion::BlockReduce ||
-           config.kernel_version == KernelVersion::Hybrid)
+          (config.kernel_version == KernelVersion::DynamicBlock)
               ? config.num_solutions * config.eval.grid.y
               : config.num_solutions * config.num_datapoints;
 
@@ -661,7 +630,7 @@ class SRProblem : public GPInstanceBase {
   void _free_solution_on_gpu() {
     free_on_gpu(d_type);
     free_on_gpu(d_value);
-    d_type = nullptr;
+    d_type  = nullptr;
     d_value = nullptr;
     _num_solutions_allocated = 0;
   }
@@ -670,9 +639,9 @@ class SRProblem : public GPInstanceBase {
     free_on_gpu(d_partial);
     free_on_gpu(d_result);
     d_partial = nullptr;
-    d_result = nullptr;
+    d_result  = nullptr;
     _num_partials_allocated = 0;
-    _num_results_allocated = 0;
+    _num_results_allocated  = 0;
   }
 #endif // GOBLIN_HAS_CUDA
 
@@ -681,32 +650,33 @@ class SRProblem : public GPInstanceBase {
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
   usize _num_continuous{};
-  Vec<CType> _continuous_lower_bounds{};
-  Vec<CType> _continuous_upper_bounds{};
-  Vec<CType> _continuous_init_lower_bounds{};
-  Vec<CType> _continuous_init_upper_bounds{};
+  Vec<CType> _continuous_lower_bounds;
+  Vec<CType> _continuous_upper_bounds;
+  Vec<CType> _continuous_init_lower_bounds;
+  Vec<CType> _continuous_init_upper_bounds;
 
   // CPU fields
-  std::string _gradient_mode{};
-  CType _gradient_epsilon{};
-  std::optional<bool> _always_inherit_continuous{};
-  std::optional<usize> _batch_size{};
-  mutable Arr2D<ScalarType> _eval_buffer{};
+  std::string _gradient_mode;
+  CType _gradient_epsilon;
+  std::optional<bool> _always_inherit_continuous;
+  std::optional<usize> _batch_size;
+  mutable Arr2D<ScalarType> _eval_buffer;  // reused across evaluations to avoid repeated allocation
 
 #ifdef GOBLIN_HAS_CUDA
   // GPU fields
-  std::optional<KernelVersion> _kernel_version{};
-  int _num_sms = 0;
+  std::optional<KernelVersion> _kernel_version;
+  int    _num_sms        = 0;
   size_t _num_datapoints = 0;
+  // Watermark sizes: GPU buffers only grow, never shrink, to minimise cudaMalloc calls.
   size_t _num_solutions_allocated = 0;
-  size_t _num_partials_allocated = 0;
-  size_t _num_results_allocated = 0;
-  float* d_X = nullptr;
-  float* d_Y = nullptr;
-  uint8_t* d_type = nullptr;
-  float* d_value = nullptr;
-  float* d_partial = nullptr;
-  float* d_result = nullptr;
+  size_t _num_partials_allocated  = 0;
+  size_t _num_results_allocated   = 0;
+  float*    d_X       = nullptr;
+  float*    d_Y       = nullptr;
+  uint8_t*  d_type    = nullptr;
+  float*    d_value   = nullptr;
+  float*    d_partial = nullptr;
+  float*    d_result  = nullptr;
 #endif  // GOBLIN_HAS_CUDA
 };
 

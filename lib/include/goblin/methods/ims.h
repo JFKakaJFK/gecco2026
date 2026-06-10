@@ -221,19 +221,12 @@ class IMS final : public MethodBase {
             }
           }
         }
-        // TODO: uncomment
-        // if (populations[p_idx].converged() || 
-        //     (opts.restart_stale_populations &&
-        //      generations_since_last_improvement[p_idx] >
-        //          opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-        //   running[p_idx] = false;
-        // }
-
-        // TODO: remove
-        if (opts.generations_without_improvement_until_stopping.has_value() &&
-            generations_since_last_improvement[p_idx] >=
-                opts.generations_without_improvement_until_stopping.value()) {
-          return std::make_tuple(archive, TerminationStatus::NoImprovementLimitReached);
+        
+        if (populations[p_idx].converged() || 
+            (opts.restart_stale_populations &&
+             generations_since_last_improvement[p_idx] >
+                 opts.generations_without_improvement_until_restart.value_or(total_generations))) {
+          running[p_idx] = false;
         }
       }
 

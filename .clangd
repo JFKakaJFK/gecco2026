@@ -1,6 +1,6 @@
 CompileFlags:
     Add: [-std=c++23, -Wno-unknown-warning-option]
-    CompilationDatabase: None
+    CompilationDatabase: build
     Remove:
         # nvcc flags
         - -forward-unknown-to-host-compiler
@@ -17,3 +17,17 @@ CompileFlags:
 Diagnostics:
     ClangTidy:
         Add: ["readability-*"]
+    Suppress: 
+        # False positive: clang incorrectly requires __host__ __device__ on std library deduction
+        # guides when parsing in CUDA mode.
+        - deduction_guide_target_attr
+        - readability-identifier-length
+        - readability-function-cognitive-complexity
+
+---
+If:
+    PathMatch: .*\.cu
+Diagnostics:
+    # IncludeCleaner cannot fully trace CUDA template instantiations, so it
+    # misreports direct includes like cub/cub.cuh as unused.
+    UnusedIncludes: None

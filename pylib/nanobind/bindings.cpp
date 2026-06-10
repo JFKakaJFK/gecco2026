@@ -2077,7 +2077,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           .value("time_limit_reached", goblin::TerminationStatus::TimeLimitReached, "")
           .value("generation_limit_reached", goblin::TerminationStatus::GenerationLimitReached, "")
           .value("evaluation_limit_reached", goblin::TerminationStatus::EvaluationLimitReached, "")
-          .value("no_improvement_limit_reached", goblin::TerminationStatus::NoImprovementLimitReached, "")
           .value("target_reached", goblin::TerminationStatus::TargetReached, "")
           .value("converged", goblin::TerminationStatus::Converged, "")
           .value("aborted", goblin::TerminationStatus::Aborted, "")
@@ -2601,15 +2600,9 @@ void py_init_module_pygoblin(nb::module_& m) {
 
 
   auto pyEnumKernelVersion =
-      nb::enum_<goblin::KernelVersion>(m, "KernelVersion", nb::is_arithmetic(), "")
-          .value("baseline", goblin::KernelVersion::Baseline, "")
-          .value("restrict", goblin::KernelVersion::Restrict, "")
-          .value("shared_memory", goblin::KernelVersion::SharedMemory, "")
-          .value("block_reduce", goblin::KernelVersion::BlockReduce, "")
-          .value("single_kernel", goblin::KernelVersion::SingleKernel, "")
-          .value("single_kernel_fmaf", goblin::KernelVersion::SingleKernelFMAF, "")
-          .value("single_kernel_inplace", goblin::KernelVersion::SingleKernelInplace, "")
-          .value("hybrid", goblin::KernelVersion::Hybrid, "");
+      nb::enum_<goblin::KernelVersion>(m, "KernelVersion", nb::is_arithmetic(), " SingleBlock: one block per solution; threads partition the datapoints within that block.\n DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.")
+          .value("single_block", goblin::KernelVersion::SingleBlock, "")
+          .value("dynamic_block", goblin::KernelVersion::DynamicBlock, "");
 
 
   m.def("to_string",
@@ -2617,7 +2610,7 @@ void py_init_module_pygoblin(nb::module_& m) {
 
 
   auto pyEnumNodeType =
-      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), "")
+      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), " Trees are encoded as parallel arrays (type[], value[]) in postfix order.\n Input: value holds the feature index.\n Constant: value holds the literal constant.\n Operator: value is the Operator enum cast to float.")
           .value("input", goblin::NodeType::Input, "")
           .value("constant", goblin::NodeType::Constant, "")
           .value("operator", goblin::NodeType::Operator, "")
@@ -3280,11 +3273,11 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("z", &goblin::KernelDim::z, "")
       .def(nb::init<>())
       .def(nb::init<size_t, size_t, size_t>(),
-          nb::arg("_x"), nb::arg("_y") = 1, nb::arg("_z") = 1)
+          nb::arg("x"), nb::arg("y") = 1, nb::arg("z") = 1)
       .def_static("determine",
           &goblin::KernelDim::determine,
           nb::arg("count"),
-          " Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)\n that minimises idle threads when covering `count` items.")
+          " Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)\n that minimizes idle threads when covering `count` items.")
       .def("check",
           &goblin::KernelDim::check)
       .def("__eq__",
@@ -3299,27 +3292,19 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def_rw("block", &goblin::KernelConfig::block, "")
       .def(nb::init<>())
       .def(nb::init<goblin::KernelDim, goblin::KernelDim>(),
-          nb::arg("_grid"), nb::arg("_block"))
-      .def_static("for_eval",
-          &goblin::KernelConfig::for_eval,
+          nb::arg("grid"), nb::arg("block"))
+      .def_static("single_block",
+          &goblin::KernelConfig::single_block,
           nb::arg("num_solutions"), nb::arg("num_datapoints"),
-          "One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce.")
-      .def_static("for_eval_single",
-          &goblin::KernelConfig::for_eval_single,
-          nb::arg("num_solutions"), nb::arg("num_datapoints"),
-          "One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants.")
-      .def_static("for_eval_hybrid",
-          &goblin::KernelConfig::for_eval_hybrid,
+          "One block per solution; threads cover all datapoints in a single pass.")
+      .def_static("dynamic_block_evaluation",
+          &goblin::KernelConfig::dynamic_block_evaluation,
           nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("blocks_per_individual"),
-          "Multiple blocks per solution; blocks split the datapoints. Used by Hybrid.")
-      .def_static("for_mse_simple",
-          &goblin::KernelConfig::for_mse_simple,
-          nb::arg("num_solutions"),
-          "One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory.")
-      .def_static("for_mse_block",
-          &goblin::KernelConfig::for_mse_block,
+          "Multiple blocks per solution; blocks partition the datapoints.")
+      .def_static("dynamic_block_reduction",
+          &goblin::KernelConfig::dynamic_block_reduction,
           nb::arg("num_solutions"), nb::arg("num_partial"),
-          "One block per solution for the MSE reduction. Used by BlockReduce and Hybrid.")
+          "One block per solution for the MSE reduction.")
       .def("check",
           &goblin::KernelConfig::check)
       .def("__eq__",
@@ -3331,17 +3316,17 @@ void py_init_module_pygoblin(nb::module_& m) {
       nb::class_<goblin::LaunchConfig>
           (m, "LaunchConfig", "")
       .def_rw("eval", &goblin::LaunchConfig::eval, "")
-      .def_rw("mse", &goblin::LaunchConfig::mse, "")
+      .def_rw("mse", &goblin::LaunchConfig::mse, "DynamicBlock only: reduction pass")
       .def_rw("kernel_version", &goblin::LaunchConfig::kernel_version, "")
       .def_rw("num_solutions", &goblin::LaunchConfig::num_solutions, "")
       .def_rw("num_datapoints", &goblin::LaunchConfig::num_datapoints, "")
       .def_rw("solution_length", &goblin::LaunchConfig::solution_length, "")
-      .def_rw("blocks_per_individual", &goblin::LaunchConfig::blocks_per_individual, "")
-      .def_rw("datapoints_per_block", &goblin::LaunchConfig::datapoints_per_block, "")
-      .def_rw("datapoints_per_thread", &goblin::LaunchConfig::datapoints_per_thread, "")
+      .def_rw("blocks_per_individual", &goblin::LaunchConfig::blocks_per_individual, "DynamicBlock only: blocks assigned per solution")
+      .def_rw("datapoints_per_block", &goblin::LaunchConfig::datapoints_per_block, "DynamicBlock only: datapoints handled per block")
+      .def_rw("datapoints_per_thread", &goblin::LaunchConfig::datapoints_per_thread, "datapoints each thread evaluates in its loop")
       .def(nb::init<>())
       .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion>(),
-          nb::arg("eval"), nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::Baseline)
+          nb::arg("eval"), nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::SingleBlock)
       .def_static("determine",
           &goblin::LaunchConfig::determine, nb::arg("kernel_version"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("solution_length"), nb::arg("num_sms").none())
       .def("check",
@@ -3358,8 +3343,8 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def(nb::init<>()) // implicit default constructor
       .def("clone",
           &goblin::SRQuality::clone)
-      .def_rw("ls_params", &goblin::SRQuality::ls_params, "/ Linear scaling parameters")
-      .def_rw("test_quality", &goblin::SRQuality::test_quality, "/*\n  The test accuracy uses interior mutability (i.e. it ignores const) since it is not\n  part of what defines a solution or its accuracy - as indicated by the name, it is never\n  used to make any decisions and only tracked for analysis purposes. By making it mutable\n  it an be lazily computed only when requested.\n   */\n/ Optional test set accuracy")
+      .def_rw("ls_params", &goblin::SRQuality::ls_params, " Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.\n Scaled prediction: intercept + slope * raw_tree_output.")
+      .def_rw("test_quality", &goblin::SRQuality::test_quality, " Lazily computed test-set accuracy, populated on first request via evaluate_test().\n Declared mutable because it is not part of solution identity and never drives decisions.")
       ;
 
 
@@ -3375,9 +3360,31 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   auto pyClassSRProblem =
       nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
-          (m, "SRProblem", "")
-      .def(nb::init<goblin::GPContext, Arr2D<CType>, Arr2D<CType>, std::optional<Arr2D<CType>>, std::optional<Arr2D<CType>>, std::variant<std::string, std::vector<std::string>>, std::optional<usize>, bool, std::optional<AnyInit>, CType, CType, std::optional<std::vector<CType>>, std::string, CType, CType, std::optional<bool>, std::optional<usize>, std::optional<goblin::KernelVersion>>(),
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon") = 1e-5, nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none(), nb::arg("kernel_version").none() = nb::none())
+          (m, "SRProblem", " Symbolic regression problem: fits a GP tree to minimise one or more objectives\n (e.g. MSE, NMSE, tree size) over (X_train, Y_train) with optional linear scaling\n of the raw tree output.  GPU evaluation is available when GOBLIN_HAS_CUDA is defined.")
+      .def("__init__",
+          [](goblin::SRProblem * self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", const std::optional<const CType> & gradient_epsilon = std::nullopt, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt)
+          {
+              auto ctor_wrapper = [](goblin::SRProblem* self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", CType gradient_epsilon = goblin::DEFAULT_GRADIENT_EPSILON, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt) ->  void
+              {
+                  new(self) goblin::SRProblem(ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size, kernel_version); // placement new
+              };
+              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::SRProblem * self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", const std::optional<const CType> & gradient_epsilon = std::nullopt, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt)
+              {
+
+                  const CType& gradient_epsilon_or_default = [&]() -> const CType {
+                      if (gradient_epsilon.has_value())
+                          return gradient_epsilon.value();
+                      else
+                          return goblin::DEFAULT_GRADIENT_EPSILON;
+                  }();
+
+                  ctor_wrapper(self, ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon_or_default, archive_epsilon, always_inherit_continuous, batch_size, kernel_version);
+              };
+
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size, kernel_version);
+          },
+          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon").none() = nb::none(), nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none(), nb::arg("kernel_version").none() = nb::none(),
+          " TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes\n adding custom objectives hard.  Dependency injection would be cleaner but risks\n recomputing the tree output multiple times.  Leaving hardcoded until a better design\n is found (see how other GP/SR libraries handle this).\n\n\nPython bindings defaults:\n    If gradient_epsilon is None, then its default value will be: DEFAULT_GRADIENT_EPSILON")
       .def("adapt",
           &goblin::SRProblem::adapt, nb::arg("rng"))
       .def("discrete_domain_sizes",
@@ -4586,7 +4593,7 @@ void py_init_module_pygoblin(nb::module_& m) {
   // #endif
 
   { // <namespace test>
-      nb::module_ pyNstest = m.def_submodule("test", "The following declarations are used to create more readable test cases");
+      nb::module_ pyNstest = m.def_submodule("test", "Helpers for writing readable test trees using the same float encoding as the runtime.");
       pyNstest.def("val",
           nb::overload_cast<float>(goblin::test::Val), nb::arg("x"));
 

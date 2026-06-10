@@ -689,11 +689,10 @@ class TerminationStatus(enum.IntEnum):
     time_limit_reached = enum.auto()  # (= 0)
     generation_limit_reached = enum.auto()  # (= 1)
     evaluation_limit_reached = enum.auto()  # (= 2)
-    no_improvement_limit_reached = enum.auto()  # (= 3)
-    target_reached = enum.auto()  # (= 4)
-    converged = enum.auto()  # (= 5)
-    aborted = enum.auto()  # (= 6)
-    running = enum.auto()  # (= 7)
+    target_reached = enum.auto()  # (= 3)
+    converged = enum.auto()  # (= 4)
+    aborted = enum.auto()  # (= 5)
+    running = enum.auto()  # (= 6)
 
 class Budget:
     max_evaluations: Optional[int] = None
@@ -1599,19 +1598,23 @@ class Template:
 #
 
 class KernelVersion(enum.IntEnum):
-    baseline = enum.auto()  # (= 0)
-    restrict = enum.auto()  # (= 1)
-    shared_memory = enum.auto()  # (= 2)
-    block_reduce = enum.auto()  # (= 3)
-    single_kernel = enum.auto()  # (= 4)
-    single_kernel_fmaf = enum.auto()  # (= 5)
-    single_kernel_inplace = enum.auto()  # (= 6)
-    hybrid = enum.auto()  # (= 7)
+    """SingleBlock: one block per solution; threads partition the datapoints within that block.
+    DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.
+    """
+
+    single_block = enum.auto()  # (= 0)
+    dynamic_block = enum.auto()  # (= 1)
 
 def to_string(v: KernelVersion) -> str:
     pass
 
 class NodeType(enum.IntEnum):
+    """Trees are encoded as parallel arrays (type[], value[]) in postfix order.
+    Input: value holds the feature index.
+    Constant: value holds the literal constant.
+    Operator: value is the Operator enum cast to float.
+    """
+
     input = enum.auto()  # (= 0)
     constant = enum.auto()  # (= 1)
     operator = enum.auto()  # (= 2)
@@ -2603,13 +2606,13 @@ class KernelDim:
         pass
 
     @overload
-    def __init__(self, _x: int, _y: int = 1, _z: int = 1) -> None:
+    def __init__(self, x: int, y: int = 1, z: int = 1) -> None:
         pass
 
     @staticmethod
     def determine(count: int) -> KernelDim:
         """Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)
-        that minimises idle threads when covering `count` items.
+        that minimizes idle threads when covering `count` items.
         """
         pass
 
@@ -2628,34 +2631,24 @@ class KernelConfig:
         pass
 
     @overload
-    def __init__(self, _grid: KernelDim, _block: KernelDim) -> None:
+    def __init__(self, grid: KernelDim, block: KernelDim) -> None:
         pass
 
     @staticmethod
-    def for_eval(num_solutions: int, num_datapoints: int) -> KernelConfig:
-        """One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce."""
+    def single_block(num_solutions: int, num_datapoints: int) -> KernelConfig:
+        """One block per solution; threads cover all datapoints in a single pass."""
         pass
 
     @staticmethod
-    def for_eval_single(num_solutions: int, num_datapoints: int) -> KernelConfig:
-        """One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants."""
-        pass
-
-    @staticmethod
-    def for_eval_hybrid(
+    def dynamic_block_evaluation(
         num_solutions: int, num_datapoints: int, blocks_per_individual: int
     ) -> KernelConfig:
-        """Multiple blocks per solution; blocks split the datapoints. Used by Hybrid."""
+        """Multiple blocks per solution; blocks partition the datapoints."""
         pass
 
     @staticmethod
-    def for_mse_simple(num_solutions: int) -> KernelConfig:
-        """One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory."""
-        pass
-
-    @staticmethod
-    def for_mse_block(num_solutions: int, num_partial: int) -> KernelConfig:
-        """One block per solution for the MSE reduction. Used by BlockReduce and Hybrid."""
+    def dynamic_block_reduction(num_solutions: int, num_partial: int) -> KernelConfig:
+        """One block per solution for the MSE reduction."""
         pass
 
     def check(self) -> None:
@@ -2666,14 +2659,14 @@ class KernelConfig:
 
 class LaunchConfig:
     eval: KernelConfig
-    mse: KernelConfig
-    kernel_version: KernelVersion = KernelVersion.baseline
+    mse: KernelConfig  # DynamicBlock only: reduction pass
+    kernel_version: KernelVersion = KernelVersion.single_block
     num_solutions: int = 0
     num_datapoints: int = 0
     solution_length: int = 0
-    blocks_per_individual: int = 1
-    datapoints_per_block: int = 0
-    datapoints_per_thread: int = 0
+    blocks_per_individual: int = 1  # DynamicBlock only: blocks assigned per solution
+    datapoints_per_block: int = 0  # DynamicBlock only: datapoints handled per block
+    datapoints_per_thread: int = 0  # datapoints each thread evaluates in its loop
 
     @overload
     def __init__(self) -> None:
@@ -2684,7 +2677,7 @@ class LaunchConfig:
         self,
         eval: KernelConfig,
         mse: KernelConfig,
-        version: KernelVersion = KernelVersion.baseline,
+        version: KernelVersion = KernelVersion.single_block,
     ) -> None:
         pass
 
@@ -2713,16 +2706,12 @@ class LaunchConfig:
 class SRQuality(MOQuality):
     def clone(self) -> QualityBase:
         pass
-    # / Linear scaling parameters
+    # Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.
+    # Scaled prediction: intercept + slope * raw_tree_output.
     ls_params: np.ndarray
 
-    # /*
-    #  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
-    #  part of what defines a solution or its accuracy - as indicated by the name, it is never
-    #  used to make any decisions and only tracked for analysis purposes. By making it mutable
-    #  it an be lazily computed only when requested.
-    #   */
-    # / Optional test set accuracy
+    # Lazily computed test-set accuracy, populated on first request via evaluate_test().
+    # Declared mutable because it is not part of solution identity and never drives decisions.
     test_quality: Optional[MOQuality] = None
     def __init__(self) -> None:
         """Autogenerated default constructor"""
@@ -2738,6 +2727,11 @@ class SRFitness(MOFitness):
         pass
 
 class SRProblem(GPInstanceBase):
+    """Symbolic regression problem: fits a GP tree to minimise one or more objectives
+    (e.g. MSE, NMSE, tree size) over (X_train, Y_train) with optional linear scaling
+    of the raw tree output.  GPU evaluation is available when GOBLIN_HAS_CUDA is defined.
+    """
+
     def __init__(
         self,
         ctx: GPContext,
@@ -2753,12 +2747,21 @@ class SRProblem(GPInstanceBase):
         constant_init_upper_bound: float = 1.0,
         target_objectives: Optional[List[float]] = None,
         gradient_mode: str = "forward",
-        gradient_epsilon: float = 1e-5,
+        gradient_epsilon: Optional[float] = None,
         archive_epsilon: float = 0.0,
         always_inherit_continuous: Optional[bool] = None,
         batch_size: Optional[int] = None,
         kernel_version: Optional[KernelVersion] = None,
     ) -> None:
+        """TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes
+         adding custom objectives hard.  Dependency injection would be cleaner but risks
+         recomputing the tree output multiple times.  Leaving hardcoded until a better design
+         is found (see how other GP/SR libraries handle this).
+
+
+        Python bindings defaults:
+            If gradient_epsilon is None, then its default value will be: DEFAULT_GRADIENT_EPSILON
+        """
         pass
 
     def adapt(self, rng: Rng) -> bool:
@@ -2846,6 +2849,8 @@ class SRProblem(GPInstanceBase):
     objectives: List[str]
     x_train: np.ndarray
     y_train: np.ndarray
+    # Variance per output column, precomputed for NMSE normalisation.
+    # Near-zero entries are clamped to 1.0 so NMSE degrades gracefully to MSE.
     var_y_train: np.ndarray
     x_batch: np.ndarray
     y_batch: np.ndarray
@@ -4836,7 +4841,7 @@ class MixedGOMEA(MethodBase):
 # <submodule test>
 class test:  # Proxy class that introduces typings for the *submodule* test
     pass  # (This corresponds to a C++ namespace. All methods are static!)
-    """ The following declarations are used to create more readable test cases"""
+    """ Helpers for writing readable test trees using the same float encoding as the runtime."""
 
     @staticmethod
     @overload

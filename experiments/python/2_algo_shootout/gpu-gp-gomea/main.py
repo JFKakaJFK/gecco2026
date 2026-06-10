@@ -173,10 +173,10 @@ def main():
     output_directory = Path("results") / run_date
 
     # GPU Experiments
-    grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=True)
-    grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
-    grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
-    grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
+    grid_execution(cfg.DAILY_DEMAND_GPU, output_directory, dry_run=False)
+    # grid_execution(cfg.AUTO_MPG_GPU, output_directory, dry_run=True)
+    # grid_execution(cfg.CALIFORNIA_GPU, output_directory, dry_run=True)
+    # grid_execution(cfg.FEYNMAN_GPU, output_directory, dry_run=True)
 
 
 if __name__ == "__main__":

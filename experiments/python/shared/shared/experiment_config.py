@@ -5,14 +5,8 @@ from shared.dataset_config import DATASETS, DatasetConfig
 
 # Only used for GPU GP-GOMEA
 KernelType = Literal[
-    "baseline",
-    "restrict",
-    "shared_memory",
-    "block_reduce",
-    "single_kernel",
-    "single_kernel_fmaf",
-    "single_kernel_inplace",
-    "hybrid",
+    "single_block",
+    "dynamic_block",
 ]
 
 OPERATOR_SETS: dict[str, str] = {
@@ -29,7 +23,7 @@ OPERATOR_SETS: dict[str, str] = {
 @dataclass(frozen=True)
 class GPUConfig:
     enabled: bool = True
-    kernels: tuple[KernelType] = ("single_kernel_inplace",)
+    kernels: tuple[KernelType] = ("single_block",)
 
 
 @dataclass(frozen=True)
@@ -114,7 +108,7 @@ class PaperExperimentConfig(ExperimentConfig):
             test_size=0,
             cpu=CPUConfig(enabled=not gpu_enabled),
             gpu=GPUConfig(enabled=gpu_enabled),
-            max_duration=10 if gpu_enabled else 60,
+            max_duration=60 if gpu_enabled else 60,
         )
 
 
@@ -219,7 +213,7 @@ ADDITION_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=240,
 )
 
@@ -237,7 +231,7 @@ DIVISION_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=240,
 )
 
@@ -255,7 +249,7 @@ SUBTRACTION_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=240,
 )
 
@@ -273,7 +267,7 @@ MULTIPLICATION_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=240,
 )
 
@@ -291,7 +285,7 @@ SQUARE_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=240,
 )
 
@@ -472,7 +466,7 @@ MODULAR_DOT_PRODUCT_GPU = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=10,
 )
 
@@ -490,7 +484,7 @@ MODULAR_DISTANCE_GPU = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=10,
 )
 
@@ -508,7 +502,7 @@ MODULAR_GRAVITY_GPU = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=10,
 )
 
@@ -529,7 +523,7 @@ MODULAR_1_GPU_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=30,
 )
 
@@ -550,7 +544,7 @@ MODULAR_2_GPU_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=30,
 )
 
@@ -571,7 +565,7 @@ MODULAR_3_GPU_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=30,
 )
 
@@ -592,7 +586,7 @@ MODULAR_4_GPU_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=30,
 )
 
@@ -613,7 +607,7 @@ MODULAR_5_GPU_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(enabled=False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace",)),
+    gpu=GPUConfig(enabled=True, kernels=("single_block",)),
     max_duration=30,
 )
 
@@ -635,7 +629,7 @@ HYBRID_DAILY_DEMAND_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    gpu=GPUConfig(enabled=True, kernels=("single_block", "dynamic_block")),
     max_duration=10,
 )
 
@@ -653,7 +647,7 @@ HYBRID_AUTO_MPG_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    gpu=GPUConfig(enabled=True, kernels=("single_block", "dynamic_block")),
     max_duration=10,
 )
 
@@ -671,7 +665,7 @@ HYBRID_CALIFORNIA_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    gpu=GPUConfig(enabled=True, kernels=("single_block", "dynamic_block")),
     max_duration=10,
 )
 
@@ -689,7 +683,7 @@ HYBRID_FEYNMAN_CONFIG = ExperimentConfig(
     num_iterations=1,
     test_size=0,
     cpu=CPUConfig(False),
-    gpu=GPUConfig(enabled=True, kernels=("single_kernel_inplace", "hybrid")),
+    gpu=GPUConfig(enabled=True, kernels=("single_block", "dynamic_block")),
     max_duration=10,
 )
 

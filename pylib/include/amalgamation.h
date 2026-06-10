@@ -23,7 +23,7 @@
 #define __goblin_runtime_assert(x)                                                                             \
   if (!(x)) {                                                                                                  \
     throw std::runtime_error(std::format("{}:{}:\n\t Runtime assertion `{}` failed", __FILE__, __LINE__, #x)); \
-  } else  // eats up semicolon
+  }  // eats up semicolon
 #endif
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1357,7 +1357,6 @@ enum struct TerminationStatus : u8 {
   TimeLimitReached,
   GenerationLimitReached,
   EvaluationLimitReached,
-  NoImprovementLimitReached,
   TargetReached,
   Converged,
   Aborted,
@@ -1372,8 +1371,6 @@ inline constexpr std::string_view format_as(const TerminationStatus& s) noexcept
       return std::string_view{"GenerationLimitReached"};
     case TerminationStatus::EvaluationLimitReached:
       return std::string_view{"EvaluationLimitReached"};
-    case TerminationStatus::NoImprovementLimitReached:
-      return std::string_view("NoImprovementLimitReached");
     case TerminationStatus::TargetReached:
       return std::string_view{"TargetReached"};
     case TerminationStatus::Converged:
@@ -3302,32 +3299,26 @@ namespace goblin {
 
 using u8 = std::uint8_t;
 
+// SingleBlock: one block per solution; threads partition the datapoints within that block.
+// DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.
 enum class KernelVersion : u8 {
-    Baseline,
-    Restrict,
-    SharedMemory,
-    BlockReduce,
-    SingleKernel,
-    SingleKernelFMAF,
-    SingleKernelInplace,
-    Hybrid
+    SingleBlock,
+    DynamicBlock
 };
 
 constexpr std::string_view to_string(KernelVersion v) {
     switch (v) {
-        case KernelVersion::Baseline:            return "Baseline";
-        case KernelVersion::Restrict:            return "Restrict";
-        case KernelVersion::SharedMemory:        return "SharedMemory";
-        case KernelVersion::BlockReduce:         return "BlockReduce";
-        case KernelVersion::SingleKernel:        return "SingleKernel";
-        case KernelVersion::SingleKernelFMAF:    return "SingleKernelFMAF";
-        case KernelVersion::SingleKernelInplace: return "SingleKernelInPlace";
-        case KernelVersion::Hybrid:              return "Hybrid";
+        case KernelVersion::SingleBlock:    return "SingleBlock";
+        case KernelVersion::DynamicBlock:   return "DynamicBlock";
     }
 
     return "Unknown KernelVersion";
 }
 
+// Trees are encoded as parallel arrays (type[], value[]) in postfix order.
+// Input: value holds the feature index.
+// Constant: value holds the literal constant.
+// Operator: value is the Operator enum cast to float.
 enum class NodeType : u8 {
     Input,
     Constant,
@@ -3352,7 +3343,7 @@ enum class Operator : u8 {
     Max
 };
 
-// The following declarations are used to create more readable test cases
+// Helpers for writing readable test trees using the same float encoding as the runtime.
 namespace test {
     constexpr u8 C = static_cast<u8>(NodeType::Constant);
     constexpr u8 I = static_cast<u8>(NodeType::Input);
@@ -3383,6 +3374,7 @@ namespace test {
 }
 
 #endif /* _GOBLIN_GA_GP_TYPES_H */
+
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/operator.h continued                                                         //
@@ -6300,10 +6292,10 @@ class RecursiveCompleteInit2 final : public DiscreteInitBase {
 
 
 
-#define MAX_THREADS_PER_BLOCK 1024
-#define WARP_SIZE 32
-
 namespace goblin {
+
+static constexpr size_t MAX_THREADS_PER_BLOCK = 1024;
+static constexpr size_t WARP_SIZE             = 32;
 
 constexpr size_t round_up(size_t value, size_t multiple) {
     return ((value + multiple - 1) / multiple) * multiple;
@@ -6319,22 +6311,21 @@ struct KernelDim {
     size_t z = 1;
 
     KernelDim() = default;
-    KernelDim(size_t _x, size_t _y = 1, size_t _z = 1) : x(_x), y(_y), z(_z) {}
+    KernelDim(size_t x, size_t y = 1, size_t z = 1) : x(x), y(y), z(z) {}
 
     // Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)
-    // that minimises idle threads when covering `count` items.
+    // that minimizes idle threads when covering `count` items.
     static KernelDim determine(size_t count) {
-        KernelDim dim{WARP_SIZE};
+        KernelDim best{ WARP_SIZE };
         size_t min_redundant = MAX_THREADS_PER_BLOCK;
 
         for (size_t threads = MAX_THREADS_PER_BLOCK; threads > 0; threads -= WARP_SIZE) {
-            // Round up division to determine number of blocks needed
             size_t blocks_needed = ceil_div(count, threads);
             size_t redundant = (blocks_needed * threads) - count;
 
             if (redundant < min_redundant) {
                 min_redundant = redundant;
-                dim.x = threads;
+                best.x = threads;
             }
 
             // Early exit if perfect fit is found
@@ -6343,7 +6334,7 @@ struct KernelDim {
             }
         }
 
-        return dim;
+        return best;
     }
 
     void check() const { assert(x * y * z <= MAX_THREADS_PER_BLOCK); }
@@ -6358,48 +6349,31 @@ struct KernelConfig {
     KernelDim block;
 
     KernelConfig() = default;
-    KernelConfig(KernelDim _grid, KernelDim _block) : grid(_grid), block(_block) {}
+    KernelConfig(KernelDim grid, KernelDim block) : grid(grid), block(block) {}
 
-    // One block per solution; threads cover datapoints. Used by Baseline/Restrict/SharedMemory/BlockReduce.
-    static KernelConfig for_eval(size_t num_solutions, size_t num_datapoints) {
+    // One block per solution; threads cover all datapoints in a single pass.
+    static KernelConfig single_block(size_t num_solutions, size_t num_datapoints) {
         KernelConfig config;
-        config.block   = KernelDim::determine(num_datapoints);
         config.grid.x  = num_solutions;
-        config.grid.y  = ceil_div(num_datapoints, config.block.x);
+        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
         return config;
     }
 
-    // One block per solution; threads cover all datapoints in a single pass. Used by SingleKernel variants.
-    static KernelConfig for_eval_single(size_t num_solutions, size_t num_datapoints) {
-        KernelConfig config;
-        config.grid.x  = num_solutions;
-        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_datapoints, WARP_SIZE));
-        return config;
-    }
-
-    // Multiple blocks per solution; blocks split the datapoints. Used by Hybrid.
-    static KernelConfig for_eval_hybrid(size_t num_solutions, size_t num_datapoints, size_t blocks_per_individual) {
+    // Multiple blocks per solution; blocks partition the datapoints.
+    static KernelConfig dynamic_block_evaluation(size_t num_solutions, size_t num_datapoints, size_t blocks_per_individual) {
         const size_t datapoints_per_block = ceil_div(num_datapoints, blocks_per_individual);
         KernelConfig config;
         config.grid.x  = num_solutions;
         config.grid.y  = blocks_per_individual;
-        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(datapoints_per_block, WARP_SIZE));
+        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(datapoints_per_block, WARP_SIZE));
         return config;
     }
 
-    // One thread per solution for the MSE reduction. Used by Baseline/Restrict/SharedMemory.
-    static KernelConfig for_mse_simple(size_t num_solutions) {
-        KernelConfig config;
-        config.block  = KernelDim::determine(num_solutions);
-        config.grid.x = ceil_div(num_solutions, config.block.x);
-        return config;
-    }
-
-    // One block per solution for the MSE reduction. Used by BlockReduce and Hybrid.
-    static KernelConfig for_mse_block(size_t num_solutions, size_t num_partial) {
+    // One block per solution for the MSE reduction.
+    static KernelConfig dynamic_block_reduction(size_t num_solutions, size_t num_partial) {
         KernelConfig config;
         config.grid.x  = num_solutions;
-        config.block.x = std::min((size_t)MAX_THREADS_PER_BLOCK, round_up(num_partial, WARP_SIZE));
+        config.block.x = std::min(MAX_THREADS_PER_BLOCK, round_up(num_partial, WARP_SIZE));
         return config;
     }
 
@@ -6412,21 +6386,21 @@ struct KernelConfig {
 
 struct LaunchConfig {
     KernelConfig eval;
-    KernelConfig mse;
-    KernelVersion kernel_version    = KernelVersion::Baseline;
+    KernelConfig mse;                               // DynamicBlock only: reduction pass
+    KernelVersion kernel_version    = KernelVersion::SingleBlock;
     size_t num_solutions            = 0;
     size_t num_datapoints           = 0;
     size_t solution_length          = 0;
-    size_t blocks_per_individual    = 1;
-    size_t datapoints_per_block     = 0;
-    size_t datapoints_per_thread    = 0;
+    size_t blocks_per_individual    = 1;            // DynamicBlock only: blocks assigned per solution
+    size_t datapoints_per_block     = 0;            // DynamicBlock only: datapoints handled per block
+    size_t datapoints_per_thread    = 0;            // datapoints each thread evaluates in its loop
 
     LaunchConfig() = default;
 
     LaunchConfig(
         KernelConfig eval,
         KernelConfig mse,
-        KernelVersion version = KernelVersion::Baseline
+        KernelVersion version = KernelVersion::SingleBlock
     ) : eval(eval),
         mse(mse),
         kernel_version(version) {}
@@ -6445,39 +6419,25 @@ struct LaunchConfig {
         config.solution_length = solution_length;
 
         switch (kernel_version) {
-            case KernelVersion::Baseline:
-            case KernelVersion::Restrict:
-            case KernelVersion::SharedMemory:
-                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
-                config.mse  = KernelConfig::for_mse_simple(num_solutions);
-                break;
-
-            case KernelVersion::BlockReduce:
-                config.eval = KernelConfig::for_eval(num_solutions, num_datapoints);
-                config.mse  = KernelConfig::for_mse_block(num_solutions, config.eval.grid.y);
-                break;
-
-            case KernelVersion::SingleKernel:
-            case KernelVersion::SingleKernelFMAF:
-            case KernelVersion::SingleKernelInplace:
-                config.eval = KernelConfig::for_eval_single(num_solutions, num_datapoints);
+            case KernelVersion::SingleBlock:
+                config.eval = KernelConfig::single_block(num_solutions, num_datapoints);
                 config.datapoints_per_thread = ceil_div(num_datapoints, config.eval.block.x);
                 break;
 
-            case KernelVersion::Hybrid:
+            case KernelVersion::DynamicBlock:
                 __goblin_runtime_assert(num_sms.has_value());
 
                 if (num_solutions * 2 <= num_sms.value()) {
                     config.blocks_per_individual = num_sms.value() / num_solutions;
-                    config.eval = KernelConfig::for_eval_hybrid(
+                    config.eval = KernelConfig::dynamic_block_evaluation(
                         num_solutions, num_datapoints, config.blocks_per_individual);
                     config.datapoints_per_block  = ceil_div(num_datapoints, config.blocks_per_individual);
                     config.datapoints_per_thread = ceil_div(config.datapoints_per_block, config.eval.block.x);
-                    config.mse = KernelConfig::for_mse_block(num_solutions, config.blocks_per_individual);
+                    config.mse = KernelConfig::dynamic_block_reduction(num_solutions, config.blocks_per_individual);
                 } else {
                     // Not enough SMs to benefit from multi-block; fall back to single-block.
                     return LaunchConfig::determine(
-                        KernelVersion::SingleKernelInplace, num_solutions, num_datapoints, solution_length, num_sms);
+                        KernelVersion::SingleBlock, num_solutions, num_datapoints, solution_length, num_sms);
                 }
                 break;
 
@@ -6511,7 +6471,6 @@ struct LaunchConfig {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/gpu_evaluation/evaluate.h included by goblin/gp/sr.h                         //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 #ifndef _GOBLIN_GA_GP_EVAL_KERNEL_H
 #define _GOBLIN_GA_GP_EVAL_KERNEL_H
 
@@ -6519,64 +6478,13 @@ struct LaunchConfig {
 
 namespace goblin {
 
-using u8 = std::uint8_t;
+// Hard limits enforced by the evaluation kernel's shared memory and per-thread stack.
+static constexpr size_t EVAL_MAX_NODES      = 512;
+static constexpr size_t EVAL_MAX_STACK_DEPTH = 16;
 
 #ifdef __CUDACC__
-__global__
-void evaluate_kernel_baseline(
-    float* X,
-    float* Y,
-    const u8* v_type,
-    float* v_value,
-    float* partial,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
-__global__
-void evaluate_kernel_restrict(
-    const float* __restrict__ X,
-    const float* __restrict__ Y,
-    const u8* __restrict__ v_type,
-    const float* __restrict__ v_value,
-    float* __restrict__ v,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
-__global__
-void evaluate_kernel_shared_memory(
-    const float* __restrict__ X,
-    const float* __restrict__ Y,
-    const u8* __restrict__ v_type,
-    const float* __restrict__ v_value,
-    float* __restrict__ partial,
-    size_t solution_length,
-    size_t num_datapoints
-);
-
 __device__
-float compute_tree_output_baseline(
-    float* X,
-    const u8* type,
-    const float* value,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index
-);
-
-__device__
-float compute_tree_output_restrict(
-    const float* __restrict__ X,
-    const u8* __restrict__ type,
-    const float* __restrict__ value,
-    size_t solution_length,
-    size_t num_datapoints,
-    size_t datapoint_index
-);
-
-__device__
-float compute_tree_output_inplace(
+float compute_tree_output(
     const float* __restrict__ X,
     const u8* __restrict__ type,
     const float* __restrict__ value,
@@ -6586,23 +6494,19 @@ float compute_tree_output_inplace(
 );
 
 __global__
-void compute_mse_kernel_baseline(
-    const float* __restrict__ partial,
+void single_block_kernel(
+    const float* __restrict__ X,
+    const float* __restrict__ Y,
+    const u8* __restrict__ v_type,
+    const float* __restrict__ v_value,
     float* __restrict__ result,
-    size_t num_solutions,
-    size_t num_datapoints
+    size_t solution_length,
+    size_t num_datapoints,
+    size_t datapoints_per_thread
 );
 
 __global__
-void mse_kernel_restrict(
-    const float* __restrict__ partial,
-    float* __restrict__ result,
-    size_t num_solutions,
-    size_t num_datapoints
-);
-
-__global__
-void evaluate_kernel_hybrid(
+void dynamic_block_evaluate_kernel(
     const float* __restrict__ X,
     const float* __restrict__ Y,
     const u8* __restrict__ v_type,
@@ -6615,6 +6519,14 @@ void evaluate_kernel_hybrid(
 );
 
 __global__
+void dynamic_block_reduction_kernel(
+    const float* __restrict__ partial,
+    float* __restrict__ result,
+    size_t num_partial,
+    size_t num_datapoints
+);
+
+__global__
 void compute_tree_output_wrapper(
     float* X,
     const u8* type,
@@ -6622,31 +6534,32 @@ void compute_tree_output_wrapper(
     float* result,
     size_t solution_length,
     size_t num_datapoints,
-    size_t datapoint_index,
-    KernelVersion version
+    size_t datapoint_index
 );
 #endif
 
-void evaluate_kernel_wrapper(
+// Wrappers
+
+void single_block_wrapper(
     float* X,
     float* Y,
     u8* type,
     float* value,
-    float* partial,
-    LaunchConfig config
-);
-
-void mse_kernel_wrapper(
-    float* partial,
     float* result,
     LaunchConfig config
 );
 
-void evaluate_mse_kernel_wrapper(
+void dynamic_block_evaluate_wrapper(
     float* X,
     float* Y,
     u8* type,
     float* value,
+    float* partial,
+    LaunchConfig config
+);
+
+void dynamic_block_reduction_wrapper(
+    float* partial,
     float* result,
     LaunchConfig config
 );
@@ -6661,7 +6574,9 @@ void kernel_wrapper(
     LaunchConfig config
 );
 
-float test_compute_output_kernel(
+// Test Wrappers
+
+float test_compute_tree_output(
     std::vector<float> h_X,
     std::vector<u8> h_type,
     std::vector<float> h_value,
@@ -6670,34 +6585,16 @@ float test_compute_output_kernel(
     KernelVersion version
 );
 
-std::vector<float> test_evaluate_kernel(
+std::vector<float> test_single_block(
     std::vector<float> h_X,
     std::vector<float> h_Y,
     std::vector<u8> h_type,
     std::vector<float> h_value,
     size_t num_solutions,
-    size_t num_datapoints,
-    KernelVersion version
+    size_t num_datapoints
 );
 
-std::vector<float> test_compute_mse_kernel(
-    std::vector<float> partial,
-    size_t num_solutions,
-    size_t num_datapoints,
-    KernelVersion version
-);
-
-std::vector<float> test_evaluate_mse_kernel(
-    std::vector<float> h_X,
-    std::vector<float> h_Y,
-    std::vector<u8> h_type,
-    std::vector<float> h_value,
-    size_t num_solutions,
-    size_t num_datapoints,
-    KernelVersion version
-);
-
-std::vector<float> test_kernel_hybrid(
+std::vector<float> test_dynamic_block(
     std::vector<float> h_X,
     std::vector<float> h_Y,
     std::vector<u8> h_type,
@@ -6710,17 +6607,14 @@ std::vector<float> test_kernel_hybrid(
 }  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_EVAL_KERNEL_H */
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/gpu_evaluation/memory.h included by goblin/gp/sr.h                           //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-#ifndef _GOBLIN_GA_GP_HELPER_H
-#define _GOBLIN_GA_GP_HELPER_H
+#ifndef _GOBLIN_GA_GP_MEMORY_H
+#define _GOBLIN_GA_GP_MEMORY_H
 
 namespace goblin {
-
-#ifdef __CUDACC__
-void check(cudaError_t err, char const* func, char const* file, int line);
-#endif
 
 template <typename T>
 T* allocate_on_gpu(size_t count);
@@ -6740,9 +6634,10 @@ void free_on_gpu(T* d_ptr);
 template <typename T>
 void zero_mem_on_gpu(T* d_ptr, size_t count);
 
-};  // namespace goblin
+}  // namespace goblin
 
-#endif /* _GOBLIN_GA_GP_HELPER_H */
+#endif /* _GOBLIN_GA_GP_MEMORY_H */
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //                       goblin/gp/gpu_evaluation/misc.h included by goblin/gp/sr.h                             //
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -6758,6 +6653,11 @@ struct GpuInfo {
 
 GpuInfo get_gpu_info();
 
+#ifdef __CUDACC__
+void check(cudaError_t err, char const* func, char const* file, int line);
+#define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
+#endif
+
 }
 
 #endif /* _GOBLIN_GA_GP_MISC_H */
@@ -6769,23 +6669,21 @@ GpuInfo get_gpu_info();
 #endif // GOBLIN_HAS_CUDA
 
 
-
 namespace goblin {
+
+const CType VARIANCE_BOUND = 1e-12;
+const CType DEFAULT_GRADIENT_EPSILON = 1e-5;
 
 class SRQuality : public MOQuality {
  public:
   std::unique_ptr<QualityBase> clone() const override { return std::make_unique<SRQuality>(*this); };
 
-  /// Linear scaling parameters
-  Arr2D<CType> ls_params{};
+  // Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.
+  // Scaled prediction: intercept + slope * raw_tree_output.
+  Arr2D<CType> ls_params;
 
-  /*
-  The test accuracy uses interior mutability (i.e. it ignores const) since it is not
-  part of what defines a solution or its accuracy - as indicated by the name, it is never
-  used to make any decisions and only tracked for analysis purposes. By making it mutable
-  it an be lazily computed only when requested.
-   */
-  /// Optional test set accuracy
+  // Lazily computed test-set accuracy, populated on first request via evaluate_test().
+  // Declared mutable because it is not part of solution identity and never drives decisions.
   mutable std::optional<MOQuality> test_quality = std::nullopt;
 };
 
@@ -6803,46 +6701,41 @@ class SRFitness : public MOFitness {
   };
 };
 
+// Symbolic regression problem: fits a GP tree to minimise one or more objectives
+// (e.g. MSE, NMSE, tree size) over (X_train, Y_train) with optional linear scaling
+// of the raw tree output.  GPU evaluation is available when GOBLIN_HAS_CUDA is defined.
 class SRProblem : public GPInstanceBase {
-  using ScalarType = CType;  // TODO template the implementation and add a wrapper class - by doing so the wrapper can
-                             // at compile time delegate to different ScalarTypes (float, double, mpfr, autodiff
-                             // versions) while still having a nice Python API...
+  // TODO template ScalarType and add a wrapper class so the Python API can delegate
+  // at compile time to float, double, mpfr, or autodiff without changing the interface.
+  using ScalarType = CType;
 
  public:
+  // TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes
+  // adding custom objectives hard.  Dependency injection would be cleaner but risks
+  // recomputing the tree output multiple times.  Leaving hardcoded until a better design
+  // is found (see how other GP/SR libraries handle this).
   SRProblem(GPContext ctx,
             Arr2D<CType> X_train,
             Arr2D<CType> Y_train,
             std::optional<Arr2D<CType>> X_test = std::nullopt,
             std::optional<Arr2D<CType>> Y_test = std::nullopt,
-            std::variant<std::string, std::vector<std::string>> objectives =
-                "mse",  /// The objectives that should be recorded in the archive, and by default the objectives that
-                        /// are optimized.
-
-            // TODO I really don't like this API - it is the way it is because this way is convenient for
-            // the Python bindings, but makes adding custom objectives hard. Dependency injection would be
-            // better, but isn't perfect either - a fully decoupled design ("given the solution, give me the
-            // objective value") would potentially mean recomputing the output multiple times, and passing a
-            // few fixed values (e.g. the solution, the output, the size) isn't enough for some objectives
-            // that could be interesting (e.g. diversity, effective information criterion,...). Until I have
-            // a better API design, I will leave this hardcoded, and maybe look at how other GP/SR libraries
-            // do it to see if there are better solutions.
-
-            std::optional<usize> objectives_to_optimize =
-                std::nullopt,  /// The number of objectives to optimize in case those differ from the `objectives`
-                               /// parameter, corresponds to the first `objectives_to_optimize` entries in `objectives`.
+            // Objectives recorded in the archive (and optimised by default).
+            std::variant<std::string, std::vector<std::string>> objectives = "mse",
+            // Restrict optimisation to the first N entries of `objectives`; the rest
+            // are tracked in the archive only.
+            std::optional<usize> objectives_to_optimize = std::nullopt,
             bool linear_scaling = true,
             std::optional<AnyInit> init = std::nullopt,
             CType constant_init_lower_bound = -1.0,
             CType constant_init_upper_bound = 1.0,
             std::optional<std::vector<CType>> target_objectives = std::nullopt,
             std::string gradient_mode = "forward",
-            CType gradient_epsilon = 1e-5,
+            CType gradient_epsilon = DEFAULT_GRADIENT_EPSILON,
             CType archive_epsilon = 0.0,
             std::optional<bool> always_inherit_continuous = std::nullopt,
             std::optional<usize> batch_size = std::nullopt,
-            std::optional<KernelVersion> kernel_version =
-                std::nullopt  /// When set, evaluation runs on the GPU using the specified kernel. Requires GOBLIN_HAS_CUDA.
-            )
+            // When set, evaluation runs on the GPU with the specified kernel. Requires GOBLIN_HAS_CUDA.
+            std::optional<KernelVersion> kernel_version = std::nullopt)
       : ctx(ctx),
         linear_scaling(linear_scaling),
         objectives(std::holds_alternative<std::string>(objectives)
@@ -6884,10 +6777,9 @@ class SRProblem : public GPInstanceBase {
     __goblin_runtime_assert(static_cast<usize>(this->Y_train.cols()) == ctx.num_outputs);
 
     var_Y_train = (this->Y_train.rowwise() - this->Y_train.colwise().mean()).square().colwise().mean();
-    // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
-    // normalizing...)
+    // Near-zero variance means R² is undefined; clamp to 1.0 so NMSE falls back to MSE.
     for (isize i = 0; i < var_Y_train.size(); i++) {
-      if (std::abs(var_Y_train(i)) < CType(1e-12)) {
+      if (std::abs(var_Y_train(i)) < VARIANCE_BOUND) {
         var_Y_train(i) = 1.0;
       }
     }
@@ -6902,10 +6794,8 @@ class SRProblem : public GPInstanceBase {
       __goblin_runtime_assert(this->X_test.rows() == this->Y_test.rows());
 
       var_Y_test = (this->Y_test.rowwise() - this->Y_test.colwise().mean()).square().colwise().mean();
-      // ~0 => 1 (R2 is not defined, so we fall back to the MSE by not
-      // normalizing...)
       for (isize i = 0; i < var_Y_test.size(); i++) {
-        if (std::abs(var_Y_test(i)) < CType(1e-12)) {
+        if (std::abs(var_Y_test(i)) < VARIANCE_BOUND) {
           var_Y_test(i) = 1.0;
         }
       }
@@ -6944,13 +6834,9 @@ class SRProblem : public GPInstanceBase {
 
   bool adapt(Rng& rng) override final {
     if (_batch_size.has_value() && _batch_size.value() < static_cast<usize>(X_train.rows())) {
-      // TODO refactor out into something like PyTorch's DataLoader/Sampler and allow more sophisticated sampling
-      // strategies Surprisingly (?) PyTorch does not have any fancy strategies that take the data distribution into
-      // account (https://docs.pytorch.org/docs/stable/data.html#torch.utils.data.Sampler) I'd expect something like a
-      // "parallel greedy scattered subset selection" to perform well since each batch tries to represent the whole
-      // training data distribution (i.e. in random order, assign the furthest row to the current batch until all rows
-      // are assigned to a batch, where the number of batches is ceil(dataset_size / batch_size) - so basically
-      // stratified sampling)
+      // TODO refactor into a DataLoader/Sampler abstraction with configurable sampling strategies.
+      // (Random permutation is simplest; stratified/scattered subsets may better represent the
+      // training distribution but earlier experiments on another codebase showed little benefit.)
       auto perm = permute(rng, X_train.rows());
       perm.resize(_batch_size.value());
 
@@ -6959,9 +6845,9 @@ class SRProblem : public GPInstanceBase {
 
       var_Y_batch = (Y_batch.rowwise() - Y_batch.colwise().mean()).square().colwise().mean();
       return true;
-    } else {
-      return false;
     }
+
+    return false;
   };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return ctx.domain_sizes; };
@@ -6985,7 +6871,7 @@ class SRProblem : public GPInstanceBase {
   void add_random(Rng& rng, SolutionSetBase& solutions, usize count) const override final {
     _init->add_random(rng, *this, solutions, count);
 #ifndef NDEBUG
-    auto p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
+    auto *p = dynamic_cast<SRQuality*>(&solutions[solutions.size() - 1].quality());
     assert(p != nullptr && "Quality mismatch");
 #endif
   };
@@ -7001,11 +6887,12 @@ class SRProblem : public GPInstanceBase {
                                                                         ctx.const_repr == ConstantRepr::Edges) &&
                                     ctx.const_repr != ConstantRepr::None;
 
-    // the pool size is not tied to the number of discrete variables, so the full pool instead of the paired values is
-    // inherited...
+    // Pool constants are not index-paired with discrete variables, so the full pool is inherited.
     const bool inherit_by_index = ctx.const_repr != ConstantRepr::Pool;
 
-    bool any_active_changed = false, anything_changed = false;
+    bool any_active_changed = false;
+    bool anything_changed = false;
+
     for (usize i : subset.discrete) {
       if (offspring.discrete_values()(i) != donor.discrete_values()(i)) {
         any_active_changed |= offspring.discrete_active()(i);
@@ -7016,10 +6903,7 @@ class SRProblem : public GPInstanceBase {
       // TODO for GCS: inherit child arities + permutations
 
       if (inherit_continuous && inherit_by_index) {
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
-        //
-        // yes, the indices here should be from the discrete subset!
+        // TODO floating-point equality here is not robust; consider a relative+absolute threshold.
         if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
           any_active_changed |= offspring.continuous_active()(i);
           anything_changed = true;
@@ -7029,13 +6913,9 @@ class SRProblem : public GPInstanceBase {
     }
 
     if (inherit_continuous && !inherit_by_index) {
-      // note: arguably just inheriting all continuous variables even if the inherited discrete values might not even be
-      // constants is not the best idea - but earlier experiments on another codebase suggested that more
-      // appropriate/interpolating continuous mixing doesn't really work and here it also is more for completeness and
-      // not used by default...
+      // Inheriting all continuous variables even when the paired discrete slot is not a constant
+      // is imprecise, but earlier experiments showed interpolating continuous mixing doesn't help.
       for (usize i = 0; i < num_continuous(); i++) {
-        // TODO sufficiently relatively + absolutely different or no check, but floating point equality is not really
-        // useful...
         if (offspring.continuous_values()(i) != donor.continuous_values()(i)) {
           any_active_changed |= offspring.continuous_active()(i);
           anything_changed = true;
@@ -7075,9 +6955,9 @@ class SRProblem : public GPInstanceBase {
   bool target_reached(const ArchiveBase& archive) const override final {
     if (!_target.empty()) {
       return archive.covers(_target);
-    } else {
-      return false;
     }
+
+    return false;
   };
 
   void log_header(std::ostream& os) const override final {
@@ -7086,11 +6966,11 @@ class SRProblem : public GPInstanceBase {
     }
     os << "unresolved_expressions,";
     os << "expressions,";
-    for (auto& o : objectives) {
+    for (const auto& o : objectives) {
       os << o << "_train,";
     }
     if (Y_test.size() > 0) {
-      for (auto& o : objectives) {
+      for (const auto& o : objectives) {
         os << o << "_test,";
       }
     }
@@ -7133,7 +7013,7 @@ class SRProblem : public GPInstanceBase {
       if (linear_scaling) {
         const auto& q = solution.quality_as<SRQuality>();
         if (static_cast<usize>(q.ls_params.cols()) != ctx.num_outputs) {
-          os << exprs[i];  // for the edge case where unevaluated solutions are logged...
+          os << exprs[i];  // unevaluated solution — no scaling params yet
         } else {
           os << q.ls_params(0, i) << " + (" << q.ls_params(1, i) << " * (" << exprs[i] << "))";
         }
@@ -7165,9 +7045,9 @@ class SRProblem : public GPInstanceBase {
   void evaluate_test(const SolutionBase& solution) const {
     const auto& q = solution.quality_as<SRQuality>();
     if (Y_test.size() > 0 && !q.test_quality.has_value()) {
-      Solution copy = solution;  // copy is needed since active variables are not mutable...
+      Solution copy = solution;  // copy needed because active variables are not mutable
 
-      Array<ScalarType> params;  // TODO fit FC params...
+      Array<ScalarType> params;  // TODO fit FC params
       auto& cq = copy.quality_as<SRQuality>();
       eval_one(copy, X_test, Y_test, var_Y_test, params, false, cq, cq.ls_params);
 
@@ -7190,10 +7070,12 @@ class SRProblem : public GPInstanceBase {
   std::vector<std::string> objectives;
   Arr2D<ScalarType> X_train;
   Arr2D<ScalarType> Y_train;
+  // Variance per output column, precomputed for NMSE normalisation.
+  // Near-zero entries are clamped to 1.0 so NMSE degrades gracefully to MSE.
   Array<ScalarType> var_Y_train;
-  Arr2D<ScalarType> X_batch{};
-  Arr2D<ScalarType> Y_batch{};
-  Array<ScalarType> var_Y_batch{};
+  Arr2D<ScalarType> X_batch;
+  Arr2D<ScalarType> Y_batch;
+  Array<ScalarType> var_Y_batch;
   Arr2D<ScalarType> X_test;
   Arr2D<ScalarType> Y_test;
   Array<ScalarType> var_Y_test;
@@ -7202,7 +7084,6 @@ class SRProblem : public GPInstanceBase {
   // --- CPU evaluation ---
 
   void _evaluate_cpu(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) {
-    // initialize the first batch if needed
     if (_batch_size.has_value() && X_batch.size() == 0) {
       adapt(rng);
     }
@@ -7210,7 +7091,7 @@ class SRProblem : public GPInstanceBase {
     Array<ScalarType> params;
     for (auto i : indices) {
       auto& q = solutions[i].quality_as<SRQuality>();
-      q.test_quality = std::nullopt;  // Non test evaluations indicate that the test quality is likely out of date...
+      q.test_quality = std::nullopt;  // invalidate cached test quality on every train evaluation
       if (_batch_size.has_value()) {
         eval_one(solutions[i], X_batch, Y_batch, var_Y_batch, params, true, q, q.ls_params);
       } else {
@@ -7219,7 +7100,6 @@ class SRProblem : public GPInstanceBase {
     }
   }
 
-  // solution, X, Y, train/test, quality to write to
   void eval_one(SolutionBase& solution,
                 const Arr2D<ScalarType>& X,
                 const Arr2D<ScalarType>& Y,
@@ -7254,8 +7134,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);
+            CType slope = ls_params(1, o);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean();
           }
         } else {
@@ -7265,8 +7145,8 @@ class SRProblem : public GPInstanceBase {
         if (linear_scaling) {
           quality.objectives(j) = 0.0;
           for (usize o = 0; o < ctx.num_outputs; o++) {
-            CType intercept = ls_params(0, o);  // solution.continuous_values()(ctx.num_continuous + 2 * o);
-            CType slope = ls_params(1, o);      // solution.continuous_values()(ctx.num_continuous + 2 * o + 1);
+            CType intercept = ls_params(0, o);
+            CType slope = ls_params(1, o);
             quality.objectives(j) += ((intercept + slope * Y_pred.col(o)) - Y.col(o)).square().mean() / var_Y(o);
           }
         } else {
@@ -7291,7 +7171,6 @@ class SRProblem : public GPInstanceBase {
       return;
     }
 
-    // Transform solutions to GPU compatible representation
     std::vector<u8> node_type;
     std::vector<float> node_value;
     std::vector<bool> overflowed(num_solutions, false);
@@ -7349,22 +7228,19 @@ class SRProblem : public GPInstanceBase {
 
     if (_num_solutions_allocated < num_elements) {
       _free_solution_on_gpu();
-      d_type = allocate_and_copy(node_type.data(), node_type.size());
+      d_type  = allocate_and_copy(node_type.data(), node_type.size());
       d_value = allocate_and_copy(node_value.data(), node_value.size());
       _num_solutions_allocated = num_elements;
     } else {
-      copy_to_gpu(d_type, node_type.data(), node_type.size());
+      copy_to_gpu(d_type,  node_type.data(),  node_type.size());
       copy_to_gpu(d_value, node_value.data(), node_value.size());
     }
   }
 
   void _allocate_results_on_gpu(const LaunchConfig& config) {
-    if (config.kernel_version != KernelVersion::SingleKernel &&
-        config.kernel_version != KernelVersion::SingleKernelFMAF &&
-        config.kernel_version != KernelVersion::SingleKernelInplace) {
+    if (config.kernel_version != KernelVersion::SingleBlock) {
       const size_t num_partials =
-          (config.kernel_version == KernelVersion::BlockReduce ||
-           config.kernel_version == KernelVersion::Hybrid)
+          (config.kernel_version == KernelVersion::DynamicBlock)
               ? config.num_solutions * config.eval.grid.y
               : config.num_solutions * config.num_datapoints;
 
@@ -7392,7 +7268,7 @@ class SRProblem : public GPInstanceBase {
   void _free_solution_on_gpu() {
     free_on_gpu(d_type);
     free_on_gpu(d_value);
-    d_type = nullptr;
+    d_type  = nullptr;
     d_value = nullptr;
     _num_solutions_allocated = 0;
   }
@@ -7401,9 +7277,9 @@ class SRProblem : public GPInstanceBase {
     free_on_gpu(d_partial);
     free_on_gpu(d_result);
     d_partial = nullptr;
-    d_result = nullptr;
+    d_result  = nullptr;
     _num_partials_allocated = 0;
-    _num_results_allocated = 0;
+    _num_results_allocated  = 0;
   }
 #endif // GOBLIN_HAS_CUDA
 
@@ -7412,32 +7288,33 @@ class SRProblem : public GPInstanceBase {
   std::shared_ptr<InitBase> _init;
   UnboundedArchive _target;
   usize _num_continuous{};
-  Vec<CType> _continuous_lower_bounds{};
-  Vec<CType> _continuous_upper_bounds{};
-  Vec<CType> _continuous_init_lower_bounds{};
-  Vec<CType> _continuous_init_upper_bounds{};
+  Vec<CType> _continuous_lower_bounds;
+  Vec<CType> _continuous_upper_bounds;
+  Vec<CType> _continuous_init_lower_bounds;
+  Vec<CType> _continuous_init_upper_bounds;
 
   // CPU fields
-  std::string _gradient_mode{};
-  CType _gradient_epsilon{};
-  std::optional<bool> _always_inherit_continuous{};
-  std::optional<usize> _batch_size{};
-  mutable Arr2D<ScalarType> _eval_buffer{};
+  std::string _gradient_mode;
+  CType _gradient_epsilon;
+  std::optional<bool> _always_inherit_continuous;
+  std::optional<usize> _batch_size;
+  mutable Arr2D<ScalarType> _eval_buffer;  // reused across evaluations to avoid repeated allocation
 
 #ifdef GOBLIN_HAS_CUDA
   // GPU fields
-  std::optional<KernelVersion> _kernel_version{};
-  int _num_sms = 0;
+  std::optional<KernelVersion> _kernel_version;
+  int    _num_sms        = 0;
   size_t _num_datapoints = 0;
+  // Watermark sizes: GPU buffers only grow, never shrink, to minimise cudaMalloc calls.
   size_t _num_solutions_allocated = 0;
-  size_t _num_partials_allocated = 0;
-  size_t _num_results_allocated = 0;
-  float* d_X = nullptr;
-  float* d_Y = nullptr;
-  uint8_t* d_type = nullptr;
-  float* d_value = nullptr;
-  float* d_partial = nullptr;
-  float* d_result = nullptr;
+  size_t _num_partials_allocated  = 0;
+  size_t _num_results_allocated   = 0;
+  float*    d_X       = nullptr;
+  float*    d_Y       = nullptr;
+  uint8_t*  d_type    = nullptr;
+  float*    d_value   = nullptr;
+  float*    d_partial = nullptr;
+  float*    d_result  = nullptr;
 #endif  // GOBLIN_HAS_CUDA
 };
 
@@ -9740,19 +9617,12 @@ class IMS final : public MethodBase {
             }
           }
         }
-        // TODO: uncomment
-        // if (populations[p_idx].converged() ||
-        //     (opts.restart_stale_populations &&
-        //      generations_since_last_improvement[p_idx] >
-        //          opts.generations_without_improvement_until_restart.value_or(total_generations))) {
-        //   running[p_idx] = false;
-        // }
 
-        // TODO: remove
-        if (opts.generations_without_improvement_until_stopping.has_value() &&
-            generations_since_last_improvement[p_idx] >=
-                opts.generations_without_improvement_until_stopping.value()) {
-          return std::make_tuple(archive, TerminationStatus::NoImprovementLimitReached);
+        if (populations[p_idx].converged() ||
+            (opts.restart_stale_populations &&
+             generations_since_last_improvement[p_idx] >
+                 opts.generations_without_improvement_until_restart.value_or(total_generations))) {
+          running[p_idx] = false;
         }
       }
 
