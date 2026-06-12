@@ -87,4 +87,28 @@ bool ArchiveBase::covers(const ArchiveBase& other) const {
     return true;
   }
 };
+
+bool ArchiveBase::approximately_covers(const ArchiveBase& other, CType epsilon) const {
+  if (other.empty())
+    return true;  // any archive covers the empty archive
+  if (empty()) {
+    return false;  // an empty archive covers nothing
+  } else {
+    CType min_dist;
+    // for each solution in other
+    for (usize i = 0; i < other.size(); i++) {
+      // there must be at least one solution in this that is within epsilon in objective space
+      for (usize j = 0; j < size(); j++) {
+        CType d = fitness().distance(operator[](j).quality(), other[i].quality(), std::nullopt);
+        if (j == 0 || d < min_dist) {
+          min_dist = d;
+        }
+      }
+      if (min_dist > epsilon) {
+        return false;
+      }
+    }
+    return true;
+  }
+};
 };  // namespace goblin

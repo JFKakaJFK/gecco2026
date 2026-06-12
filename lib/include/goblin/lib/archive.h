@@ -11,8 +11,6 @@
 #include <type_traits>
 #include <tuple>
 
-#include <Eigen/Dense>
-
 #include "goblin/lib/assert.h"
 #include "goblin/lib/fitness.h"
 #include "goblin/lib/ordering.h"
@@ -49,7 +47,7 @@ class ArchiveBase {
   /// Updates the archive with the solution and returns whether the solution was
   /// accepted into the archive.
   bool update(const SolutionBase& solution,
-              bool strict,               // If false, returns true for solutions that are
+              bool strict = true,        // If false, returns true for solutions that are
                                          // non-dominated by the archive but not accepted
               bool check_synched = true  // Only consider a solution accepted if it
                                          // also is accepted by all synched archives
@@ -60,6 +58,10 @@ class ArchiveBase {
 
   bool dominates(const SolutionBase& solution, bool strict) const;
   bool covers(const ArchiveBase& other) const;
+  /// Checks if this archive approximately covers other, where
+  /// approximate coverage corresponds to the one-sided Hausdorff distance (or max[D_PF->S]) in objective space being
+  /// lower than some epsilon.
+  bool approximately_covers(const ArchiveBase& other, CType epsilon) const;
 
   inline const SolutionBase& random_solution(Rng& rng) const {
     __goblin_runtime_assert(!empty());

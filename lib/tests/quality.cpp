@@ -90,6 +90,15 @@ class NoisyFitness : public ArchiveFitnessBase {
 
 class NoisySphere : public InstanceBase {
  public:
+  NoisySphere() {
+    add_target([&](const ArchiveBase& archive) {
+      NoisyResult target;
+      target.samples = Vec<CType>::Constant(1, NOISE);
+
+      return archive.size() > 0 && fitness().cmp(archive[0].quality(), target, std::nullopt) != Ordering::Worse;
+    });
+  }
+
   CRef<Vec<DType>> discrete_domain_sizes() const override final {
     static Vec<DType> d;
     return d;
@@ -136,12 +145,12 @@ class NoisySphere : public InstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return fitness_; }
 
-  bool target_reached(const ArchiveBase& archive) const override {
-    NoisyResult target;
-    target.samples = Vec<CType>::Constant(1, NOISE);
+  // bool target_reached(const ArchiveBase& archive) const override {
+  //   NoisyResult target;
+  //   target.samples = Vec<CType>::Constant(1, NOISE);
 
-    return archive.size() > 0 && fitness().cmp(archive[0].quality(), target, std::nullopt) != Ordering::Worse;
-  };
+  //   return archive.size() > 0 && fitness().cmp(archive[0].quality(), target, std::nullopt) != Ordering::Worse;
+  // };
 
  private:
   NoisyFitness fitness_{};

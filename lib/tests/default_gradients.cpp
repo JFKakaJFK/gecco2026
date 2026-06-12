@@ -11,7 +11,7 @@ using namespace goblin;
 TEST_CASE("goblin::lib::instance_default_gradient") {
   CType vtr = 1e-8;
   BenchmarkInstance sphere(std::make_shared<Sphere>(2));
-  sphere.register_target({vtr});
+  sphere.add_target(vtr);
   sphere.set_initial_bounds(100.0, 110.0);
 
   REQUIRE(sphere.num_objectives() == 1);

@@ -108,7 +108,6 @@ class SRProblem : public GPInstanceBase {
         _archive_fitness(SRFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
         _fitness(SRFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_archive_fitness),
         _gradient_mode(gradient_mode),
         _gradient_epsilon(gradient_epsilon),
         _always_inherit_continuous(always_inherit_continuous),
@@ -162,7 +161,7 @@ class SRProblem : public GPInstanceBase {
     }
 
     if (target_objectives.has_value()) {
-      register_target(target_objectives.value());
+      add_target(target_objectives.value());
     }
   };
 
@@ -279,41 +278,12 @@ class SRProblem : public GPInstanceBase {
     return std::make_tuple(any_active_changed, anything_changed);
   }
 
-  // bool always_inherit_continuous() const override final {
-  //   return ;
-  // };
-
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));
     if (ctx.value_kind[value] == ValueKind::Constant) {
       return solution.continuous_values()(ctx.const_repr == ConstantRepr::Pool ? ctx.value_idx[value] : discrete_index);
     }
     return std::nullopt;
-  };
-
-  void register_target(CRefS<Vec<CType>> target_objectives) {
-    _target.clear();
-    Solution s(
-        archive_fitness().worst(),
-        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
-        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality_as<SRQuality>().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality_as<SRQuality>().objectives.size()) >=
-                            fitness().num_objectives());
-    s.quality_as<SRQuality>().constraint_value = 0.0;
-    _target.update(s, false);
-  };
-
-  void register_target(std::vector<CType> target_objectives) {
-    register_target(Eigen::Map<Vec<CType>>(target_objectives.data(), target_objectives.size()));
-  };
-
-  bool target_reached(const ArchiveBase& archive) const override final {
-    if (!_target.empty()) {
-      return archive.covers(_target);
-    } else {
-      return false;
-    }
   };
 
   void log_header(std::ostream& os) const override final {
@@ -473,7 +443,6 @@ class SRProblem : public GPInstanceBase {
   SRFitness _archive_fitness;
   SRFitness _fitness;
   std::shared_ptr<InitBase> _init;
-  UnboundedArchive _target;
   std::string _gradient_mode{};
   CType _gradient_epsilon{};
   std::optional<bool> _always_inherit_continuous{};

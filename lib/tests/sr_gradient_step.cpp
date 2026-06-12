@@ -44,7 +44,7 @@ TEST_CASE("goblin::gp::sr_problem.gradient_steps") {
   for (usize ls = 0; ls <= 1; ls++) {
     bool linear_scaling = ls > 0;
     SRProblem srp(ctx, X, Y, std::nullopt, std::nullopt, {"nmse"}, std::nullopt, linear_scaling);
-    srp.register_target({vtr});
+    srp.add_target(vtr);
 
     Rng rng = seeded_rng(42);
     AoSSet solutions, parents;

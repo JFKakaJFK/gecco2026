@@ -18,8 +18,10 @@ void print_front(InstanceBase& problem, const ArchiveBase& archive) {
 };
 
 TEST_CASE("goblin::methods::so::gomea") {
-  BenchmarkInstance one_max(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<OneMax>(5)});
-  one_max.register_target({5});
+  const usize N = 5;
+  const CType VTR = static_cast<CType>(N);
+  BenchmarkInstance one_max(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<OneMax>(N)});
+  one_max.add_target(VTR);
   Budget budget(/* max_evaluations = */ 10000);
 
   auto _f1 = one_max.archive_fitness().worst(), _f2 = one_max.archive_fitness().worst();
@@ -37,7 +39,7 @@ TEST_CASE("goblin::methods::so::gomea") {
 
   REQUIRE(front->empty() == false);
   print_front(one_max, *front);
-  REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == 5.0);
+  REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == VTR);
 
   std::cout << "GI-GOMEA" << std::endl;
 
@@ -46,11 +48,11 @@ TEST_CASE("goblin::methods::so::gomea") {
 
   REQUIRE(front->empty() == false);
   print_front(one_max, *front);
-  REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == 5.0);
+  REQUIRE(front->so_solution(0).quality_as<MOQuality>().objectives[0] == VTR);
 
   BenchmarkInstance sphere(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<Sphere>(2)});
   sphere.set_initial_bounds(100.0, 110.0);
-  sphere.register_target({1e-8});
+  sphere.add_target(1e-8);
 
   auto rvgomea = RvGOMEA(
       /* linkage_model = */ "Full",

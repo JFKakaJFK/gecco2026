@@ -171,7 +171,7 @@ TEST_CASE("goblin::gp::sr") {
                     /* gradient_mode = */ "forward",
                     /* gradient_epsilon = */ 1e-5,
                     /* archive_epsilon = */ 0.0, always_inherit_continuous);
-      srp.register_target({vtr});
+      srp.add_target(vtr);
 
       Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
 

@@ -2,13 +2,18 @@
 #ifndef _GOBLIN_LIB_INSTANCE_H
 #define _GOBLIN_LIB_INSTANCE_H
 
+#include <vector>
+#include <cstddef>
 #include <format>
 #include <iostream>
+#include <memory>
+#include <optional>
 #include <sstream>
 #include <tuple>
-#include <optional>
-#include <cstddef>
-#include <memory>
+#include <variant>
+#include <stdexcept>
+#include <functional>
+#include <type_traits>
 
 #include "goblin/lib/types.h"
 #include "goblin/lib/fitness.h"
@@ -16,6 +21,14 @@
 #include "goblin/lib/archive.h"
 
 namespace goblin {
+
+// - (Single) solution values (derive objectives)
+// - (Single) solution objectives (use dummy values, eval != actual fitness)
+// TODO multiple solution values / objectives
+//
+//   => (a => a.covers(X))
+// - Front size (a => a.size() >= X)
+// - Front predicate (e.g. D(PF->S) <= X) => (a => a.distance_to(PF = a') < X)
 
 class CacheKey {
  public:
@@ -31,7 +44,16 @@ class CacheKey {
   usize hash_value_;
 };
 
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 class InstanceBase {
+  std::function<bool(const ArchiveBase&)> _target_reached;
+
  public:
   usize num_objectives() const { return fitness().num_objectives(); };
 
@@ -128,7 +150,194 @@ class InstanceBase {
     return std::nullopt;
   };
 
-  virtual bool target_reached(const ArchiveBase& archive) const { return false; };
+  bool target_reached(const ArchiveBase& archive) const {
+    if (_target_reached) {
+      return _target_reached(archive);
+    }
+    return false;
+  };
+
+  // InstanceBase& add_target(AnyTarget target);
+  InstanceBase& add_target(std::function<bool(const ArchiveBase&)> target_reached_check) {
+    if (_target_reached) {
+      auto existing = std::move(_target_reached);
+      _target_reached = [a = std::move(existing), b = std::move(target_reached_check)](const ArchiveBase& archive) {
+        return a(archive) || b(archive);
+      };
+    } else {
+      _target_reached = std::move(target_reached_check);
+    }
+    return *this;
+  }
+  InstanceBase& add_target(const ArchiveBase& target_front) {
+    std::shared_ptr<ArchiveBase> front = target_front.clone();
+    std::function<bool(const ArchiveBase&)> incoming = [front = std::move(front)](const ArchiveBase& archive) {
+      return archive.covers(*front);
+    };
+
+    return add_target(std::move(incoming));
+  }
+  InstanceBase& add_target(const SolutionBase& target_solution) {
+    UnboundedArchive target_front(archive_fitness());
+    target_front.update(target_solution);
+    return add_target(target_front);
+  }
+  InstanceBase& add_target(const QualityBase& target_quality) {
+    Solution s(
+        target_quality.clone(),
+        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+    return add_target(s);
+  }
+  InstanceBase& add_target(std::variant<Vec<CType>, std::vector<CType>> target_objectives) {
+    auto vtr = archive_fitness().worst();
+    if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+      throw std::runtime_error(
+          "A vector of objective values is only a valid target value in combination with `MOQuality` or a subclass "
+          "as quality.");
+    }
+
+    auto& q = vtr->as<MOQuality>();
+    q.constraint_value = 0.0;
+    q.objectives.fill(0.0);
+
+    Vec<CType> to;
+    if (std::holds_alternative<Vec<CType>>(target_objectives)) {
+      to = std::get<Vec<CType>>(target_objectives);
+    } else {
+      auto t = std::get<std::vector<CType>>(target_objectives);
+      to = Eigen::Map<Vec<CType>>(t.data(), t.size());
+    }
+
+    usize no = to.size();
+    if (fitness().num_objectives() > no || no > archive_fitness().num_objectives()) {
+      throw std::runtime_error("Mismatch in number of target objectives provided.");
+    }
+    for (usize i = 0; i < no; i++) {
+      q.objectives(i) = to(i);
+    }
+
+    return add_target(*vtr);
+  };
+  InstanceBase& add_target_front_size(usize target_front_size) {
+    return add_target([target_front_size](const ArchiveBase& archive) { return archive.size() >= target_front_size; });
+  }
+  InstanceBase& add_target_front(std::optional<Mat<DType>> discrete,
+                                 std::optional<Mat<CType>> continuous,
+                                 std::optional<usize> evaluation_seed = std::nullopt) {
+    if (num_discrete() > 0) {
+      if (!discrete.has_value()) {
+        throw std::runtime_error("Problem has discrete variables but none were provided.");
+      }
+      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+        throw std::runtime_error("Mismatch in number of discrete variables provided");
+      }
+    }
+    if (num_continuous() > 0) {
+      if (!continuous.has_value()) {
+        throw std::runtime_error("Problem has continuous variables but none were provided.");
+      }
+      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+        throw std::runtime_error("Mismatch in number of discrete variables provided");
+      }
+    }
+    if (num_discrete() > 0 && num_continuous() > 0 && discrete.value().rows() != continuous.value().rows()) {
+      throw std::runtime_error("Mismatch in number of discrete/continuous solutions provided");
+    }
+
+    usize n = std::max(num_discrete(), num_continuous());
+
+    AoSSet s;
+    std::vector<usize> indices(n);
+    for (isize i = 0; i < n; i++) {
+      s.add(Solution(archive_fitness().worst(),
+                     num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.value().row(i)) : std::nullopt,
+                     num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.value().row(i)) : std::nullopt));
+    }
+
+    Rng rng = seeded_rng(evaluation_seed);
+    evaluate(rng, s, indices);
+
+    UnboundedArchive target_front(archive_fitness());
+    for (usize i = 0; i < n; i++) {
+      target_front.update(s[i]);
+    }
+
+    return add_target(target_front);
+  }
+  InstanceBase& add_target(CType target_fitness) {
+    if (num_objectives() != 1) {
+      throw std::runtime_error("A single objective value is only a valid target value for single-objective instances.");
+    }
+    auto vtr = archive_fitness().worst();
+    if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+      throw std::runtime_error(
+          "A single objective value is only a valid target value in combination with `MOQuality` or a subclass as "
+          "quality.");
+    }
+
+    auto& q = vtr->as<MOQuality>();
+    q.constraint_value = 0.0;
+    q.objectives.fill(0.0);
+    q.objectives(0) = target_fitness;
+
+    return add_target(*vtr);
+  };
+  /*
+  InstanceBase& add_any_target(AnyTarget target) {
+    // return std::visit([&](auto&& arg) -> InstanceBase& { return add_target(arg); }, target);
+    //
+    // return
+    std::visit([&](auto&& arg) { add_target(arg); }, target);
+    return *this;
+
+    // return std::visit(
+    //     [&](auto&& arg) -> InstanceBase& {
+    //       using T = std::decay_t<decltype(arg)>;
+    //       if constexpr (std::is_same_v<T, CType>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, Vec<CType>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::vector<CType>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const QualityBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const SolutionBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const ArchiveBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::function<bool(const ArchiveBase&)>>) {
+    //         return add_target(arg);
+    //       } else {
+    //         static_assert(sizeof(T) == 0, "non-exhaustive visitor!");
+    //       }
+    //     },
+    //     target);
+
+    // std::visit(overloaded{
+    //                [&](CType arg) { add_target(arg); },
+    //                [&](Vec<CType> arg) { add_target(arg); },
+    //                [&](std::vector<CType> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const QualityBase> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const SolutionBase> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const ArchiveBase> arg) { add_target(arg); },
+    //                [&](std::function<bool(const ArchiveBase&)> arg) { add_target(arg); },
+    //            },
+    //            target);
+
+    // if (std::holds_alternative<CType>(target)) {
+    //   return add_target(std::get<CType>(target));
+    //   // } else if (std::holds_alternative<Vec<CType>>(target)) {
+    //   // return add_target(std::get<Vec<CType>>(target));
+    // } else if (std::holds_alternative<std::vector<CType>>(target)) {
+    //   return add_target(std::get<std::vector<CType>>(target));
+    // } else {
+    //   throw std::runtime_error("Non exhaustive visitor.");
+    // }
+  };
+   */
+
+  // virtual bool target_reached(const ArchiveBase& archive) const { return false; };
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";
@@ -273,7 +482,7 @@ class WrappedInstance : public InstanceBase {
     return inner.as_continuous(solution, discrete_index);
   };
 
-  bool target_reached(const ArchiveBase& archive) const override { return inner.target_reached(archive); };
+  bool target_reached(const ArchiveBase& archive) const { return inner.target_reached(archive); };
 
   void log_header(std::ostream& os) const override { return inner.log_header(os); };
 
@@ -317,7 +526,6 @@ class CachedInstanceBase : public WrappedInstance {
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
                                            usize cache_size = 10000,
                                            std::string cache_policy = "lru");
-
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_INSTANCE_H */

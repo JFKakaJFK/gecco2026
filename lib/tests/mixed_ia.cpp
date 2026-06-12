@@ -20,7 +20,7 @@ TEST_CASE("goblin::methods::mixed_ia") {
   const double VTR = N;
   BenchmarkInstance instance(std::make_shared<LeadingOnes>(N));
   instance.set_init(std::make_shared<RandomInit>());
-  instance.register_target({VTR});
+  instance.add_target(VTR);
 
   Budget budget(/* max_evaluations = */ 1000000);
 

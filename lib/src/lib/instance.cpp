@@ -181,6 +181,91 @@ std::tuple<std::vector<usize>, u64> InstanceBase::gradient_steps(Rng& rng,
   return std::make_tuple(changed_solutions, evaluations);
 }
 
+/*
+InstanceBase& InstanceBase::add_target(AnyTarget target) {
+  std::function<bool(const ArchiveBase&)> incoming;
+
+  // if (std::holds_alternative<CType>(target)) {
+  //   if (num_objectives() != 1) {
+  //     throw std::runtime_error("A single objective value is only a valid target value for single-objective
+  //     instances.");
+  //   }
+  //   auto vtr = archive_fitness().worst();
+  //   if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+  //     throw std::runtime_error(
+  //         "A single objective value is only a valid target value in combination with `MOQuality` or a subclass as "
+  //         "quality.");
+  //   }
+
+  //   auto& q = vtr->as<MOQuality>();
+  //   q.constraint_value = 0.0;
+  //   q.objectives.fill(0.0);
+  //   q.objectives(0) = std::get<CType>(target);
+
+  //   return add_target(*vtr);
+  // } else if (std::holds_alternative<Vec<CType>>(target) || std::holds_alternative<std::vector<CType>>(target)) {
+  //   auto vtr = archive_fitness().worst();
+  //   if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+  //     throw std::runtime_error(
+  //         "A vector of objective values is only a valid target value in combination with `MOQuality` or a subclass "
+  //         "as quality.");
+  //   }
+
+  //   auto& q = vtr->as<MOQuality>();
+  //   q.constraint_value = 0.0;
+  //   q.objectives.fill(0.0);
+
+  //   Vec<CType> target_objectives;
+  //   if (std::holds_alternative<Vec<CType>>(target)) {
+  //     target_objectives = std::get<Vec<CType>>(target);
+  //   } else {
+  //     std::vector<CType> to = std::get<std::vector<CType>>(target);
+  //     target_objectives = Eigen::Map<Vec<CType>>(to.data(), to.size());
+  //   }
+  //   usize no = target_objectives.size();
+  //   if (fitness().num_objectives() > no || no > archive_fitness().num_objectives()) {
+  //     throw std::runtime_error("Mismatch in number of target objectives provided.");
+  //   }
+  //   for (usize i = 0; i < no; i++) {
+  //     q.objectives(i) = target_objectives(i);
+  //   }
+
+  //   return add_target(*vtr);
+  // } else
+  if (std::holds_alternative<std::reference_wrapper<const QualityBase>>(target)) {
+    Solution s(
+        std::get<std::reference_wrapper<const QualityBase>>(target).get().clone(),
+        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+    return add_target(s);
+    // } else if (std::holds_alternative<std::reference_wrapper<const SolutionBase>>(target)) {
+    //   UnboundedArchive target_front(archive_fitness());
+    //   target_front.update(std::get<std::reference_wrapper<const SolutionBase>>(target));
+    //   return add_target(target_front);
+    // } else if (std::holds_alternative<std::reference_wrapper<const ArchiveBase>>(target)) {
+    //   std::shared_ptr<ArchiveBase> target_front =
+    //       std::get<std::reference_wrapper<const ArchiveBase>>(target).get().clone();
+    //   incoming = [target_front = std::move(target_front)](const ArchiveBase& archive) {
+    //     return archive.covers(*target_front);
+    //   };
+    // } else if (std::holds_alternative<std::function<bool(const ArchiveBase&)>>(target)) {
+    //   incoming = std::get<std::function<bool(const ArchiveBase&)>>(target);
+  } else {
+    throw std::runtime_error("Unsupported target!");
+  }
+
+  if (_target_reached) {
+    auto existing = std::move(_target_reached);
+    _target_reached = [a = std::move(existing), b = std::move(incoming)](const ArchiveBase& archive) {
+      return a(archive) || b(archive);
+    };
+  } else {
+    _target_reached = std::move(incoming);
+  }
+  return *this;
+};
+*/
+
 template <typename Cache>
 std::shared_ptr<CachedInstanceBase> cached_impl(std::shared_ptr<InstanceBase> problem, usize cache_size) {
   struct CachedWrapper : public CachedInstanceBase {

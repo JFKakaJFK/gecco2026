@@ -508,7 +508,7 @@ namespace goblin {
 class InstanceBase_trampoline : public InstanceBase
 {
 public:
-    NB_TRAMPOLINE(InstanceBase, 21);
+    NB_TRAMPOLINE(InstanceBase, 20);
 
     CRef<Vec<DType>> discrete_domain_sizes() const override
     {
@@ -623,14 +623,6 @@ public:
             solution, discrete_index // params
         );
     }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
-        );
-    }
     void log_header(std::ostream & os) const override
     {
         NB_OVERRIDE_NAME(
@@ -678,7 +670,7 @@ namespace goblin {
 class CachedInstanceBase_trampoline : public CachedInstanceBase
 {
 public:
-    NB_TRAMPOLINE(CachedInstanceBase, 30);
+    NB_TRAMPOLINE(CachedInstanceBase, 29);
 
     usize hit_count() const override
     {
@@ -854,14 +846,6 @@ public:
             "as_continuous", // function name (python)
             as_continuous, // function name (c++)
             solution, discrete_index // params
-        );
-    }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
         );
     }
     void log_header(std::ostream & os) const override
@@ -1107,7 +1091,7 @@ namespace goblin {
 class GPInstanceBase_trampoline : public GPInstanceBase
 {
 public:
-    NB_TRAMPOLINE(GPInstanceBase, 22);
+    NB_TRAMPOLINE(GPInstanceBase, 21);
 
     const goblin::GPContext & context() const override
     {
@@ -1227,14 +1211,6 @@ public:
             "as_continuous", // function name (python)
             as_continuous, // function name (c++)
             solution, discrete_index // params
-        );
-    }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
         );
     }
     void log_header(std::ostream & os) const override
@@ -1997,7 +1973,7 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ArchiveBase::clone)
       .def("update",
           &goblin::ArchiveBase::update,
-          nb::arg("solution"), nb::arg("strict"), nb::arg("check_synched") = true,
+          nb::arg("solution"), nb::arg("strict") = true, nb::arg("check_synched") = true,
           "/ Updates the archive with the solution and returns whether the solution was\n/ accepted into the archive.")
       .def("sync_with",
           &goblin::ArchiveBase::sync_with, nb::arg("other"))
@@ -2007,6 +1983,10 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ArchiveBase::dominates, nb::arg("solution"), nb::arg("strict"))
       .def("covers",
           &goblin::ArchiveBase::covers, nb::arg("other"))
+      .def("approximately_covers",
+          &goblin::ArchiveBase::approximately_covers,
+          nb::arg("other"), nb::arg("epsilon"),
+          "/ Checks if this archive approximately covers other, where\n/ approximate coverage corresponds to the one-sided Hausdorff distance (or max[D_PF->S]) in objective space being\n/ lower than some epsilon.")
       .def("random_solution",
           &goblin::ArchiveBase::random_solution, nb::arg("rng"))
       ;
@@ -2161,6 +2141,22 @@ void py_init_module_pygoblin(nb::module_& m) {
           " useful for discrete linkage learning in GP\n - needed to be able to perform constant binning\n - needed to erase constant pool references")
       .def("target_reached",
           &goblin::InstanceBase::target_reached, nb::arg("archive"))
+      .def("add_target",
+          nb::overload_cast<std::function<bool(const goblin::ArchiveBase&)>>(&goblin::InstanceBase::add_target), nb::arg("target_reached_check"))
+      .def("add_target",
+          nb::overload_cast<const goblin::ArchiveBase &>(&goblin::InstanceBase::add_target), nb::arg("target_front"))
+      .def("add_target",
+          nb::overload_cast<const goblin::SolutionBase &>(&goblin::InstanceBase::add_target), nb::arg("target_solution"))
+      .def("add_target",
+          nb::overload_cast<const goblin::QualityBase &>(&goblin::InstanceBase::add_target), nb::arg("target_quality"))
+      .def("add_target",
+          nb::overload_cast<std::variant<Vec<CType>, std::vector<CType>>>(&goblin::InstanceBase::add_target), nb::arg("target_objectives"))
+      .def("add_target_front_size",
+          &goblin::InstanceBase::add_target_front_size, nb::arg("target_front_size"))
+      .def("add_target_front",
+          &goblin::InstanceBase::add_target_front, nb::arg("discrete").none(), nb::arg("continuous").none(), nb::arg("evaluation_seed").none() = nb::none())
+      .def("add_target",
+          nb::overload_cast<CType>(&goblin::InstanceBase::add_target), nb::arg("target_fitness"))
       .def("log_header",
           &goblin::InstanceBase::log_header, nb::arg("os"))
       .def("log_solution",
@@ -3222,12 +3218,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::SRProblem::inherit_discrete, nb::arg("offspring"), nb::arg("donor"), nb::arg("subset"))
       .def("as_continuous",
           &goblin::SRProblem::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
-      .def("register_target",
-          nb::overload_cast<CRefS<Vec<CType>>>(&goblin::SRProblem::register_target), nb::arg("target_objectives"))
-      .def("register_target",
-          nb::overload_cast<std::vector<CType>>(&goblin::SRProblem::register_target), nb::arg("target_objectives"))
-      .def("target_reached",
-          &goblin::SRProblem::target_reached, nb::arg("archive"))
       .def("log_header",
           &goblin::SRProblem::log_header, nb::arg("os"))
       .def("evaluate_test",
@@ -3653,7 +3643,7 @@ void py_init_module_pygoblin(nb::module_& m) {
 
   auto pyClassZDT1 =
       nb::class_<goblin::ZDT1, goblin::MOFunctionBase>
-          (m, "ZDT1", "")
+          (m, "ZDT1", "/ ZDT1 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 30)
       .def("num_objectives",
@@ -3664,12 +3654,18 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT1::num_continuous)
       .def("evaluate",
           &goblin::ZDT1::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT1::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT1::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT1::pareto_front, nb::arg("num_samples"))
       ;
 
 
   auto pyClassZDT2 =
       nb::class_<goblin::ZDT2, goblin::MOFunctionBase>
-          (m, "ZDT2", "")
+          (m, "ZDT2", "/ ZDT2 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 30)
       .def("num_objectives",
@@ -3680,12 +3676,18 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT2::num_continuous)
       .def("evaluate",
           &goblin::ZDT2::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT2::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT2::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT2::pareto_front, nb::arg("num_samples"))
       ;
 
 
   auto pyClassZDT3 =
       nb::class_<goblin::ZDT3, goblin::MOFunctionBase>
-          (m, "ZDT3", "")
+          (m, "ZDT3", "/ ZDT3 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 30)
       .def("num_objectives",
@@ -3696,12 +3698,18 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT3::num_continuous)
       .def("evaluate",
           &goblin::ZDT3::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT3::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT3::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT3::pareto_front, nb::arg("num_samples"))
       ;
 
 
   auto pyClassZDT4 =
       nb::class_<goblin::ZDT4, goblin::MOFunctionBase>
-          (m, "ZDT4", "")
+          (m, "ZDT4", "/ ZDT4 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 10)
       .def("num_objectives",
@@ -3712,12 +3720,18 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT4::num_continuous)
       .def("evaluate",
           &goblin::ZDT4::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT4::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT4::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT4::pareto_front, nb::arg("num_samples"))
       ;
 
 
   auto pyClassZDT5 =
       nb::class_<goblin::ZDT5, goblin::MOFunctionBase>
-          (m, "ZDT5", "")
+          (m, "ZDT5", "/ ZDT5 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 11)
       .def("num_objectives",
@@ -3728,12 +3742,18 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT5::num_continuous)
       .def("evaluate",
           &goblin::ZDT5::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT5::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT5::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT5::pareto_front, nb::arg("num_samples"))
       ;
 
 
   auto pyClassZDT6 =
       nb::class_<goblin::ZDT6, goblin::MOFunctionBase>
-          (m, "ZDT6", "")
+          (m, "ZDT6", "/ ZDT6 from https://doi.org/10.1162/106365600568202")
       .def(nb::init<usize>(),
           nb::arg("dims") = 10)
       .def("num_objectives",
@@ -3744,6 +3764,12 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::ZDT6::num_continuous)
       .def("evaluate",
           &goblin::ZDT6::evaluate, nb::arg("solution"))
+      .def("continuous_lower_bounds",
+          &goblin::ZDT6::continuous_lower_bounds)
+      .def("continuous_upper_bounds",
+          &goblin::ZDT6::continuous_upper_bounds)
+      .def("pareto_front",
+          &goblin::ZDT6::pareto_front, nb::arg("num_samples"))
       ;
   // #endif
   // #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
@@ -3810,17 +3836,17 @@ void py_init_module_pygoblin(nb::module_& m) {
       .def("__init__",
           [](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
                                        std::shared_ptr<goblin::MOFunctionBase>,
-                                       std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
+                                       std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
           {
               auto ctor_wrapper = [](goblin::BenchmarkInstance* self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
                                                std::shared_ptr<goblin::MOFunctionBase>,
-                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, std::variant<DType, Vec<DType>> discrete_domain = DType(2), std::variant<CType, Vec<CType>> continuous_lower_bound = -std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_upper_bound = std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0), std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0), std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt) ->  void
+                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, std::variant<DType, Vec<DType>> discrete_domain = DType(2), std::variant<CType, Vec<CType>> continuous_lower_bound = -std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_upper_bound = std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0), std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0), std::optional<AnyInit> init = std::nullopt, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::optional<usize> target_archive_size = std::nullopt) ->  void
               {
-                  new(self) goblin::BenchmarkInstance(objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size); // placement new
+                  new(self) goblin::BenchmarkInstance(objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target_objectives, target_archive_size); // placement new
               };
               auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
                                                std::shared_ptr<goblin::MOFunctionBase>,
-                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
+                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
               {
 
                   const std::variant<DType, Vec<DType>>& discrete_domain_or_default = [&]() -> const std::variant<DType, Vec<DType>> {
@@ -3858,12 +3884,12 @@ void py_init_module_pygoblin(nb::module_& m) {
                           return CType(1.0);
                   }();
 
-                  ctor_wrapper(self, objectives, discrete_domain_or_default, continuous_lower_bound_or_default, continuous_upper_bound_or_default, continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default, init, target, target_archive_size);
+                  ctor_wrapper(self, objectives, discrete_domain_or_default, continuous_lower_bound_or_default, continuous_upper_bound_or_default, continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default, init, target_objectives, target_archive_size);
               };
 
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size);
+              ctor_wrapper_adapt_mutable_param_with_default_value(self, objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target_objectives, target_archive_size);
           },
-          nb::arg("objectives"), nb::arg("discrete_domain").none() = nb::none(), nb::arg("continuous_lower_bound").none() = nb::none(), nb::arg("continuous_upper_bound").none() = nb::none(), nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(), nb::arg("init").none() = nb::none(), nb::arg("target").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none(),
+          nb::arg("objectives"), nb::arg("discrete_domain").none() = nb::none(), nb::arg("continuous_lower_bound").none() = nb::none(), nb::arg("continuous_upper_bound").none() = nb::none(), nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(), nb::arg("init").none() = nb::none(), nb::arg("target_objectives").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none(),
           "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * discrete_domain: int(2)\n        * continuous_lower_bound: -std.numeric_limits<float>.infinity()\n        * continuous_upper_bound: std.numeric_limits<float>.infinity()\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
       .def("set_init",
           &goblin::BenchmarkInstance::set_init, nb::arg("init"))
@@ -3894,10 +3920,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           },
           nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(),
           "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
-      .def("register_target",
-          nb::overload_cast<CRefS<Vec<CType>>>(&goblin::BenchmarkInstance::register_target), nb::arg("target_objectives"))
-      .def("register_target",
-          nb::overload_cast<std::vector<CType>>(&goblin::BenchmarkInstance::register_target), nb::arg("target_objectives"))
       .def("register_target_front",
           nb::overload_cast<const goblin::ArchiveBase &>(&goblin::BenchmarkInstance::register_target_front), nb::arg("other"))
       .def("register_target_front",
@@ -3924,8 +3946,6 @@ void py_init_module_pygoblin(nb::module_& m) {
           &goblin::BenchmarkInstance::fitness)
       .def("archive_fitness",
           &goblin::BenchmarkInstance::archive_fitness)
-      .def("target_reached",
-          &goblin::BenchmarkInstance::target_reached, nb::arg("archive"))
       ;
   // #endif
   // #ifndef _GOBLIN_BENCH_TIMER_H

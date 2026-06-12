@@ -3662,6 +3662,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=23.3.0" },
     { name = "litgen", marker = "python_full_version >= '3.10'", git = "https://github.com/pthom/litgen" },
+    { name = "matplotlib", specifier = ">=3.5.3" },
     { name = "mypy", specifier = ">=1.4.1" },
     { name = "nanobind", specifier = ">=2.9.1" },
     { name = "pre-commit", specifier = ">=2.21.0" },

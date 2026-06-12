@@ -12,7 +12,7 @@ using namespace goblin;
 
 TEST_CASE("goblin::methods::mixed_mixed") {
   BenchmarkInstance sphere(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<LeadingSpheres>(5)});
-  sphere.register_target({1e-8});
+  sphere.add_target(1e-8);
   sphere.set_initial_bounds(-1.0, 1.0);
 
   REQUIRE(sphere.num_objectives() == 1);

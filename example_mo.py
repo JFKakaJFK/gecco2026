@@ -133,10 +133,14 @@ def example_rv():
         continuous_upper_bound=1.0,
     )
 
+    # works, but has heavy overhead due to the Python boundary...
+    # pareto_front = ZDT1().pareto_front(25)
+    # problem.add_target(lambda a: a.approximately_covers(pareto_front, 1e-2))
+
     gomea = MoRvGOMEA()
 
     # all the standard things should work, you can also have a custom python callback as termination criterion
-    budget = Budget(max_evaluations=10_000, max_generations=1000, max_time_seconds=10)
+    budget = Budget(max_evaluations=50_000, max_generations=10_000, max_time_seconds=10)
 
     # or just archive, status = gomea.run(problem, budget=budget, seed=42)
     archive, status = Tracked.run(
@@ -167,7 +171,13 @@ def example_rv():
     try:
         import matplotlib.pyplot as plt
 
+        # compute pareto front
+        x = np.linspace(0, 1, 100)
+        y = 1.0 - np.sqrt(x)
+        plt.plot(x, y, label="Pareto front")
+
         plt.scatter(objectives[:, 0], objectives[:, 1])
+
         plt.title("ZDT1")
         plt.show()
     except ImportError as e:

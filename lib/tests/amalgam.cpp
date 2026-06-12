@@ -11,7 +11,7 @@ using namespace goblin;
 TEST_CASE("goblin::methods::amalgam") {
   BenchmarkInstance sphere(std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<Sphere>(2)});
   sphere.set_initial_bounds(100.0, 110.0);
-  sphere.register_target({1e-8});
+  sphere.add_target(1e-8);
 
   REQUIRE(sphere.num_objectives() == 1);
   REQUIRE(sphere.num_continuous() == 2);

@@ -1202,7 +1202,6 @@ using DefaultSolutionSet = AoSSet;
 #include <tuple>
 
 
-
 namespace goblin {
 
 class ArchiveBase {
@@ -1233,7 +1232,7 @@ class ArchiveBase {
   /// Updates the archive with the solution and returns whether the solution was
   /// accepted into the archive.
   bool update(const SolutionBase& solution,
-              bool strict,               // If false, returns true for solutions that are
+              bool strict = true,        // If false, returns true for solutions that are
                                          // non-dominated by the archive but not accepted
               bool check_synched = true  // Only consider a solution accepted if it
                                          // also is accepted by all synched archives
@@ -1244,6 +1243,10 @@ class ArchiveBase {
 
   bool dominates(const SolutionBase& solution, bool strict) const;
   bool covers(const ArchiveBase& other) const;
+  /// Checks if this archive approximately covers other, where
+  /// approximate coverage corresponds to the one-sided Hausdorff distance (or max[D_PF->S]) in objective space being
+  /// lower than some epsilon.
+  bool approximately_covers(const ArchiveBase& other, CType epsilon) const;
 
   inline const SolutionBase& random_solution(Rng& rng) const {
     __goblin_runtime_assert(!empty());
@@ -1454,9 +1457,18 @@ struct Budget {
 #define _GOBLIN_LIB_INSTANCE_H
 
 #include <cstddef>
+#include <variant>
 
 
 namespace goblin {
+
+// - (Single) solution values (derive objectives)
+// - (Single) solution objectives (use dummy values, eval != actual fitness)
+// TODO multiple solution values / objectives
+//
+//   => (a => a.covers(X))
+// - Front size (a => a.size() >= X)
+// - Front predicate (e.g. D(PF->S) <= X) => (a => a.distance_to(PF = a') < X)
 
 class CacheKey {
  public:
@@ -1472,7 +1484,16 @@ class CacheKey {
   usize hash_value_;
 };
 
+template <class... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+template <class... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
+
 class InstanceBase {
+  std::function<bool(const ArchiveBase&)> _target_reached;
+
  public:
   usize num_objectives() const { return fitness().num_objectives(); };
 
@@ -1569,7 +1590,194 @@ class InstanceBase {
     return std::nullopt;
   };
 
-  virtual bool target_reached(const ArchiveBase& archive) const { return false; };
+  bool target_reached(const ArchiveBase& archive) const {
+    if (_target_reached) {
+      return _target_reached(archive);
+    }
+    return false;
+  };
+
+  // InstanceBase& add_target(AnyTarget target);
+  InstanceBase& add_target(std::function<bool(const ArchiveBase&)> target_reached_check) {
+    if (_target_reached) {
+      auto existing = std::move(_target_reached);
+      _target_reached = [a = std::move(existing), b = std::move(target_reached_check)](const ArchiveBase& archive) {
+        return a(archive) || b(archive);
+      };
+    } else {
+      _target_reached = std::move(target_reached_check);
+    }
+    return *this;
+  }
+  InstanceBase& add_target(const ArchiveBase& target_front) {
+    std::shared_ptr<ArchiveBase> front = target_front.clone();
+    std::function<bool(const ArchiveBase&)> incoming = [front = std::move(front)](const ArchiveBase& archive) {
+      return archive.covers(*front);
+    };
+
+    return add_target(std::move(incoming));
+  }
+  InstanceBase& add_target(const SolutionBase& target_solution) {
+    UnboundedArchive target_front(archive_fitness());
+    target_front.update(target_solution);
+    return add_target(target_front);
+  }
+  InstanceBase& add_target(const QualityBase& target_quality) {
+    Solution s(
+        target_quality.clone(),
+        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+    return add_target(s);
+  }
+  InstanceBase& add_target(std::variant<Vec<CType>, std::vector<CType>> target_objectives) {
+    auto vtr = archive_fitness().worst();
+    if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+      throw std::runtime_error(
+          "A vector of objective values is only a valid target value in combination with `MOQuality` or a subclass "
+          "as quality.");
+    }
+
+    auto& q = vtr->as<MOQuality>();
+    q.constraint_value = 0.0;
+    q.objectives.fill(0.0);
+
+    Vec<CType> to;
+    if (std::holds_alternative<Vec<CType>>(target_objectives)) {
+      to = std::get<Vec<CType>>(target_objectives);
+    } else {
+      auto t = std::get<std::vector<CType>>(target_objectives);
+      to = Eigen::Map<Vec<CType>>(t.data(), t.size());
+    }
+
+    usize no = to.size();
+    if (fitness().num_objectives() > no || no > archive_fitness().num_objectives()) {
+      throw std::runtime_error("Mismatch in number of target objectives provided.");
+    }
+    for (usize i = 0; i < no; i++) {
+      q.objectives(i) = to(i);
+    }
+
+    return add_target(*vtr);
+  };
+  InstanceBase& add_target_front_size(usize target_front_size) {
+    return add_target([target_front_size](const ArchiveBase& archive) { return archive.size() >= target_front_size; });
+  }
+  InstanceBase& add_target_front(std::optional<Mat<DType>> discrete,
+                                 std::optional<Mat<CType>> continuous,
+                                 std::optional<usize> evaluation_seed = std::nullopt) {
+    if (num_discrete() > 0) {
+      if (!discrete.has_value()) {
+        throw std::runtime_error("Problem has discrete variables but none were provided.");
+      }
+      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+        throw std::runtime_error("Mismatch in number of discrete variables provided");
+      }
+    }
+    if (num_continuous() > 0) {
+      if (!continuous.has_value()) {
+        throw std::runtime_error("Problem has continuous variables but none were provided.");
+      }
+      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+        throw std::runtime_error("Mismatch in number of discrete variables provided");
+      }
+    }
+    if (num_discrete() > 0 && num_continuous() > 0 && discrete.value().rows() != continuous.value().rows()) {
+      throw std::runtime_error("Mismatch in number of discrete/continuous solutions provided");
+    }
+
+    usize n = std::max(num_discrete(), num_continuous());
+
+    AoSSet s;
+    std::vector<usize> indices(n);
+    for (isize i = 0; i < n; i++) {
+      s.add(Solution(archive_fitness().worst(),
+                     num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.value().row(i)) : std::nullopt,
+                     num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.value().row(i)) : std::nullopt));
+    }
+
+    Rng rng = seeded_rng(evaluation_seed);
+    evaluate(rng, s, indices);
+
+    UnboundedArchive target_front(archive_fitness());
+    for (usize i = 0; i < n; i++) {
+      target_front.update(s[i]);
+    }
+
+    return add_target(target_front);
+  }
+  InstanceBase& add_target(CType target_fitness) {
+    if (num_objectives() != 1) {
+      throw std::runtime_error("A single objective value is only a valid target value for single-objective instances.");
+    }
+    auto vtr = archive_fitness().worst();
+    if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+      throw std::runtime_error(
+          "A single objective value is only a valid target value in combination with `MOQuality` or a subclass as "
+          "quality.");
+    }
+
+    auto& q = vtr->as<MOQuality>();
+    q.constraint_value = 0.0;
+    q.objectives.fill(0.0);
+    q.objectives(0) = target_fitness;
+
+    return add_target(*vtr);
+  };
+  /*
+  InstanceBase& add_any_target(AnyTarget target) {
+    // return std::visit([&](auto&& arg) -> InstanceBase& { return add_target(arg); }, target);
+    //
+    // return
+    std::visit([&](auto&& arg) { add_target(arg); }, target);
+    return *this;
+
+    // return std::visit(
+    //     [&](auto&& arg) -> InstanceBase& {
+    //       using T = std::decay_t<decltype(arg)>;
+    //       if constexpr (std::is_same_v<T, CType>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, Vec<CType>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::vector<CType>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const QualityBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const SolutionBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const ArchiveBase>>) {
+    //         return add_target(arg);
+    //       } else if constexpr (std::is_same_v<T, std::function<bool(const ArchiveBase&)>>) {
+    //         return add_target(arg);
+    //       } else {
+    //         static_assert(sizeof(T) == 0, "non-exhaustive visitor!");
+    //       }
+    //     },
+    //     target);
+
+    // std::visit(overloaded{
+    //                [&](CType arg) { add_target(arg); },
+    //                [&](Vec<CType> arg) { add_target(arg); },
+    //                [&](std::vector<CType> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const QualityBase> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const SolutionBase> arg) { add_target(arg); },
+    //                [&](std::reference_wrapper<const ArchiveBase> arg) { add_target(arg); },
+    //                [&](std::function<bool(const ArchiveBase&)> arg) { add_target(arg); },
+    //            },
+    //            target);
+
+    // if (std::holds_alternative<CType>(target)) {
+    //   return add_target(std::get<CType>(target));
+    //   // } else if (std::holds_alternative<Vec<CType>>(target)) {
+    //   // return add_target(std::get<Vec<CType>>(target));
+    // } else if (std::holds_alternative<std::vector<CType>>(target)) {
+    //   return add_target(std::get<std::vector<CType>>(target));
+    // } else {
+    //   throw std::runtime_error("Non exhaustive visitor.");
+    // }
+  };
+   */
+
+  // virtual bool target_reached(const ArchiveBase& archive) const { return false; };
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";
@@ -1714,7 +1922,7 @@ class WrappedInstance : public InstanceBase {
     return inner.as_continuous(solution, discrete_index);
   };
 
-  bool target_reached(const ArchiveBase& archive) const override { return inner.target_reached(archive); };
+  bool target_reached(const ArchiveBase& archive) const { return inner.target_reached(archive); };
 
   void log_header(std::ostream& os) const override { return inner.log_header(os); };
 
@@ -1758,7 +1966,6 @@ class CachedInstanceBase : public WrappedInstance {
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
                                            usize cache_size = 10000,
                                            std::string cache_policy = "lru");
-
 };  // namespace goblin
 
 #endif /* _GOBLIN_LIB_INSTANCE_H */
@@ -2048,7 +2255,6 @@ inline std::tuple<std::vector<usize>, std::vector<usize>> greedy_scattered_subse
 #define _GOBLIN_LIB_ALGORITHMS_MO_H
 
 #include <set>
-#include <variant>
 
 
 namespace goblin {
@@ -5796,7 +6002,6 @@ class SRProblem : public GPInstanceBase {
         _archive_fitness(SRFitness(this->objectives.size(), /* minimize = */ true, archive_epsilon)),
         _fitness(SRFitness(objectives_to_optimize.value_or(this->objectives.size()))),
         _init(from_any_init(init.value_or(std::make_shared<HalfHalfInit>()))),
-        _target(_archive_fitness),
         _gradient_mode(gradient_mode),
         _gradient_epsilon(gradient_epsilon),
         _always_inherit_continuous(always_inherit_continuous),
@@ -5850,7 +6055,7 @@ class SRProblem : public GPInstanceBase {
     }
 
     if (target_objectives.has_value()) {
-      register_target(target_objectives.value());
+      add_target(target_objectives.value());
     }
   };
 
@@ -5967,41 +6172,12 @@ class SRProblem : public GPInstanceBase {
     return std::make_tuple(any_active_changed, anything_changed);
   }
 
-  // bool always_inherit_continuous() const override final {
-  //   return ;
-  // };
-
   std::optional<CType> as_continuous(const SolutionBase& solution, usize discrete_index) const override final {
     auto value = ctx.domain2value(discrete_index, solution.discrete_values()(discrete_index));
     if (ctx.value_kind[value] == ValueKind::Constant) {
       return solution.continuous_values()(ctx.const_repr == ConstantRepr::Pool ? ctx.value_idx[value] : discrete_index);
     }
     return std::nullopt;
-  };
-
-  void register_target(CRefS<Vec<CType>> target_objectives) {
-    _target.clear();
-    Solution s(
-        archive_fitness().worst(),
-        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
-        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    s.quality_as<SRQuality>().objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(s.quality_as<SRQuality>().objectives.size()) >=
-                            fitness().num_objectives());
-    s.quality_as<SRQuality>().constraint_value = 0.0;
-    _target.update(s, false);
-  };
-
-  void register_target(std::vector<CType> target_objectives) {
-    register_target(Eigen::Map<Vec<CType>>(target_objectives.data(), target_objectives.size()));
-  };
-
-  bool target_reached(const ArchiveBase& archive) const override final {
-    if (!_target.empty()) {
-      return archive.covers(_target);
-    } else {
-      return false;
-    }
   };
 
   void log_header(std::ostream& os) const override final {
@@ -6161,7 +6337,6 @@ class SRProblem : public GPInstanceBase {
   SRFitness _archive_fitness;
   SRFitness _fitness;
   std::shared_ptr<InitBase> _init;
-  UnboundedArchive _target;
   std::string _gradient_mode{};
   CType _gradient_epsilon{};
   std::optional<bool> _always_inherit_continuous{};
@@ -7305,6 +7480,9 @@ class CirclesInASquare final : public ObjectiveBase {
   usize dims;
 };
 
+// TODO for ZDT problems: add domains & fronts/success criterion?
+
+/// ZDT1 from https://doi.org/10.1162/106365600568202
 class ZDT1 : public MOFunctionBase {
   usize dims;
 
@@ -7337,8 +7515,31 @@ class ZDT1 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
+/// ZDT2 from https://doi.org/10.1162/106365600568202
 class ZDT2 : public MOFunctionBase {
   usize dims;
 
@@ -7372,8 +7573,31 @@ class ZDT2 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - x0 * x0;
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
+/// ZDT3 from https://doi.org/10.1162/106365600568202
 class ZDT3 : public MOFunctionBase {
   usize dims;
 
@@ -7407,8 +7631,31 @@ class ZDT3 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0) - x0 * std::sin(10.0 * std::numbers::pi * x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
+/// ZDT4 from https://doi.org/10.1162/106365600568202
 class ZDT4 : public MOFunctionBase {
   usize dims;
 
@@ -7441,8 +7688,39 @@ class ZDT4 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const {
+    Vec<CType> lb = Vec<CType>::Constant(dims, -5.0);
+    lb(0) = 0.0;
+    return lb;
+  };
+  Vec<CType> continuous_upper_bounds() const {
+    Vec<CType> ub = Vec<CType>::Constant(dims, 5.0);
+    ub(0) = 1.0;
+    return ub;
+  };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
+/// ZDT5 from https://doi.org/10.1162/106365600568202
 class ZDT5 : public MOFunctionBase {
   usize dims;
 
@@ -7486,8 +7764,31 @@ class ZDT5 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = 1.0 + static_cast<CType>(u(x0, 30));
+      o.objectives(1) = 10.0 * (1.0 / o.objectives(0));
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
+/// ZDT6 from https://doi.org/10.1162/106365600568202
 class ZDT6 : public MOFunctionBase {
   usize dims;
 
@@ -7521,6 +7822,28 @@ class ZDT6 : public MOFunctionBase {
     h = 1.0 - h * h;
 
     q.objectives(1) = g * h;
+  }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = 1.0 - std::exp(-4.0 * x0) * std::pow(std::sin(6.0 * std::numbers::pi * x0), 6);
+      o.objectives(1) = 1.0 - o.objectives(0) * o.objectives(0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
   }
 };
 
@@ -7673,8 +7996,8 @@ class BenchmarkInstance final : public InstanceBase {
                     std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0),
                     std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0),
                     std::optional<AnyInit> init = std::nullopt,
-                    std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>>
-                        target = std::nullopt,
+                    // std::optional<AnyTarget> target = std::nullopt,
+                    std::optional<std::vector<CType>> target_objectives = std::nullopt,
                     std::optional<usize> target_archive_size = std::nullopt)
       : _objectives(std::holds_alternative<std::shared_ptr<MOFunctionBase>>(objectives)
                         ? std::get<std::shared_ptr<MOFunctionBase>>(objectives)
@@ -7686,9 +8009,7 @@ class BenchmarkInstance final : public InstanceBase {
                                      std::move(std::get<std::vector<std::shared_ptr<ObjectiveBase>>>(objectives)))))),
         _fitness(MOFitness(_objectives->num_objectives(),
                            /* minimize */ _objectives->num_continuous() > 0)),
-        _init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))),
-        _target(_fitness),
-        _target_archive_size(target_archive_size) {
+        _init(from_any_init(init.value_or(std::make_shared<CompleteInit>()))) {
     if (std::holds_alternative<DType>(discrete_domain)) {
       _discrete_domain_sizes.resize(_objectives->num_discrete());
       _discrete_domain_sizes.fill(std::get<DType>(discrete_domain));
@@ -7721,18 +8042,29 @@ class BenchmarkInstance final : public InstanceBase {
       __goblin_runtime_assert(_continuous_init_lower_bounds(i) < _continuous_init_upper_bounds(i));
     }
 
-    if (target.has_value()) {
-      if (std::holds_alternative<Vec<CType>>(target.value())) {
-        register_target(std::get<Vec<CType>>(target.value()));
-      } else if (std::holds_alternative<std::vector<CType>>(target.value())) {
-        register_target(std::get<std::vector<CType>>(target.value()));
-      } else {
-        // this assumes that the evaluation function is reasonably cheap
-        // (lazy evaluation would be an option, but more complex and not really
-        // that beneficial)
-        auto [dvals, cvals] = std::get<1>(target.value());
-        register_target_front(dvals, cvals);
-      }
+    // if (target.has_value()) {
+    //   add_any_target(target.value());
+    // }
+    // if (std::holds_alternative<Vec<CType>>(target.value())) {
+    //   add_target(std::get<Vec<CType>>(target.value()));
+    // } else if (std::holds_alternative<std::vector<CType>>(target.value())) {
+    //   add_target(std::get<std::vector<CType>>(target.value()));
+    // } else {
+    //   // this assumes that the evaluation function is reasonably cheap
+    //   // (lazy evaluation would be an option, but more complex and not really
+    //   // that beneficial)
+    //   auto [dvals, cvals] = std::get<1>(target.value());
+    //   register_target_front(dvals, cvals);
+    // }
+    //  }
+    if (target_objectives.has_value()) {
+      add_target(target_objectives.value());
+    }
+    if (target_archive_size.has_value()) {
+      add_target_front_size(target_archive_size.value());
+      // add_target([target_archive_size = target_archive_size.value()](const ArchiveBase& archive) {
+      //   return archive.size() >= target_archive_size;
+      // });
     }
   };
 
@@ -7757,50 +8089,31 @@ class BenchmarkInstance final : public InstanceBase {
     __goblin_runtime_assert(static_cast<usize>(_continuous_init_upper_bounds.size()) == _objectives->num_continuous());
   };
 
-  void register_target(CRefS<Vec<CType>> target_objectives) {
-    _target.clear();
-    Solution s(
-        archive_fitness().worst(),
-        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
-        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
-    auto& q = s.quality_as<MOQuality>();
-    q.objectives = target_objectives;
-    __goblin_runtime_assert(static_cast<usize>(q.objectives.size()) >= fitness().num_objectives());
-    q.constraint_value = 0.0;
-    _target.update(s, false);
-  };
-
-  void register_target(std::vector<CType> target_objectives) {
-    register_target(Eigen::Map<Vec<CType>>(target_objectives.data(), target_objectives.size()));
-  };
-
-  void register_target_front(const ArchiveBase& other) {
-    _target.clear();
-    for (usize i = 0; i < other.size(); i++) {
-      _target.update(other[i], false);
-    }
-  };
+  void register_target_front(const ArchiveBase& other) { add_target(other); };
 
   void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
-    _target.clear();
-    if (num_discrete() > 0 && num_continuous() > 0) {
-      __goblin_runtime_assert(discrete.rows() == continuous.rows());
-    }
-    __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
-    __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
-    for (isize i = 0; i < discrete.rows(); i++) {
-      Solution s(archive_fitness().worst(),
-                 num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
-                 num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.row(i)) : std::nullopt);
-      _objectives->evaluate(s);
-      _target.update(s, false);
-    }
+    add_target_front(discrete, continuous);
+    // UnboundedArchive _target(archive_fitness());
+    // _target.clear();
+    // if (num_discrete() > 0 && num_continuous() > 0) {
+    //   __goblin_runtime_assert(discrete.rows() == continuous.rows());
+    // }
+    // __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
+    // __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
+    // for (isize i = 0; i < discrete.rows(); i++) {
+    //   Solution s(archive_fitness().worst(),
+    //              num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
+    //              num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.row(i)) : std::nullopt);
+    //   _objectives->evaluate(s);
+    //   _target.update(s, false);
+    // }
+
+    // add_target(_target);
+
+    // add_target([&](const ArchiveBase& archive) { return archive.covers(_target); });
   };
 
-  void register_target_archive_size(usize target_archive_size) {
-    __goblin_runtime_assert(target_archive_size > 1);
-    _target_archive_size = target_archive_size;
-  };
+  void register_target_archive_size(usize target_archive_size) { add_target_front_size(target_archive_size); };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
 
@@ -7834,22 +8147,10 @@ class BenchmarkInstance final : public InstanceBase {
 
   const ArchiveFitnessBase& archive_fitness() const override final { return _fitness; }
 
-  bool target_reached(const ArchiveBase& archive) const override final {
-    if (!_target.empty()) {
-      return archive.covers(_target);
-    } else if (_target_archive_size.has_value()) {
-      return archive.size() >= _target_archive_size.value();
-    } else {
-      return false;
-    }
-  };
-
  private:
   std::shared_ptr<MOFunctionBase> _objectives;
   MOFitness _fitness;
   std::shared_ptr<InitBase> _init;
-  UnboundedArchive _target;
-  std::optional<usize> _target_archive_size;
   Vec<DType> _discrete_domain_sizes;
   Vec<CType> _continuous_lower_bounds;
   Vec<CType> _continuous_upper_bounds;

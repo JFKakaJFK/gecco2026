@@ -10,6 +10,8 @@
 
 #include "goblin/bench/functions.h"
 #include "goblin/lib/assert.h"
+#include "goblin/lib/fitness.h"
+#include "goblin/lib/archive.h"
 
 namespace goblin {
 
@@ -215,6 +217,28 @@ class ZDT1 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
 /// ZDT2 from https://doi.org/10.1162/106365600568202
@@ -250,6 +274,28 @@ class ZDT2 : public MOFunctionBase {
     h = 1.0 - h * h;
 
     q.objectives(1) = g * h;
+  }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - x0 * x0;
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
   }
 };
 
@@ -287,6 +333,28 @@ class ZDT3 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0) - x0 * std::sin(10.0 * std::numbers::pi * x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
 /// ZDT4 from https://doi.org/10.1162/106365600568202
@@ -321,6 +389,36 @@ class ZDT4 : public MOFunctionBase {
     CType h = 1.0 - std::sqrt(solution.continuous_values()(0) / g);
 
     q.objectives(1) = g * h;
+  }
+
+  Vec<CType> continuous_lower_bounds() const {
+    Vec<CType> lb = Vec<CType>::Constant(dims, -5.0);
+    lb(0) = 0.0;
+    return lb;
+  };
+  Vec<CType> continuous_upper_bounds() const {
+    Vec<CType> ub = Vec<CType>::Constant(dims, 5.0);
+    ub(0) = 1.0;
+    return ub;
+  };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = x0;
+      o.objectives(1) = 1.0 - std::sqrt(x0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
   }
 };
 
@@ -368,6 +466,28 @@ class ZDT5 : public MOFunctionBase {
 
     q.objectives(1) = g * h;
   }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = 1.0 + static_cast<CType>(u(x0, 30));
+      o.objectives(1) = 10.0 * (1.0 / o.objectives(0));
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
+  }
 };
 
 /// ZDT6 from https://doi.org/10.1162/106365600568202
@@ -404,6 +524,28 @@ class ZDT6 : public MOFunctionBase {
     h = 1.0 - h * h;
 
     q.objectives(1) = g * h;
+  }
+
+  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
+  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+
+  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+    CType x0 = 0.0;
+    CType step = 1.0 / static_cast<CType>(num_samples - 1);
+
+    MOFitness f(2);
+    auto pf = std::make_shared<UnboundedArchive>(f);
+    for (usize i = 0; i < num_samples; i++) {
+      auto q = f.worst();
+      auto& o = q->as<MOQuality>();
+      o.objectives(0) = 1.0 - std::exp(-4.0 * x0) * std::pow(std::sin(6.0 * std::numbers::pi * x0), 6);
+      o.objectives(1) = 1.0 - o.objectives(0) * o.objectives(0);
+      o.constraint_value = 0.0;
+      pf->update(Solution(std::move(q), std::nullopt, Vec<CType>::Zero(dims)));
+
+      x0 += step;
+    }
+    return pf;
   }
 };
 

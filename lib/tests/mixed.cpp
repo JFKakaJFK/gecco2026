@@ -21,7 +21,7 @@ TEST_CASE("goblin::methods::mixed") {
   const usize REPEATS = 4;
   BenchmarkInstance instance(std::make_shared<Repeat>(std::make_shared<DeceptiveTrap>(5), REPEATS));
   double vtr = 5.0 * REPEATS;
-  instance.register_target({vtr});
+  instance.add_target(vtr);
 
   Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
 

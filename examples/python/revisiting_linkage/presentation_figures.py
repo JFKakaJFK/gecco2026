@@ -1908,8 +1908,352 @@ def linkage_example2():
     )
 
 
+Node_FOS = [
+    [0],
+    [1],
+    [2],
+    [3],
+    [4],
+    [5],
+    [6],
+    [7],
+    [8],
+    [9],
+    [10],
+    [11],
+    [12],
+    [13],
+    [14],
+    [15],
+    [16],
+    [17],
+    [18],
+    [19],
+    [20],
+    [21],
+    [22],
+    [23],
+    [24],
+    [25],
+    [26],
+    [27],
+    [28],
+    [29],
+    [30],
+    [13, 27],
+    [13, 27, 28],
+    [2, 6],
+    [7, 15],
+    [7, 15, 16],
+    [10, 21],
+    [2, 5, 6],
+    [12, 26],
+    [14, 29],
+    [0, 2, 5, 6],  #
+    [1, 3],  #
+    [14, 29, 30],  #
+    [11, 24],
+    [10, 21, 22],
+    [11, 23, 24],
+    [4, 9],
+    [12, 25, 26],
+    [4, 9, 10, 21, 22],  #
+    [19, 20],  #
+    [1, 3, 4, 9, 10, 21, 22],
+    [0, 1, 2, 3, 4, 5, 6, 9, 10, 21, 22],  #
+    [11, 12, 23, 24, 25, 26],
+    [8, 18],
+    [8, 17, 18],
+    [0, 1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 21, 22, 23, 24, 25, 26],
+    [7, 8, 15, 16, 17, 18],  #
+    [13, 14, 27, 28, 29, 30],
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 18, 21, 22, 23, 24, 25, 26],
+    [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+    ],
+]
+
+
+def example_template_fos():
+    template = Template([TemplateNode.full_nary(branching_factor=2, depth=4)], [])
+    ctx = GPContext(
+        num_inputs=1,
+        expression_template=template,
+        operators=[],
+        constant_representation="none",
+    )
+    template_structure = ctx2graph(ctx)
+
+    fig, axes = plt.subplot_mosaic(
+        """
+        T
+        """,
+        figsize=(12, 8),
+        # figsize=(32, 8),
+        # gridspec_kw=dict(width_ratios=[1.5, 1, 1], wspace=0.25),
+    )
+
+    # axes["T"].set_axis_off()
+
+    pos = draw_nx(
+        template_structure,
+        axes["T"],
+        # labels={n: template_structure.nodes[n]["label"] for n in template_structure},
+        xscale=1,
+        yscale=1,
+        dy=0.15,
+        dx=1,
+        # label_offset=(0, 0),
+        node_size=800,
+        margins=0.05,
+    )
+
+    def vl(v_):
+        return np.sqrt(np.dot(v_, v_))
+
+    def n(v_):
+        return v_ / vl(v_)
+
+    def rot(v_, deg):
+        rad = deg / 180.0 * np.pi
+        return np.array([[np.cos(rad), -np.sin(rad)], [np.sin(rad), np.cos(rad)]]) @ v_
+
+    def point(xy, marker="x", s=100, **kwargs):
+        axes["T"].scatter([xy[0]], [xy[1]], marker=marker, s=s, **kwargs)
+
+    def vec(xy, v_, pt_kwargs=None, **kwargs):
+        if pt_kwargs is None:
+            pt_kwargs = {}
+        if "color" not in pt_kwargs:
+            pt_kwargs["color"] = kwargs.get("color")
+        point(xy, **pt_kwargs)
+        xy2 = xy + v_
+        axes["T"].plot([xy[0], xy2[0]], [xy[1], xy2[1]], **kwargs)
+
+    def shortest_angle(v0, v1):
+        n0, n1 = n(v0), n(v1)
+        return np.arccos(np.dot(n0, n1)) / np.pi * 180
+
+    def intersect(xy0, v0, xy1, v1):
+        xy01 = xy0 + v0
+        xy11 = xy1 + v1
+
+        x1, y1 = xy0
+        x2, y2 = xy01
+        x3, y3 = xy1
+        x4, y4 = xy11
+
+        a = x1 * y2 - y1 * x2
+        b = x3 * y4 - y3 * x4
+        d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
+
+        assert np.abs(d) > 1e-6
+        xyi = (a * (xy1 - xy11) - b * (xy0 - xy01)) / d
+
+        # vec(xy0, v0, color="red")
+        # vec(xy1, v1, color="blue")
+        # point(xyi, color="orange")
+        return xyi
+
+    X, Y = np.array([1.0, 0.0]), np.array([0.0, 1.0])
+
+    def arc_between(xy0, xy1, cxy, long: bool = False):
+        txy0, txy1 = xy0 - cxy, xy1 - cxy
+
+        theta1, theta2 = shortest_angle(X, txy0), shortest_angle(X, txy1)
+        if txy0[1] < 0.0:
+            theta1 = 360.0 - theta1
+        if txy1[1] < 0.0:
+            theta2 = 360.0 - theta2
+
+        flip = theta1 > theta2
+        if long:
+            flip = not flip
+        if flip:
+            theta1, theta2 = theta2, theta1
+
+        if theta2 - theta1 > (360.0 - theta2) + theta1:
+            flip = not flip
+            theta1, theta2 = theta2, theta1
+        arc = Path.arc(theta1, theta2)
+
+        r, r1 = vl(xy0 - cxy), vl(xy1 - cxy)
+        assert np.abs(r - r1) < 1e-6, (r, r1)
+
+        yield Path.MOVETO, xy1 if flip else xy0
+        for c, v in zip(arc.codes[1:-1], arc.vertices[1:-1]):
+            yield c, v * r + cxy
+        yield Path.LINETO, xy0 if flip else xy1
+        yield Path.MOVETO, xy1
+
+    xy = np.array([list(pos[i]) for i in range(ctx.num_discrete)])
+    v = np.array(
+        [
+            [(xy[j] - xy[i]).tolist() for j in range(ctx.num_discrete)]
+            for i in range(ctx.num_discrete)
+        ]
+    )
+
+    # [0, 2, 5, 6],  #
+    # [1, 3],  #
+    # [14, 29, 30],  #
+    # [4, 9, 10, 21, 22],  #
+    # [19, 20],  #
+    # [0, 1, 2, 3, 4, 5, 6, 9, 10, 21, 22],  #
+    # [7, 8, 15, 16, 17, 18],  #
+
+    dz = 0.0575
+
+    sets = [
+        [0, 2, 6, 5],
+        [1, 3],
+        [14, 30, 29],
+        [4, 10, 22, 21, 9],  # -20,
+        [25, 26],
+        # [0, 1, 2, 3, 4, 5, 6, 9, 10, 21, 22],
+        [7, 8, 18, 15],  # 16, 17
+    ]
+    # sets = [[0, 2, 6, 2, 5, 2]]
+
+    def set2path(set):
+        path = []
+        for i in range(len(set)):
+            node = set[i % len(set)]
+            prev = set[(i - 1) % len(set)]
+            next = set[(i + 1) % len(set)]
+            p0 = xy[node] + n(rot(v[node, next], 90.0)) * dz
+            p1 = xy[next] + n(rot(v[next, node], -90.0)) * dz
+
+            if i == 0:
+                pend = xy[node] + n(rot(v[node, prev], -90.0)) * dz
+                path.append((Path.MOVETO, pend))
+
+            # edge case where arc is inverted
+            long_arc = prev == next  # np.allclose(p0 + (p1 - p0) / 2, xy[node])
+
+            if long_arc:
+                mid = xy[node] + n(v[prev, node] + v[next, node]) * dz
+                path += arc_between(path[-1][1], mid, xy[node])
+                path += arc_between(mid, p0, xy[node])
+            elif node == 21 and next == 9:
+                p20 = xy[20] + n(rot(p1 - p0, -90.0)) * dz
+                p20_0 = xy[20] + n(rot(p20 - p0, -90.0)) * dz
+                p20_1 = xy[20] + n(rot(p1 - p20, -90.0)) * dz
+                p0_1 = xy[node] + n(rot(p0 - p20_0, -90.0)) * dz
+                p1_1 = xy[next] + n(rot(p20_1 - p1, -90.0)) * dz
+
+                path += arc_between(path[-1][1], p0_1, xy[node])
+
+                path.append((Path.LINETO, p20_0))
+                path += arc_between(p20_0, p20_1, xy[20])
+                path.append((Path.LINETO, p1_1))
+                path += arc_between(p1_1, p1, xy[next])
+            else:
+                path += arc_between(path[-1][1], p0, xy[node])
+
+            path.append((Path.LINETO, p1))
+
+        path.append((Path.CLOSEPOLY, path[0][1]))
+        return path
+
+    path_kwargs = dict(
+        # edgecolor="k",
+        edgecolor="#cf113a",
+        linewidth=1.5,
+        # ls=(0, (4, 4)),
+        facecolor="none",
+        # alpha=0.25,
+        zorder=100,
+    )
+
+    def draw_path(path, **kwargs):
+        kw = {**path_kwargs}
+        for k, v in kwargs.items():
+            kw[k] = v
+        if isinstance(path, Path):
+            pass
+        else:
+            codes, verts = zip(*path)
+            path = Path(verts, codes)
+        axes["T"].add_patch(PathPatch(path, **kw))
+
+    for set in sets:
+        draw_path(set2path(set))
+
+    # highglight_subfns = True
+    # if highglight_subfns:
+    #     dz = 0.17
+    #     # draw_path(Path.circle(xy[3], radius=dz), edgecolor="k")
+    #     # draw_path(Path.circle(xy[4], radius=dz), edgecolor="k")
+    #     # draw_path(Path.circle(xy[5], radius=dz), edgecolor="k")
+    #     # draw_path(Path.circle(xy[6], radius=dz), edgecolor="k")
+    #     # draw_path(path_f1, edgecolor="k")
+    #     draw_path(path_0256)  # , edgecolor="k")
+    #     # draw_path(path_f0)  # , ls="-.")
+
+    # nx.draw_networkx_labels(
+    #     template_structure,
+    #     {n: (x + 35, y - 15) for n, (x, y) in pos.items()},
+    #     {n: f"${{}}_{n}$" for n in template_structure},
+    #     ax=axes["T"],
+    # )
+    axes["T"].set_xlabel("Template (H=5)")
+
+    # axes["T"].set_aspect(1)
+
+    # sns.heatmap(
+    #     node_proximity,
+    #     annot=node_proximity,
+    #     mask=np.eye(node_proximity.shape[0], dtype=np.bool_),
+    #     cmap="Blues",
+    #     vmin=0,
+    #     vmax=1,
+    #     square=True,
+    #     annot_kws=dict(fontsize="x-small"),
+    #     ax=axes["N"],
+    #     cbar=False,
+    # )
+    # axes["N"].set_xlabel("Node Proximity")
+    # axes["N"].tick_params(labelsize="x-small", pad=2, length=2)
+
+    fig.savefig(
+        "template_fos_example.pdf",
+        dpi=600,
+        transparent=True,
+        bbox_inches="tight",
+    )
+
+
 if __name__ == "__main__":
-    example_templates()
+    # example_templates()
     # example_solution()
     # plt.show()
     # example_node_proximity()
@@ -1921,3 +2265,5 @@ if __name__ == "__main__":
     # plt.show()
     # linkage_example2()
     # plt.show()
+
+    example_template_fos()

@@ -45,7 +45,7 @@ TEST_CASE("goblin::gp::archive_objectives") {
   for (usize objectives_to_optimize = 1; objectives_to_optimize <= objectives.size(); objectives_to_optimize++) {
     SRProblem srp(ctx, X, Y, X_test, Y_test, objectives, /* objectives_to_optimize = */ objectives_to_optimize,
                   /* linear_scaling */ true);
-    srp.register_target(vtr);
+    srp.add_target(vtr);
 
     Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
     auto gomea = MixedGOMEA(PopulationOptions(), RvOptions{.enabled = false},
