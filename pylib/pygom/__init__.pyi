@@ -736,14 +736,6 @@ class Budget:
 # #ifndef _GOBLIN_LIB_INSTANCE_H
 #
 
-# - (Single) solution values (derive objectives)
-# - (Single) solution objectives (use dummy values, eval != actual fitness)
-# TODO multiple solution values / objectives
-#
-#   => (a => a.covers(X))
-# - Front size (a => a.size() >= X)
-# - Front predicate (e.g. D(PF->S) <= X) => (a => a.distance_to(PF = a') < X)
-
 class CacheKey:
     @overload
     def __init__(self, key: str) -> None:
@@ -879,7 +871,7 @@ class InstanceBase:
 
     def target_reached(self, archive: ArchiveBase) -> bool:
         pass
-    # InstanceBase& add_target(AnyTarget target);
+
     @overload
     def add_target(
         self, target_reached_check: Callable[[ArchiveBase], bool]
@@ -907,6 +899,11 @@ class InstanceBase:
     def add_target_front_size(self, target_front_size: int) -> InstanceBase:
         pass
 
+    @overload
+    def add_target_front(self, target_objectives: np.ndarray) -> InstanceBase:
+        pass
+
+    @overload
     def add_target_front(
         self,
         discrete: Optional[np.ndarray],
@@ -918,61 +915,6 @@ class InstanceBase:
     @overload
     def add_target(self, target_fitness: float) -> InstanceBase:
         pass
-    #
-    #  InstanceBase& add_any_target(AnyTarget target) {
-    #    // return std::visit([&](auto&& arg) -> InstanceBase& { return add_target(arg); }, target);
-    #    //
-    #    // return
-    #    std::visit([&](auto&& arg) { add_target(arg); }, target);
-    #    return *this;
-    #
-    #    // return std::visit(
-    #    //     [&](auto&& arg) -> InstanceBase& {
-    #    //       using T = std::decay_t<decltype(arg)>;
-    #    //       if constexpr (std::is_same_v<T, CType>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, Vec<CType>>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, std::vector<CType>>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const QualityBase>>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const SolutionBase>>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const ArchiveBase>>) {
-    #    //         return add_target(arg);
-    #    //       } else if constexpr (std::is_same_v<T, std::function<bool(const ArchiveBase&)>>) {
-    #    //         return add_target(arg);
-    #    //       } else {
-    #    //         static_assert(sizeof(T) == 0, "non-exhaustive visitor!");
-    #    //       }
-    #    //     },
-    #    //     target);
-    #
-    #    // std::visit(overloaded{
-    #    //                [&](CType arg) { add_target(arg); },
-    #    //                [&](Vec<CType> arg) { add_target(arg); },
-    #    //                [&](std::vector<CType> arg) { add_target(arg); },
-    #    //                [&](std::reference_wrapper<const QualityBase> arg) { add_target(arg); },
-    #    //                [&](std::reference_wrapper<const SolutionBase> arg) { add_target(arg); },
-    #    //                [&](std::reference_wrapper<const ArchiveBase> arg) { add_target(arg); },
-    #    //                [&](std::function<bool(const ArchiveBase&)> arg) { add_target(arg); },
-    #    //            },
-    #    //            target);
-    #
-    #    // if (std::holds_alternative<CType>(target)) {
-    #    //   return add_target(std::get<CType>(target));
-    #    //   // } else if (std::holds_alternative<Vec<CType>>(target)) {
-    #    //   // return add_target(std::get<Vec<CType>>(target));
-    #    // } else if (std::holds_alternative<std::vector<CType>>(target)) {
-    #    //   return add_target(std::get<std::vector<CType>>(target));
-    #    // } else {
-    #    //   throw std::runtime_error("Non exhaustive visitor.");
-    #    // }
-    #  };
-    #
-
-    # virtual bool target_reached(const ArchiveBase& archive) const { return False; };
 
     def log_header(self, os: io.IOBase) -> None:  # overridable
         pass
@@ -2748,6 +2690,7 @@ class ObjectiveBase:
 
     def num_continuous(self) -> int:  # overridable (pure virtual)
         pass
+    # TODO add extensions to allow providing domain/vtr info
 
     def evaluate(  # overridable (pure virtual)
         self,
@@ -2787,6 +2730,18 @@ class MOFunctionBase:
         pass
 
     def num_continuous(self) -> int:  # overridable (pure virtual)
+        pass
+
+    def discrete_domain_sizes(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:  # overridable
         pass
 
     def evaluate(self, solution: SolutionBase) -> None:  # overridable (pure virtual)
@@ -3611,7 +3566,7 @@ class CirclesInASquare(ObjectiveBase):
 class ZDT1(MOFunctionBase):
     """/ ZDT1 from https://doi.org/10.1162/106365600568202"""
 
-    def __init__(self, dims: int = 30) -> None:
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3626,19 +3581,19 @@ class ZDT1(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 class ZDT2(MOFunctionBase):
     """/ ZDT2 from https://doi.org/10.1162/106365600568202"""
 
-    def __init__(self, dims: int = 30) -> None:
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3653,19 +3608,19 @@ class ZDT2(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 class ZDT3(MOFunctionBase):
     """/ ZDT3 from https://doi.org/10.1162/106365600568202"""
 
-    def __init__(self, dims: int = 30) -> None:
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3680,19 +3635,21 @@ class ZDT3(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 class ZDT4(MOFunctionBase):
-    """/ ZDT4 from https://doi.org/10.1162/106365600568202"""
+    """TODO fix bug (crashes sometimes...)
+    / ZDT4 from https://doi.org/10.1162/106365600568202
+    """
 
-    def __init__(self, dims: int = 10) -> None:
+    def __init__(self, dims: int = 10, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3707,19 +3664,19 @@ class ZDT4(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 class ZDT5(MOFunctionBase):
     """/ ZDT5 from https://doi.org/10.1162/106365600568202"""
 
-    def __init__(self, dims: int = 11) -> None:
+    def __init__(self, dims: int = 11, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3734,19 +3691,19 @@ class ZDT5(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 class ZDT6(MOFunctionBase):
     """/ ZDT6 from https://doi.org/10.1162/106365600568202"""
 
-    def __init__(self, dims: int = 10) -> None:
+    def __init__(self, dims: int = 10, pareto_front_samples: int = 100) -> None:
         pass
 
     def num_objectives(self) -> int:
@@ -3761,13 +3718,13 @@ class ZDT6(MOFunctionBase):
     def evaluate(self, solution: SolutionBase) -> None:
         pass
 
-    def continuous_lower_bounds(self) -> np.ndarray:
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def continuous_upper_bounds(self) -> np.ndarray:
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
         pass
 
-    def pareto_front(self, num_samples: int) -> ArchiveBase:
+    def pareto_front(self) -> Optional[ArchiveBase]:
         pass
 
 # #endif
@@ -3877,6 +3834,7 @@ class BenchmarkInstance(InstanceBase):
         init: Optional[AnyInit] = None,
         target_objectives: Optional[List[float]] = None,
         target_archive_size: Optional[int] = None,
+        target_tolerance: Optional[float] = None,
     ) -> None:
         """Python bindings defaults:
         If any of the params below is None, then its default value below will be used:
@@ -3901,19 +3859,6 @@ class BenchmarkInstance(InstanceBase):
             * continuous_init_lower_bound: float(0.0)
             * continuous_init_upper_bound: float(1.0)
         """
-        pass
-
-    @overload
-    def register_target_front(self, other: ArchiveBase) -> None:
-        pass
-
-    @overload
-    def register_target_front(
-        self, discrete: np.ndarray, continuous: np.ndarray
-    ) -> None:
-        pass
-
-    def register_target_archive_size(self, target_archive_size: int) -> None:
         pass
 
     def discrete_domain_sizes(self) -> np.ndarray:
@@ -3996,6 +3941,7 @@ class TrackingOptions:
         consider_evaluation_time: bool = True,
         report_intermediate_results: bool = True,
         report_on_archive_change: bool = False,
+        report_raw_solutions: bool = False,
         initial_evaluations_until_next_report: int = 10,
         eval_factor: int = 2,
         max_evaluations_until_next_report: int = 1000000,
@@ -4023,6 +3969,7 @@ class TrackingOptions:
     consider_evaluation_time: bool
     report_intermediate_results: bool
     report_on_archive_change: bool
+    report_raw_solutions: bool
 
     initial_evaluations_until_next_report: int
     eval_factor: int  # 1 is linear, >= 2 is exponential spacing

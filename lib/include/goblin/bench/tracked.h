@@ -140,6 +140,8 @@ class TrackingOptions {
                   /// Report every time the elitist archive gets updated (for when algorithm behaviour is more
                   /// interesting than the results)
                   bool report_on_archive_change = false,
+                  /// If enabled, the raw discrete/continuous values and active information is logged
+                  bool report_raw_solutions = false,
                   u64 initial_evaluations_until_next_report = 10,
                   u64 eval_factor = 2,
                   u64 max_evaluations_until_next_report = 1000000,
@@ -154,6 +156,7 @@ class TrackingOptions {
         consider_evaluation_time(consider_evaluation_time),
         report_intermediate_results(report_intermediate_results),
         report_on_archive_change(report_on_archive_change),
+        report_raw_solutions(report_raw_solutions),
         initial_evaluations_until_next_report(initial_evaluations_until_next_report),
         eval_factor(eval_factor),
         max_evaluations_until_next_report(max_evaluations_until_next_report),
@@ -178,6 +181,7 @@ class TrackingOptions {
   bool consider_evaluation_time;
   bool report_intermediate_results;
   bool report_on_archive_change;
+  bool report_raw_solutions;
 
   u64 initial_evaluations_until_next_report;
   u64 eval_factor;  // 1 is linear, >= 2 is exponential spacing
@@ -555,13 +559,18 @@ class Tracked final : public WrappedInstance {
 
     for (usize i = 0; i < solutions.size(); i++) {
       const auto& s = solutions[i];
-      // clang-format off
-        logfile << common;
+
+      logfile << common;
+      if (config.report_raw_solutions) {
+        // clang-format off
         log_helper(logfile,   s.discrete_values(), true); logfile << ',';
         log_helper(logfile,   s.discrete_active(), true); logfile << ',';
         log_helper(logfile, s.continuous_values(), true); logfile << ',';
         log_helper(logfile, s.continuous_active(), true); logfile << ',';
-      // clang-format on
+        // clang-format on
+      } else {
+        logfile << ",,,,";
+      }
       inner.log(logfile, s);
       logfile << "\n";
     }

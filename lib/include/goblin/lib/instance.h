@@ -22,14 +22,6 @@
 
 namespace goblin {
 
-// - (Single) solution values (derive objectives)
-// - (Single) solution objectives (use dummy values, eval != actual fitness)
-// TODO multiple solution values / objectives
-//
-//   => (a => a.covers(X))
-// - Front size (a => a.size() >= X)
-// - Front predicate (e.g. D(PF->S) <= X) => (a => a.distance_to(PF = a') < X)
-
 class CacheKey {
  public:
   explicit CacheKey(const std::string& key);
@@ -157,7 +149,6 @@ class InstanceBase {
     return false;
   };
 
-  // InstanceBase& add_target(AnyTarget target);
   InstanceBase& add_target(std::function<bool(const ArchiveBase&)> target_reached_check) {
     if (_target_reached) {
       auto existing = std::move(_target_reached);
@@ -222,6 +213,33 @@ class InstanceBase {
   InstanceBase& add_target_front_size(usize target_front_size) {
     return add_target([target_front_size](const ArchiveBase& archive) { return archive.size() >= target_front_size; });
   }
+  InstanceBase& add_target_front(Mat<CType> target_objectives) {
+    auto vtr = archive_fitness().worst();
+    if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+      throw std::runtime_error(
+          "A matrix of objective values is only a valid target value in combination with `MOQuality` or a subclass "
+          "as quality.");
+    }
+
+    auto& q = vtr->as<MOQuality>();
+    q.constraint_value = 0.0;
+    q.objectives.fill(0.0);
+
+    usize no = target_objectives.cols();
+    if (fitness().num_objectives() > no || no > archive_fitness().num_objectives()) {
+      throw std::runtime_error("Mismatch in number of target objectives provided.");
+    }
+
+    UnboundedArchive target_front(archive_fitness());
+    for (isize i = 0; i < target_objectives.rows(); i++) {
+      for (isize j = 0; j < target_objectives.cols(); j++) {
+        q.objectives(j) = target_objectives(i, j);
+      }
+      target_front.update(Solution(vtr->clone(), Vec<DType>::Zero(num_discrete()), Vec<CType>::Zero(num_continuous())));
+    }
+
+    return add_target(target_front);
+  };
   InstanceBase& add_target_front(std::optional<Mat<DType>> discrete,
                                  std::optional<Mat<CType>> continuous,
                                  std::optional<usize> evaluation_seed = std::nullopt) {
@@ -229,7 +247,7 @@ class InstanceBase {
       if (!discrete.has_value()) {
         throw std::runtime_error("Problem has discrete variables but none were provided.");
       }
-      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+      if (static_cast<usize>(discrete.value().cols()) != num_discrete()) {
         throw std::runtime_error("Mismatch in number of discrete variables provided");
       }
     }
@@ -237,7 +255,7 @@ class InstanceBase {
       if (!continuous.has_value()) {
         throw std::runtime_error("Problem has continuous variables but none were provided.");
       }
-      if (discrete.value().cols() != static_cast<usize>(num_discrete())) {
+      if (static_cast<usize>(discrete.value().cols()) != num_discrete()) {
         throw std::runtime_error("Mismatch in number of discrete variables provided");
       }
     }
@@ -249,7 +267,7 @@ class InstanceBase {
 
     AoSSet s;
     std::vector<usize> indices(n);
-    for (isize i = 0; i < n; i++) {
+    for (usize i = 0; i < n; i++) {
       s.add(Solution(archive_fitness().worst(),
                      num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.value().row(i)) : std::nullopt,
                      num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.value().row(i)) : std::nullopt));
@@ -283,61 +301,6 @@ class InstanceBase {
 
     return add_target(*vtr);
   };
-  /*
-  InstanceBase& add_any_target(AnyTarget target) {
-    // return std::visit([&](auto&& arg) -> InstanceBase& { return add_target(arg); }, target);
-    //
-    // return
-    std::visit([&](auto&& arg) { add_target(arg); }, target);
-    return *this;
-
-    // return std::visit(
-    //     [&](auto&& arg) -> InstanceBase& {
-    //       using T = std::decay_t<decltype(arg)>;
-    //       if constexpr (std::is_same_v<T, CType>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, Vec<CType>>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, std::vector<CType>>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const QualityBase>>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const SolutionBase>>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, std::reference_wrapper<const ArchiveBase>>) {
-    //         return add_target(arg);
-    //       } else if constexpr (std::is_same_v<T, std::function<bool(const ArchiveBase&)>>) {
-    //         return add_target(arg);
-    //       } else {
-    //         static_assert(sizeof(T) == 0, "non-exhaustive visitor!");
-    //       }
-    //     },
-    //     target);
-
-    // std::visit(overloaded{
-    //                [&](CType arg) { add_target(arg); },
-    //                [&](Vec<CType> arg) { add_target(arg); },
-    //                [&](std::vector<CType> arg) { add_target(arg); },
-    //                [&](std::reference_wrapper<const QualityBase> arg) { add_target(arg); },
-    //                [&](std::reference_wrapper<const SolutionBase> arg) { add_target(arg); },
-    //                [&](std::reference_wrapper<const ArchiveBase> arg) { add_target(arg); },
-    //                [&](std::function<bool(const ArchiveBase&)> arg) { add_target(arg); },
-    //            },
-    //            target);
-
-    // if (std::holds_alternative<CType>(target)) {
-    //   return add_target(std::get<CType>(target));
-    //   // } else if (std::holds_alternative<Vec<CType>>(target)) {
-    //   // return add_target(std::get<Vec<CType>>(target));
-    // } else if (std::holds_alternative<std::vector<CType>>(target)) {
-    //   return add_target(std::get<std::vector<CType>>(target));
-    // } else {
-    //   throw std::runtime_error("Non exhaustive visitor.");
-    // }
-  };
-   */
-
-  // virtual bool target_reached(const ArchiveBase& archive) const { return false; };
 
   virtual void log_header(std::ostream& os) const {
     os << "values,";

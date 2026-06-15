@@ -3,10 +3,12 @@
 #define _GOBLIN_BENCH_FUNCTIONS_H
 
 #include <tuple>
+#include <optional>
 
 #include "goblin/lib/types.h"
 #include "goblin/lib/subset.h"
 #include "goblin/lib/solution.h"
+#include "goblin/lib/archive.h"
 
 namespace goblin {
 
@@ -14,6 +16,8 @@ class ObjectiveBase {
  public:
   virtual usize num_discrete() const = 0;
   virtual usize num_continuous() const = 0;
+
+  // TODO add extensions to allow providing domain/vtr info
 
   virtual std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
                                             RefS<Vec<CType>> continuous_values,
@@ -43,6 +47,13 @@ class MOFunctionBase {
   virtual usize num_objectives() const = 0;
   virtual usize num_discrete() const = 0;
   virtual usize num_continuous() const = 0;
+
+  virtual std::optional<CRef<Vec<DType>>> discrete_domain_sizes() const { return std::nullopt; };
+
+  virtual std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const { return std::nullopt; };
+  virtual std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const { return std::nullopt; };
+
+  virtual std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const { return std::nullopt; }
 
   virtual void evaluate(SolutionBase& solution) = 0;
 

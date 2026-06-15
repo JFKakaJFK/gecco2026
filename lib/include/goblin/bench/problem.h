@@ -16,7 +16,7 @@
 
 namespace goblin {
 
-class PyFunctionBase : MOFunctionBase {
+class PyFunctionBase : public MOFunctionBase {
  public:
   virtual usize num_objectives() const override = 0;
   virtual usize num_discrete() const override = 0;
@@ -97,9 +97,9 @@ class BenchmarkInstance final : public InstanceBase {
                     std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0),
                     std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0),
                     std::optional<AnyInit> init = std::nullopt,
-                    // std::optional<AnyTarget> target = std::nullopt,
                     std::optional<std::vector<CType>> target_objectives = std::nullopt,
-                    std::optional<usize> target_archive_size = std::nullopt)
+                    std::optional<usize> target_archive_size = std::nullopt,
+                    std::optional<CType> target_tolerance = std::nullopt)
       : _objectives(std::holds_alternative<std::shared_ptr<MOFunctionBase>>(objectives)
                         ? std::get<std::shared_ptr<MOFunctionBase>>(objectives)
                         : (std::holds_alternative<std::shared_ptr<ObjectiveBase>>(objectives)
@@ -143,29 +143,43 @@ class BenchmarkInstance final : public InstanceBase {
       __goblin_runtime_assert(_continuous_init_lower_bounds(i) < _continuous_init_upper_bounds(i));
     }
 
-    // if (target.has_value()) {
-    //   add_any_target(target.value());
-    // }
-    // if (std::holds_alternative<Vec<CType>>(target.value())) {
-    //   add_target(std::get<Vec<CType>>(target.value()));
-    // } else if (std::holds_alternative<std::vector<CType>>(target.value())) {
-    //   add_target(std::get<std::vector<CType>>(target.value()));
-    // } else {
-    //   // this assumes that the evaluation function is reasonably cheap
-    //   // (lazy evaluation would be an option, but more complex and not really
-    //   // that beneficial)
-    //   auto [dvals, cvals] = std::get<1>(target.value());
-    //   register_target_front(dvals, cvals);
-    // }
-    //  }
     if (target_objectives.has_value()) {
       add_target(target_objectives.value());
     }
     if (target_archive_size.has_value()) {
       add_target_front_size(target_archive_size.value());
-      // add_target([target_archive_size = target_archive_size.value()](const ArchiveBase& archive) {
-      //   return archive.size() >= target_archive_size;
-      // });
+    }
+
+    // TODO for problem specified bounds/targets: either merge with user-provided information or only use one instead of
+    // silently overwriting user provided parameters...
+
+    auto fn_dbounds = _objectives->discrete_domain_sizes();
+    if (fn_dbounds.has_value()) {
+      // TODO check if current bounds are non-inf and outside -> conflict...
+      _discrete_domain_sizes = fn_dbounds.value();
+    }
+
+    auto fn_lb = _objectives->continuous_lower_bounds();
+    if (fn_lb.has_value()) {
+      // TODO check if current bounds are non-inf and outside -> conflict...
+      _continuous_lower_bounds = fn_lb.value();
+      _continuous_init_lower_bounds = fn_lb.value();
+    }
+
+    auto fn_ub = _objectives->continuous_upper_bounds();
+    if (fn_ub.has_value()) {
+      // TODO check if current bounds are non-inf and outside -> conflict...
+      _continuous_upper_bounds = fn_ub.value();
+      _continuous_init_upper_bounds = fn_ub.value();
+    }
+
+    // if the problem provides a pareto front of optimal solution objectives, typically the success condition is to
+    // approximate the target with some tolerance instead of perfect recovery -> only register a target condition if a
+    // tolerance is provided
+    auto fn_front = _objectives->pareto_front();
+    if (fn_front.has_value() && target_tolerance.has_value()) {
+      add_target([pareto_front = std::move(fn_front.value()), tolerance = target_tolerance.value()](
+                     const ArchiveBase& archive) { return archive.approximately_covers(*pareto_front, tolerance); });
     }
   };
 
@@ -189,32 +203,6 @@ class BenchmarkInstance final : public InstanceBase {
     }
     __goblin_runtime_assert(static_cast<usize>(_continuous_init_upper_bounds.size()) == _objectives->num_continuous());
   };
-
-  void register_target_front(const ArchiveBase& other) { add_target(other); };
-
-  void register_target_front(Mat<DType> discrete, Mat<CType> continuous) {
-    add_target_front(discrete, continuous);
-    // UnboundedArchive _target(archive_fitness());
-    // _target.clear();
-    // if (num_discrete() > 0 && num_continuous() > 0) {
-    //   __goblin_runtime_assert(discrete.rows() == continuous.rows());
-    // }
-    // __goblin_runtime_assert(static_cast<usize>(discrete.cols()) == num_discrete());
-    // __goblin_runtime_assert(static_cast<usize>(continuous.cols()) == num_continuous());
-    // for (isize i = 0; i < discrete.rows(); i++) {
-    //   Solution s(archive_fitness().worst(),
-    //              num_discrete() > 0 ? std::make_optional<Vec<DType>>(discrete.row(i)) : std::nullopt,
-    //              num_continuous() > 0 ? std::make_optional<Vec<CType>>(continuous.row(i)) : std::nullopt);
-    //   _objectives->evaluate(s);
-    //   _target.update(s, false);
-    // }
-
-    // add_target(_target);
-
-    // add_target([&](const ArchiveBase& archive) { return archive.covers(_target); });
-  };
-
-  void register_target_archive_size(usize target_archive_size) { add_target_front_size(target_archive_size); };
 
   CRef<Vec<DType>> discrete_domain_sizes() const override final { return _discrete_domain_sizes; };
 

@@ -1,3 +1,6 @@
+#include <stdexcept>
+#include <string>
+
 #include "goblin/methods/library.h"
 
 #include <gomea/src/common/linkage_config.hpp>
@@ -124,16 +127,27 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> DiscreteGOMEA::run(I
       qp.objectives(0) = parent->getObjectiveValue(0);
       qp.constraint_value = parent->getConstraintValue();
 
+      // only the discrete values need to be copied instead of the full solution (s[0] = _parent[0];)
       s[0].discrete_values() = _parent[0].discrete_values();
 
       touched_indices.discrete.clear();
       for (usize i = 0; i < solution->touched_indices.size(); i++) {
-        touched_indices.discrete.push_back(i);
+        touched_indices.discrete.push_back(solution->touched_indices[i]);
         solution->touched_variables[i] %= static_cast<char>(p.discrete_domain_sizes()(solution->touched_indices[i]));
         s[0].discrete_values()(solution->touched_indices[i]) = static_cast<DType>(solution->touched_variables[i]);
       }
-      // p.evaluate(rng, s, idxs);
+
       p.evaluate_partial(rng, s, _parent, subsets, idxs);
+
+      // auto sq = s[0].quality().clone();
+      // p.evaluate(rng, s, idxs);
+
+      // if (p.fitness().cmp(*sq, s[0].quality(), 0) != Ordering::Equal) {
+      //   std::println("{} @ ", p.format_solution(_parent[0]), touched_indices.discrete);
+      //   std::println("{} / {}", p.format_solution(s[0]), touched_indices.discrete);
+      //   std::println("actual: {}\nexpected: {}", p.fitness().format(*sq), p.fitness().format(s[0].quality()));
+      //   throw std::invalid_argument("Quality mismatch between full & partial evaluation");
+      // }
 
       auto& q = s[0].quality_as<MOQuality>();
       solution->setObjectiveValue(q.objectives(0));
@@ -302,7 +316,7 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> RvGOMEA::run(Instanc
 
       touched_indices.continuous.clear();
       for (usize i = 0; i < solution->touched_indices.size(); i++) {
-        touched_indices.continuous.push_back(i);
+        touched_indices.continuous.push_back(solution->touched_indices[i]);
         s[0].continuous_values()(solution->touched_indices[i]) = solution->touched_variables[i];
       }
 

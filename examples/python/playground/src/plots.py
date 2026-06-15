@@ -480,6 +480,8 @@ def plot_scalability(
             if log_x:
                 ax.set_xscale("log")
             sdims = sorted(set(all_dims))
+            if not sdims:
+                continue
             ax.set_xticks(sdims)
             # make sure all ticks are shown
             ax.get_xaxis().set_major_formatter(ticker.ScalarFormatter())

@@ -64,3 +64,18 @@ TEST_CASE("goblin::methods::mo_rv_gomea") {
 
   // REQUIRE(status == TerminationStatus::TargetReached);
 }
+
+// TEST_CASE("goblin::methods::mo_rv_gomea_zdt4") {
+//   BenchmarkInstance instance(std::make_shared<ZDT4>());
+
+//   Budget budget(/* max_evaluations = */ 1'000'000);
+
+//   auto gomea = MoRvGOMEA();
+//   auto [front, status] = Tracked::run(instance, gomea, budget, TrackingOptions("mo_rv_gomea.csv"));
+
+//   std::println("Status: {}", format_as(status));
+
+//   REQUIRE(front->empty() == false);
+
+//   REQUIRE(status == TerminationStatus::TargetReached);
+// }

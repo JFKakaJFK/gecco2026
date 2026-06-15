@@ -35,7 +35,6 @@
  */
 
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-= Section Includes -=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-#include <stdexcept>
 #include "MO_optimization.h"
 
 namespace mo_rv_gomea_impl {
@@ -335,7 +334,9 @@ void installedProblemEvaluation(int index,
     if (problem.target_reached(archive)) {
       global_status = goblin::TerminationStatus::TargetReached;
       // hand control back to the wrapper, no matter where this is called within MO-RV-GOMEA
-      throw std::runtime_error("");
+      // Note: the wonky manual short-circuiting instead of exceptions is to not mess with MO-RV-GOMEA state (would
+      // crash/not free up memory)
+      global_terminate_immediately = true;
     }
 
     // library quality -> MO-RV-GOMEA fitness
@@ -2628,9 +2629,13 @@ individual* initializeIndividual(void) {
 }
 
 void ezilaitiniIndividual(individual* ind) {
-  free(ind->objective_values);
-  free(ind->parameters);
-  free(ind);
+  if (ind != NULL) {
+    if (ind->objective_values != NULL)
+      free(ind->objective_values);
+    if (ind->parameters != NULL)
+      free(ind->parameters);
+    free(ind);
+  }
 }
 
 void copyIndividual(individual* source, individual* destination) {

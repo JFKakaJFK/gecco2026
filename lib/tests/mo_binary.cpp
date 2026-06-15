@@ -21,7 +21,7 @@ TEST_CASE("goblin::methods::mixed") {
   const usize NDIMS = 20;
   BenchmarkInstance instance(
       std::vector<std::shared_ptr<ObjectiveBase>>{std::make_shared<OneMax>(NDIMS), std::make_shared<ZeroMax>(NDIMS)});
-  instance.register_target_archive_size(NDIMS + 1);
+  instance.add_target_front_size(NDIMS + 1);
 
   Budget budget(/* max_evaluations = */ 100000, /* max_generations = */ 100);
 

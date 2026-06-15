@@ -353,6 +353,8 @@ inline goblin::TerminationStatus global_status{};
 inline goblin::AoSSet global_solution_set{};
 inline goblin::AoSSet global_parent_set{};
 
+inline bool global_terminate_immediately = false;
+
 inline int number_of_objectives, current_population_index,
     approximation_set_size; /* Number of solutions in the final answer (the approximation set). */
 inline double sum_of_ellipsoids_normalization_factor;

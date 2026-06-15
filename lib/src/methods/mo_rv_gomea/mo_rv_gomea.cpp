@@ -45,11 +45,7 @@
 #include "MO_optimization.h"
 
 #include <cstdint>
-#include <limits>
 #include <mutex>
-#include <random>
-#include <stdexcept>
-#include <tuple>
 
 #include "goblin/methods/mo_rv_gomea.h"
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -840,6 +836,10 @@ void initializePopulationAndFitnessValues(int population_index) {
                                0);
 
     updateElitistArchive(populations[population_index][i]);
+
+    if (global_terminate_immediately) {
+      return;
+    }
   }
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -982,6 +982,10 @@ short isSolutionInRangeBoundsForFOSElement(double* solution, int population_inde
 short checkTerminationConditionAllPopulations(void) {
   int i;
 
+  if (global_terminate_immediately) {
+    return 1;
+  }
+
   if (number_of_populations == 0)
     return (0);
 
@@ -1006,6 +1010,10 @@ short checkTerminationConditionAllPopulations(void) {
 }
 
 short checkTerminationConditionOnePopulation(int population_index) {
+  if (global_terminate_immediately) {
+    return 1;
+  }
+
   if (number_of_populations == 0)
     return (0);
 
@@ -2272,8 +2280,12 @@ void estimateFullCovarianceMatrixML(int population_index, int cluster_index) {
 
 void evaluateCompletePopulation(int population_index) {
   int i;
-  for (i = 0; i < population_sizes[population_index]; i++)
+  for (i = 0; i < population_sizes[population_index]; i++) {
     installedProblemEvaluation(problem_index, populations[population_index][i], number_of_parameters, NULL, NULL, 0, 0);
+    if (global_terminate_immediately) {
+      return;
+    }
+  }
 }
 
 /**
@@ -2300,6 +2312,10 @@ void generateAndEvaluateNewSolutionsToFillPopulationAndUpdateElitistArchive(int 
   if (!black_box_evaluations && (number_of_generations[population_index] + 1) % 50 == 0)
     evaluateCompletePopulation(population_index);
 
+  if (global_terminate_immediately) {
+    return;
+  }
+
   for (i = 0; i < number_of_mixing_components[population_index]; i++)
     computeParametersForSampling(population_index, i);
 
@@ -2319,8 +2335,15 @@ void generateAndEvaluateNewSolutionsToFillPopulationAndUpdateElitistArchive(int 
       for (i = 0; i < population_sizes[population_index]; i++) {
         if (cluster_index_for_population[population_index][i] != k)
           continue;
-        if (generateNewSolutionFromFOSElement(population_index, k, oj, i))
+        if (generateNewSolutionFromFOSElement(population_index, k, oj, i)) {
           generational_improvement[i] = 1;
+
+          if (global_terminate_immediately) {
+            free(order);
+            free(generational_improvement);
+            return;
+          }
+        }
         samples_current_cluster++;
       }
 
@@ -2345,6 +2368,12 @@ void generateAndEvaluateNewSolutionsToFillPopulationAndUpdateElitistArchive(int 
         c++;
         if (c >= 0.5 * tau * num_individuals_in_cluster[population_index][k])
           break;
+
+        if (global_terminate_immediately) {
+          free(is_improved_by_AMS);
+          free(generational_improvement);
+          return;
+        }
       }
       c = 0;
       for (i = 0; i < population_sizes[population_index]; i++) {
@@ -2370,8 +2399,14 @@ void generateAndEvaluateNewSolutionsToFillPopulationAndUpdateElitistArchive(int 
   // Forced Improvements
   if (use_forced_improvement) {
     for (i = 0; i < population_sizes[population_index]; i++) {
-      if (populations[population_index][i]->NIS > maximum_no_improvement_stretch)
+      if (populations[population_index][i]->NIS > maximum_no_improvement_stretch) {
         applyForcedImprovements(population_index, i, &(generational_improvement[i]));
+
+        if (global_terminate_immediately) {
+          free(generational_improvement);
+          return;
+        }
+      }
     }
   }
 
@@ -2515,6 +2550,10 @@ void applyForcedImprovements(int population_index, int individual_index, short* 
       installedProblemEvaluation(problem_index, populations[population_index][i], num_indices, indices, FI_backup,
                                  populations[population_index][i]->objective_values,
                                  populations[population_index][i]->constraint_value);
+      if (global_terminate_immediately) {
+        free(FI_backup);
+        return;
+      }
 
       if (single_objective_clusters[population_index][cluster_index] != -1) {
         objective_index = single_objective_clusters[population_index][cluster_index];
@@ -3151,6 +3190,10 @@ void runAllPopulations(void) {
       initializeNewPopulation();
     }
 
+    if (global_terminate_immediately) {
+      return;
+    }
+
     /*
     computeApproximationSet();
 
@@ -3358,14 +3401,17 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> MoRvGOMEA::run(Insta
   mo_rv_gomea_impl::global_rng_ptr = &rng;
 
   // actually run MO-RV-GOMEA
+  mo_rv_gomea_impl::global_terminate_immediately = false;
   mo_rv_gomea_impl::startTimer();
-  try {
-    // mo_rv_gomea_impl::checkOptions();
-    mo_rv_gomea_impl::initialize();
-    mo_rv_gomea_impl::runAllPopulations();
-    // mo_rv_gomea_impl::computeApproximationSet();
-  } catch (std::runtime_error& e) {
-  }
+
+  // mo_rv_gomea_impl::checkOptions();
+  mo_rv_gomea_impl::initialize();
+  mo_rv_gomea_impl::runAllPopulations();
+  // mo_rv_gomea_impl::computeApproximationSet();
+
+  // free memory
+  // mo_rv_gomea_impl::freeApproximationSet(); // only needed for MO-RV-GOMEA internal logging which is disabled
+  mo_rv_gomea_impl::ezilaitini();
 
   // TODO this does not work as intended and also show up for e.g. budget exhaustion (if the algorithm was not stopped
   // due to success/budget exhaustion, some internal convergence check probably triggered)
@@ -3373,9 +3419,6 @@ std::tuple<std::shared_ptr<ArchiveBase>, TerminationStatus> MoRvGOMEA::run(Insta
     mo_rv_gomea_impl::global_status = TerminationStatus::Converged;
   }
 
-  // free memory
-  // mo_rv_gomea_impl::freeApproximationSet(); // only needed for MO-RV-GOMEA internal logging which is disabled
-  mo_rv_gomea_impl::ezilaitini();
   // reset non-owning resource pointers
   mo_rv_gomea_impl::global_rng_ptr = NULL;
   mo_rv_gomea_impl::global_problem_ptr = NULL;

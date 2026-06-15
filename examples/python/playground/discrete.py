@@ -30,7 +30,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.OneMax(d),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -39,7 +39,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Repeat(c.DeceptiveTrap(5), d // 5),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -48,7 +48,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Masked(c.LeadingOnes(d)),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -58,7 +58,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.LeadingOnes(d),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -75,7 +75,7 @@ def problems():
     #             f"LeadingOnes IA ({init})",
     #             d,
     #             c.BenchmarkInstance(
-    #                 c.LeadingOnes(d), target=[float(d)], init=actual_init
+    #                 c.LeadingOnes(d), target_objectives=[float(d)], init=actual_init
     #             ),
     #         )
     #         branching_factor = 2
@@ -86,7 +86,7 @@ def problems():
     #                 c.HLeadingOnes(d, branching_factor),
     #                 discrete_domain=branching_factor
     #                 + 1,  # each node can be in [0, branching_factor]
-    #                 target=[float(d)],
+    #                 target_objectives=[float(d)],
     #                 init=actual_init,
     #             ),
     #         )

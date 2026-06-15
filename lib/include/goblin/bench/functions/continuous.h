@@ -187,9 +187,10 @@ class CirclesInASquare final : public ObjectiveBase {
 /// ZDT1 from https://doi.org/10.1162/106365600568202
 class ZDT1 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
  public:
-  ZDT1(usize dims = 30) : dims(dims) {
+  ZDT1(usize dims = 30, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT1 requires at least 2 parameters.");
     }
@@ -218,10 +219,10 @@ class ZDT1 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
-  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final { return Vec<CType>::Zero(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final { return Vec<CType>::Ones(dims); };
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 
@@ -244,9 +245,10 @@ class ZDT1 : public MOFunctionBase {
 /// ZDT2 from https://doi.org/10.1162/106365600568202
 class ZDT2 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
  public:
-  ZDT2(usize dims = 30) : dims(dims) {
+  ZDT2(usize dims = 30, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT2 requires at least 2 parameters.");
     }
@@ -276,10 +278,10 @@ class ZDT2 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
-  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final { return Vec<CType>::Zero(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final { return Vec<CType>::Ones(dims); };
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 
@@ -302,9 +304,10 @@ class ZDT2 : public MOFunctionBase {
 /// ZDT3 from https://doi.org/10.1162/106365600568202
 class ZDT3 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
  public:
-  ZDT3(usize dims = 30) : dims(dims) {
+  ZDT3(usize dims = 30, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT3 requires at least 2 parameters.");
     }
@@ -334,10 +337,10 @@ class ZDT3 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
-  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final { return Vec<CType>::Zero(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final { return Vec<CType>::Ones(dims); };
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 
@@ -357,12 +360,14 @@ class ZDT3 : public MOFunctionBase {
   }
 };
 
+// TODO fix bug (crashes sometimes...)
 /// ZDT4 from https://doi.org/10.1162/106365600568202
 class ZDT4 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
  public:
-  ZDT4(usize dims = 10) : dims(dims) {
+  ZDT4(usize dims = 10, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT4 requires at least 2 parameters.");
     }
@@ -391,18 +396,18 @@ class ZDT4 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const {
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final {
     Vec<CType> lb = Vec<CType>::Constant(dims, -5.0);
     lb(0) = 0.0;
     return lb;
   };
-  Vec<CType> continuous_upper_bounds() const {
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final {
     Vec<CType> ub = Vec<CType>::Constant(dims, 5.0);
     ub(0) = 1.0;
     return ub;
   };
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 
@@ -425,6 +430,7 @@ class ZDT4 : public MOFunctionBase {
 /// ZDT5 from https://doi.org/10.1162/106365600568202
 class ZDT5 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
   u32 u(CType x, u32 num_bits) const {
     u64 bits;
@@ -439,7 +445,7 @@ class ZDT5 : public MOFunctionBase {
   CType v(u32 num_ones) const { return num_ones < 5 ? 2.0 + static_cast<CType>(num_ones) : 1.0; };
 
  public:
-  ZDT5(usize dims = 11) : dims(dims) {
+  ZDT5(usize dims = 11, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT5 requires at least 2 parameters.");
     }
@@ -467,10 +473,23 @@ class ZDT5 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
-  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final { return Vec<CType>::Zero(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final {
+    Vec<CType> ub = Vec<CType>::Zero(dims);
+    u64 bits;
+    for (usize i = 0; i < dims; i++) {
+      usize nbits = dims > 0 ? 5 : 30;
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+      std::memcpy(&bits, &ub(i), sizeof(bits));  // interpret the memory as bytes
+      for (usize j = 0; j < nbits; j++) {
+        bits |= 1ULL << (52 - j);  // set fraction bits to 1
+      }
+      std::memcpy(&ub(i), &bits, sizeof(CType));  // interpret the memory as CType
+    }
+    return ub;
+  };
+
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 
@@ -493,9 +512,10 @@ class ZDT5 : public MOFunctionBase {
 /// ZDT6 from https://doi.org/10.1162/106365600568202
 class ZDT6 : public MOFunctionBase {
   usize dims;
+  usize num_samples;
 
  public:
-  ZDT6(usize dims = 10) : dims(dims) {
+  ZDT6(usize dims = 10, usize pareto_front_samples = 100) : dims(dims), num_samples(pareto_front_samples) {
     if (dims < 2) {
       throw std::runtime_error("ZDT6 requires at least 2 parameters.");
     }
@@ -526,10 +546,10 @@ class ZDT6 : public MOFunctionBase {
     q.objectives(1) = g * h;
   }
 
-  Vec<CType> continuous_lower_bounds() const { return Vec<CType>::Zero(dims); };
-  Vec<CType> continuous_upper_bounds() const { return Vec<CType>::Ones(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override final { return Vec<CType>::Zero(dims); };
+  std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override final { return Vec<CType>::Ones(dims); };
 
-  std::shared_ptr<ArchiveBase> pareto_front(usize num_samples) const {
+  std::optional<std::shared_ptr<ArchiveBase>> pareto_front() const override final {
     CType x0 = 0.0;
     CType step = 1.0 / static_cast<CType>(num_samples - 1);
 

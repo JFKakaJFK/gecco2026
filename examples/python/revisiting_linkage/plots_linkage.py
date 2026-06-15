@@ -14,8 +14,6 @@ from rliable import library as rly
 from rliable import metrics, plot_utils
 from seaborn._core.typing import PaletteSpec
 from sklearn import metrics as skm
-from tqdm import tqdm
-
 from src.config import c, extract, instantiate, load_config
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
@@ -25,6 +23,7 @@ from src.postprocessing import (
     rliable_score_dict,
 )
 from src.run import compute_run_path, run_tasks
+from tqdm import tqdm
 
 sns.set_theme(
     context="paper",
@@ -1943,6 +1942,315 @@ def custom_interval_plot(
         plt.clf()
 
 
+def custom_interval_plot_presentation(
+    conn,
+    plot_dir,
+    include_operator_set: bool = False,
+    show_test_acc: bool = False,
+    wscale: float = 7,
+    hscale: float = 3.25,
+    gridspec_kw=dict(wspace=0.05, hspace=0.1),
+    legend_pos=(0.5, -0.0),
+    groups=(
+        (
+            "_main",
+            r"method_name NOT SIMILAR TO '.*(\*|any|all).*'",  # |static
+        ),  # random, mi, mi_a, mi_m, node
+        # (
+        #     "_masking",
+        #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|Node).*'",
+        # ),  # mi, any, all, masked
+        # (
+        #     "_hybrid",
+        #     r"method_name NOT SIMILAR TO '.*(adjusted|Random|any|all).*'",
+        # ),  # mi, node, static, hybrid
+    ),
+    show_ls=False,
+):
+    pdir = plot_dir / "custom" / "intervals"
+    pdir.mkdir(parents=True, exist_ok=True)
+
+    for group, m_where_query in tqdm(groups):
+        algorithms = []
+        rows = []
+        for metric_label, metric in [  #
+            (r"$R^2$ Train", "1.0::DOUBLE - nmse_train::DOUBLE"),
+        ] + (
+            [
+                (r"$R^2$ Test", "1.0::DOUBLE - nmse_test::DOUBLE"),
+            ]
+            if show_test_acc
+            else []
+        ):
+            # modifier -> info + score dict
+            modifiers = []
+
+            for h_value, h_where_query in [  #
+                ("5", r"template_height::INTEGER = 5::INTEGER"),
+                ("7", r"template_height::INTEGER = 7::INTEGER"),
+            ]:
+                ls_mods = (
+                    [("Yes", r"linear_scaling::BOOLEAN = true")]
+                    if show_ls
+                    else [("No", r"linear_scaling::BOOLEAN = false")]
+                )
+                for ls_value, ls_where_query in ls_mods:
+                    if include_operator_set:
+                        for op_value, op_where_query in [  #
+                            ("\n#O = 5", r"operator_set = 'small'"),
+                            ("\n#O = 10", r"operator_set = 'large'"),
+                        ]:
+                            where_query = " AND ".join(
+                                q
+                                for q in [
+                                    h_where_query,
+                                    ls_where_query,
+                                    m_where_query,
+                                    op_where_query,
+                                ]
+                                if q
+                            )
+
+                            score_dict, problems = rliable_score_dict(
+                                conn,
+                                run_expr="format('{}.{}', fold, run)",
+                                problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
+                                # method_query="format('{} {}', method_name, init)",
+                                where_query=where_query,
+                                normalized_value_expr=metric,
+                            )
+
+                            score_dict = {
+                                method2name(m): s for m, s in score_dict.items()
+                            }
+
+                            algorithms += score_dict.keys()
+
+                            modifiers.append(
+                                (
+                                    # h_value + " " + ls_value,
+                                    f"H = {h_value}{['', '\nLS']['Yes' == ls_value]}{op_value}",
+                                    score_dict,
+                                )
+                            )
+                    else:
+                        where_query = " AND ".join(
+                            q
+                            for q in [h_where_query, ls_where_query, m_where_query]
+                            if q
+                        )
+
+                        score_dict, problems = rliable_score_dict(
+                            conn,
+                            run_expr="format('{}.{}', fold, run)",
+                            problem_query="format('{}\nH={}\nLS={}', problem_name, template_height::STRING,IF(linear_scaling, 'Yes', 'No')::STRING)",  # operator_set::STRING,
+                            # method_query="format('{} {}', method_name, init)",
+                            where_query=where_query,
+                            normalized_value_expr=metric,
+                        )
+
+                        score_dict = {method2name(m): s for m, s in score_dict.items()}
+
+                        algorithms += score_dict.keys()
+
+                        modifiers.append(
+                            (
+                                # h_value + " " + ls_value,
+                                f"H = {h_value}{['', '\nLS']['Yes' == ls_value]}",
+                                score_dict,
+                            )
+                        )
+            rows.append((metric_label, modifiers))
+
+        algorithms = sorted(set(algorithms))
+        keys = {m: m_order.get(m, len(m_order) + i) for i, m in enumerate(algorithms)}
+        algorithms = sorted(set(algorithms), key=lambda m: keys[m])
+
+        hues = sns.color_palette(  #
+            "colorblind", n_colors=len(algorithms)
+        )
+        palette = {a: h for a, h in zip(algorithms, hues)}
+
+        palette = PALETTE
+
+        aggregate_func = lambda x: np.array(
+            [
+                # metrics.aggregate_median(x), # is the median of means
+                # metrics.aggregate_iqm(x),
+                # metrics.aggregate_mean(x),
+                np.mean(np.median(x, axis=0, keepdims=False), axis=0),
+                # metrics.aggregate_optimality_gap(x),
+                # # bottom 25%
+                # np.mean(np.quantile(x, 0.25, axis=0, keepdims=False), axis=0),
+                # # top 25 %
+                # np.mean(np.quantile(x, 0.75, axis=0, keepdims=False), axis=0)
+            ]
+        )
+        aggregate_labels = [  # "Median of Means",
+            # "Interquartile Mean",  # IQM
+            # "Mean",
+            "Mean of Medians",
+        ]
+
+        nrows = len(rows)
+        ncols = aggregate_func(np.eye(2)).shape[0]
+
+        fig, axes = plt.subplots(
+            nrows=nrows,
+            ncols=ncols,
+            sharex=True,  # "col",
+            sharey=False,
+            squeeze=False,
+            figsize=(ncols * wscale, nrows * hscale),
+            gridspec_kw=gridspec_kw,
+        )
+
+        size = 10
+        y_pad = 0.1  # padding between modifiers (defines jitter...)
+        thickness = 1e-3 / 4  # ci center thickness
+        ci_style = dict(
+            lw=size,
+            alpha=0.75,
+            solid_capstyle="butt",
+        )
+
+        for row, (row_label, modifiers) in enumerate(rows):
+            for col in range(ncols):
+                ax = axes[row, col]
+
+                yticks, yticklabels = [], []
+                for v_idx, (ytick, score_dict) in enumerate(modifiers):
+                    value = len(modifiers) - v_idx
+                    if v_idx > 0:
+                        ax.axhline(value + 0.5, color="black", lw=1.0, ls="--")
+
+                    # hack to have a shaded background for every other row...
+                    # if (v_idx + 1) % 2 == 0:
+                    #     ax.axhline(value, color="black", lw=26.5, alpha=0.05)
+
+                    # if (v_idx + 1) % 2 == 0:
+                    #     s = 1 / len(modifiers)
+                    #     ax.add_patch(
+                    #         Rectangle(
+                    #             xy=(0.0, 1.0 - v_idx * s - s),
+                    #             width=1.0,
+                    #             height=s,
+                    #             color="black",
+                    #             lw=0,
+                    #             alpha=0.05,
+                    #             transform=ax.transAxes,
+                    #         )
+                    #     )
+
+                    yticks.append(value)
+                    yticklabels.append(ytick)
+
+                    aggregate_scores, aggregate_score_cis = rly.get_interval_estimates(
+                        score_dict,
+                        aggregate_func,
+                        reps=5000,  # 0
+                    )
+
+                    if len(algorithms) > 1:
+                        y_start = value + 0.5 - y_pad
+                        y_end = value - 0.5 + y_pad
+                        y_step = (y_start - y_end) / (len(algorithms) - 1)
+                    else:
+                        y_start, y_step = value, 0
+                    for i, alg in enumerate(algorithms):
+                        hue = palette[alg]
+
+                        center = aggregate_scores[alg][col]
+                        lower, upper = aggregate_score_cis[alg][:, col]
+
+                        y = y_start - i * y_step
+                        ax.plot([lower, upper], [y, y], color=hue, **ci_style)
+                        ax.plot(
+                            [center - thickness, center + thickness],
+                            [y, y],
+                            color="black",
+                            lw=size,
+                            solid_capstyle="butt",
+                            zorder=10,
+                        )
+                        # ax.scatter(
+                        #     [center],
+                        #     [y],
+                        #     color="black",  # hue,
+                        #     marker="$|$",
+                        #     s=size**2,
+                        #     lw=0,
+                        #     zorder=10,
+                        # )  # o")
+
+                if col == 0:
+                    ax.set_yticks(yticks, yticklabels, ha="center", fontsize="x-small")
+                    # ax.set_ylabel(row_label)
+                    ax.set_ylabel("")
+                else:
+                    ax.set_ylabel("")
+                    ax.set_yticks([])
+
+                if row == 0:
+                    ax.set_title(aggregate_labels[col])
+
+                # if row >= nrows - 1:
+                #     pass
+                # else:
+                #     ax.set_xticks([])
+                # ax.set_xlabel(r"$R^2$ Train")
+                ax.set_xlabel(r"")
+
+                ax.set_ylim(0.5, len(modifiers) + 0.5)
+                # xmin, xmax = ax.get_xlim()
+                # ax.set_xlim(max(xmin, 0.0), min(xmax, 1.0))
+
+                sns.despine(ax=ax, left=True, bottom=True)  # , trim=True)
+
+                # for ticklabel in ax.get_yticklabels():
+                #     ticklabel.set_horizontalalignment("center")
+
+                ax.tick_params("x", length=0)
+                ax.tick_params("y", pad=20, length=0)
+                ax.grid(
+                    visible=True,
+                    which="major",
+                    axis="x",
+                    lw=0.5,
+                    color="black",
+                    alpha=0.2,
+                )
+
+        for ax in axes.flat:
+            ax.set_xlim(0.65, 0.9)
+
+        # labels, handles = [], []
+        # for alg in algorithms:
+        #     h, *_ = axes.flat[0].plot([], [], color=palette[alg], **ci_style)
+        #     labels.append(alg)
+        #     handles.append(h)
+
+        # fig.legend(
+        #     handles,
+        #     labels,
+        #     loc="lower center",
+        #     bbox_to_anchor=legend_pos,
+        #     ncols=len(algorithms),  # min(6, len(algorithms)),
+        #     borderaxespad=0.0,
+        #     frameon=False,
+        # )
+
+        fig.savefig(
+            pdir
+            / f"interval_estimates_presentation{group}{'_os' if include_operator_set else ''}.pdf",
+            dpi=600,
+            bbox_inches="tight",
+            transparent=True,
+        )
+
+        plt.clf()
+
+
 def main():
     with load_results(
         LOG_DIR,
@@ -1963,6 +2271,18 @@ def main():
 
         # custom_problem_plot(conn, PLOT_DIR, groups=(("_main", where_query),))
 
+        ppkw = dict(
+            wscale=8,
+            hscale=4,
+            legend_pos=(0.5, -0.03),
+        )
+        custom_interval_plot_presentation(
+            conn, PLOT_DIR, groups=(("", where_query),), **ppkw
+        )
+        custom_interval_plot_presentation(
+            conn, PLOT_DIR, groups=(("_ls", where_query),), show_ls=True, **ppkw
+        )
+
         # custom_interval_plot(
         #     conn,
         #     PLOT_DIR,
@@ -1973,17 +2293,17 @@ def main():
         # )
 
         # custom_problem_convergence_plot(conn, PLOT_DIR, where_query=where_query)
-        custom_problem_convergence_plot(
-            conn,
-            PLOT_DIR,
-            where_query=rf"{where_query} AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
-            wscale=3,
-            hscale=2.75,
-            gridspec_kw=dict(hspace=0.15),
-            supxlabel_kwargs=dict(y=-0.1),
-            legend_pos=(0.5, -0.11),
-            filename="convergence_per_problem_h7ls_wide",
-        )
+        # custom_problem_convergence_plot(
+        #     conn,
+        #     PLOT_DIR,
+        #     where_query=rf"{where_query} AND template_height::INTEGER = 7::INTEGER AND NOT linear_scaling",
+        #     wscale=3,
+        #     hscale=2.75,
+        #     gridspec_kw=dict(hspace=0.15),
+        #     supxlabel_kwargs=dict(y=-0.1),
+        #     legend_pos=(0.5, -0.11),
+        #     filename="convergence_per_problem_h7ls_wide",
+        # )
 
         # custom_cmp_plot2(conn, PLOT_DIR, method_where_query=where_query)
         # custom_cmp_plot(conn, PLOT_DIR, method_where_query=where_query)
