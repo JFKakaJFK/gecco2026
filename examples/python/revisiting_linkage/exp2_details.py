@@ -14,7 +14,6 @@ from matplotlib.lines import Line2D
 from pygom import *
 from scipy.optimize import linear_sum_assignment
 from scipy.sparse.linalg._isolve.lsqr import eps
-
 from src.config import c, instantiate
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
