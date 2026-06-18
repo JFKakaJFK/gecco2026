@@ -11,28 +11,28 @@
 
 template <>
 struct std::hash<goblin::CacheKey> {
-  std::size_t operator()(const goblin::CacheKey& key) const noexcept { return key.hash_value_; }
+    std::size_t operator()(const goblin::CacheKey& key) const noexcept { return key.hash_value_; }
 };
 
 // TODO at some point consider https://github.com/Nicoshev/rapidhash / https://github.com/Cyan4973/xxHash
 // since FNV-1a is slow: https://aras-p.info/blog/2016/08/09/More-Hash-Function-Tests/
 inline std::size_t hash_bytes(const std::vector<std::byte>& data) {
-  // FNV-1a as per https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
-  const std::size_t FNV_BASIS = 0xcbf29ce484222325;
-  const std::size_t FNV_PRIME = 0x00000100000001b3;
-  std::size_t h = FNV_BASIS;
-  for (auto b : data) {
-    h ^= static_cast<std::size_t>(b);
-    h *= FNV_PRIME;
-  }
-  return h;
+    // FNV-1a as per https://en.wikipedia.org/wiki/Fowler%E2%80%93Noll%E2%80%93Vo_hash_function
+    const std::size_t FNV_BASIS = 0xcbf29ce484222325;
+    const std::size_t FNV_PRIME = 0x00000100000001b3;
+    std::size_t h = FNV_BASIS;
+    for (auto b : data) {
+        h ^= static_cast<std::size_t>(b);
+        h *= FNV_PRIME;
+    }
+    return h;
 };
 
 namespace goblin {
 CacheKey::CacheKey(const std::string& key) {
-  const auto* s = reinterpret_cast<const std::byte*>(key.data());
-  key_ = std::vector<std::byte>(s, s + key.size());
-  hash_value_ = hash_bytes(key_);
+    const auto* s = reinterpret_cast<const std::byte*>(key.data());
+    key_ = std::vector<std::byte>(s, s + key.size());
+    hash_value_ = hash_bytes(key_);
 };
 CacheKey::CacheKey(std::vector<std::byte>&& key) : key_(std::move(key)), hash_value_(hash_bytes(key_)) {};
 
@@ -42,83 +42,83 @@ Mat<CType> InstanceBase::gradients(Rng& rng,
                                    const std::vector<const Subset*>& subsets,
                                    const std::span<const usize>& indices,
                                    u64& evaluations) {
-  const CType e = 1e-6;
-  const CType ee = e + e;
+    const CType e = 1e-6;
+    const CType ee = e + e;
 
-  Mat<CType> grads = Mat<CType>::Zero(indices.size(), num_continuous());
-  if (num_continuous() == 0) {
-    return grads;
-  }
-
-  // back up qualities
-  std::vector<std::unique_ptr<QualityBase>> actual;
-  actual.reserve(indices.size());
-  for (size_t i = 0; i < indices.size(); i++) {
-    actual.push_back(solutions[indices[i]].quality().clone());
-  }
-
-  std::vector<std::unique_ptr<QualityBase>> q_e;
-  q_e.reserve(indices.size());
-
-  std::vector<usize> solutions_to_evaluate;
-  solutions_to_evaluate.reserve(indices.size());
-  for (size_t c = 0; c < num_continuous(); c++) {
-    solutions_to_evaluate.clear();
-
-    // -e
-    for (size_t _i = 0, i; _i < indices.size(); _i++) {
-      i = indices[_i];
-      if (solutions[i].continuous_active()(c)) {
-        solutions[i].continuous_values()(c) -= e;
-        solutions_to_evaluate.push_back(i);
-      }
+    Mat<CType> grads = Mat<CType>::Zero(indices.size(), num_continuous());
+    if (num_continuous() == 0) {
+        return grads;
     }
 
-    evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    evaluations += solutions_to_evaluate.size();
-
-    q_e.clear();
+    // back up qualities
+    std::vector<std::unique_ptr<QualityBase>> actual;
+    actual.reserve(indices.size());
     for (size_t i = 0; i < indices.size(); i++) {
-      q_e.push_back(solutions[indices[i]].quality().clone());
+        actual.push_back(solutions[indices[i]].quality().clone());
     }
 
-    // +e
-    for (size_t _i = 0, i; _i < indices.size(); _i++) {
-      i = indices[_i];
-      if (solutions[i].continuous_active()(c)) {
-        solutions[i].continuous_values()(c) += ee;
-      }
-    }
+    std::vector<std::unique_ptr<QualityBase>> q_e;
+    q_e.reserve(indices.size());
 
-    evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
-    evaluations += solutions_to_evaluate.size();
+    std::vector<usize> solutions_to_evaluate;
+    solutions_to_evaluate.reserve(indices.size());
+    for (size_t c = 0; c < num_continuous(); c++) {
+        solutions_to_evaluate.clear();
 
-    for (size_t i = 0; i < indices.size(); i++) {
-      CType dist = fitness().distance(*q_e[i], solutions[indices[i]].quality(), std::nullopt) / ee;
-      if (!isna(dist) && dist > 0.0) {
-        Ordering o = fitness().cmp(*q_e[i], solutions[indices[i]].quality(), std::nullopt);
-        if (o == Ordering::Better) {
-          grads(i, c) = dist;
-        } else if (o == Ordering::Worse) {
-          grads(i, c) = -dist;
+        // -e
+        for (size_t _i = 0, i; _i < indices.size(); _i++) {
+            i = indices[_i];
+            if (solutions[i].continuous_active()(c)) {
+                solutions[i].continuous_values()(c) -= e;
+                solutions_to_evaluate.push_back(i);
+            }
         }
-      }
+
+        evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
+        evaluations += solutions_to_evaluate.size();
+
+        q_e.clear();
+        for (size_t i = 0; i < indices.size(); i++) {
+            q_e.push_back(solutions[indices[i]].quality().clone());
+        }
+
+        // +e
+        for (size_t _i = 0, i; _i < indices.size(); _i++) {
+            i = indices[_i];
+            if (solutions[i].continuous_active()(c)) {
+                solutions[i].continuous_values()(c) += ee;
+            }
+        }
+
+        evaluate_partial(rng, solutions, parents, subsets, solutions_to_evaluate);
+        evaluations += solutions_to_evaluate.size();
+
+        for (size_t i = 0; i < indices.size(); i++) {
+            CType dist = fitness().distance(*q_e[i], solutions[indices[i]].quality(), std::nullopt) / ee;
+            if (!isna(dist) && dist > 0.0) {
+                Ordering o = fitness().cmp(*q_e[i], solutions[indices[i]].quality(), std::nullopt);
+                if (o == Ordering::Better) {
+                    grads(i, c) = dist;
+                } else if (o == Ordering::Worse) {
+                    grads(i, c) = -dist;
+                }
+            }
+        }
+
+        // restore values
+        for (size_t _i = 0, i; _i < indices.size(); _i++) {
+            i = indices[_i];
+            if (solutions[i].continuous_active()(c)) {
+                solutions[i].continuous_values()(c) -= e;
+            }
+        }
     }
 
-    // restore values
-    for (size_t _i = 0, i; _i < indices.size(); _i++) {
-      i = indices[_i];
-      if (solutions[i].continuous_active()(c)) {
-        solutions[i].continuous_values()(c) -= e;
-      }
+    // restore actual quality
+    for (size_t i = 0; i < indices.size(); i++) {
+        solutions[indices[i]].assign_quality(*actual[i]);
     }
-  }
-
-  // restore actual quality
-  for (size_t i = 0; i < indices.size(); i++) {
-    solutions[indices[i]].assign_quality(*actual[i]);
-  }
-  return grads;
+    return grads;
 }
 
 std::tuple<std::vector<usize>, u64> InstanceBase::gradient_steps(Rng& rng,
@@ -126,182 +126,267 @@ std::tuple<std::vector<usize>, u64> InstanceBase::gradient_steps(Rng& rng,
                                                                  SolutionSetBase& parents,
                                                                  const std::span<const usize>& indices,
                                                                  usize num_steps) {
-  const CType e = 1e-6;
-  const CType learning_rate = 0.1;
+    const CType e = 1e-6;
+    const CType learning_rate = 0.1;
 
-  std::vector<usize> changed_solutions;
-  if (num_continuous() == 0) {
-    return std::make_tuple(changed_solutions, 0);
-  }
-
-  bool any_solution_changed = false;
-  std::vector<Subset> _subsets(solutions.size());
-  std::vector<const Subset*> subsets(solutions.size());
-  for (usize i = 0; i < indices.size(); i++) {
-    for (usize j = 0; j < num_continuous(); j++) {
-      if (solutions[indices[i]].continuous_active()(j)) {
-        _subsets[indices[i]].continuous.push_back(j);
-        subsets[indices[i]] = &_subsets[indices[i]];
-        any_solution_changed = true;
-      }
+    std::vector<usize> changed_solutions;
+    if (num_continuous() == 0) {
+        return std::make_tuple(changed_solutions, 0);
     }
-  }
-  if (!any_solution_changed) {
-    return std::make_tuple(changed_solutions, 0);
-  }
 
-  u64 evaluations = 0;
-
-  std::vector<bool> solution_changed(indices.size(), false);
-  for (usize s = 0; s < num_steps && any_solution_changed; s++) {
-    any_solution_changed = false;
-
-    auto grads = gradients(rng, solutions, parents, subsets, indices, evaluations);
-
+    bool any_solution_changed = false;
+    std::vector<Subset> _subsets(solutions.size());
+    std::vector<const Subset*> subsets(solutions.size());
     for (usize i = 0; i < indices.size(); i++) {
-      for (usize j = 0; j < num_continuous(); j++) {
-        if (std::abs(grads(i, j)) > e) {
-          solutions[indices[i]].continuous_values()(j) -= learning_rate * grads(i, j);
-          solution_changed[i] = true;
-          any_solution_changed = true;
+        for (usize j = 0; j < num_continuous(); j++) {
+            if (solutions[indices[i]].continuous_active()(j)) {
+                _subsets[indices[i]].continuous.push_back(j);
+                subsets[indices[i]] = &_subsets[indices[i]];
+                any_solution_changed = true;
+            }
         }
-      }
     }
+    if (!any_solution_changed) {
+        return std::make_tuple(changed_solutions, 0);
+    }
+
+    u64 evaluations = 0;
+
+    std::vector<bool> solution_changed(indices.size(), false);
+    for (usize s = 0; s < num_steps && any_solution_changed; s++) {
+        any_solution_changed = false;
+
+        auto grads = gradients(rng, solutions, parents, subsets, indices, evaluations);
+
+        for (usize i = 0; i < indices.size(); i++) {
+            for (usize j = 0; j < num_continuous(); j++) {
+                if (std::abs(grads(i, j)) > e) {
+                    solutions[indices[i]].continuous_values()(j) -= learning_rate * grads(i, j);
+                    solution_changed[i] = true;
+                    any_solution_changed = true;
+                }
+            }
+        }
+    }
+
+    changed_solutions.reserve(indices.size());
+    for (usize i = 0; i < indices.size(); i++) {
+        if (solution_changed[i]) {
+            changed_solutions.push_back(indices[i]);
+        }
+    }
+    // update the quality now that the solution has been changed
+    evaluate_partial(rng, solutions, parents, subsets, changed_solutions);
+    evaluations += changed_solutions.size();
+    return std::make_tuple(changed_solutions, evaluations);
+}
+
+/*
+InstanceBase& InstanceBase::add_target(AnyTarget target) {
+  std::function<bool(const ArchiveBase&)> incoming;
+
+  // if (std::holds_alternative<CType>(target)) {
+  //   if (num_objectives() != 1) {
+  //     throw std::runtime_error("A single objective value is only a valid target value for single-objective
+  //     instances.");
+  //   }
+  //   auto vtr = archive_fitness().worst();
+  //   if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+  //     throw std::runtime_error(
+  //         "A single objective value is only a valid target value in combination with `MOQuality` or a subclass as "
+  //         "quality.");
+  //   }
+
+  //   auto& q = vtr->as<MOQuality>();
+  //   q.constraint_value = 0.0;
+  //   q.objectives.fill(0.0);
+  //   q.objectives(0) = std::get<CType>(target);
+
+  //   return add_target(*vtr);
+  // } else if (std::holds_alternative<Vec<CType>>(target) || std::holds_alternative<std::vector<CType>>(target)) {
+  //   auto vtr = archive_fitness().worst();
+  //   if (auto p = dynamic_cast<const MOQuality*>(vtr.get()); p == nullptr) {
+  //     throw std::runtime_error(
+  //         "A vector of objective values is only a valid target value in combination with `MOQuality` or a subclass "
+  //         "as quality.");
+  //   }
+
+  //   auto& q = vtr->as<MOQuality>();
+  //   q.constraint_value = 0.0;
+  //   q.objectives.fill(0.0);
+
+  //   Vec<CType> target_objectives;
+  //   if (std::holds_alternative<Vec<CType>>(target)) {
+  //     target_objectives = std::get<Vec<CType>>(target);
+  //   } else {
+  //     std::vector<CType> to = std::get<std::vector<CType>>(target);
+  //     target_objectives = Eigen::Map<Vec<CType>>(to.data(), to.size());
+  //   }
+  //   usize no = target_objectives.size();
+  //   if (fitness().num_objectives() > no || no > archive_fitness().num_objectives()) {
+  //     throw std::runtime_error("Mismatch in number of target objectives provided.");
+  //   }
+  //   for (usize i = 0; i < no; i++) {
+  //     q.objectives(i) = target_objectives(i);
+  //   }
+
+  //   return add_target(*vtr);
+  // } else
+  if (std::holds_alternative<std::reference_wrapper<const QualityBase>>(target)) {
+    Solution s(
+        std::get<std::reference_wrapper<const QualityBase>>(target).get().clone(),
+        num_discrete() > 0 ? std::make_optional<Vec<DType>>(Vec<DType>::Zero(num_discrete())) : std::nullopt,
+        num_continuous() > 0 ? std::make_optional<Vec<CType>>(Vec<CType>::Zero(num_continuous())) : std::nullopt);
+    return add_target(s);
+    // } else if (std::holds_alternative<std::reference_wrapper<const SolutionBase>>(target)) {
+    //   UnboundedArchive target_front(archive_fitness());
+    //   target_front.update(std::get<std::reference_wrapper<const SolutionBase>>(target));
+    //   return add_target(target_front);
+    // } else if (std::holds_alternative<std::reference_wrapper<const ArchiveBase>>(target)) {
+    //   std::shared_ptr<ArchiveBase> target_front =
+    //       std::get<std::reference_wrapper<const ArchiveBase>>(target).get().clone();
+    //   incoming = [target_front = std::move(target_front)](const ArchiveBase& archive) {
+    //     return archive.covers(*target_front);
+    //   };
+    // } else if (std::holds_alternative<std::function<bool(const ArchiveBase&)>>(target)) {
+    //   incoming = std::get<std::function<bool(const ArchiveBase&)>>(target);
+  } else {
+    throw std::runtime_error("Unsupported target!");
   }
 
-  changed_solutions.reserve(indices.size());
-  for (usize i = 0; i < indices.size(); i++) {
-    if (solution_changed[i]) {
-      changed_solutions.push_back(indices[i]);
-    }
+  if (_target_reached) {
+    auto existing = std::move(_target_reached);
+    _target_reached = [a = std::move(existing), b = std::move(incoming)](const ArchiveBase& archive) {
+      return a(archive) || b(archive);
+    };
+  } else {
+    _target_reached = std::move(incoming);
   }
-  // update the quality now that the solution has been changed
-  evaluate_partial(rng, solutions, parents, subsets, changed_solutions);
-  evaluations += changed_solutions.size();
-  return std::make_tuple(changed_solutions, evaluations);
-}
+  return *this;
+};
+*/
 
 template <typename Cache>
 std::shared_ptr<CachedInstanceBase> cached_impl(std::shared_ptr<InstanceBase> problem, usize cache_size) {
-  struct CachedWrapper : public CachedInstanceBase {
-    CachedWrapper(std::shared_ptr<InstanceBase>&& problem, usize cache_size)
-        : CachedInstanceBase(*problem), problem(std::move(problem)), cache_size(cache_size), cache(cache_size) {};
+    struct CachedWrapper : public CachedInstanceBase {
+        CachedWrapper(std::shared_ptr<InstanceBase>&& problem, usize cache_size)
+            : CachedInstanceBase(*problem), problem(std::move(problem)), cache_size(cache_size), cache(cache_size) {};
 
-    void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
-      std::vector<usize> idxs;
-      idxs.reserve(indices.size());
-      std::vector<std::optional<CacheKey>> keys;
-      keys.reserve(indices.size());
+        void evaluate(Rng& rng, SolutionSetBase& solutions, const std::span<const usize>& indices) override final {
+            std::vector<usize> idxs;
+            idxs.reserve(indices.size());
+            std::vector<std::optional<CacheKey>> keys;
+            keys.reserve(indices.size());
 
-      // 1. cache lookup
-      for (usize i : indices) {
-        auto key = problem->solution_cache_key(solutions[i]);
-        if (key.has_value() && cache.contains(key.value())) {
-          solutions[i].assign_quality(*cache[key.value()]);
-        } else {
-          idxs.push_back(i);
-          keys.push_back(key);
+            // 1. cache lookup
+            for (usize i : indices) {
+                auto key = problem->solution_cache_key(solutions[i]);
+                if (key.has_value() && cache.contains(key.value())) {
+                    solutions[i].assign_quality(*cache[key.value()]);
+                } else {
+                    idxs.push_back(i);
+                    keys.push_back(key);
+                }
+            }
+
+            // 2. compute missing
+            problem->evaluate(rng, solutions, idxs);
+
+            // 3. cache update
+            for (usize i = 0; i < idxs.size(); i++) {
+                if (keys[i].has_value()) {
+                    cache.insert(keys[i].value(), solutions[idxs[i]].quality().clone());
+                }
+            }
+        };
+        void evaluate_partial(Rng& rng,
+                              SolutionSetBase& solutions,
+                              SolutionSetBase& parents,
+                              const std::vector<const Subset*>& subsets,
+                              const std::span<const usize>& indices) override final {
+            std::vector<usize> idxs;
+            idxs.reserve(indices.size());
+            std::vector<std::optional<CacheKey>> keys;
+            keys.reserve(indices.size());
+
+            // 1. cache lookup
+            for (usize i : indices) {
+                auto key = problem->solution_cache_key(solutions[i]);
+                if (key.has_value() && cache.contains(key.value())) {
+                    solutions[i].assign_quality(*cache[key.value()]);
+                } else {
+                    idxs.push_back(i);
+                    keys.push_back(key);
+                }
+            }
+
+            // 2. compute missing
+            problem->evaluate_partial(rng, solutions, parents, subsets, idxs);
+
+            // 3. cache update
+            for (usize i = 0; i < idxs.size(); i++) {
+                if (keys[i].has_value()) {
+                    cache.insert(keys[i].value(), solutions[idxs[i]].quality().clone());
+                }
+            }
         }
-      }
 
-      // 2. compute missing
-      problem->evaluate(rng, solutions, idxs);
+        bool adapt(Rng& rng) override final {
+            if (problem->adapt(rng)) {
+                cache.clear();
+                return true;
+            } else {
+                return false;
+            }
+        };
 
-      // 3. cache update
-      for (usize i = 0; i < idxs.size(); i++) {
-        if (keys[i].has_value()) {
-          cache.insert(keys[i].value(), solutions[idxs[i]].quality().clone());
-        }
-      }
-    };
-    void evaluate_partial(Rng& rng,
-                          SolutionSetBase& solutions,
-                          SolutionSetBase& parents,
-                          const std::vector<const Subset*>& subsets,
-                          const std::span<const usize>& indices) override final {
-      std::vector<usize> idxs;
-      idxs.reserve(indices.size());
-      std::vector<std::optional<CacheKey>> keys;
-      keys.reserve(indices.size());
+        void log_header(std::ostream& os) const override final {
+            inner.log_header(os);
+            os << "cache_hit_ratio,cache_utilization";
+        };
 
-      // 1. cache lookup
-      for (usize i : indices) {
-        auto key = problem->solution_cache_key(solutions[i]);
-        if (key.has_value() && cache.contains(key.value())) {
-          solutions[i].assign_quality(*cache[key.value()]);
-        } else {
-          idxs.push_back(i);
-          keys.push_back(key);
-        }
-      }
+        void log(std::ostream& os, const SolutionBase& solution) const override final {
+            inner.log(os, solution);
+            os << hit_ratio() << ',' << utilization();
+        };
 
-      // 2. compute missing
-      problem->evaluate_partial(rng, solutions, parents, subsets, idxs);
+        usize hit_count() const override final { return cache.hit_count(); };
+        usize miss_count() const override final { return cache.miss_count(); };
+        usize access_count() const override final { return cache.access_count(); }
+        usize entry_invalidation_count() const override final { return cache.entry_invalidation_count(); }
+        usize cache_invalidation_count() const override final { return cache.cache_invalidation_count(); }
+        usize evicted_count() const override final { return cache.evicted_count(); }
 
-      // 3. cache update
-      for (usize i = 0; i < idxs.size(); i++) {
-        if (keys[i].has_value()) {
-          cache.insert(keys[i].value(), solutions[idxs[i]].quality().clone());
-        }
-      }
-    }
+        CType hit_ratio() const override final { return cache.hit_ratio(); }
+        CType miss_ratio() const override final { return cache.miss_ratio(); }
+        CType utilization() const override final { return cache.utilization(); }
 
-    bool adapt(Rng& rng) override final {
-      if (problem->adapt(rng)) {
-        cache.clear();
-        return true;
-      } else {
-        return false;
-      }
+        std::shared_ptr<InstanceBase> problem;
+        usize cache_size;
+        Cache cache;
     };
 
-    void log_header(std::ostream& os) const override final {
-      inner.log_header(os);
-      os << "cache_hit_ratio,cache_utilization";
-    };
-
-    void log(std::ostream& os, const SolutionBase& solution) const override final {
-      inner.log(os, solution);
-      os << hit_ratio() << ',' << utilization();
-    };
-
-    usize hit_count() const override final { return cache.hit_count(); };
-    usize miss_count() const override final { return cache.miss_count(); };
-    usize access_count() const override final { return cache.access_count(); }
-    usize entry_invalidation_count() const override final { return cache.entry_invalidation_count(); }
-    usize cache_invalidation_count() const override final { return cache.cache_invalidation_count(); }
-    usize evicted_count() const override final { return cache.evicted_count(); }
-
-    CType hit_ratio() const override final { return cache.hit_ratio(); }
-    CType miss_ratio() const override final { return cache.miss_ratio(); }
-    CType utilization() const override final { return cache.utilization(); }
-
-    std::shared_ptr<InstanceBase> problem;
-    usize cache_size;
-    Cache cache;
-  };
-
-  return std::make_shared<CachedWrapper>(std::move(problem), cache_size);
+    return std::make_shared<CachedWrapper>(std::move(problem), cache_size);
 }
 
 std::shared_ptr<CachedInstanceBase> Cached(std::shared_ptr<InstanceBase> problem,
                                            usize cache_size,
                                            std::string cache_policy) {
-  using Value = std::unique_ptr<QualityBase>;
-  if (cache_policy == "fifo") {
-    return cached_impl<Cache<CacheKey, Value, Policy::FIFO>>(std::move(problem), cache_size);
-  } else if (cache_policy == "lfu") {
-    return cached_impl<Cache<CacheKey, Value, Policy::LFU>>(std::move(problem), cache_size);
-  } else if (cache_policy == "lifo") {
-    return cached_impl<Cache<CacheKey, Value, Policy::LIFO>>(std::move(problem), cache_size);
-  } else if (cache_policy == "lru") {
-    return cached_impl<Cache<CacheKey, Value, Policy::LRU>>(std::move(problem), cache_size);
-  } else if (cache_policy == "mru") {
-    return cached_impl<Cache<CacheKey, Value, Policy::MRU>>(std::move(problem), cache_size);
-  } else if (cache_policy == "random") {
-    return cached_impl<Cache<CacheKey, Value, Policy::Random>>(std::move(problem), cache_size);
-  } else {
-    throw std::runtime_error("Unknown cache policy.");
-  }
+    using Value = std::unique_ptr<QualityBase>;
+    if (cache_policy == "fifo") {
+        return cached_impl<Cache<CacheKey, Value, Policy::FIFO>>(std::move(problem), cache_size);
+    } else if (cache_policy == "lfu") {
+        return cached_impl<Cache<CacheKey, Value, Policy::LFU>>(std::move(problem), cache_size);
+    } else if (cache_policy == "lifo") {
+        return cached_impl<Cache<CacheKey, Value, Policy::LIFO>>(std::move(problem), cache_size);
+    } else if (cache_policy == "lru") {
+        return cached_impl<Cache<CacheKey, Value, Policy::LRU>>(std::move(problem), cache_size);
+    } else if (cache_policy == "mru") {
+        return cached_impl<Cache<CacheKey, Value, Policy::MRU>>(std::move(problem), cache_size);
+    } else if (cache_policy == "random") {
+        return cached_impl<Cache<CacheKey, Value, Policy::Random>>(std::move(problem), cache_size);
+    } else {
+        throw std::runtime_error("Unknown cache policy.");
+    }
 }
 };  // namespace goblin

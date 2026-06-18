@@ -310,18 +310,18 @@ int64_t random_seed,                    /* The seed used for the random-number g
  * failure.
  */
 void* Malloc(long size) {
-  void* result;
+    void* result;
 
-  result = (void*)malloc(size);
-  if (!result) {
-    printf("\n");
-    printf("Error while allocating memory in Malloc( %ld ), aborting program.", size);
-    printf("\n");
+    result = (void*)malloc(size);
+    if (!result) {
+        printf("\n");
+        printf("Error while allocating memory in Malloc( %ld ), aborting program.", size);
+        printf("\n");
 
-    exit(0);
-  }
+        exit(0);
+    }
 
-  return (result);
+    return (result);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -330,28 +330,28 @@ void* Malloc(long size) {
  * Creates a new matrix with dimensions n x m.
  */
 double** matrixNew(int n, int m) {
-  int i;
-  double** result;
+    int i;
+    double** result;
 
-  result = (double**)malloc(n * (sizeof(double*)));
-  for (i = 0; i < n; i++)
-    result[i] = (double*)malloc(m * (sizeof(double)));
+    result = (double**)malloc(n * (sizeof(double*)));
+    for (i = 0; i < n; i++)
+        result[i] = (double*)malloc(m * (sizeof(double)));
 
-  return (result);
+    return (result);
 }
 
 /**
  * Computes the dot product of two vectors of the same dimensionality n0.
  */
 double vectorDotProduct(double* vector0, double* vector1, int n0) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < n0; i++)
-    result += vector0[i] * vector1[i];
+    result = 0.0;
+    for (i = 0; i < n0; i++)
+        result += vector0[i] * vector1[i];
 
-  return (result);
+    return (result);
 }
 
 /**
@@ -360,14 +360,14 @@ double vectorDotProduct(double* vector0, double* vector1, int n0) {
  * dimensionality n1.
  */
 double* matrixVectorMultiplication(double** matrix, double* vector, int n0, int n1) {
-  int i;
-  double* result;
+    int i;
+    double* result;
 
-  result = (double*)malloc(n0 * sizeof(double));
-  for (i = 0; i < n0; i++)
-    result[i] = vectorDotProduct(matrix[i], vector, n1);
+    result = (double*)malloc(n0 * sizeof(double));
+    for (i = 0; i < n0; i++)
+        result[i] = vectorDotProduct(matrix[i], vector, n1);
 
-  return (result);
+    return (result);
 }
 
 /**
@@ -375,180 +375,180 @@ double* matrixVectorMultiplication(double** matrix, double* vector, int n0, int 
  * of dimensions A: n0 x n1 and B: n1 x n2.
  */
 double** matrixMatrixMultiplication(double** matrix0, double** matrix1, int n0, int n1, int n2) {
-  int i, j, k;
-  double** result;
+    int i, j, k;
+    double** result;
 
-  result = (double**)malloc(n0 * sizeof(double*));
-  for (i = 0; i < n0; i++)
-    result[i] = (double*)malloc(n2 * sizeof(double));
+    result = (double**)malloc(n0 * sizeof(double*));
+    for (i = 0; i < n0; i++)
+        result[i] = (double*)malloc(n2 * sizeof(double));
 
-  for (i = 0; i < n0; i++) {
-    for (j = 0; j < n2; j++) {
-      result[i][j] = 0;
-      for (k = 0; k < n1; k++)
-        result[i][j] += matrix0[i][k] * matrix1[k][j];
+    for (i = 0; i < n0; i++) {
+        for (j = 0; j < n2; j++) {
+            result[i][j] = 0;
+            for (k = 0; k < n1; k++)
+                result[i][j] += matrix0[i][k] * matrix1[k][j];
+        }
     }
-  }
 
-  return (result);
+    return (result);
 }
 
 /**
  * BLAS subroutine.
  */
 int blasDSWAP(int n, double* dx, int incx, double* dy, int incy) {
-  double dtmp;
+    double dtmp;
 
-  if (n > 0) {
-    incx *= sizeof(double);
-    incy *= sizeof(double);
+    if (n > 0) {
+        incx *= sizeof(double);
+        incy *= sizeof(double);
 
-    dtmp = (*dx);
-    *dx = (*dy);
-    *dy = dtmp;
+        dtmp = (*dx);
+        *dx = (*dy);
+        *dy = dtmp;
 
-    while ((--n) > 0) {
-      dx = (double*)((char*)dx + incx);
-      dy = (double*)((char*)dy + incy);
-      dtmp = (*dx);
-      *dx = (*dy);
-      *dy = dtmp;
+        while ((--n) > 0) {
+            dx = (double*)((char*)dx + incx);
+            dy = (double*)((char*)dy + incy);
+            dtmp = (*dx);
+            *dx = (*dy);
+            *dy = dtmp;
+        }
     }
-  }
 
-  return (0);
+    return (0);
 }
 
 /**
  * BLAS subroutine.
  */
 int blasDAXPY(int n, double da, double* dx, int incx, double* dy, int incy) {
-  double dtmp0, dtmp, *dx0, *dy0;
+    double dtmp0, dtmp, *dx0, *dy0;
 
-  if (n > 0 && da != 0.) {
-    incx *= sizeof(double);
-    incy *= sizeof(double);
-    *dy += da * (*dx);
+    if (n > 0 && da != 0.) {
+        incx *= sizeof(double);
+        incy *= sizeof(double);
+        *dy += da * (*dx);
 
-    if ((n & 1) == 0) {
-      dx = (double*)((char*)dx + incx);
-      dy = (double*)((char*)dy + incy);
-      *dy += da * (*dx);
-      --n;
+        if ((n & 1) == 0) {
+            dx = (double*)((char*)dx + incx);
+            dy = (double*)((char*)dy + incy);
+            *dy += da * (*dx);
+            --n;
+        }
+        n = n >> 1;
+        while (n > 0) {
+            dy0 = (double*)((char*)dy + incy);
+            dy = (double*)((char*)dy0 + incy);
+            dtmp0 = (*dy0);
+            dtmp = (*dy);
+            dx0 = (double*)((char*)dx + incx);
+            dx = (double*)((char*)dx0 + incx);
+            *dy0 = dtmp0 + da * (*dx0);
+            *dy = dtmp + da * (*dx);
+            --n;
+        }
     }
-    n = n >> 1;
-    while (n > 0) {
-      dy0 = (double*)((char*)dy + incy);
-      dy = (double*)((char*)dy0 + incy);
-      dtmp0 = (*dy0);
-      dtmp = (*dy);
-      dx0 = (double*)((char*)dx + incx);
-      dx = (double*)((char*)dx0 + incx);
-      *dy0 = dtmp0 + da * (*dx0);
-      *dy = dtmp + da * (*dx);
-      --n;
-    }
-  }
 
-  return (0);
+    return (0);
 }
 
 /**
  * BLAS subroutine.
  */
 void blasDSCAL(int n, double sa, double x[], int incx) {
-  int i, ix, m;
+    int i, ix, m;
 
-  if (n <= 0) {
-  } else if (incx == 1) {
-    m = n % 5;
+    if (n <= 0) {
+    } else if (incx == 1) {
+        m = n % 5;
 
-    for (i = 0; i < m; i++) {
-      x[i] = sa * x[i];
-    }
+        for (i = 0; i < m; i++) {
+            x[i] = sa * x[i];
+        }
 
-    for (i = m; i < n; i = i + 5) {
-      x[i] = sa * x[i];
-      x[i + 1] = sa * x[i + 1];
-      x[i + 2] = sa * x[i + 2];
-      x[i + 3] = sa * x[i + 3];
-      x[i + 4] = sa * x[i + 4];
-    }
-  } else {
-    if (0 <= incx) {
-      ix = 0;
+        for (i = m; i < n; i = i + 5) {
+            x[i] = sa * x[i];
+            x[i + 1] = sa * x[i + 1];
+            x[i + 2] = sa * x[i + 2];
+            x[i + 3] = sa * x[i + 3];
+            x[i + 4] = sa * x[i + 4];
+        }
     } else {
-      ix = (-n + 1) * incx;
-    }
+        if (0 <= incx) {
+            ix = 0;
+        } else {
+            ix = (-n + 1) * incx;
+        }
 
-    for (i = 0; i < n; i++) {
-      x[ix] = sa * x[ix];
-      ix = ix + incx;
+        for (i = 0; i < n; i++) {
+            x[ix] = sa * x[ix];
+            ix = ix + incx;
+        }
     }
-  }
 }
 
 /**
  * LINPACK subroutine.
  */
 int linpackDCHDC(double a[], int lda, int p, double work[], int ipvt[]) {
-  int info, j, jp, k, l, maxl, pl, pu;
-  double maxdia, temp;
+    int info, j, jp, k, l, maxl, pl, pu;
+    double maxdia, temp;
 
-  pl = 1;
-  pu = 0;
-  info = p;
-  for (k = 1; k <= p; k++) {
-    maxdia = a[k - 1 + (k - 1) * lda];
-    maxl = k;
-    if (pl <= k && k < pu) {
-      for (l = k + 1; l <= pu; l++) {
-        if (maxdia < a[l - 1 + (l - 1) * lda]) {
-          maxdia = a[l - 1 + (l - 1) * lda];
-          maxl = l;
+    pl = 1;
+    pu = 0;
+    info = p;
+    for (k = 1; k <= p; k++) {
+        maxdia = a[k - 1 + (k - 1) * lda];
+        maxl = k;
+        if (pl <= k && k < pu) {
+            for (l = k + 1; l <= pu; l++) {
+                if (maxdia < a[l - 1 + (l - 1) * lda]) {
+                    maxdia = a[l - 1 + (l - 1) * lda];
+                    maxl = l;
+                }
+            }
         }
-      }
-    }
 
-    if (maxdia <= 0.0) {
-      info = k - 1;
+        if (maxdia <= 0.0) {
+            info = k - 1;
 
-      return (info);
-    }
-
-    if (k != maxl) {
-      blasDSWAP(k - 1, a + 0 + (k - 1) * lda, 1, a + 0 + (maxl - 1) * lda, 1);
-
-      a[maxl - 1 + (maxl - 1) * lda] = a[k - 1 + (k - 1) * lda];
-      a[k - 1 + (k - 1) * lda] = maxdia;
-      jp = ipvt[maxl - 1];
-      ipvt[maxl - 1] = ipvt[k - 1];
-      ipvt[k - 1] = jp;
-    }
-    work[k - 1] = sqrt(a[k - 1 + (k - 1) * lda]);
-    a[k - 1 + (k - 1) * lda] = work[k - 1];
-
-    for (j = k + 1; j <= p; j++) {
-      if (k != maxl) {
-        if (j < maxl) {
-          temp = a[k - 1 + (j - 1) * lda];
-          a[k - 1 + (j - 1) * lda] = a[j - 1 + (maxl - 1) * lda];
-          a[j - 1 + (maxl - 1) * lda] = temp;
-        } else if (maxl < j) {
-          temp = a[k - 1 + (j - 1) * lda];
-          a[k - 1 + (j - 1) * lda] = a[maxl - 1 + (j - 1) * lda];
-          a[maxl - 1 + (j - 1) * lda] = temp;
+            return (info);
         }
-      }
-      a[k - 1 + (j - 1) * lda] = a[k - 1 + (j - 1) * lda] / work[k - 1];
-      work[j - 1] = a[k - 1 + (j - 1) * lda];
-      temp = -a[k - 1 + (j - 1) * lda];
 
-      blasDAXPY(j - k, temp, work + k, 1, a + k + (j - 1) * lda, 1);
+        if (k != maxl) {
+            blasDSWAP(k - 1, a + 0 + (k - 1) * lda, 1, a + 0 + (maxl - 1) * lda, 1);
+
+            a[maxl - 1 + (maxl - 1) * lda] = a[k - 1 + (k - 1) * lda];
+            a[k - 1 + (k - 1) * lda] = maxdia;
+            jp = ipvt[maxl - 1];
+            ipvt[maxl - 1] = ipvt[k - 1];
+            ipvt[k - 1] = jp;
+        }
+        work[k - 1] = sqrt(a[k - 1 + (k - 1) * lda]);
+        a[k - 1 + (k - 1) * lda] = work[k - 1];
+
+        for (j = k + 1; j <= p; j++) {
+            if (k != maxl) {
+                if (j < maxl) {
+                    temp = a[k - 1 + (j - 1) * lda];
+                    a[k - 1 + (j - 1) * lda] = a[j - 1 + (maxl - 1) * lda];
+                    a[j - 1 + (maxl - 1) * lda] = temp;
+                } else if (maxl < j) {
+                    temp = a[k - 1 + (j - 1) * lda];
+                    a[k - 1 + (j - 1) * lda] = a[maxl - 1 + (j - 1) * lda];
+                    a[maxl - 1 + (j - 1) * lda] = temp;
+                }
+            }
+            a[k - 1 + (j - 1) * lda] = a[k - 1 + (j - 1) * lda] / work[k - 1];
+            work[j - 1] = a[k - 1 + (j - 1) * lda];
+            temp = -a[k - 1 + (j - 1) * lda];
+
+            blasDAXPY(j - k, temp, work + k, 1, a + k + (j - 1) * lda, 1);
+        }
     }
-  }
 
-  return (info);
+    return (info);
 }
 
 /**
@@ -557,80 +557,80 @@ int linpackDCHDC(double a[], int lda, int p, double work[], int ipvt[]) {
  * Subroutines from LINPACK and BLAS are used.
  */
 double** choleskyDecomposition(double** matrix, int n) {
-  int i, j, k, info, *ipvt;
-  double *a, *work, **result;
+    int i, j, k, info, *ipvt;
+    double *a, *work, **result;
 
-  a = (double*)Malloc(n * n * sizeof(double));
-  work = (double*)Malloc(n * sizeof(double));
-  ipvt = (int*)Malloc(n * sizeof(int));
+    a = (double*)Malloc(n * n * sizeof(double));
+    work = (double*)Malloc(n * sizeof(double));
+    ipvt = (int*)Malloc(n * sizeof(int));
 
-  k = 0;
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < n; j++) {
-      a[k] = matrix[i][j];
-      k++;
-    }
-    ipvt[i] = 0;
-  }
-
-  info = linpackDCHDC(a, n, n, work, ipvt);
-
-  result = matrixNew(n, n);
-  if (info != n) /* Matrix is not positive definite */
-  {
     k = 0;
     for (i = 0; i < n; i++) {
-      for (j = 0; j < n; j++) {
-        result[i][j] = i != j ? 0.0 : sqrt(matrix[i][j]);
-        k++;
-      }
+        for (j = 0; j < n; j++) {
+            a[k] = matrix[i][j];
+            k++;
+        }
+        ipvt[i] = 0;
     }
-  } else {
-    k = 0;
-    for (i = 0; i < n; i++) {
-      for (j = 0; j < n; j++) {
-        result[i][j] = i < j ? 0.0 : a[k];
-        k++;
-      }
+
+    info = linpackDCHDC(a, n, n, work, ipvt);
+
+    result = matrixNew(n, n);
+    if (info != n) /* Matrix is not positive definite */
+    {
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                result[i][j] = i != j ? 0.0 : sqrt(matrix[i][j]);
+                k++;
+            }
+        }
+    } else {
+        k = 0;
+        for (i = 0; i < n; i++) {
+            for (j = 0; j < n; j++) {
+                result[i][j] = i < j ? 0.0 : a[k];
+                k++;
+            }
+        }
     }
-  }
 
-  free(ipvt);
-  free(work);
-  free(a);
+    free(ipvt);
+    free(work);
+    free(a);
 
-  return (result);
+    return (result);
 }
 
 /**
  * LINPACK subroutine.
  */
 int linpackDTRDI(double t[], int ldt, int n) {
-  int j, k, info;
-  double temp;
+    int j, k, info;
+    double temp;
 
-  info = 0;
-  for (k = n; 1 <= k; k--) {
-    if (t[k - 1 + (k - 1) * ldt] == 0.0) {
-      info = k;
-      break;
+    info = 0;
+    for (k = n; 1 <= k; k--) {
+        if (t[k - 1 + (k - 1) * ldt] == 0.0) {
+            info = k;
+            break;
+        }
+
+        t[k - 1 + (k - 1) * ldt] = 1.0 / t[k - 1 + (k - 1) * ldt];
+        temp = -t[k - 1 + (k - 1) * ldt];
+
+        if (k != n) {
+            blasDSCAL(n - k, temp, t + k + (k - 1) * ldt, 1);
+        }
+
+        for (j = 1; j <= k - 1; j++) {
+            temp = t[k - 1 + (j - 1) * ldt];
+            t[k - 1 + (j - 1) * ldt] = 0.0;
+            blasDAXPY(n - k + 1, temp, t + k - 1 + (k - 1) * ldt, 1, t + k - 1 + (j - 1) * ldt, 1);
+        }
     }
 
-    t[k - 1 + (k - 1) * ldt] = 1.0 / t[k - 1 + (k - 1) * ldt];
-    temp = -t[k - 1 + (k - 1) * ldt];
-
-    if (k != n) {
-      blasDSCAL(n - k, temp, t + k + (k - 1) * ldt, 1);
-    }
-
-    for (j = 1; j <= k - 1; j++) {
-      temp = t[k - 1 + (j - 1) * ldt];
-      t[k - 1 + (j - 1) * ldt] = 0.0;
-      blasDAXPY(n - k + 1, temp, t + k - 1 + (k - 1) * ldt, 1, t + k - 1 + (j - 1) * ldt, 1);
-    }
-  }
-
-  return (info);
+    return (info);
 }
 
 /**
@@ -638,63 +638,63 @@ int linpackDTRDI(double t[], int ldt, int n) {
  * lower triangular form.
  */
 double** matrixLowerTriangularInverse(double** matrix, int n) {
-  int i, j, k, info;
-  double *t, **result;
+    int i, j, k, info;
+    double *t, **result;
 
-  t = (double*)Malloc(n * n * sizeof(double));
+    t = (double*)Malloc(n * n * sizeof(double));
 
-  k = 0;
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < n; j++) {
-      t[k] = matrix[j][i];
-      k++;
+    k = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            t[k] = matrix[j][i];
+            k++;
+        }
     }
-  }
 
-  info = linpackDTRDI(t, n, n);
+    info = linpackDTRDI(t, n, n);
 
-  result = matrixNew(n, n);
-  k = 0;
-  for (i = 0; i < n; i++) {
-    for (j = 0; j < n; j++) {
-      result[j][i] = i > j ? 0.0 : t[k];
-      k++;
+    result = matrixNew(n, n);
+    k = 0;
+    for (i = 0; i < n; i++) {
+        for (j = 0; j < n; j++) {
+            result[j][i] = i > j ? 0.0 : t[k];
+            k++;
+        }
     }
-  }
 
-  free(t);
+    free(t);
 
-  return (result);
+    return (result);
 }
 
 /**
  * Writes the contents of a matrix of dimensions n0 x n1 to a file.
  */
 void matrixWriteToFile(FILE* file, double** matrix, int n0, int n1) {
-  int i, j;
-  char line_for_output[10000];
+    int i, j;
+    char line_for_output[10000];
 
-  sprintf(line_for_output, "[");
-  fputs(line_for_output, file);
-  for (i = 0; i < n0; i++) {
     sprintf(line_for_output, "[");
     fputs(line_for_output, file);
-    for (j = 0; j < n1; j++) {
-      sprintf(line_for_output, "%lf", matrix[i][j]);
-      fputs(line_for_output, file);
-      if (j < n1 - 1) {
-        sprintf(line_for_output, ", ");
+    for (i = 0; i < n0; i++) {
+        sprintf(line_for_output, "[");
         fputs(line_for_output, file);
-      }
+        for (j = 0; j < n1; j++) {
+            sprintf(line_for_output, "%lf", matrix[i][j]);
+            fputs(line_for_output, file);
+            if (j < n1 - 1) {
+                sprintf(line_for_output, ", ");
+                fputs(line_for_output, file);
+            }
+        }
+        if (i == n0 - 1)
+            sprintf(line_for_output, "]");
+        else
+            sprintf(line_for_output, "];");
+        fputs(line_for_output, file);
     }
-    if (i == n0 - 1)
-      sprintf(line_for_output, "]");
-    else
-      sprintf(line_for_output, "];");
+    sprintf(line_for_output, "]\n");
     fputs(line_for_output, file);
-  }
-  sprintf(line_for_output, "]\n");
-  fputs(line_for_output, file);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -703,66 +703,66 @@ void matrixWriteToFile(FILE* file, double** matrix, int n0, int n1) {
  * Sorts an array of doubles and returns the sort-order (small to large).
  */
 int* mergeSort(double* array, int array_size) {
-  int i, *sorted, *tosort;
+    int i, *sorted, *tosort;
 
-  sorted = (int*)Malloc(array_size * sizeof(int));
-  tosort = (int*)Malloc(array_size * sizeof(int));
-  for (i = 0; i < array_size; i++)
-    tosort[i] = i;
+    sorted = (int*)Malloc(array_size * sizeof(int));
+    tosort = (int*)Malloc(array_size * sizeof(int));
+    for (i = 0; i < array_size; i++)
+        tosort[i] = i;
 
-  if (array_size == 1)
-    sorted[0] = 0;
-  else
-    mergeSortWithinBounds(array, sorted, tosort, 0, array_size - 1);
+    if (array_size == 1)
+        sorted[0] = 0;
+    else
+        mergeSortWithinBounds(array, sorted, tosort, 0, array_size - 1);
 
-  free(tosort);
+    free(tosort);
 
-  return (sorted);
+    return (sorted);
 }
 
 /**
  * Subroutine of merge sort, sorts the part of the array between p and q.
  */
 void mergeSortWithinBounds(double* array, int* sorted, int* tosort, int p, int q) {
-  int r;
+    int r;
 
-  if (p < q) {
-    r = (p + q) / 2;
-    mergeSortWithinBounds(array, sorted, tosort, p, r);
-    mergeSortWithinBounds(array, sorted, tosort, r + 1, q);
-    mergeSortMerge(array, sorted, tosort, p, r + 1, q);
-  }
+    if (p < q) {
+        r = (p + q) / 2;
+        mergeSortWithinBounds(array, sorted, tosort, p, r);
+        mergeSortWithinBounds(array, sorted, tosort, r + 1, q);
+        mergeSortMerge(array, sorted, tosort, p, r + 1, q);
+    }
 }
 
 /**
  * Subroutine of merge sort, merges the results of two sorted parts.
  */
 void mergeSortMerge(double* array, int* sorted, int* tosort, int p, int r, int q) {
-  int i, j, k, first;
+    int i, j, k, first;
 
-  i = p;
-  j = r;
-  for (k = p; k <= q; k++) {
-    first = 0;
-    if (j <= q) {
-      if (i < r) {
-        if (array[tosort[i]] < array[tosort[j]])
-          first = 1;
-      }
-    } else
-      first = 1;
+    i = p;
+    j = r;
+    for (k = p; k <= q; k++) {
+        first = 0;
+        if (j <= q) {
+            if (i < r) {
+                if (array[tosort[i]] < array[tosort[j]])
+                    first = 1;
+            }
+        } else
+            first = 1;
 
-    if (first) {
-      sorted[k] = tosort[i];
-      i++;
-    } else {
-      sorted[k] = tosort[j];
-      j++;
+        if (first) {
+            sorted[k] = tosort[i];
+            i++;
+        } else {
+            sorted[k] = tosort[j];
+            j++;
+        }
     }
-  }
 
-  for (k = p; k <= q; k++)
-    tosort[k] = sorted[k];
+    for (k = p; k <= q; k++)
+        tosort[k] = sorted[k];
 }
 
 /**
@@ -771,21 +771,21 @@ void mergeSortMerge(double* array, int* sorted, int* tosort, int p, int r, int q
  * sort-order (small to large).
  */
 int* mergeSortFitness(double* objectives, double* constraints, int number_of_solutions) {
-  int i, *sorted, *tosort;
+    int i, *sorted, *tosort;
 
-  sorted = (int*)Malloc(number_of_solutions * sizeof(int));
-  tosort = (int*)Malloc(number_of_solutions * sizeof(int));
-  for (i = 0; i < number_of_solutions; i++)
-    tosort[i] = i;
+    sorted = (int*)Malloc(number_of_solutions * sizeof(int));
+    tosort = (int*)Malloc(number_of_solutions * sizeof(int));
+    for (i = 0; i < number_of_solutions; i++)
+        tosort[i] = i;
 
-  if (number_of_solutions == 1)
-    sorted[0] = 0;
-  else
-    mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, 0, number_of_solutions - 1);
+    if (number_of_solutions == 1)
+        sorted[0] = 0;
+    else
+        mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, 0, number_of_solutions - 1);
 
-  free(tosort);
+    free(tosort);
 
-  return (sorted);
+    return (sorted);
 }
 
 /**
@@ -793,45 +793,46 @@ int* mergeSortFitness(double* objectives, double* constraints, int number_of_sol
  * constraints arrays between p and q.
  */
 void mergeSortFitnessWithinBounds(double* objectives, double* constraints, int* sorted, int* tosort, int p, int q) {
-  int r;
+    int r;
 
-  if (p < q) {
-    r = (p + q) / 2;
-    mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, p, r);
-    mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, r + 1, q);
-    mergeSortFitnessMerge(objectives, constraints, sorted, tosort, p, r + 1, q);
-  }
+    if (p < q) {
+        r = (p + q) / 2;
+        mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, p, r);
+        mergeSortFitnessWithinBounds(objectives, constraints, sorted, tosort, r + 1, q);
+        mergeSortFitnessMerge(objectives, constraints, sorted, tosort, p, r + 1, q);
+    }
 }
 
 /**
  * Subroutine of merge sort, merges the results of two sorted parts.
  */
 void mergeSortFitnessMerge(double* objectives, double* constraints, int* sorted, int* tosort, int p, int r, int q) {
-  int i, j, k, first;
+    int i, j, k, first;
 
-  i = p;
-  j = r;
-  for (k = p; k <= q; k++) {
-    first = 0;
-    if (j <= q) {
-      if (i < r) {
-        if (betterFitness(objectives[tosort[i]], constraints[tosort[i]], objectives[tosort[j]], constraints[tosort[j]]))
-          first = 1;
-      }
-    } else
-      first = 1;
+    i = p;
+    j = r;
+    for (k = p; k <= q; k++) {
+        first = 0;
+        if (j <= q) {
+            if (i < r) {
+                if (betterFitness(objectives[tosort[i]], constraints[tosort[i]], objectives[tosort[j]],
+                                  constraints[tosort[j]]))
+                    first = 1;
+            }
+        } else
+            first = 1;
 
-    if (first) {
-      sorted[k] = tosort[i];
-      i++;
-    } else {
-      sorted[k] = tosort[j];
-      j++;
+        if (first) {
+            sorted[k] = tosort[i];
+            i++;
+        } else {
+            sorted[k] = tosort[j];
+            j++;
+        }
     }
-  }
 
-  for (k = p; k <= q; k++)
-    tosort[k] = sorted[k];
+    for (k = p; k <= q; k++)
+        tosort[k] = sorted[k];
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -840,9 +841,9 @@ void mergeSortFitnessMerge(double* objectives, double* constraints, int* sorted,
  * Parses and checks the command line.
  */
 void interpretCommandLine(int argc, char** argv) {
-  parseCommandLine(argc, argv);
+    parseCommandLine(argc, argv);
 
-  checkOptions();
+    checkOptions();
 }
 
 /**
@@ -850,240 +851,240 @@ void interpretCommandLine(int argc, char** argv) {
  * For options, see printUsage.
  */
 void parseCommandLine(int argc, char** argv) {
-  int index;
+    int index;
 
-  index = 1;
+    index = 1;
 
-  parseOptions(argc, argv, &index);
+    parseOptions(argc, argv, &index);
 
-  parseParameters(argc, argv, &index);
+    parseParameters(argc, argv, &index);
 }
 
 /**
  * Parses only the options from the command line.
  */
 void parseOptions(int argc, char** argv, int* index) {
-  double dummy;
+    double dummy;
 
-  write_generational_statistics = 0;
-  write_generational_solutions = 0;
-  print_verbose_overview = 0;
-  use_vtr = 0;
+    write_generational_statistics = 0;
+    write_generational_solutions = 0;
+    print_verbose_overview = 0;
+    use_vtr = 0;
 
-  for (; (*index) < argc; (*index)++) {
-    if (argv[*index][0] == '-') {
-      /* If it is a negative number, the option part is over */
-      if (sscanf(argv[*index], "%lf", &dummy) && argv[*index][1] != '\0')
-        break;
+    for (; (*index) < argc; (*index)++) {
+        if (argv[*index][0] == '-') {
+            /* If it is a negative number, the option part is over */
+            if (sscanf(argv[*index], "%lf", &dummy) && argv[*index][1] != '\0')
+                break;
 
-      if (argv[*index][1] == '\0')
-        optionError(argv, *index);
-      else if (argv[*index][2] != '\0')
-        optionError(argv, *index);
-      else {
-        switch (argv[*index][1]) {
-          case '?':
-            printUsage();
+            if (argv[*index][1] == '\0')
+                optionError(argv, *index);
+            else if (argv[*index][2] != '\0')
+                optionError(argv, *index);
+            else {
+                switch (argv[*index][1]) {
+                    case '?':
+                        printUsage();
+                        break;
+                    case 'P':
+                        printAllInstalledProblems();
+                        break;
+                    case 's':
+                        write_generational_statistics = 1;
+                        break;
+                    case 'w':
+                        write_generational_solutions = 1;
+                        break;
+                    case 'v':
+                        print_verbose_overview = 1;
+                        break;
+                    case 'r':
+                        use_vtr = 1;
+                        break;
+                    default:
+                        optionError(argv, *index);
+                }
+            }
+        } else /* Argument is not an option, so option part is over */
             break;
-          case 'P':
-            printAllInstalledProblems();
-            break;
-          case 's':
-            write_generational_statistics = 1;
-            break;
-          case 'w':
-            write_generational_solutions = 1;
-            break;
-          case 'v':
-            print_verbose_overview = 1;
-            break;
-          case 'r':
-            use_vtr = 1;
-            break;
-          default:
-            optionError(argv, *index);
-        }
-      }
-    } else /* Argument is not an option, so option part is over */
-      break;
-  }
+    }
 }
 
 /**
  * Writes the names of all installed problems to the standard output.
  */
 void printAllInstalledProblems(void) {
-  int i, n;
+    int i, n;
 
-  n = numberOfInstalledProblems();
-  printf("Installed optimization problems:\n");
-  for (i = 0; i < n; i++)
-    printf("%3d: %s\n", i, installedProblemName(i));
+    n = numberOfInstalledProblems();
+    printf("Installed optimization problems:\n");
+    for (i = 0; i < n; i++)
+        printf("%3d: %s\n", i, installedProblemName(i));
 
-  exit(0);
+    exit(0);
 }
 
 /**
  * Informs the user of an illegal option and exits the program.
  */
 void optionError(char** argv, int index) {
-  printf("Illegal option: %s\n\n", argv[index]);
+    printf("Illegal option: %s\n\n", argv[index]);
 
-  printUsage();
+    printUsage();
 }
 
 /**
  * Parses only the EA parameters from the command line.
  */
 void parseParameters(int argc, char** argv, int* index) {
-  int noError;
+    int noError;
 
-  if ((argc - *index) != 9) {
-    printf(
-        "Number of parameters is incorrect, require 9 parameters (you "
-        "provided %d).\n\n",
-        (argc - *index));
+    if ((argc - *index) != 9) {
+        printf(
+            "Number of parameters is incorrect, require 9 parameters (you "
+            "provided %d).\n\n",
+            (argc - *index));
 
-    printUsage();
-  }
+        printUsage();
+    }
 
-  noError = 1;
-  noError = noError && sscanf(argv[*index + 0], "%d", &problem_index);
-  noError = noError && sscanf(argv[*index + 1], "%d", &number_of_parameters);
-  noError = noError && sscanf(argv[*index + 2], "%lf", &lower_user_range);
-  noError = noError && sscanf(argv[*index + 3], "%lf", &upper_user_range);
-  noError = noError && sscanf(argv[*index + 4], "%lf", &rotation_angle);
-  noError = noError && sscanf(argv[*index + 5], "%d", &maximum_number_of_evaluations);
-  noError = noError && sscanf(argv[*index + 6], "%lf", &vtr);
-  noError = noError && sscanf(argv[*index + 7], "%lf", &fitness_variance_tolerance);
-  noError = noError && sscanf(argv[*index + 8], "%d", &maximum_number_of_populations);
+    noError = 1;
+    noError = noError && sscanf(argv[*index + 0], "%d", &problem_index);
+    noError = noError && sscanf(argv[*index + 1], "%d", &number_of_parameters);
+    noError = noError && sscanf(argv[*index + 2], "%lf", &lower_user_range);
+    noError = noError && sscanf(argv[*index + 3], "%lf", &upper_user_range);
+    noError = noError && sscanf(argv[*index + 4], "%lf", &rotation_angle);
+    noError = noError && sscanf(argv[*index + 5], "%d", &maximum_number_of_evaluations);
+    noError = noError && sscanf(argv[*index + 6], "%lf", &vtr);
+    noError = noError && sscanf(argv[*index + 7], "%lf", &fitness_variance_tolerance);
+    noError = noError && sscanf(argv[*index + 8], "%d", &maximum_number_of_populations);
 
-  if (!noError) {
-    printf("Error parsing parameters.\n\n");
+    if (!noError) {
+        printf("Error parsing parameters.\n\n");
 
-    printUsage();
-  }
+        printUsage();
+    }
 }
 
 /**
  * Prints usage information and exits the program.
  */
 void printUsage(void) {
-  printf(
-      "Usage: AMaLGaM-Full-Free [-?] [-P] [-s] [-w] [-v] [-r] pro dim low "
-      "upp rot eva vtr tol pop\n");
-  printf(" -?: Prints out this usage information.\n");
-  printf(" -P: Prints out a list of all installed optimization problems.\n");
-  printf(" -s: Enables computing and writing of statistics every generation.\n");
-  printf(
-      " -w: Enables writing of solutions and their fitnesses every "
-      "generation.\n");
-  printf(
-      " -v: Enables verbose mode. Prints the settings before starting the "
-      "run.\n");
-  printf(" -r: Enables use of vtr in termination condition (value-to-reach).\n");
-  printf("\n");
-  printf("  pro: Index of optimization problem to be solved (minimization).\n");
-  printf("  dim: Number of parameters.\n");
-  printf("  low: Overall initialization lower bound.\n");
-  printf("  upp: Overall initialization upper bound.\n");
-  printf("  rot: The angle by which to rotate the problem.\n");
-  printf("  eva: Maximum number of evaluations allowed.\n");
-  printf(
-      "  vtr: The value to reach. If the objective value of the best "
-      "feasible solution reaches\n");
-  printf("       this value, termination is enforced (if -r is specified).\n");
-  printf(
-      "  tol: The tolerance level for fitness variance (i.e. minimum "
-      "fitness variance)\n");
-  printf("  pop: The maximum number of parallel populations.\n");
-  exit(0);
+    printf(
+        "Usage: AMaLGaM-Full-Free [-?] [-P] [-s] [-w] [-v] [-r] pro dim low "
+        "upp rot eva vtr tol pop\n");
+    printf(" -?: Prints out this usage information.\n");
+    printf(" -P: Prints out a list of all installed optimization problems.\n");
+    printf(" -s: Enables computing and writing of statistics every generation.\n");
+    printf(
+        " -w: Enables writing of solutions and their fitnesses every "
+        "generation.\n");
+    printf(
+        " -v: Enables verbose mode. Prints the settings before starting the "
+        "run.\n");
+    printf(" -r: Enables use of vtr in termination condition (value-to-reach).\n");
+    printf("\n");
+    printf("  pro: Index of optimization problem to be solved (minimization).\n");
+    printf("  dim: Number of parameters.\n");
+    printf("  low: Overall initialization lower bound.\n");
+    printf("  upp: Overall initialization upper bound.\n");
+    printf("  rot: The angle by which to rotate the problem.\n");
+    printf("  eva: Maximum number of evaluations allowed.\n");
+    printf(
+        "  vtr: The value to reach. If the objective value of the best "
+        "feasible solution reaches\n");
+    printf("       this value, termination is enforced (if -r is specified).\n");
+    printf(
+        "  tol: The tolerance level for fitness variance (i.e. minimum "
+        "fitness variance)\n");
+    printf("  pop: The maximum number of parallel populations.\n");
+    exit(0);
 }
 
 /**
  * Checks whether the selected options are feasible.
  */
 void checkOptions(void) {
-  if (number_of_parameters < 1) {
-    printf("\n");
-    printf(
-        "Error: number of parameters < 1 (read: %d). Require number of "
-        "parameters >= 1.",
-        number_of_parameters);
-    printf("\n\n");
+    if (number_of_parameters < 1) {
+        printf("\n");
+        printf(
+            "Error: number of parameters < 1 (read: %d). Require number of "
+            "parameters >= 1.",
+            number_of_parameters);
+        printf("\n\n");
 
-    exit(0);
-  }
+        exit(0);
+    }
 
-  if (maximum_number_of_populations < 1) {
-    printf("\n");
-    printf(
-        "Error: maximum number of populations < 1 (read: %d). Require "
-        "maximum number of populations >= 1.",
-        maximum_number_of_populations);
-    printf("\n\n");
+    if (maximum_number_of_populations < 1) {
+        printf("\n");
+        printf(
+            "Error: maximum number of populations < 1 (read: %d). Require "
+            "maximum number of populations >= 1.",
+            maximum_number_of_populations);
+        printf("\n\n");
 
-    exit(0);
-  }
+        exit(0);
+    }
 
-  if (maximum_number_of_evaluations < 1) {
-    printf("\n");
-    printf(
-        "Error: maximum number of evaluations < 1 (read: %d). Require "
-        "maximum number of evaluations >= 1.",
-        maximum_number_of_evaluations);
-    printf("\n\n");
+    if (maximum_number_of_evaluations < 1) {
+        printf("\n");
+        printf(
+            "Error: maximum number of evaluations < 1 (read: %d). Require "
+            "maximum number of evaluations >= 1.",
+            maximum_number_of_evaluations);
+        printf("\n\n");
 
-    exit(0);
-  }
+        exit(0);
+    }
 
-  if (installedProblemName(problem_index) == NULL) {
-    printf("\n");
-    printf("Error: unknown index for problem (read index %d).", problem_index);
-    printf("\n\n");
+    if (installedProblemName(problem_index) == NULL) {
+        printf("\n");
+        printf("Error: unknown index for problem (read index %d).", problem_index);
+        printf("\n\n");
 
-    exit(0);
-  }
+        exit(0);
+    }
 }
 
 /**
  * Prints the settings as read on the command line.
  */
 void printVerboseOverview(void) {
-  int i;
+    int i;
 
-  printf("### Settings #################################################\n");
-  printf("#\n");
-  printf("# Statistics writing every generation: %s\n", write_generational_statistics ? "enabled" : "disabled");
-  printf("# Population file writing            : %s\n", write_generational_solutions ? "enabled" : "disabled");
-  printf("# Use of value-to-reach (vtr)        : %s\n", use_vtr ? "enabled" : "disabled");
-  printf("#\n");
-  printf("##############################################################\n");
-  printf("#\n");
-  printf("# Optimization problem    = %s\n", installedProblemName(problem_index));
-  printf("# Number of parameters    = %d\n", number_of_parameters);
-  printf("# Initialization ranges   = ");
-  for (i = 0; i < number_of_parameters; i++) {
-    printf("x_%d: [%e;%e]", i, lower_init_ranges[i], upper_init_ranges[i]);
-    if (i < number_of_parameters - 1)
-      printf("\n#                           ");
-  }
-  printf("\n");
-  printf("# Boundary ranges         = ");
-  for (i = 0; i < number_of_parameters; i++) {
-    printf("x_%d: [%e;%e]", i, lower_range_bounds[i], upper_range_bounds[i]);
-    if (i < number_of_parameters - 1)
-      printf("\n#                           ");
-  }
-  printf("\n");
-  printf("# Rotation angle          = %e\n", rotation_angle);
-  printf("# Maximum numb. of eval.  = %d\n", maximum_number_of_evaluations);
-  printf("# Value to reach (vtr)    = %e\n", vtr);
-  printf("# Fitness var. tolerance  = %e\n", fitness_variance_tolerance);
-  printf("# Max. number of pop's    = %d\n", maximum_number_of_populations);
-  printf("# Random seed             = %ld\n", random_seed);
-  printf("#\n");
-  printf("##############################################################\n");
+    printf("### Settings #################################################\n");
+    printf("#\n");
+    printf("# Statistics writing every generation: %s\n", write_generational_statistics ? "enabled" : "disabled");
+    printf("# Population file writing            : %s\n", write_generational_solutions ? "enabled" : "disabled");
+    printf("# Use of value-to-reach (vtr)        : %s\n", use_vtr ? "enabled" : "disabled");
+    printf("#\n");
+    printf("##############################################################\n");
+    printf("#\n");
+    printf("# Optimization problem    = %s\n", installedProblemName(problem_index));
+    printf("# Number of parameters    = %d\n", number_of_parameters);
+    printf("# Initialization ranges   = ");
+    for (i = 0; i < number_of_parameters; i++) {
+        printf("x_%d: [%e;%e]", i, lower_init_ranges[i], upper_init_ranges[i]);
+        if (i < number_of_parameters - 1)
+            printf("\n#                           ");
+    }
+    printf("\n");
+    printf("# Boundary ranges         = ");
+    for (i = 0; i < number_of_parameters; i++) {
+        printf("x_%d: [%e;%e]", i, lower_range_bounds[i], upper_range_bounds[i]);
+        if (i < number_of_parameters - 1)
+            printf("\n#                           ");
+    }
+    printf("\n");
+    printf("# Rotation angle          = %e\n", rotation_angle);
+    printf("# Maximum numb. of eval.  = %d\n", maximum_number_of_evaluations);
+    printf("# Value to reach (vtr)    = %e\n", vtr);
+    printf("# Fitness var. tolerance  = %e\n", fitness_variance_tolerance);
+    printf("# Max. number of pop's    = %d\n", maximum_number_of_populations);
+    printf("# Random seed             = %ld\n", random_seed);
+    printf("#\n");
+    printf("##############################################################\n");
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -1092,53 +1093,53 @@ void printVerboseOverview(void) {
  * Returns a random double, distributed uniformly between 0 and 1.
  */
 double randomRealUniform01(void) {
-  int64_t n26, n27;
-  double result;
+    int64_t n26, n27;
+    double result;
 
-  random_seed_changing = (random_seed_changing * 0x5DEECE66DLLU + 0xBLLU) & ((1LLU << 48) - 1);
-  n26 = (int64_t)(random_seed_changing >> (48 - 26));
-  random_seed_changing = (random_seed_changing * 0x5DEECE66DLLU + 0xBLLU) & ((1LLU << 48) - 1);
-  n27 = (int64_t)(random_seed_changing >> (48 - 27));
-  result = (((int64_t)n26 << 27) + n27) / ((double)(1LLU << 53));
+    random_seed_changing = (random_seed_changing * 0x5DEECE66DLLU + 0xBLLU) & ((1LLU << 48) - 1);
+    n26 = (int64_t)(random_seed_changing >> (48 - 26));
+    random_seed_changing = (random_seed_changing * 0x5DEECE66DLLU + 0xBLLU) & ((1LLU << 48) - 1);
+    n27 = (int64_t)(random_seed_changing >> (48 - 27));
+    result = (((int64_t)n26 << 27) + n27) / ((double)(1LLU << 53));
 
-  return (result);
+    return (result);
 }
 
 /**
  * Returns a random integer, distributed uniformly between 0 and maximum.
  */
 int randomInt(int maximum) {
-  int result;
+    int result;
 
-  result = (int)(((double)maximum) * randomRealUniform01());
+    result = (int)(((double)maximum) * randomRealUniform01());
 
-  return (result);
+    return (result);
 }
 
 /**
  * Returns a random double, distributed normally with mean 0 and variance 1.
  */
 double random1DNormalUnit(void) {
-  double v1, v2, s, multiplier, value;
+    double v1, v2, s, multiplier, value;
 
-  if (haveNextNextGaussian) {
-    haveNextNextGaussian = 0;
+    if (haveNextNextGaussian) {
+        haveNextNextGaussian = 0;
 
-    return (nextNextGaussian);
-  } else {
-    do {
-      v1 = 2 * (randomRealUniform01()) - 1;
-      v2 = 2 * (randomRealUniform01()) - 1;
-      s = v1 * v1 + v2 * v2;
-    } while (s >= 1);
+        return (nextNextGaussian);
+    } else {
+        do {
+            v1 = 2 * (randomRealUniform01()) - 1;
+            v2 = 2 * (randomRealUniform01()) - 1;
+            s = v1 * v1 + v2 * v2;
+        } while (s >= 1);
 
-    value = -2 * log(s) / s;
-    multiplier = value <= 0.0 ? 0.0 : sqrt(value);
-    nextNextGaussian = v2 * multiplier;
-    haveNextNextGaussian = 1;
+        value = -2 * log(s) / s;
+        multiplier = value <= 0.0 ? 0.0 : sqrt(value);
+        nextNextGaussian = v2 * multiplier;
+        haveNextNextGaussian = 1;
 
-    return (v1 * multiplier);
-  }
+        return (v1 * multiplier);
+    }
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -1147,129 +1148,129 @@ double random1DNormalUnit(void) {
  * Returns the name of an installed problem.
  */
 char* installedProblemName(int index) {
-  switch (index) {
-    case 0:
-      return ((char*)"Sphere");
-    case 1:
-      return ((char*)"Ellipsoid");
-    case 2:
-      return ((char*)"Cigar");
-    case 3:
-      return ((char*)"Tablet");
-    case 4:
-      return ((char*)"Cigar-tablet");
-    case 5:
-      return ((char*)"Two axes");
-    case 6:
-      return ((char*)"Different powers");
-    case 7:
-      return ((char*)"Rosenbrock");
-    case 8:
-      return ((char*)"Parabolic ridge");
-    case 9:
-      return ((char*)"Sharp ridge");
-    case 10:
-      return ((char*)"Griewank");
-    case 11:
-      return ((char*)"Michalewicz");
-    case 12:
-      return ((char*)"Rastrigin");
-    case 13:
-      return ((char*)"<?>");
-  }
+    switch (index) {
+        case 0:
+            return ((char*)"Sphere");
+        case 1:
+            return ((char*)"Ellipsoid");
+        case 2:
+            return ((char*)"Cigar");
+        case 3:
+            return ((char*)"Tablet");
+        case 4:
+            return ((char*)"Cigar-tablet");
+        case 5:
+            return ((char*)"Two axes");
+        case 6:
+            return ((char*)"Different powers");
+        case 7:
+            return ((char*)"Rosenbrock");
+        case 8:
+            return ((char*)"Parabolic ridge");
+        case 9:
+            return ((char*)"Sharp ridge");
+        case 10:
+            return ((char*)"Griewank");
+        case 11:
+            return ((char*)"Michalewicz");
+        case 12:
+            return ((char*)"Rastrigin");
+        case 13:
+            return ((char*)"<?>");
+    }
 
-  return (NULL);
+    return (NULL);
 }
 
 /**
  * Returns the number of problems installed.
  */
 int numberOfInstalledProblems(void) {
-  static int result = -1;
+    static int result = -1;
 
-  if (result == -1) {
-    result = 0;
-    while (installedProblemName(result) != NULL)
-      result++;
-  }
+    if (result == -1) {
+        result = 0;
+        while (installedProblemName(result) != NULL)
+            result++;
+    }
 
-  return (result);
+    return (result);
 }
 
 /**
  * Returns the lower-range bound of an installed problem.
  */
 double installedProblemLowerRangeBound(int index, int dimension) {
-  switch (index) {
-    case 0:
-      return (sphereFunctionProblemLowerRangeBound(dimension));
-    case 1:
-      return (ellipsoidFunctionLowerRangeBound(dimension));
-    case 2:
-      return (cigarFunctionLowerRangeBound(dimension));
-    case 3:
-      return (tabletFunctionLowerRangeBound(dimension));
-    case 4:
-      return (cigarTabletFunctionLowerRangeBound(dimension));
-    case 5:
-      return (twoAxesFunctionLowerRangeBound(dimension));
-    case 6:
-      return (differentPowersFunctionLowerRangeBound(dimension));
-    case 7:
-      return (rosenbrockFunctionLowerRangeBound(dimension));
-    case 8:
-      return (parabolicRidgeFunctionLowerRangeBound(dimension));
-    case 9:
-      return (sharpRidgeFunctionLowerRangeBound(dimension));
-    case 10:
-      return (griewankFunctionLowerRangeBound(dimension));
-    case 11:
-      return (michalewiczFunctionLowerRangeBound(dimension));
-    case 12:
-      return (rastriginFunctionLowerRangeBound(dimension));
-    case 13:
-      return (std::get<0>(global_bounds[dimension]));
-  }
+    switch (index) {
+        case 0:
+            return (sphereFunctionProblemLowerRangeBound(dimension));
+        case 1:
+            return (ellipsoidFunctionLowerRangeBound(dimension));
+        case 2:
+            return (cigarFunctionLowerRangeBound(dimension));
+        case 3:
+            return (tabletFunctionLowerRangeBound(dimension));
+        case 4:
+            return (cigarTabletFunctionLowerRangeBound(dimension));
+        case 5:
+            return (twoAxesFunctionLowerRangeBound(dimension));
+        case 6:
+            return (differentPowersFunctionLowerRangeBound(dimension));
+        case 7:
+            return (rosenbrockFunctionLowerRangeBound(dimension));
+        case 8:
+            return (parabolicRidgeFunctionLowerRangeBound(dimension));
+        case 9:
+            return (sharpRidgeFunctionLowerRangeBound(dimension));
+        case 10:
+            return (griewankFunctionLowerRangeBound(dimension));
+        case 11:
+            return (michalewiczFunctionLowerRangeBound(dimension));
+        case 12:
+            return (rastriginFunctionLowerRangeBound(dimension));
+        case 13:
+            return (std::get<0>(global_bounds[dimension]));
+    }
 
-  return (0.0);
+    return (0.0);
 }
 
 /**
  * Returns the upper-range bound of an installed problem.
  */
 double installedProblemUpperRangeBound(int index, int dimension) {
-  switch (index) {
-    case 0:
-      return (sphereFunctionProblemUpperRangeBound(dimension));
-    case 1:
-      return (ellipsoidFunctionUpperRangeBound(dimension));
-    case 2:
-      return (cigarFunctionUpperRangeBound(dimension));
-    case 3:
-      return (tabletFunctionUpperRangeBound(dimension));
-    case 4:
-      return (cigarTabletFunctionUpperRangeBound(dimension));
-    case 5:
-      return (twoAxesFunctionUpperRangeBound(dimension));
-    case 6:
-      return (differentPowersFunctionUpperRangeBound(dimension));
-    case 7:
-      return (rosenbrockFunctionUpperRangeBound(dimension));
-    case 8:
-      return (parabolicRidgeFunctionUpperRangeBound(dimension));
-    case 9:
-      return (sharpRidgeFunctionUpperRangeBound(dimension));
-    case 10:
-      return (griewankFunctionUpperRangeBound(dimension));
-    case 11:
-      return (michalewiczFunctionUpperRangeBound(dimension));
-    case 12:
-      return (rastriginFunctionUpperRangeBound(dimension));
-    case 13:
-      return (std::get<1>(global_bounds[dimension]));
-  }
+    switch (index) {
+        case 0:
+            return (sphereFunctionProblemUpperRangeBound(dimension));
+        case 1:
+            return (ellipsoidFunctionUpperRangeBound(dimension));
+        case 2:
+            return (cigarFunctionUpperRangeBound(dimension));
+        case 3:
+            return (tabletFunctionUpperRangeBound(dimension));
+        case 4:
+            return (cigarTabletFunctionUpperRangeBound(dimension));
+        case 5:
+            return (twoAxesFunctionUpperRangeBound(dimension));
+        case 6:
+            return (differentPowersFunctionUpperRangeBound(dimension));
+        case 7:
+            return (rosenbrockFunctionUpperRangeBound(dimension));
+        case 8:
+            return (parabolicRidgeFunctionUpperRangeBound(dimension));
+        case 9:
+            return (sharpRidgeFunctionUpperRangeBound(dimension));
+        case 10:
+            return (griewankFunctionUpperRangeBound(dimension));
+        case 11:
+            return (michalewiczFunctionUpperRangeBound(dimension));
+        case 12:
+            return (rastriginFunctionUpperRangeBound(dimension));
+        case 13:
+            return (std::get<1>(global_bounds[dimension]));
+    }
 
-  return (0.0);
+    return (0.0);
 }
 
 /**
@@ -1277,12 +1278,12 @@ double installedProblemUpperRangeBound(int index, int dimension) {
  * every problem.
  */
 short isParameterInRangeBounds(double parameter, int dimension) {
-  if (parameter < installedProblemLowerRangeBound(problem_index, dimension) ||
-      parameter > installedProblemUpperRangeBound(problem_index, dimension) || isnan(parameter)) {
-    return (0);
-  }
+    if (parameter < installedProblemLowerRangeBound(problem_index, dimension) ||
+        parameter > installedProblemUpperRangeBound(problem_index, dimension) || isnan(parameter)) {
+        return (0);
+    }
 
-  return (1);
+    return (1);
 }
 
 /**
@@ -1292,20 +1293,20 @@ short isParameterInRangeBounds(double parameter, int dimension) {
  * Both are returned using pointer variables.
  */
 void installedProblemEvaluation(int index, double* parameters, double* objective_value, double* constraint_value) {
-  double* rotated_parameters;
+    double* rotated_parameters;
 
-  number_of_evaluations++;
+    number_of_evaluations++;
 
-  if (rotation_angle == 0.0)
-    installedProblemEvaluationWithoutRotation(index, parameters, objective_value, constraint_value);
-  else {
-    rotated_parameters =
-        matrixVectorMultiplication(rotation_matrix, parameters, number_of_parameters, number_of_parameters);
+    if (rotation_angle == 0.0)
+        installedProblemEvaluationWithoutRotation(index, parameters, objective_value, constraint_value);
+    else {
+        rotated_parameters =
+            matrixVectorMultiplication(rotation_matrix, parameters, number_of_parameters, number_of_parameters);
 
-    installedProblemEvaluationWithoutRotation(index, rotated_parameters, objective_value, constraint_value);
+        installedProblemEvaluationWithoutRotation(index, rotated_parameters, objective_value, constraint_value);
 
-    free(rotated_parameters);
-  }
+        free(rotated_parameters);
+    }
 }
 
 /**
@@ -1318,331 +1319,332 @@ void installedProblemEvaluationWithoutRotation(int index,
                                                double* parameters,
                                                double* objective_value,
                                                double* constraint_value) {
-  *objective_value = 0.0;
-  *constraint_value = 0.0;
+    *objective_value = 0.0;
+    *constraint_value = 0.0;
 
-  switch (index) {
-    case 0:
-      sphereFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 1:
-      ellipsoidFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 2:
-      cigarFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 3:
-      tabletFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 4:
-      cigarTabletFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 5:
-      twoAxesFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 6:
-      differentPowersFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 7:
-      rosenbrockFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 8:
-      parabolicRidgeFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 9:
-      sharpRidgeFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 10:
-      griewankFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 11:
-      michalewiczFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 12:
-      rastriginFunctionProblemEvaluation(parameters, objective_value, constraint_value);
-      break;
-    case 13:
-      global_evaluate(parameters, objective_value, constraint_value);
-      break;
-  }
+    switch (index) {
+        case 0:
+            sphereFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 1:
+            ellipsoidFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 2:
+            cigarFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 3:
+            tabletFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 4:
+            cigarTabletFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 5:
+            twoAxesFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 6:
+            differentPowersFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 7:
+            rosenbrockFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 8:
+            parabolicRidgeFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 9:
+            sharpRidgeFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 10:
+            griewankFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 11:
+            michalewiczFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 12:
+            rastriginFunctionProblemEvaluation(parameters, objective_value, constraint_value);
+            break;
+        case 13:
+            global_evaluate(parameters, objective_value, constraint_value);
+            break;
+    }
 }
 
 void sphereFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++)
-    result += parameters[i] * parameters[i];
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++)
+        result += parameters[i] * parameters[i];
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double sphereFunctionProblemLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double sphereFunctionProblemUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void ellipsoidFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++)
-    result += pow(10.0, 6.0 * (((double)(i)) / ((double)(number_of_parameters - 1)))) * parameters[i] * parameters[i];
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++)
+        result +=
+            pow(10.0, 6.0 * (((double)(i)) / ((double)(number_of_parameters - 1)))) * parameters[i] * parameters[i];
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double ellipsoidFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double ellipsoidFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void cigarFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = parameters[0] * parameters[0];
-  for (i = 1; i < number_of_parameters; i++) {
-    result += pow(10.0, 6.0) * parameters[i] * parameters[i];
-  }
+    result = parameters[0] * parameters[0];
+    for (i = 1; i < number_of_parameters; i++) {
+        result += pow(10.0, 6.0) * parameters[i] * parameters[i];
+    }
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double cigarFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double cigarFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void tabletFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = pow(10.0, 6.0) * parameters[0] * parameters[0];
-  for (i = 1; i < number_of_parameters; i++)
-    result += parameters[i] * parameters[i];
+    result = pow(10.0, 6.0) * parameters[0] * parameters[0];
+    for (i = 1; i < number_of_parameters; i++)
+        result += parameters[i] * parameters[i];
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double tabletFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double tabletFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void cigarTabletFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = parameters[0] * parameters[0];
-  for (i = 1; i < number_of_parameters - 1; i++)
-    result += pow(10.0, 4.0) * parameters[i] * parameters[i];
-  result += pow(10.0, 8.0) * parameters[number_of_parameters - 1] * parameters[number_of_parameters - 1];
+    result = parameters[0] * parameters[0];
+    for (i = 1; i < number_of_parameters - 1; i++)
+        result += pow(10.0, 4.0) * parameters[i] * parameters[i];
+    result += pow(10.0, 8.0) * parameters[number_of_parameters - 1] * parameters[number_of_parameters - 1];
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double cigarTabletFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double cigarTabletFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void twoAxesFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i <= (number_of_parameters / 2) - 1; i++)
-    result += pow(10.0, 6.0) * parameters[i] * parameters[i];
-  for (i = (number_of_parameters / 2); i < number_of_parameters; i++)
-    result += parameters[i] * parameters[i];
+    result = 0.0;
+    for (i = 0; i <= (number_of_parameters / 2) - 1; i++)
+        result += pow(10.0, 6.0) * parameters[i] * parameters[i];
+    for (i = (number_of_parameters / 2); i < number_of_parameters; i++)
+        result += parameters[i] * parameters[i];
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double twoAxesFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double twoAxesFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void differentPowersFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++)
-    result += pow(fabs(parameters[i]), 2.0 + 10.0 * (((double)(i)) / ((double)(number_of_parameters - 1))));
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++)
+        result += pow(fabs(parameters[i]), 2.0 + 10.0 * (((double)(i)) / ((double)(number_of_parameters - 1))));
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double differentPowersFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double differentPowersFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void rosenbrockFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters - 1; i++)
-    result += 100 * (parameters[i + 1] - parameters[i] * parameters[i]) *
-                  (parameters[i + 1] - parameters[i] * parameters[i]) +
-              (1.0 - parameters[i]) * (1.0 - parameters[i]);
+    result = 0.0;
+    for (i = 0; i < number_of_parameters - 1; i++)
+        result += 100 * (parameters[i + 1] - parameters[i] * parameters[i]) *
+                      (parameters[i + 1] - parameters[i] * parameters[i]) +
+                  (1.0 - parameters[i]) * (1.0 - parameters[i]);
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double rosenbrockFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double rosenbrockFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void parabolicRidgeFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double sum, result;
+    int i;
+    double sum, result;
 
-  sum = 0;
-  for (i = 1; i < number_of_parameters; i++)
-    sum += parameters[i] * parameters[i];
+    sum = 0;
+    for (i = 1; i < number_of_parameters; i++)
+        sum += parameters[i] * parameters[i];
 
-  result = -parameters[0] + 100.0 * sum;
+    result = -parameters[0] + 100.0 * sum;
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double parabolicRidgeFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double parabolicRidgeFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void sharpRidgeFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double sum, result;
+    int i;
+    double sum, result;
 
-  sum = 0;
-  for (i = 1; i < number_of_parameters; i++)
-    sum += parameters[i] * parameters[i];
+    sum = 0;
+    for (i = 1; i < number_of_parameters; i++)
+        sum += parameters[i] * parameters[i];
 
-  result = -parameters[0] + 100.0 * sqrt(sum);
+    result = -parameters[0] + 100.0 * sqrt(sum);
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double sharpRidgeFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double sharpRidgeFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void griewankFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double yi, sum, prod, result;
+    int i;
+    double yi, sum, prod, result;
 
-  sum = 0;
-  prod = 1.0;
-  for (i = 0; i < number_of_parameters; i++) {
-    yi = parameters[i] - 100.0;
-    sum += yi * yi;
+    sum = 0;
+    prod = 1.0;
+    for (i = 0; i < number_of_parameters; i++) {
+        yi = parameters[i] - 100.0;
+        sum += yi * yi;
 
-    yi = (parameters[i] - 100.0) / sqrt((double)(i + 1));
-    prod *= cos(yi);
-  }
+        yi = (parameters[i] - 100.0) / sqrt((double)(i + 1));
+        prod *= cos(yi);
+    }
 
-  result = sum / 4000.0 - prod + 1.0;
+    result = sum / 4000.0 - prod + 1.0;
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double griewankFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double griewankFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 
 void michalewiczFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++)
-    result += -sin(parameters[i]) * pow(sin(((i + 1) * parameters[i] * parameters[i]) / PI), 20.0);
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++)
+        result += -sin(parameters[i]) * pow(sin(((i + 1) * parameters[i] * parameters[i]) / PI), 20.0);
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double michalewiczFunctionLowerRangeBound(int dimension) {
-  return (0.0);
+    return (0.0);
 }
 
 double michalewiczFunctionUpperRangeBound(int dimension) {
-  return (PI);
+    return (PI);
 }
 
 void rastriginFunctionProblemEvaluation(double* parameters, double* objective_value, double* constraint_value) {
-  int i;
-  double result;
+    int i;
+    double result;
 
-  result = 10 * number_of_parameters;
-  for (i = 0; i < number_of_parameters; i++)
-    result += parameters[i] * parameters[i] - 10.0 * cos(2.0 * PI * parameters[i]);
+    result = 10 * number_of_parameters;
+    for (i = 0; i < number_of_parameters; i++)
+        result += parameters[i] * parameters[i] - 10.0 * cos(2.0 * PI * parameters[i]);
 
-  *objective_value = result;
-  *constraint_value = 0;
+    *objective_value = result;
+    *constraint_value = 0;
 }
 
 double rastriginFunctionLowerRangeBound(int dimension) {
-  return (-1e+308);
+    return (-1e+308);
 }
 
 double rastriginFunctionUpperRangeBound(int dimension) {
-  return (1e+308);
+    return (1e+308);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -1651,260 +1653,260 @@ double rastriginFunctionUpperRangeBound(int dimension) {
  * Performs initializations that are required before starting a run.
  */
 void initialize(void) {
-  number_of_generations = 0;
+    number_of_generations = 0;
 
-  if (number_of_starts == 1)
-    number_of_evaluations = 0;
+    if (number_of_starts == 1)
+        number_of_evaluations = 0;
 
-  alpha_AMS = 0.5 * tau * (((double)population_size) / ((double)(population_size - 1)));
-  delta_AMS = 2.0;
+    alpha_AMS = 0.5 * tau * (((double)population_size) / ((double)(population_size - 1)));
+    delta_AMS = 2.0;
 
-  initializeMemory();
+    initializeMemory();
 
-  if (number_of_starts == 1)
-    initializeRandomNumberGenerator();
+    if (number_of_starts == 1)
+        initializeRandomNumberGenerator();
 
-  initializeParameterRangeBounds();
+    initializeParameterRangeBounds();
 
-  initializeDistributionMultipliers();
+    initializeDistributionMultipliers();
 
-  initializeObjectiveRotationMatrix();
+    initializeObjectiveRotationMatrix();
 
-  initializePopulationsAndFitnessValues();
+    initializePopulationsAndFitnessValues();
 
-  computeRanks();
+    computeRanks();
 }
 
 /**
  * Initializes the memory.
  */
 void initializeMemory(void) {
-  int i, j;
+    int i, j;
 
-  selection_size = (int)(tau * (population_size));
+    selection_size = (int)(tau * (population_size));
 
-  populations = (double***)Malloc(number_of_populations * sizeof(double**));
-  populations_terminated = (short*)Malloc(number_of_populations * sizeof(short));
-  no_improvement_stretch = (int*)Malloc(number_of_populations * sizeof(int));
-  objective_values = (double**)Malloc(number_of_populations * sizeof(double*));
-  constraint_values = (double**)Malloc(number_of_populations * sizeof(double*));
-  ranks = (double**)Malloc(number_of_populations * sizeof(double*));
-  selections = (double***)Malloc(number_of_populations * sizeof(double**));
-  objective_values_selections = (double**)Malloc(number_of_populations * sizeof(double*));
-  constraint_values_selections = (double**)Malloc(number_of_populations * sizeof(double*));
-  mean_vectors = (double**)Malloc(number_of_populations * sizeof(double*));
-  mean_vectors_previous = (double**)Malloc(number_of_populations * sizeof(double*));
-  covariance_matrices = (double***)Malloc(number_of_populations * sizeof(double**));
-  cholesky_factors_lower_triangle = (double***)Malloc(number_of_populations * sizeof(double**));
+    populations = (double***)Malloc(number_of_populations * sizeof(double**));
+    populations_terminated = (short*)Malloc(number_of_populations * sizeof(short));
+    no_improvement_stretch = (int*)Malloc(number_of_populations * sizeof(int));
+    objective_values = (double**)Malloc(number_of_populations * sizeof(double*));
+    constraint_values = (double**)Malloc(number_of_populations * sizeof(double*));
+    ranks = (double**)Malloc(number_of_populations * sizeof(double*));
+    selections = (double***)Malloc(number_of_populations * sizeof(double**));
+    objective_values_selections = (double**)Malloc(number_of_populations * sizeof(double*));
+    constraint_values_selections = (double**)Malloc(number_of_populations * sizeof(double*));
+    mean_vectors = (double**)Malloc(number_of_populations * sizeof(double*));
+    mean_vectors_previous = (double**)Malloc(number_of_populations * sizeof(double*));
+    covariance_matrices = (double***)Malloc(number_of_populations * sizeof(double**));
+    cholesky_factors_lower_triangle = (double***)Malloc(number_of_populations * sizeof(double**));
 
-  for (i = 0; i < number_of_populations; i++) {
-    populations[i] = (double**)Malloc(population_size * sizeof(double*));
-    for (j = 0; j < population_size; j++)
-      populations[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
+    for (i = 0; i < number_of_populations; i++) {
+        populations[i] = (double**)Malloc(population_size * sizeof(double*));
+        for (j = 0; j < population_size; j++)
+            populations[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-    populations_terminated[i] = 0;
+        populations_terminated[i] = 0;
 
-    no_improvement_stretch[i] = 0;
+        no_improvement_stretch[i] = 0;
 
-    objective_values[i] = (double*)Malloc(population_size * sizeof(double));
+        objective_values[i] = (double*)Malloc(population_size * sizeof(double));
 
-    constraint_values[i] = (double*)Malloc(population_size * sizeof(double));
+        constraint_values[i] = (double*)Malloc(population_size * sizeof(double));
 
-    ranks[i] = (double*)Malloc(population_size * sizeof(double));
+        ranks[i] = (double*)Malloc(population_size * sizeof(double));
 
-    selections[i] = (double**)Malloc(selection_size * sizeof(double*));
-    for (j = 0; j < selection_size; j++)
-      selections[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
+        selections[i] = (double**)Malloc(selection_size * sizeof(double*));
+        for (j = 0; j < selection_size; j++)
+            selections[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-    objective_values_selections[i] = (double*)Malloc(selection_size * sizeof(double));
+        objective_values_selections[i] = (double*)Malloc(selection_size * sizeof(double));
 
-    constraint_values_selections[i] = (double*)Malloc(selection_size * sizeof(double));
+        constraint_values_selections[i] = (double*)Malloc(selection_size * sizeof(double));
 
-    mean_vectors[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+        mean_vectors[i] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-    mean_vectors_previous[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+        mean_vectors_previous[i] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-    covariance_matrices[i] = (double**)Malloc(number_of_parameters * sizeof(double*));
-    for (j = 0; j < number_of_parameters; j++)
-      covariance_matrices[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
+        covariance_matrices[i] = (double**)Malloc(number_of_parameters * sizeof(double*));
+        for (j = 0; j < number_of_parameters; j++)
+            covariance_matrices[i][j] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-    cholesky_factors_lower_triangle[i] = NULL;
-  }
+        cholesky_factors_lower_triangle[i] = NULL;
+    }
 
-  lower_range_bounds = (double*)Malloc(number_of_parameters * sizeof(double));
-  upper_range_bounds = (double*)Malloc(number_of_parameters * sizeof(double));
-  lower_init_ranges = (double*)Malloc(number_of_parameters * sizeof(double));
-  upper_init_ranges = (double*)Malloc(number_of_parameters * sizeof(double));
+    lower_range_bounds = (double*)Malloc(number_of_parameters * sizeof(double));
+    upper_range_bounds = (double*)Malloc(number_of_parameters * sizeof(double));
+    lower_init_ranges = (double*)Malloc(number_of_parameters * sizeof(double));
+    upper_init_ranges = (double*)Malloc(number_of_parameters * sizeof(double));
 }
 
 /**
  * Initializes the random number generator.
  */
 void initializeRandomNumberGenerator(void) {
-  struct tm* timep;
-  time_t t;
+    struct tm* timep;
+    time_t t;
 
-  while (random_seed_changing == 0) {
-    t = time(NULL);
-    timep = localtime(&t);
-    random_seed_changing = ((60 * (long)timep->tm_min)) + (60 * 60 * (long)timep->tm_hour) + ((long)timep->tm_sec);
-    random_seed_changing = (random_seed_changing / ((int)(9.99 * randomRealUniform01()) + 1)) *
-                           (((int)(randomRealUniform01() * 1000000.0)) % 10);
-  }
+    while (random_seed_changing == 0) {
+        t = time(NULL);
+        timep = localtime(&t);
+        random_seed_changing = ((60 * (long)timep->tm_min)) + (60 * 60 * (long)timep->tm_hour) + ((long)timep->tm_sec);
+        random_seed_changing = (random_seed_changing / ((int)(9.99 * randomRealUniform01()) + 1)) *
+                               (((int)(randomRealUniform01() * 1000000.0)) % 10);
+    }
 
-  random_seed = random_seed_changing;
+    random_seed = random_seed_changing;
 }
 
 /**
  * Initializes the parameter range bounds.
  */
 void initializeParameterRangeBounds(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_parameters; i++) {
-    lower_range_bounds[i] = installedProblemLowerRangeBound(problem_index, i);
-    upper_range_bounds[i] = installedProblemUpperRangeBound(problem_index, i);
-  }
+    for (i = 0; i < number_of_parameters; i++) {
+        lower_range_bounds[i] = installedProblemLowerRangeBound(problem_index, i);
+        upper_range_bounds[i] = installedProblemUpperRangeBound(problem_index, i);
+    }
 
-  for (i = 0; i < number_of_parameters; i++) {
-    lower_init_ranges[i] = lower_user_range;
-    if (lower_user_range < lower_range_bounds[i])
-      lower_init_ranges[i] = lower_range_bounds[i];
+    for (i = 0; i < number_of_parameters; i++) {
+        lower_init_ranges[i] = lower_user_range;
+        if (lower_user_range < lower_range_bounds[i])
+            lower_init_ranges[i] = lower_range_bounds[i];
 
-    upper_init_ranges[i] = upper_user_range;
-    if (upper_user_range > upper_range_bounds[i])
-      upper_init_ranges[i] = upper_range_bounds[i];
-  }
+        upper_init_ranges[i] = upper_user_range;
+        if (upper_user_range > upper_range_bounds[i])
+            upper_init_ranges[i] = upper_range_bounds[i];
+    }
 }
 
 /**
  * Initializes the distribution multipliers.
  */
 void initializeDistributionMultipliers(void) {
-  int i;
+    int i;
 
-  distribution_multipliers = (double*)Malloc(number_of_populations * sizeof(double));
-  for (i = 0; i < number_of_populations; i++)
-    distribution_multipliers[i] = 1.0;
+    distribution_multipliers = (double*)Malloc(number_of_populations * sizeof(double));
+    for (i = 0; i < number_of_populations; i++)
+        distribution_multipliers[i] = 1.0;
 
-  samples_drawn_from_normal = (int*)Malloc(number_of_populations * sizeof(int));
-  out_of_bounds_draws = (int*)Malloc(number_of_populations * sizeof(int));
+    samples_drawn_from_normal = (int*)Malloc(number_of_populations * sizeof(int));
+    out_of_bounds_draws = (int*)Malloc(number_of_populations * sizeof(int));
 
-  distribution_multiplier_increase = 1.0 / distribution_multiplier_decrease;
+    distribution_multiplier_increase = 1.0 / distribution_multiplier_decrease;
 }
 
 /**
  * Initializes the populations, the objective values and the constraint values.
  */
 void initializePopulationsAndFitnessValues(void) {
-  int i, j, k, o, q, *sorted, ssize, j_min, *temporary_population_sizes;
-  double *distances, d, d_min, **solutions, *fitnesses, *constraints, **leader_vectors;
+    int i, j, k, o, q, *sorted, ssize, j_min, *temporary_population_sizes;
+    double *distances, d, d_min, **solutions, *fitnesses, *constraints, **leader_vectors;
 
-  for (i = 0; i < number_of_populations; i++) {
-    for (j = 0; j < population_size; j++) {
-      for (k = 0; k < number_of_parameters; k++)
-        populations[i][j][k] =
-            lower_init_ranges[k] + (upper_init_ranges[k] - lower_init_ranges[k]) * randomRealUniform01();
-
-      installedProblemEvaluation(problem_index, populations[i][j], &(objective_values[i][j]),
-                                 &(constraint_values[i][j]));
-    }
-  }
-
-  /* Initialize means and redistribute solutions */
-  if (number_of_populations > 1) {
-    ssize = number_of_populations * population_size;
-    solutions = (double**)Malloc(ssize * sizeof(double*));
-    fitnesses = (double*)Malloc(ssize * sizeof(double));
-    constraints = (double*)Malloc(ssize * sizeof(double));
-    temporary_population_sizes = (int*)Malloc(ssize * sizeof(int));
-    distances = (double*)Malloc(ssize * sizeof(double));
-    leader_vectors = (double**)Malloc(number_of_populations * sizeof(double*));
-
-    for (i = 0; i < ssize; i++)
-      solutions[i] = (double*)Malloc(number_of_parameters * sizeof(double));
-
-    for (i = 0; i < number_of_populations; i++)
-      leader_vectors[i] = (double*)Malloc(number_of_parameters * sizeof(double));
-
-    q = 0;
     for (i = 0; i < number_of_populations; i++) {
-      for (j = 0; j < population_size; j++) {
-        for (k = 0; k < number_of_parameters; k++)
-          solutions[q][k] = populations[i][j][k];
+        for (j = 0; j < population_size; j++) {
+            for (k = 0; k < number_of_parameters; k++)
+                populations[i][j][k] =
+                    lower_init_ranges[k] + (upper_init_ranges[k] - lower_init_ranges[k]) * randomRealUniform01();
 
-        fitnesses[q] = objective_values[i][j];
-        constraints[q] = constraint_values[i][j];
-        q++;
-      }
-    }
-    o = randomInt(number_of_parameters);
-
-    for (i = 0; i < ssize; i++)
-      distances[i] = solutions[i][o];
-
-    sorted = mergeSort(distances, ssize);
-
-    q = 0;
-    for (i = 0; i < number_of_parameters; i++)
-      leader_vectors[q][i] = solutions[sorted[0]][i];
-
-    for (i = 0; i < ssize; i++)
-      distances[i] = -distanceInParameterSpace(leader_vectors[q], solutions[i]);
-
-    free(sorted);
-
-    q++;
-    while (q < number_of_populations) {
-      sorted = mergeSort(distances, ssize);
-
-      for (i = 0; i < number_of_parameters; i++)
-        leader_vectors[q][i] = solutions[sorted[0]][i];
-
-      for (i = 0; i < ssize; i++) {
-        d = -distanceInParameterSpace(leader_vectors[q], solutions[i]);
-        if (d > distances[i])
-          distances[i] = d;
-      }
-
-      free(sorted);
-
-      q++;
-    }
-
-    for (i = 0; i < number_of_populations; i++)
-      temporary_population_sizes[i] = 0;
-
-    for (i = 0; i < ssize; i++) {
-      j_min = -1;
-      d_min = 0;
-      for (j = 0; j < number_of_populations; j++) {
-        if (temporary_population_sizes[j] < population_size) {
-          d = distanceInParameterSpace(solutions[i], leader_vectors[j]);
-          if ((j_min == -1) || (d < d_min)) {
-            j_min = j;
-            d_min = d;
-          }
+            installedProblemEvaluation(problem_index, populations[i][j], &(objective_values[i][j]),
+                                       &(constraint_values[i][j]));
         }
-      }
-      for (k = 0; k < number_of_parameters; k++)
-        populations[j_min][temporary_population_sizes[j_min]][k] = solutions[i][k];
-      objective_values[j_min][temporary_population_sizes[j_min]] = fitnesses[i];
-      constraint_values[j_min][temporary_population_sizes[j_min]] = constraints[i];
-      temporary_population_sizes[j_min]++;
     }
 
-    for (i = 0; i < number_of_populations; i++)
-      free(leader_vectors[i]);
-    free(leader_vectors);
-    free(distances);
-    free(temporary_population_sizes);
-    free(fitnesses);
-    free(constraints);
-    for (i = 0; i < ssize; i++)
-      free(solutions[i]);
-    free(solutions);
-  }
+    /* Initialize means and redistribute solutions */
+    if (number_of_populations > 1) {
+        ssize = number_of_populations * population_size;
+        solutions = (double**)Malloc(ssize * sizeof(double*));
+        fitnesses = (double*)Malloc(ssize * sizeof(double));
+        constraints = (double*)Malloc(ssize * sizeof(double));
+        temporary_population_sizes = (int*)Malloc(ssize * sizeof(int));
+        distances = (double*)Malloc(ssize * sizeof(double));
+        leader_vectors = (double**)Malloc(number_of_populations * sizeof(double*));
+
+        for (i = 0; i < ssize; i++)
+            solutions[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+
+        for (i = 0; i < number_of_populations; i++)
+            leader_vectors[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+
+        q = 0;
+        for (i = 0; i < number_of_populations; i++) {
+            for (j = 0; j < population_size; j++) {
+                for (k = 0; k < number_of_parameters; k++)
+                    solutions[q][k] = populations[i][j][k];
+
+                fitnesses[q] = objective_values[i][j];
+                constraints[q] = constraint_values[i][j];
+                q++;
+            }
+        }
+        o = randomInt(number_of_parameters);
+
+        for (i = 0; i < ssize; i++)
+            distances[i] = solutions[i][o];
+
+        sorted = mergeSort(distances, ssize);
+
+        q = 0;
+        for (i = 0; i < number_of_parameters; i++)
+            leader_vectors[q][i] = solutions[sorted[0]][i];
+
+        for (i = 0; i < ssize; i++)
+            distances[i] = -distanceInParameterSpace(leader_vectors[q], solutions[i]);
+
+        free(sorted);
+
+        q++;
+        while (q < number_of_populations) {
+            sorted = mergeSort(distances, ssize);
+
+            for (i = 0; i < number_of_parameters; i++)
+                leader_vectors[q][i] = solutions[sorted[0]][i];
+
+            for (i = 0; i < ssize; i++) {
+                d = -distanceInParameterSpace(leader_vectors[q], solutions[i]);
+                if (d > distances[i])
+                    distances[i] = d;
+            }
+
+            free(sorted);
+
+            q++;
+        }
+
+        for (i = 0; i < number_of_populations; i++)
+            temporary_population_sizes[i] = 0;
+
+        for (i = 0; i < ssize; i++) {
+            j_min = -1;
+            d_min = 0;
+            for (j = 0; j < number_of_populations; j++) {
+                if (temporary_population_sizes[j] < population_size) {
+                    d = distanceInParameterSpace(solutions[i], leader_vectors[j]);
+                    if ((j_min == -1) || (d < d_min)) {
+                        j_min = j;
+                        d_min = d;
+                    }
+                }
+            }
+            for (k = 0; k < number_of_parameters; k++)
+                populations[j_min][temporary_population_sizes[j_min]][k] = solutions[i][k];
+            objective_values[j_min][temporary_population_sizes[j_min]] = fitnesses[i];
+            constraint_values[j_min][temporary_population_sizes[j_min]] = constraints[i];
+            temporary_population_sizes[j_min]++;
+        }
+
+        for (i = 0; i < number_of_populations; i++)
+            free(leader_vectors[i]);
+        free(leader_vectors);
+        free(distances);
+        free(temporary_population_sizes);
+        free(fitnesses);
+        free(constraints);
+        for (i = 0; i < ssize; i++)
+            free(solutions[i]);
+        free(solutions);
+    }
 }
 
 /**
@@ -1913,58 +1915,58 @@ void initializePopulationsAndFitnessValues(void) {
  * into rotated evaluation functions.
  */
 void initializeObjectiveRotationMatrix(void) {
-  int i, j, index0, index1;
-  double **matrix, **product, theta, cos_theta, sin_theta;
+    int i, j, index0, index1;
+    double **matrix, **product, theta, cos_theta, sin_theta;
 
-  if (rotation_angle == 0.0)
-    return;
+    if (rotation_angle == 0.0)
+        return;
 
-  matrix = (double**)Malloc(number_of_parameters * sizeof(double*));
-  for (i = 0; i < number_of_parameters; i++)
-    matrix[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+    matrix = (double**)Malloc(number_of_parameters * sizeof(double*));
+    for (i = 0; i < number_of_parameters; i++)
+        matrix[i] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-  rotation_matrix = (double**)Malloc(number_of_parameters * sizeof(double*));
-  for (i = 0; i < number_of_parameters; i++)
-    rotation_matrix[i] = (double*)Malloc(number_of_parameters * sizeof(double));
+    rotation_matrix = (double**)Malloc(number_of_parameters * sizeof(double*));
+    for (i = 0; i < number_of_parameters; i++)
+        rotation_matrix[i] = (double*)Malloc(number_of_parameters * sizeof(double));
 
-  /* Initialize the rotation matrix to the identity matrix */
-  for (i = 0; i < number_of_parameters; i++) {
-    for (j = 0; j < number_of_parameters; j++)
-      rotation_matrix[i][j] = 0.0;
-    rotation_matrix[i][i] = 1.0;
-  }
-
-  /* Construct all rotation matrices (quadratic number) and multiply */
-  theta = (rotation_angle / 180.0) * PI;
-  cos_theta = cos(theta);
-  sin_theta = sin(theta);
-  for (index0 = 0; index0 < number_of_parameters - 1; index0++) {
-    for (index1 = index0 + 1; index1 < number_of_parameters; index1++) {
-      for (i = 0; i < number_of_parameters; i++) {
+    /* Initialize the rotation matrix to the identity matrix */
+    for (i = 0; i < number_of_parameters; i++) {
         for (j = 0; j < number_of_parameters; j++)
-          matrix[i][j] = 0.0;
-        matrix[i][i] = 1.0;
-      }
-      matrix[index0][index0] = cos_theta;
-      matrix[index0][index1] = -sin_theta;
-      matrix[index1][index0] = sin_theta;
-      matrix[index1][index1] = cos_theta;
-
-      product = matrixMatrixMultiplication(matrix, rotation_matrix, number_of_parameters, number_of_parameters,
-                                           number_of_parameters);
-      for (i = 0; i < number_of_parameters; i++)
-        for (j = 0; j < number_of_parameters; j++)
-          rotation_matrix[i][j] = product[i][j];
-
-      for (i = 0; i < number_of_parameters; i++)
-        free(product[i]);
-      free(product);
+            rotation_matrix[i][j] = 0.0;
+        rotation_matrix[i][i] = 1.0;
     }
-  }
 
-  for (i = 0; i < number_of_parameters; i++)
-    free(matrix[i]);
-  free(matrix);
+    /* Construct all rotation matrices (quadratic number) and multiply */
+    theta = (rotation_angle / 180.0) * PI;
+    cos_theta = cos(theta);
+    sin_theta = sin(theta);
+    for (index0 = 0; index0 < number_of_parameters - 1; index0++) {
+        for (index1 = index0 + 1; index1 < number_of_parameters; index1++) {
+            for (i = 0; i < number_of_parameters; i++) {
+                for (j = 0; j < number_of_parameters; j++)
+                    matrix[i][j] = 0.0;
+                matrix[i][i] = 1.0;
+            }
+            matrix[index0][index0] = cos_theta;
+            matrix[index0][index1] = -sin_theta;
+            matrix[index1][index0] = sin_theta;
+            matrix[index1][index1] = cos_theta;
+
+            product = matrixMatrixMultiplication(matrix, rotation_matrix, number_of_parameters, number_of_parameters,
+                                                 number_of_parameters);
+            for (i = 0; i < number_of_parameters; i++)
+                for (j = 0; j < number_of_parameters; j++)
+                    rotation_matrix[i][j] = product[i][j];
+
+            for (i = 0; i < number_of_parameters; i++)
+                free(product[i]);
+            free(product);
+        }
+    }
+
+    for (i = 0; i < number_of_parameters; i++)
+        free(matrix[i]);
+    free(matrix);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -1973,31 +1975,31 @@ void initializeObjectiveRotationMatrix(void) {
  * Computes the ranks of all populations.
  */
 void computeRanks(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_populations; i++)
-    if (!populations_terminated[i])
-      computeRanksForOnePopulation(i);
+    for (i = 0; i < number_of_populations; i++)
+        if (!populations_terminated[i])
+            computeRanksForOnePopulation(i);
 }
 
 /**
  * Computes the ranks for one population.
  */
 void computeRanksForOnePopulation(int population_index) {
-  int i, *sorted, rank;
+    int i, *sorted, rank;
 
-  sorted = mergeSortFitness(objective_values[population_index], constraint_values[population_index], population_size);
+    sorted = mergeSortFitness(objective_values[population_index], constraint_values[population_index], population_size);
 
-  rank = 0;
-  ranks[population_index][sorted[0]] = rank;
-  for (i = 1; i < population_size; i++) {
-    if (objective_values[population_index][sorted[i]] != objective_values[population_index][sorted[i - 1]])
-      rank++;
+    rank = 0;
+    ranks[population_index][sorted[0]] = rank;
+    for (i = 1; i < population_size; i++) {
+        if (objective_values[population_index][sorted[i]] != objective_values[population_index][sorted[i - 1]])
+            rank++;
 
-    ranks[population_index][sorted[i]] = rank;
-  }
+        ranks[population_index][sorted[i]] = rank;
+    }
 
-  free(sorted);
+    free(sorted);
 }
 
 /**
@@ -2005,17 +2007,17 @@ void computeRanksForOnePopulation(int population_index) {
  * the Euclidean distance in parameter space.
  */
 double distanceInParameterSpace(double* solution_a, double* solution_b) {
-  int i;
-  double value, result;
+    int i;
+    double value, result;
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++) {
-    value = solution_b[i] - solution_a[i];
-    result += value * value;
-  }
-  result = sqrt(result);
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++) {
+        value = solution_b[i] - solution_a[i];
+        result += value * value;
+    }
+    result = sqrt(result);
 
-  return (result);
+    return (result);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -2025,178 +2027,179 @@ double distanceInParameterSpace(double* solution_a, double* solution_b) {
  * file named "statistics.dat".
  */
 void writeGenerationalStatistics(void) {
-  int i, j;
-  char string[1000];
-  double overall_objective_avg, overall_objective_var, overall_objective_best, overall_objective_worst,
-      overall_constraint_avg, overall_constraint_var, overall_constraint_best, overall_constraint_worst,
-      *population_objective_avg, *population_objective_var, *population_objective_best, *population_objective_worst,
-      *population_constraint_avg, *population_constraint_var, *population_constraint_best, *population_constraint_worst;
-  FILE* file;
+    int i, j;
+    char string[1000];
+    double overall_objective_avg, overall_objective_var, overall_objective_best, overall_objective_worst,
+        overall_constraint_avg, overall_constraint_var, overall_constraint_best, overall_constraint_worst,
+        *population_objective_avg, *population_objective_var, *population_objective_best, *population_objective_worst,
+        *population_constraint_avg, *population_constraint_var, *population_constraint_best,
+        *population_constraint_worst;
+    FILE* file;
 
-  /* First compute the statistics */
-  population_objective_avg = (double*)Malloc(number_of_populations * sizeof(double));
-  population_constraint_avg = (double*)Malloc(number_of_populations * sizeof(double));
-  population_objective_var = (double*)Malloc(number_of_populations * sizeof(double));
-  population_constraint_var = (double*)Malloc(number_of_populations * sizeof(double));
-  population_objective_best = (double*)Malloc(number_of_populations * sizeof(double));
-  population_constraint_best = (double*)Malloc(number_of_populations * sizeof(double));
-  population_objective_worst = (double*)Malloc(number_of_populations * sizeof(double));
-  population_constraint_worst = (double*)Malloc(number_of_populations * sizeof(double));
+    /* First compute the statistics */
+    population_objective_avg = (double*)Malloc(number_of_populations * sizeof(double));
+    population_constraint_avg = (double*)Malloc(number_of_populations * sizeof(double));
+    population_objective_var = (double*)Malloc(number_of_populations * sizeof(double));
+    population_constraint_var = (double*)Malloc(number_of_populations * sizeof(double));
+    population_objective_best = (double*)Malloc(number_of_populations * sizeof(double));
+    population_constraint_best = (double*)Malloc(number_of_populations * sizeof(double));
+    population_objective_worst = (double*)Malloc(number_of_populations * sizeof(double));
+    population_constraint_worst = (double*)Malloc(number_of_populations * sizeof(double));
 
-  /* Overall */
-  /* Average, best and worst */
-  overall_objective_avg = 0.0;
-  overall_constraint_avg = 0.0;
-  overall_objective_best = objective_values[0][0];
-  overall_objective_worst = objective_values[0][0];
-  overall_constraint_best = constraint_values[0][0];
-  overall_constraint_worst = constraint_values[0][0];
-  for (i = 0; i < number_of_populations; i++) {
-    for (j = 0; j < population_size; j++) {
-      overall_objective_avg += objective_values[i][j];
-      overall_constraint_avg += constraint_values[i][j];
-      if (betterFitness(objective_values[i][j], constraint_values[i][j], overall_objective_best,
-                        overall_constraint_best)) {
-        overall_objective_best = objective_values[i][j];
-        overall_constraint_best = constraint_values[i][j];
-      }
-      if (betterFitness(overall_objective_worst, overall_constraint_worst, objective_values[i][j],
-                        constraint_values[i][j])) {
-        overall_objective_worst = objective_values[i][j];
-        overall_constraint_worst = constraint_values[i][j];
-      }
-    }
-  }
-  overall_objective_avg = overall_objective_avg / ((double)(number_of_populations * population_size));
-  overall_constraint_avg = overall_constraint_avg / ((double)(number_of_populations * population_size));
-
-  /* Variance */
-  overall_objective_var = 0.0;
-  overall_constraint_var = 0.0;
-  for (i = 0; i < number_of_populations; i++) {
-    for (j = 0; j < population_size; j++) {
-      overall_objective_var +=
-          (objective_values[i][j] - overall_objective_avg) * (objective_values[i][j] - overall_objective_avg);
-      overall_constraint_var +=
-          (constraint_values[i][j] - overall_constraint_avg) * (constraint_values[i][j] - overall_constraint_avg);
-    }
-  }
-  overall_objective_var = overall_objective_var / ((double)(number_of_populations * population_size));
-  overall_constraint_var = overall_constraint_var / ((double)(number_of_populations * population_size));
-
-  if (overall_objective_var <= 0.0)
-    overall_objective_var = 0.0;
-  if (overall_constraint_var <= 0.0)
-    overall_constraint_var = 0.0;
-
-  /* Per population */
-  for (i = 0; i < number_of_populations; i++) {
+    /* Overall */
     /* Average, best and worst */
-    population_objective_avg[i] = 0.0;
-    population_constraint_avg[i] = 0.0;
-    population_objective_best[i] = objective_values[i][0];
-    population_constraint_best[i] = constraint_values[i][0];
-    population_objective_worst[i] = objective_values[i][0];
-    population_constraint_worst[i] = constraint_values[i][0];
-    for (j = 0; j < population_size; j++) {
-      population_objective_avg[i] += objective_values[i][j];
-      population_constraint_avg[i] += constraint_values[i][j];
-      if (betterFitness(objective_values[i][j], constraint_values[i][j], population_objective_best[i],
-                        population_constraint_best[i])) {
-        population_objective_best[i] = objective_values[i][j];
-        population_constraint_best[i] = constraint_values[i][j];
-      }
-      if (betterFitness(population_objective_worst[i], population_constraint_worst[i], objective_values[i][j],
-                        constraint_values[i][j])) {
-        population_objective_worst[i] = objective_values[i][j];
-        population_constraint_worst[i] = constraint_values[i][j];
-      }
+    overall_objective_avg = 0.0;
+    overall_constraint_avg = 0.0;
+    overall_objective_best = objective_values[0][0];
+    overall_objective_worst = objective_values[0][0];
+    overall_constraint_best = constraint_values[0][0];
+    overall_constraint_worst = constraint_values[0][0];
+    for (i = 0; i < number_of_populations; i++) {
+        for (j = 0; j < population_size; j++) {
+            overall_objective_avg += objective_values[i][j];
+            overall_constraint_avg += constraint_values[i][j];
+            if (betterFitness(objective_values[i][j], constraint_values[i][j], overall_objective_best,
+                              overall_constraint_best)) {
+                overall_objective_best = objective_values[i][j];
+                overall_constraint_best = constraint_values[i][j];
+            }
+            if (betterFitness(overall_objective_worst, overall_constraint_worst, objective_values[i][j],
+                              constraint_values[i][j])) {
+                overall_objective_worst = objective_values[i][j];
+                overall_constraint_worst = constraint_values[i][j];
+            }
+        }
     }
-    population_objective_avg[i] = population_objective_avg[i] / ((double)population_size);
-    population_constraint_avg[i] = population_constraint_avg[i] / ((double)population_size);
+    overall_objective_avg = overall_objective_avg / ((double)(number_of_populations * population_size));
+    overall_constraint_avg = overall_constraint_avg / ((double)(number_of_populations * population_size));
 
     /* Variance */
-    population_objective_var[i] = 0.0;
-    population_constraint_var[i] = 0.0;
-    for (j = 0; j < population_size; j++) {
-      population_objective_var[i] += (objective_values[i][j] - population_objective_avg[i]) *
-                                     (objective_values[i][j] - population_objective_avg[i]);
-      population_constraint_var[i] += (constraint_values[i][j] - population_constraint_avg[i]) *
-                                      (constraint_values[i][j] - population_constraint_avg[i]);
+    overall_objective_var = 0.0;
+    overall_constraint_var = 0.0;
+    for (i = 0; i < number_of_populations; i++) {
+        for (j = 0; j < population_size; j++) {
+            overall_objective_var +=
+                (objective_values[i][j] - overall_objective_avg) * (objective_values[i][j] - overall_objective_avg);
+            overall_constraint_var +=
+                (constraint_values[i][j] - overall_constraint_avg) * (constraint_values[i][j] - overall_constraint_avg);
+        }
     }
-    population_objective_var[i] = population_objective_var[i] / ((double)population_size);
-    population_constraint_var[i] = population_constraint_var[i] / ((double)population_size);
+    overall_objective_var = overall_objective_var / ((double)(number_of_populations * population_size));
+    overall_constraint_var = overall_constraint_var / ((double)(number_of_populations * population_size));
 
-    if (population_objective_var[i] <= 0.0)
-      population_objective_var[i] = 0.0;
-    if (population_constraint_var[i] <= 0.0)
-      population_constraint_var[i] = 0.0;
-  }
+    if (overall_objective_var <= 0.0)
+        overall_objective_var = 0.0;
+    if (overall_constraint_var <= 0.0)
+        overall_constraint_var = 0.0;
 
-  /* Then write them */
-  file = NULL;
-  if (number_of_generations == 0 && number_of_starts == 1) {
-    file = fopen("statistics.dat", "w");
+    /* Per population */
+    for (i = 0; i < number_of_populations; i++) {
+        /* Average, best and worst */
+        population_objective_avg[i] = 0.0;
+        population_constraint_avg[i] = 0.0;
+        population_objective_best[i] = objective_values[i][0];
+        population_constraint_best[i] = constraint_values[i][0];
+        population_objective_worst[i] = objective_values[i][0];
+        population_constraint_worst[i] = constraint_values[i][0];
+        for (j = 0; j < population_size; j++) {
+            population_objective_avg[i] += objective_values[i][j];
+            population_constraint_avg[i] += constraint_values[i][j];
+            if (betterFitness(objective_values[i][j], constraint_values[i][j], population_objective_best[i],
+                              population_constraint_best[i])) {
+                population_objective_best[i] = objective_values[i][j];
+                population_constraint_best[i] = constraint_values[i][j];
+            }
+            if (betterFitness(population_objective_worst[i], population_constraint_worst[i], objective_values[i][j],
+                              constraint_values[i][j])) {
+                population_objective_worst[i] = objective_values[i][j];
+                population_constraint_worst[i] = constraint_values[i][j];
+            }
+        }
+        population_objective_avg[i] = population_objective_avg[i] / ((double)population_size);
+        population_constraint_avg[i] = population_constraint_avg[i] / ((double)population_size);
 
-    sprintf(string,
-            "# Generation Evaluations  Best-obj-ever Best-con-ever "
-            "Average-obj. Variance-obj.     Best-obj.    Worst-obj.  "
-            "Average-con. Variance-con.     Best-con.    Worst-con.   [ ");
+        /* Variance */
+        population_objective_var[i] = 0.0;
+        population_constraint_var[i] = 0.0;
+        for (j = 0; j < population_size; j++) {
+            population_objective_var[i] += (objective_values[i][j] - population_objective_avg[i]) *
+                                           (objective_values[i][j] - population_objective_avg[i]);
+            population_constraint_var[i] += (constraint_values[i][j] - population_constraint_avg[i]) *
+                                            (constraint_values[i][j] - population_constraint_avg[i]);
+        }
+        population_objective_var[i] = population_objective_var[i] / ((double)population_size);
+        population_constraint_var[i] = population_constraint_var[i] / ((double)population_size);
+
+        if (population_objective_var[i] <= 0.0)
+            population_objective_var[i] = 0.0;
+        if (population_constraint_var[i] <= 0.0)
+            population_constraint_var[i] = 0.0;
+    }
+
+    /* Then write them */
+    file = NULL;
+    if (number_of_generations == 0 && number_of_starts == 1) {
+        file = fopen("statistics.dat", "w");
+
+        sprintf(string,
+                "# Generation Evaluations  Best-obj-ever Best-con-ever "
+                "Average-obj. Variance-obj.     Best-obj.    Worst-obj.  "
+                "Average-con. Variance-con.     Best-con.    Worst-con.   [ ");
+        fputs(string, file);
+
+        for (i = 0; i < number_of_populations; i++) {
+            sprintf(string,
+                    "Pop.index     Dis.mult.  Pop.avg.obj.  Pop.var.obj. "
+                    "Pop.best.obj. Pop.worst.obj.  Pop.avg.con.  "
+                    "Pop.var.con. Pop.best.con. Pop.worst.con.");
+            fputs(string, file);
+            if (i < number_of_populations - 1) {
+                sprintf(string, " | ");
+                fputs(string, file);
+            }
+        }
+        sprintf(string, " ]\n");
+        fputs(string, file);
+    } else
+        file = fopen("statistics.dat", "a");
+
+    if (number_of_starts == 1 || betterFitness(overall_objective_best, overall_constraint_best,
+                                               best_so_far_objective_value, best_so_far_constraint_value))
+        sprintf(string, "  %10d %11d %13e %13e %13e %13e %13e %13e %13e %13e %13e %13e   [ ", number_of_generations,
+                number_of_evaluations, overall_objective_best, overall_constraint_best, overall_objective_avg,
+                overall_objective_var, overall_objective_best, overall_objective_worst, overall_constraint_avg,
+                overall_constraint_var, overall_constraint_best, overall_constraint_worst);
+    else
+        sprintf(string, "  %10d %11d %13e %13e %13e %13e %13e %13e %13e %13e %13e %13e   [ ", number_of_generations,
+                number_of_evaluations, best_so_far_objective_value, best_so_far_constraint_value, overall_objective_avg,
+                overall_objective_var, overall_objective_best, overall_objective_worst, overall_constraint_avg,
+                overall_constraint_var, overall_constraint_best, overall_constraint_worst);
     fputs(string, file);
 
     for (i = 0; i < number_of_populations; i++) {
-      sprintf(string,
-              "Pop.index     Dis.mult.  Pop.avg.obj.  Pop.var.obj. "
-              "Pop.best.obj. Pop.worst.obj.  Pop.avg.con.  "
-              "Pop.var.con. Pop.best.con. Pop.worst.con.");
-      fputs(string, file);
-      if (i < number_of_populations - 1) {
-        sprintf(string, " | ");
+        sprintf(string, "%9d %13e %13e %13e %13e  %13e %13e %13e %13e  %13e", i, distribution_multipliers[i],
+                population_objective_avg[i], population_objective_var[i], population_objective_best[i],
+                population_objective_worst[i], population_constraint_avg[i], population_constraint_var[i],
+                population_constraint_best[i], population_constraint_worst[i]);
         fputs(string, file);
-      }
+        if (i < number_of_populations - 1) {
+            sprintf(string, " | ");
+            fputs(string, file);
+        }
     }
     sprintf(string, " ]\n");
     fputs(string, file);
-  } else
-    file = fopen("statistics.dat", "a");
 
-  if (number_of_starts == 1 || betterFitness(overall_objective_best, overall_constraint_best,
-                                             best_so_far_objective_value, best_so_far_constraint_value))
-    sprintf(string, "  %10d %11d %13e %13e %13e %13e %13e %13e %13e %13e %13e %13e   [ ", number_of_generations,
-            number_of_evaluations, overall_objective_best, overall_constraint_best, overall_objective_avg,
-            overall_objective_var, overall_objective_best, overall_objective_worst, overall_constraint_avg,
-            overall_constraint_var, overall_constraint_best, overall_constraint_worst);
-  else
-    sprintf(string, "  %10d %11d %13e %13e %13e %13e %13e %13e %13e %13e %13e %13e   [ ", number_of_generations,
-            number_of_evaluations, best_so_far_objective_value, best_so_far_constraint_value, overall_objective_avg,
-            overall_objective_var, overall_objective_best, overall_objective_worst, overall_constraint_avg,
-            overall_constraint_var, overall_constraint_best, overall_constraint_worst);
-  fputs(string, file);
+    fclose(file);
 
-  for (i = 0; i < number_of_populations; i++) {
-    sprintf(string, "%9d %13e %13e %13e %13e  %13e %13e %13e %13e  %13e", i, distribution_multipliers[i],
-            population_objective_avg[i], population_objective_var[i], population_objective_best[i],
-            population_objective_worst[i], population_constraint_avg[i], population_constraint_var[i],
-            population_constraint_best[i], population_constraint_worst[i]);
-    fputs(string, file);
-    if (i < number_of_populations - 1) {
-      sprintf(string, " | ");
-      fputs(string, file);
-    }
-  }
-  sprintf(string, " ]\n");
-  fputs(string, file);
-
-  fclose(file);
-
-  free(population_objective_avg);
-  free(population_constraint_avg);
-  free(population_objective_var);
-  free(population_constraint_var);
-  free(population_objective_best);
-  free(population_constraint_best);
-  free(population_objective_worst);
-  free(population_constraint_worst);
+    free(population_objective_avg);
+    free(population_constraint_avg);
+    free(population_objective_var);
+    free(population_constraint_var);
+    free(population_objective_best);
+    free(population_constraint_best);
+    free(population_objective_worst);
+    free(population_constraint_worst);
 }
 
 /**
@@ -2210,78 +2213,78 @@ void writeGenerationalStatistics(void) {
  * selection_xxxxx_generation_xxxxx.dat : the individual selections
  */
 void writeGenerationalSolutions(short final) {
-  int i, j, k;
-  char string[1000];
-  FILE *file_all, *file_population, *file_selection;
+    int i, j, k;
+    char string[1000];
+    FILE *file_all, *file_population, *file_selection;
 
-  if (final)
-    sprintf(string, "all_populations_generation_final.dat");
-  else
-    sprintf(string, "all_populations_generation_%05d.dat", number_of_generations);
-  file_all = fopen(string, "w");
-
-  for (i = 0; i < number_of_populations; i++) {
     if (final)
-      sprintf(string, "population_%05d_generation_final.dat", i);
+        sprintf(string, "all_populations_generation_final.dat");
     else
-      sprintf(string, "population_%05d_generation_%05d.dat", i, number_of_generations);
-    file_population = fopen(string, "w");
+        sprintf(string, "all_populations_generation_%05d.dat", number_of_generations);
+    file_all = fopen(string, "w");
 
-    if (number_of_generations > 0 && !final) {
-      sprintf(string, "selection_%05d_generation_%05d.dat", i, number_of_generations - 1);
-      file_selection = fopen(string, "w");
-    }
+    for (i = 0; i < number_of_populations; i++) {
+        if (final)
+            sprintf(string, "population_%05d_generation_final.dat", i);
+        else
+            sprintf(string, "population_%05d_generation_%05d.dat", i, number_of_generations);
+        file_population = fopen(string, "w");
 
-    /* Populations */
-    for (j = 0; j < population_size; j++) {
-      for (k = 0; k < number_of_parameters; k++) {
-        sprintf(string, "%13e", populations[i][j][k]);
-        fputs(string, file_all);
-        fputs(string, file_population);
-        if (k < number_of_parameters - 1) {
-          sprintf(string, " ");
-          fputs(string, file_all);
-          fputs(string, file_population);
+        if (number_of_generations > 0 && !final) {
+            sprintf(string, "selection_%05d_generation_%05d.dat", i, number_of_generations - 1);
+            file_selection = fopen(string, "w");
         }
-      }
-      sprintf(string, "     ");
-      fputs(string, file_all);
-      fputs(string, file_population);
-      sprintf(string, "%13e %13e", objective_values[i][j], constraint_values[i][j]);
-      fputs(string, file_all);
-      fputs(string, file_population);
-      sprintf(string, "\n");
-      fputs(string, file_all);
-      fputs(string, file_population);
-    }
 
-    fclose(file_population);
-
-    /* Selections */
-    if (number_of_generations > 0 && !final) {
-      for (j = 0; j < selection_size; j++) {
-        for (k = 0; k < number_of_parameters; k++) {
-          sprintf(string, "%13e", selections[i][j][k]);
-          fputs(string, file_selection);
-          if (k < number_of_parameters - 1) {
-            sprintf(string, " ");
-            fputs(string, file_selection);
-          }
-          sprintf(string, "     ");
-          fputs(string, file_selection);
+        /* Populations */
+        for (j = 0; j < population_size; j++) {
+            for (k = 0; k < number_of_parameters; k++) {
+                sprintf(string, "%13e", populations[i][j][k]);
+                fputs(string, file_all);
+                fputs(string, file_population);
+                if (k < number_of_parameters - 1) {
+                    sprintf(string, " ");
+                    fputs(string, file_all);
+                    fputs(string, file_population);
+                }
+            }
+            sprintf(string, "     ");
+            fputs(string, file_all);
+            fputs(string, file_population);
+            sprintf(string, "%13e %13e", objective_values[i][j], constraint_values[i][j]);
+            fputs(string, file_all);
+            fputs(string, file_population);
+            sprintf(string, "\n");
+            fputs(string, file_all);
+            fputs(string, file_population);
         }
-        sprintf(string, "%13e %13e", objective_values_selections[i][j], constraint_values_selections[i][j]);
-        fputs(string, file_selection);
-        sprintf(string, "\n");
-        fputs(string, file_selection);
-      }
-      fclose(file_selection);
+
+        fclose(file_population);
+
+        /* Selections */
+        if (number_of_generations > 0 && !final) {
+            for (j = 0; j < selection_size; j++) {
+                for (k = 0; k < number_of_parameters; k++) {
+                    sprintf(string, "%13e", selections[i][j][k]);
+                    fputs(string, file_selection);
+                    if (k < number_of_parameters - 1) {
+                        sprintf(string, " ");
+                        fputs(string, file_selection);
+                    }
+                    sprintf(string, "     ");
+                    fputs(string, file_selection);
+                }
+                sprintf(string, "%13e %13e", objective_values_selections[i][j], constraint_values_selections[i][j]);
+                fputs(string, file_selection);
+                sprintf(string, "\n");
+                fputs(string, file_selection);
+            }
+            fclose(file_selection);
+        }
     }
-  }
 
-  fclose(file_all);
+    fclose(file_all);
 
-  writeGenerationalSolutionsBest(final);
+    writeGenerationalSolutionsBest(final);
 }
 
 /**
@@ -2298,10 +2301,10 @@ void writeGenerationalSolutions(short final) {
  * and its sum of constraint violations.
  */
 void writeGenerationalSolutionsBest(short final) {
-  if (final)
-    writeGenerationalSolutionsBestFinal();
-  else
-    writeGenerationalSolutionsBestNotFinal();
+    if (final)
+        writeGenerationalSolutionsBestFinal();
+    else
+        writeGenerationalSolutionsBestNotFinal();
 }
 
 /**
@@ -2309,29 +2312,29 @@ void writeGenerationalSolutionsBest(short final) {
  * The best solution ever found is used to this end.
  */
 void writeGenerationalSolutionsBestFinal(void) {
-  int i;
-  char string[1000];
-  FILE* file;
+    int i;
+    char string[1000];
+    FILE* file;
 
-  sprintf(string, "best_generation_final.dat");
-  file = fopen(string, "w");
+    sprintf(string, "best_generation_final.dat");
+    file = fopen(string, "w");
 
-  for (i = 0; i < number_of_parameters; i++) {
-    sprintf(string, "%13e", best_so_far_solution[i]);
-    fputs(string, file);
-    if (i < number_of_parameters - 1) {
-      sprintf(string, " ");
-      fputs(string, file);
+    for (i = 0; i < number_of_parameters; i++) {
+        sprintf(string, "%13e", best_so_far_solution[i]);
+        fputs(string, file);
+        if (i < number_of_parameters - 1) {
+            sprintf(string, " ");
+            fputs(string, file);
+        }
     }
-  }
-  sprintf(string, "     ");
-  fputs(string, file);
-  sprintf(string, "%13e %13e", best_so_far_objective_value, best_so_far_constraint_value);
-  fputs(string, file);
-  sprintf(string, "\n");
-  fputs(string, file);
+    sprintf(string, "     ");
+    fputs(string, file);
+    sprintf(string, "%13e %13e", best_so_far_objective_value, best_so_far_constraint_value);
+    fputs(string, file);
+    sprintf(string, "\n");
+    fputs(string, file);
 
-  fclose(file);
+    fclose(file);
 }
 
 /**
@@ -2340,34 +2343,34 @@ void writeGenerationalSolutionsBestFinal(void) {
  * is determined to this end.
  */
 void writeGenerationalSolutionsBestNotFinal(void) {
-  int i, population_index_best, individual_index_best;
-  char string[1000];
-  FILE* file;
+    int i, population_index_best, individual_index_best;
+    char string[1000];
+    FILE* file;
 
-  /* First find the best of all */
-  determineBestSolutionInCurrentPopulations(&population_index_best, &individual_index_best);
+    /* First find the best of all */
+    determineBestSolutionInCurrentPopulations(&population_index_best, &individual_index_best);
 
-  /* Then output it */
-  sprintf(string, "best_generation_%05d.dat", number_of_generations);
-  file = fopen(string, "w");
+    /* Then output it */
+    sprintf(string, "best_generation_%05d.dat", number_of_generations);
+    file = fopen(string, "w");
 
-  for (i = 0; i < number_of_parameters; i++) {
-    sprintf(string, "%13e", populations[population_index_best][individual_index_best][i]);
-    fputs(string, file);
-    if (i < number_of_parameters - 1) {
-      sprintf(string, " ");
-      fputs(string, file);
+    for (i = 0; i < number_of_parameters; i++) {
+        sprintf(string, "%13e", populations[population_index_best][individual_index_best][i]);
+        fputs(string, file);
+        if (i < number_of_parameters - 1) {
+            sprintf(string, " ");
+            fputs(string, file);
+        }
     }
-  }
-  sprintf(string, "     ");
-  fputs(string, file);
-  sprintf(string, "%13e %13e", objective_values[population_index_best][individual_index_best],
-          constraint_values[population_index_best][individual_index_best]);
-  fputs(string, file);
-  sprintf(string, "\n");
-  fputs(string, file);
+    sprintf(string, "     ");
+    fputs(string, file);
+    sprintf(string, "%13e %13e", objective_values[population_index_best][individual_index_best],
+            constraint_values[population_index_best][individual_index_best]);
+    fputs(string, file);
+    sprintf(string, "\n");
+    fputs(string, file);
 
-  fclose(file);
+    fclose(file);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -2379,17 +2382,17 @@ void writeGenerationalSolutionsBestNotFinal(void) {
  * 0 otherwise.
  */
 short checkTerminationCondition(void) {
-  if (checkNumberOfEvaluationsTerminationCondition())
-    return (1);
+    if (checkNumberOfEvaluationsTerminationCondition())
+        return (1);
 
-  if (use_vtr) {
-    if (best_so_far_constraint_value == 0 && best_so_far_objective_value <= vtr)
-      return (1);
+    if (use_vtr) {
+        if (best_so_far_constraint_value == 0 && best_so_far_objective_value <= vtr)
+            return (1);
+
+        return (0);
+    }
 
     return (0);
-  }
-
-  return (0);
 }
 
 /**
@@ -2397,30 +2400,30 @@ short checkTerminationCondition(void) {
  * for a single run, 0 otherwise.
  */
 short checkTerminationConditionForRunOnce(void) {
-  short allTrue;
-  int i;
+    short allTrue;
+    int i;
 
-  if (checkNumberOfEvaluationsTerminationCondition())
-    return (1);
+    if (checkNumberOfEvaluationsTerminationCondition())
+        return (1);
 
-  if (use_vtr) {
-    if (checkVTRTerminationCondition())
-      return (1);
-  }
-
-  checkFitnessVarianceTermination();
-
-  checkDistributionMultiplierTerminationCondition();
-
-  allTrue = 1;
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i]) {
-      allTrue = 0;
-      break;
+    if (use_vtr) {
+        if (checkVTRTerminationCondition())
+            return (1);
     }
-  }
 
-  return (allTrue);
+    checkFitnessVarianceTermination();
+
+    checkDistributionMultiplierTerminationCondition();
+
+    allTrue = 1;
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i]) {
+            allTrue = 0;
+            break;
+        }
+    }
+
+    return (allTrue);
 }
 
 /**
@@ -2428,25 +2431,25 @@ short checkTerminationConditionForRunOnce(void) {
  * has been reached, 0 otherwise.
  */
 short checkNumberOfEvaluationsTerminationCondition(void) {
-  if (number_of_evaluations >= maximum_number_of_evaluations)
-    return (1);
+    if (number_of_evaluations >= maximum_number_of_evaluations)
+        return (1);
 
-  return (0);
+    return (0);
 }
 
 /**
  * Returns 1 if the value-to-reach has been reached (in any population).
  */
 short checkVTRTerminationCondition(void) {
-  int population_of_best, index_of_best;
+    int population_of_best, index_of_best;
 
-  determineBestSolutionInCurrentPopulations(&population_of_best, &index_of_best);
+    determineBestSolutionInCurrentPopulations(&population_of_best, &index_of_best);
 
-  if (constraint_values[population_of_best][index_of_best] == 0 &&
-      objective_values[population_of_best][index_of_best] <= vtr)
-    return (1);
+    if (constraint_values[population_of_best][index_of_best] == 0 &&
+        objective_values[population_of_best][index_of_best] <= vtr)
+        return (1);
 
-  return (0);
+    return (0);
 }
 
 /**
@@ -2454,30 +2457,30 @@ short checkVTRTerminationCondition(void) {
  * in all current populations.
  */
 void determineBestSolutionInCurrentPopulations(int* population_of_best, int* index_of_best) {
-  int i, j;
+    int i, j;
 
-  (*population_of_best) = 0;
-  (*index_of_best) = 0;
-  for (i = 0; i < number_of_populations; i++) {
-    for (j = 0; j < population_size; j++) {
-      if (betterFitness(objective_values[i][j], constraint_values[i][j],
-                        objective_values[(*population_of_best)][(*index_of_best)],
-                        constraint_values[(*population_of_best)][(*index_of_best)])) {
-        (*population_of_best) = i;
-        (*index_of_best) = j;
-      }
+    (*population_of_best) = 0;
+    (*index_of_best) = 0;
+    for (i = 0; i < number_of_populations; i++) {
+        for (j = 0; j < population_size; j++) {
+            if (betterFitness(objective_values[i][j], constraint_values[i][j],
+                              objective_values[(*population_of_best)][(*index_of_best)],
+                              constraint_values[(*population_of_best)][(*index_of_best)])) {
+                (*population_of_best) = i;
+                (*index_of_best) = j;
+            }
+        }
     }
-  }
 }
 
 void checkFitnessVarianceTermination(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i])
-      if (checkFitnessVarianceTerminationSinglePopulation(i))
-        populations_terminated[i] = 1;
-  }
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i])
+            if (checkFitnessVarianceTerminationSinglePopulation(i))
+                populations_terminated[i] = 1;
+    }
 }
 
 /**
@@ -2485,27 +2488,27 @@ void checkFitnessVarianceTermination(void) {
  * has become too small (user-defined tolerance).
  */
 short checkFitnessVarianceTerminationSinglePopulation(int population_index) {
-  int i;
-  double objective_avg, objective_var;
+    int i;
+    double objective_avg, objective_var;
 
-  objective_avg = 0.0;
-  for (i = 0; i < population_size; i++)
-    objective_avg += objective_values[population_index][i];
-  objective_avg = objective_avg / ((double)population_size);
+    objective_avg = 0.0;
+    for (i = 0; i < population_size; i++)
+        objective_avg += objective_values[population_index][i];
+    objective_avg = objective_avg / ((double)population_size);
 
-  objective_var = 0.0;
-  for (i = 0; i < population_size; i++)
-    objective_var += (objective_values[population_index][i] - objective_avg) *
-                     (objective_values[population_index][i] - objective_avg);
-  objective_var = objective_var / ((double)population_size);
-
-  if (objective_var <= 0.0)
     objective_var = 0.0;
+    for (i = 0; i < population_size; i++)
+        objective_var += (objective_values[population_index][i] - objective_avg) *
+                         (objective_values[population_index][i] - objective_avg);
+    objective_var = objective_var / ((double)population_size);
 
-  if (objective_var <= fitness_variance_tolerance)
-    return (1);
+    if (objective_var <= 0.0)
+        objective_var = 0.0;
 
-  return (0);
+    if (objective_var <= fitness_variance_tolerance)
+        return (1);
+
+    return (0);
 }
 
 /**
@@ -2513,13 +2516,13 @@ short checkFitnessVarianceTerminationSinglePopulation(int population_index) {
  * has become too small (1e-10).
  */
 void checkDistributionMultiplierTerminationCondition(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i])
-      if (distribution_multipliers[i] < 1e-10)
-        populations_terminated[i] = 1;
-  }
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i])
+            if (distribution_multipliers[i] < 1e-10)
+                populations_terminated[i] = 1;
+    }
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -2528,34 +2531,34 @@ void checkDistributionMultiplierTerminationCondition(void) {
  * Makes a set of selected solutions for each population.
  */
 void makeSelections(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_populations; i++)
-    if (!populations_terminated[i])
-      makeSelectionsForOnePopulation(i);
+    for (i = 0; i < number_of_populations; i++)
+        if (!populations_terminated[i])
+            makeSelectionsForOnePopulation(i);
 }
 
 /**
  * Performs truncation selection on a single population.
  */
 void makeSelectionsForOnePopulation(int population_index) {
-  int i, j, *sorted;
+    int i, j, *sorted;
 
-  sorted = mergeSort(ranks[population_index], population_size);
+    sorted = mergeSort(ranks[population_index], population_size);
 
-  if (ranks[population_index][sorted[selection_size - 1]] == 0)
-    makeSelectionsForOnePopulationUsingDiversityOnRank0(population_index);
-  else {
-    for (i = 0; i < selection_size; i++) {
-      for (j = 0; j < number_of_parameters; j++)
-        selections[population_index][i][j] = populations[population_index][sorted[i]][j];
+    if (ranks[population_index][sorted[selection_size - 1]] == 0)
+        makeSelectionsForOnePopulationUsingDiversityOnRank0(population_index);
+    else {
+        for (i = 0; i < selection_size; i++) {
+            for (j = 0; j < number_of_parameters; j++)
+                selections[population_index][i][j] = populations[population_index][sorted[i]][j];
 
-      objective_values_selections[population_index][i] = objective_values[population_index][sorted[i]];
-      constraint_values_selections[population_index][i] = constraint_values[population_index][sorted[i]];
+            objective_values_selections[population_index][i] = objective_values[population_index][sorted[i]];
+            constraint_values_selections[population_index][i] = constraint_values[population_index][sorted[i]];
+        }
     }
-  }
 
-  free(sorted);
+    free(sorted);
 }
 
 /**
@@ -2563,82 +2566,83 @@ void makeSelectionsForOnePopulation(int population_index) {
  * based on diversity.
  */
 void makeSelectionsForOnePopulationUsingDiversityOnRank0(int population_index) {
-  int i, j, number_of_rank0_solutions, *preselection_indices, *selection_indices, index_of_farthest,
-      number_selected_so_far;
-  double *nn_distances, distance_of_farthest, value;
+    int i, j, number_of_rank0_solutions, *preselection_indices, *selection_indices, index_of_farthest,
+        number_selected_so_far;
+    double *nn_distances, distance_of_farthest, value;
 
-  number_of_rank0_solutions = 0;
-  for (i = 0; i < population_size; i++) {
-    if (ranks[population_index][i] == 0)
-      number_of_rank0_solutions++;
-  }
-
-  preselection_indices = (int*)Malloc(number_of_rank0_solutions * sizeof(int));
-  j = 0;
-  for (i = 0; i < population_size; i++) {
-    if (ranks[population_index][i] == 0) {
-      preselection_indices[j] = i;
-      j++;
+    number_of_rank0_solutions = 0;
+    for (i = 0; i < population_size; i++) {
+        if (ranks[population_index][i] == 0)
+            number_of_rank0_solutions++;
     }
-  }
 
-  index_of_farthest = 0;
-  distance_of_farthest = objective_values[population_index][preselection_indices[0]];
-  for (i = 1; i < number_of_rank0_solutions; i++) {
-    if (objective_values[population_index][preselection_indices[i]] > distance_of_farthest) {
-      index_of_farthest = i;
-      distance_of_farthest = objective_values[population_index][preselection_indices[i]];
+    preselection_indices = (int*)Malloc(number_of_rank0_solutions * sizeof(int));
+    j = 0;
+    for (i = 0; i < population_size; i++) {
+        if (ranks[population_index][i] == 0) {
+            preselection_indices[j] = i;
+            j++;
+        }
     }
-  }
 
-  number_selected_so_far = 0;
-  selection_indices = (int*)Malloc(selection_size * sizeof(int));
-  selection_indices[number_selected_so_far] = preselection_indices[index_of_farthest];
-  preselection_indices[index_of_farthest] = preselection_indices[number_of_rank0_solutions - 1];
-  number_of_rank0_solutions--;
-  number_selected_so_far++;
-
-  nn_distances = (double*)Malloc(number_of_rank0_solutions * sizeof(double));
-  for (i = 0; i < number_of_rank0_solutions; i++)
-    nn_distances[i] =
-        distanceInParameterSpace(populations[population_index][preselection_indices[i]],
-                                 populations[population_index][selection_indices[number_selected_so_far - 1]]);
-
-  while (number_selected_so_far < selection_size) {
     index_of_farthest = 0;
-    distance_of_farthest = nn_distances[0];
+    distance_of_farthest = objective_values[population_index][preselection_indices[0]];
     for (i = 1; i < number_of_rank0_solutions; i++) {
-      if (nn_distances[i] > distance_of_farthest) {
-        index_of_farthest = i;
-        distance_of_farthest = nn_distances[i];
-      }
+        if (objective_values[population_index][preselection_indices[i]] > distance_of_farthest) {
+            index_of_farthest = i;
+            distance_of_farthest = objective_values[population_index][preselection_indices[i]];
+        }
     }
 
+    number_selected_so_far = 0;
+    selection_indices = (int*)Malloc(selection_size * sizeof(int));
     selection_indices[number_selected_so_far] = preselection_indices[index_of_farthest];
     preselection_indices[index_of_farthest] = preselection_indices[number_of_rank0_solutions - 1];
-    nn_distances[index_of_farthest] = nn_distances[number_of_rank0_solutions - 1];
     number_of_rank0_solutions--;
     number_selected_so_far++;
 
-    for (i = 0; i < number_of_rank0_solutions; i++) {
-      value = distanceInParameterSpace(populations[population_index][preselection_indices[i]],
-                                       populations[population_index][selection_indices[number_selected_so_far - 1]]);
-      if (value < nn_distances[i])
-        nn_distances[i] = value;
+    nn_distances = (double*)Malloc(number_of_rank0_solutions * sizeof(double));
+    for (i = 0; i < number_of_rank0_solutions; i++)
+        nn_distances[i] =
+            distanceInParameterSpace(populations[population_index][preselection_indices[i]],
+                                     populations[population_index][selection_indices[number_selected_so_far - 1]]);
+
+    while (number_selected_so_far < selection_size) {
+        index_of_farthest = 0;
+        distance_of_farthest = nn_distances[0];
+        for (i = 1; i < number_of_rank0_solutions; i++) {
+            if (nn_distances[i] > distance_of_farthest) {
+                index_of_farthest = i;
+                distance_of_farthest = nn_distances[i];
+            }
+        }
+
+        selection_indices[number_selected_so_far] = preselection_indices[index_of_farthest];
+        preselection_indices[index_of_farthest] = preselection_indices[number_of_rank0_solutions - 1];
+        nn_distances[index_of_farthest] = nn_distances[number_of_rank0_solutions - 1];
+        number_of_rank0_solutions--;
+        number_selected_so_far++;
+
+        for (i = 0; i < number_of_rank0_solutions; i++) {
+            value =
+                distanceInParameterSpace(populations[population_index][preselection_indices[i]],
+                                         populations[population_index][selection_indices[number_selected_so_far - 1]]);
+            if (value < nn_distances[i])
+                nn_distances[i] = value;
+        }
     }
-  }
 
-  for (i = 0; i < selection_size; i++) {
-    for (j = 0; j < number_of_parameters; j++)
-      selections[population_index][i][j] = populations[population_index][selection_indices[i]][j];
+    for (i = 0; i < selection_size; i++) {
+        for (j = 0; j < number_of_parameters; j++)
+            selections[population_index][i][j] = populations[population_index][selection_indices[i]][j];
 
-    objective_values_selections[population_index][i] = objective_values[population_index][selection_indices[i]];
-    constraint_values_selections[population_index][i] = constraint_values[population_index][selection_indices[i]];
-  }
+        objective_values_selections[population_index][i] = objective_values[population_index][selection_indices[i]];
+        constraint_values_selections[population_index][i] = constraint_values[population_index][selection_indices[i]];
+    }
 
-  free(nn_distances);
-  free(selection_indices);
-  free(preselection_indices);
+    free(nn_distances);
+    free(selection_indices);
+    free(preselection_indices);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -2655,17 +2659,17 @@ void makeSelectionsForOnePopulationUsingDiversityOnRank0(int population_index) {
  * according to the SDR-AVS mechanism.
  */
 void makePopulations(void) {
-  estimateParametersAllPopulations();
+    estimateParametersAllPopulations();
 
-  copyBestSolutionsToPopulations();
+    copyBestSolutionsToPopulations();
 
-  applyDistributionMultipliers();
+    applyDistributionMultipliers();
 
-  generateAndEvaluateNewSolutionsToFillPopulations();
+    generateAndEvaluateNewSolutionsToFillPopulations();
 
-  computeRanks();
+    computeRanks();
 
-  adaptDistributionMultipliers();
+    adaptDistributionMultipliers();
 }
 
 /**
@@ -2673,11 +2677,11 @@ void makePopulations(void) {
  * distribution for each population separately.
  */
 void estimateParametersAllPopulations(void) {
-  int i;
+    int i;
 
-  for (i = 0; i < number_of_populations; i++)
-    if (!populations_terminated[i])
-      estimateParameters(i);
+    for (i = 0; i < number_of_populations; i++)
+        if (!populations_terminated[i])
+            estimateParameters(i);
 }
 
 /**
@@ -2685,7 +2689,7 @@ void estimateParametersAllPopulations(void) {
  * normal distribution for a specified population.
  */
 void estimateParameters(int population_index) {
-  estimateParametersML(population_index);
+    estimateParametersML(population_index);
 }
 
 /**
@@ -2694,35 +2698,35 @@ void estimateParameters(int population_index) {
  * for a specified population.
  */
 void estimateParametersML(int population_index) {
-  estimateMeanVectorML(population_index);
+    estimateMeanVectorML(population_index);
 
-  estimateCovarianceMatrixML(population_index);
+    estimateCovarianceMatrixML(population_index);
 }
 
 /**
  * Computes the sample mean for a specified population.
  */
 void estimateMeanVectorML(int population_index) {
-  int i, j;
+    int i, j;
 
-  if (number_of_generations > 0) {
-    for (i = 0; i < number_of_parameters; i++)
-      mean_vectors_previous[population_index][i] = mean_vectors[population_index][i];
-  }
+    if (number_of_generations > 0) {
+        for (i = 0; i < number_of_parameters; i++)
+            mean_vectors_previous[population_index][i] = mean_vectors[population_index][i];
+    }
 
-  for (i = 0; i < number_of_parameters; i++) {
-    mean_vectors[population_index][i] = 0.0;
+    for (i = 0; i < number_of_parameters; i++) {
+        mean_vectors[population_index][i] = 0.0;
 
-    for (j = 0; j < selection_size; j++)
-      mean_vectors[population_index][i] += selections[population_index][j][i];
+        for (j = 0; j < selection_size; j++)
+            mean_vectors[population_index][i] += selections[population_index][j][i];
 
-    mean_vectors[population_index][i] /= (double)selection_size;
-  }
+        mean_vectors[population_index][i] /= (double)selection_size;
+    }
 
-  /* Change the focus of the search to the best solution */
-  if (distribution_multipliers[population_index] < 1.0)
-    for (i = 0; i < number_of_parameters; i++)
-      mean_vectors[population_index][i] = selections[population_index][0][i];
+    /* Change the focus of the search to the best solution */
+    if (distribution_multipliers[population_index] < 1.0)
+        for (i = 0; i < number_of_parameters; i++)
+            mean_vectors[population_index][i] = selections[population_index][0][i];
 }
 
 /**
@@ -2733,25 +2737,25 @@ void estimateMeanVectorML(int population_index) {
  * estimateMeanVector was called first.
  */
 void estimateCovarianceMatrixML(int population_index) {
-  int i, j, k;
+    int i, j, k;
 
-  /* First do the maximum-likelihood estimate from data */
-  for (i = 0; i < number_of_parameters; i++) {
-    for (j = i; j < number_of_parameters; j++) {
-      covariance_matrices[population_index][i][j] = 0.0;
+    /* First do the maximum-likelihood estimate from data */
+    for (i = 0; i < number_of_parameters; i++) {
+        for (j = i; j < number_of_parameters; j++) {
+            covariance_matrices[population_index][i][j] = 0.0;
 
-      for (k = 0; k < selection_size; k++)
-        covariance_matrices[population_index][i][j] +=
-            (selections[population_index][k][i] - mean_vectors[population_index][i]) *
-            (selections[population_index][k][j] - mean_vectors[population_index][j]);
+            for (k = 0; k < selection_size; k++)
+                covariance_matrices[population_index][i][j] +=
+                    (selections[population_index][k][i] - mean_vectors[population_index][i]) *
+                    (selections[population_index][k][j] - mean_vectors[population_index][j]);
 
-      covariance_matrices[population_index][i][j] /= (double)selection_size;
+            covariance_matrices[population_index][i][j] /= (double)selection_size;
+        }
     }
-  }
 
-  for (i = 0; i < number_of_parameters; i++)
-    for (j = 0; j < i; j++)
-      covariance_matrices[population_index][i][j] = covariance_matrices[population_index][j][i];
+    for (i = 0; i < number_of_parameters; i++)
+        for (j = 0; j < i; j++)
+            covariance_matrices[population_index][i][j] = covariance_matrices[population_index][j][i];
 }
 
 /**
@@ -2759,32 +2763,32 @@ void estimateCovarianceMatrixML(int population_index) {
  * to their respective populations.
  */
 void copyBestSolutionsToPopulations(void) {
-  int i, k;
+    int i, k;
 
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i]) {
-      for (k = 0; k < number_of_parameters; k++)
-        populations[i][0][k] = selections[i][0][k];
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i]) {
+            for (k = 0; k < number_of_parameters; k++)
+                populations[i][0][k] = selections[i][0][k];
 
-      objective_values[i][0] = objective_values_selections[i][0];
-      constraint_values[i][0] = constraint_values_selections[i][0];
+            objective_values[i][0] = objective_values_selections[i][0];
+            constraint_values[i][0] = constraint_values_selections[i][0];
+        }
     }
-  }
 }
 
 /**
  * Applies the distribution multipliers.
  */
 void applyDistributionMultipliers(void) {
-  int i, j, k;
+    int i, j, k;
 
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i]) {
-      for (j = 0; j < number_of_parameters; j++)
-        for (k = 0; k < number_of_parameters; k++)
-          covariance_matrices[i][j][k] *= distribution_multipliers[i];
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i]) {
+            for (j = 0; j < number_of_parameters; j++)
+                for (k = 0; k < number_of_parameters; k++)
+                    covariance_matrices[i][j][k] *= distribution_multipliers[i];
+        }
     }
-  }
 }
 
 /**
@@ -2792,58 +2796,58 @@ void applyDistributionMultipliers(void) {
  * of the populations in turn.
  */
 void generateAndEvaluateNewSolutionsToFillPopulations(void) {
-  short out_of_range;
-  int i, j, k, q, number_of_AMS_solutions;
-  double *solution, *solution_AMS, shrink_factor;
+    short out_of_range;
+    int i, j, k, q, number_of_AMS_solutions;
+    double *solution, *solution_AMS, shrink_factor;
 
-  solution_AMS = (double*)Malloc(number_of_parameters * sizeof(double));
+    solution_AMS = (double*)Malloc(number_of_parameters * sizeof(double));
 
-  for (i = 0; i < number_of_populations; i++) {
-    computeParametersForSampling(i);
+    for (i = 0; i < number_of_populations; i++) {
+        computeParametersForSampling(i);
 
-    if (!populations_terminated[i]) {
-      number_of_AMS_solutions = (int)(alpha_AMS * (population_size - 1));
-      samples_drawn_from_normal[i] = 0;
-      out_of_bounds_draws[i] = 0;
-      q = 0;
-      for (j = 1; j < population_size; j++) {
-        solution = generateNewSolution(i);
+        if (!populations_terminated[i]) {
+            number_of_AMS_solutions = (int)(alpha_AMS * (population_size - 1));
+            samples_drawn_from_normal[i] = 0;
+            out_of_bounds_draws[i] = 0;
+            q = 0;
+            for (j = 1; j < population_size; j++) {
+                solution = generateNewSolution(i);
 
-        for (k = 0; k < number_of_parameters; k++)
-          populations[i][j][k] = solution[k];
+                for (k = 0; k < number_of_parameters; k++)
+                    populations[i][j][k] = solution[k];
 
-        if ((number_of_generations > 0) && (q < number_of_AMS_solutions)) {
-          out_of_range = 1;
-          shrink_factor = 2;
-          while ((out_of_range == 1) && (shrink_factor > 1e-10)) {
-            shrink_factor *= 0.5;
-            out_of_range = 0;
-            for (k = 0; k < number_of_parameters; k++) {
-              solution_AMS[k] = solution[k] + shrink_factor * delta_AMS * distribution_multipliers[i] *
-                                                  (mean_vectors[i][k] - mean_vectors_previous[i][k]);
-              if (!isParameterInRangeBounds(solution_AMS[k], k)) {
-                out_of_range = 1;
-                break;
-              }
+                if ((number_of_generations > 0) && (q < number_of_AMS_solutions)) {
+                    out_of_range = 1;
+                    shrink_factor = 2;
+                    while ((out_of_range == 1) && (shrink_factor > 1e-10)) {
+                        shrink_factor *= 0.5;
+                        out_of_range = 0;
+                        for (k = 0; k < number_of_parameters; k++) {
+                            solution_AMS[k] = solution[k] + shrink_factor * delta_AMS * distribution_multipliers[i] *
+                                                                (mean_vectors[i][k] - mean_vectors_previous[i][k]);
+                            if (!isParameterInRangeBounds(solution_AMS[k], k)) {
+                                out_of_range = 1;
+                                break;
+                            }
+                        }
+                    }
+                    if (!out_of_range) {
+                        for (k = 0; k < number_of_parameters; k++)
+                            populations[i][j][k] = solution_AMS[k];
+                    }
+                }
+
+                installedProblemEvaluation(problem_index, populations[i][j], &(objective_values[i][j]),
+                                           &(constraint_values[i][j]));
+
+                q++;
+
+                free(solution);
             }
-          }
-          if (!out_of_range) {
-            for (k = 0; k < number_of_parameters; k++)
-              populations[i][j][k] = solution_AMS[k];
-          }
         }
-
-        installedProblemEvaluation(problem_index, populations[i][j], &(objective_values[i][j]),
-                                   &(constraint_values[i][j]));
-
-        q++;
-
-        free(solution);
-      }
     }
-  }
 
-  free(solution_AMS);
+    free(solution_AMS);
 }
 
 /**
@@ -2851,16 +2855,16 @@ void generateAndEvaluateNewSolutionsToFillPopulations(void) {
  * the multivariate normal distribution.
  */
 void computeParametersForSampling(int population_index) {
-  int i;
+    int i;
 
-  if (cholesky_factors_lower_triangle[population_index]) {
-    for (i = 0; i < number_of_parameters; i++)
-      free(cholesky_factors_lower_triangle[population_index][i]);
-    free(cholesky_factors_lower_triangle[population_index]);
-  }
+    if (cholesky_factors_lower_triangle[population_index]) {
+        for (i = 0; i < number_of_parameters; i++)
+            free(cholesky_factors_lower_triangle[population_index][i]);
+        free(cholesky_factors_lower_triangle[population_index]);
+    }
 
-  cholesky_factors_lower_triangle[population_index] =
-      choleskyDecomposition(covariance_matrices[population_index], number_of_parameters);
+    cholesky_factors_lower_triangle[population_index] =
+        choleskyDecomposition(covariance_matrices[population_index], number_of_parameters);
 }
 
 /**
@@ -2868,49 +2872,50 @@ void computeParametersForSampling(int population_index) {
  * a single sample from a specified model.
  */
 double* generateNewSolution(int population_index) {
-  short ready;
-  int i, times_not_in_bounds;
-  double *result, *z;
+    short ready;
+    int i, times_not_in_bounds;
+    double *result, *z;
 
-  times_not_in_bounds = -1;
-  out_of_bounds_draws[population_index]--;
+    times_not_in_bounds = -1;
+    out_of_bounds_draws[population_index]--;
 
-  ready = 0;
-  do {
-    times_not_in_bounds++;
-    samples_drawn_from_normal[population_index]++;
-    out_of_bounds_draws[population_index]++;
-    if (times_not_in_bounds >= 100) {
-      result = (double*)Malloc(number_of_parameters * sizeof(double));
-      for (i = 0; i < number_of_parameters; i++)
-        result[i] = lower_init_ranges[i] + (upper_init_ranges[i] - lower_init_ranges[i]) * randomRealUniform01();
-    } else {
-      z = (double*)Malloc(number_of_parameters * sizeof(double));
+    ready = 0;
+    do {
+        times_not_in_bounds++;
+        samples_drawn_from_normal[population_index]++;
+        out_of_bounds_draws[population_index]++;
+        if (times_not_in_bounds >= 100) {
+            result = (double*)Malloc(number_of_parameters * sizeof(double));
+            for (i = 0; i < number_of_parameters; i++)
+                result[i] =
+                    lower_init_ranges[i] + (upper_init_ranges[i] - lower_init_ranges[i]) * randomRealUniform01();
+        } else {
+            z = (double*)Malloc(number_of_parameters * sizeof(double));
 
-      for (i = 0; i < number_of_parameters; i++)
-        z[i] = random1DNormalUnit();
+            for (i = 0; i < number_of_parameters; i++)
+                z[i] = random1DNormalUnit();
 
-      result = matrixVectorMultiplication(cholesky_factors_lower_triangle[population_index], z, number_of_parameters,
-                                          number_of_parameters);
+            result = matrixVectorMultiplication(cholesky_factors_lower_triangle[population_index], z,
+                                                number_of_parameters, number_of_parameters);
 
-      for (i = 0; i < number_of_parameters; i++)
-        result[i] += mean_vectors[population_index][i];
+            for (i = 0; i < number_of_parameters; i++)
+                result[i] += mean_vectors[population_index][i];
 
-      free(z);
-    }
+            free(z);
+        }
 
-    ready = 1;
-    for (i = 0; i < number_of_parameters; i++) {
-      if (!isParameterInRangeBounds(result[i], i)) {
-        ready = 0;
-        break;
-      }
-    }
-    if (!ready)
-      free(result);
-  } while (!ready);
+        ready = 1;
+        for (i = 0; i < number_of_parameters; i++) {
+            if (!isParameterInRangeBounds(result[i], i)) {
+                ready = 0;
+                break;
+            }
+        }
+        if (!ready)
+            free(result);
+    } while (!ready);
 
-  return (result);
+    return (result);
 }
 
 /**
@@ -2918,37 +2923,38 @@ double* generateNewSolution(int population_index) {
  * the SDR-AVS mechanism.
  */
 void adaptDistributionMultipliers(void) {
-  short improvement;
-  int i;
-  double st_dev_ratio;
+    short improvement;
+    int i;
+    double st_dev_ratio;
 
-  for (i = 0; i < number_of_populations; i++) {
-    if (!populations_terminated[i]) {
-      if ((((double)out_of_bounds_draws[i]) / ((double)samples_drawn_from_normal[i])) > 0.9)
-        distribution_multipliers[i] *= 0.5;
+    for (i = 0; i < number_of_populations; i++) {
+        if (!populations_terminated[i]) {
+            if ((((double)out_of_bounds_draws[i]) / ((double)samples_drawn_from_normal[i])) > 0.9)
+                distribution_multipliers[i] *= 0.5;
 
-      improvement = generationalImprovementForOnePopulation(i, &st_dev_ratio);
+            improvement = generationalImprovementForOnePopulation(i, &st_dev_ratio);
 
-      if (improvement) {
-        no_improvement_stretch[i] = 0;
+            if (improvement) {
+                no_improvement_stretch[i] = 0;
 
-        if (distribution_multipliers[i] < 1.0)
-          distribution_multipliers[i] = 1.0;
+                if (distribution_multipliers[i] < 1.0)
+                    distribution_multipliers[i] = 1.0;
 
-        if (st_dev_ratio > st_dev_ratio_threshold)
-          distribution_multipliers[i] *= distribution_multiplier_increase;
-      } else {
-        if (distribution_multipliers[i] <= 1.0)
-          (no_improvement_stretch[i])++;
+                if (st_dev_ratio > st_dev_ratio_threshold)
+                    distribution_multipliers[i] *= distribution_multiplier_increase;
+            } else {
+                if (distribution_multipliers[i] <= 1.0)
+                    (no_improvement_stretch[i])++;
 
-        if ((distribution_multipliers[i] > 1.0) || (no_improvement_stretch[i] >= maximum_no_improvement_stretch))
-          distribution_multipliers[i] *= distribution_multiplier_decrease;
+                if ((distribution_multipliers[i] > 1.0) ||
+                    (no_improvement_stretch[i] >= maximum_no_improvement_stretch))
+                    distribution_multipliers[i] *= distribution_multiplier_decrease;
 
-        if ((no_improvement_stretch[i] < maximum_no_improvement_stretch) && (distribution_multipliers[i] < 1.0))
-          distribution_multipliers[i] = 1.0;
-      }
+                if ((no_improvement_stretch[i] < maximum_no_improvement_stretch) && (distribution_multipliers[i] < 1.0))
+                    distribution_multipliers[i] = 1.0;
+            }
+        }
     }
-  }
 }
 
 /**
@@ -2958,57 +2964,57 @@ void adaptDistributionMultipliers(void) {
  * mechanism is computed and returned in the pointer variable.
  */
 short generationalImprovementForOnePopulation(int population_index, double* st_dev_ratio) {
-  int i, j, index_best_selected, index_best_population, number_of_improvements;
-  double* average_parameters_of_improvements;
+    int i, j, index_best_selected, index_best_population, number_of_improvements;
+    double* average_parameters_of_improvements;
 
-  /* Determine best selected solutions */
-  index_best_selected = 0;
-  for (i = 0; i < selection_size; i++) {
-    if (betterFitness(objective_values_selections[population_index][i],
-                      constraint_values_selections[population_index][i],
-                      objective_values_selections[population_index][index_best_selected],
-                      constraint_values_selections[population_index][index_best_selected]))
-      index_best_selected = i;
-  }
-
-  /* Determine best in the population and the average improvement parameters */
-  average_parameters_of_improvements = (double*)Malloc(number_of_parameters * sizeof(double));
-  for (i = 0; i < number_of_parameters; i++)
-    average_parameters_of_improvements[i] = 0.0;
-
-  index_best_population = 0;
-  number_of_improvements = 0;
-  for (i = 0; i < population_size; i++) {
-    if (betterFitness(objective_values[population_index][i], constraint_values[population_index][i],
-                      objective_values[population_index][index_best_population],
-                      constraint_values[population_index][index_best_population]))
-      index_best_population = i;
-
-    if (betterFitness(objective_values[population_index][i], constraint_values[population_index][i],
-                      objective_values_selections[population_index][index_best_selected],
-                      constraint_values_selections[population_index][index_best_selected])) {
-      number_of_improvements++;
-      for (j = 0; j < number_of_parameters; j++)
-        average_parameters_of_improvements[j] += populations[population_index][i][j];
+    /* Determine best selected solutions */
+    index_best_selected = 0;
+    for (i = 0; i < selection_size; i++) {
+        if (betterFitness(objective_values_selections[population_index][i],
+                          constraint_values_selections[population_index][i],
+                          objective_values_selections[population_index][index_best_selected],
+                          constraint_values_selections[population_index][index_best_selected]))
+            index_best_selected = i;
     }
-  }
 
-  /* Determine st.dev. ratio */
-  *st_dev_ratio = 0.0;
-  if (number_of_improvements > 0) {
+    /* Determine best in the population and the average improvement parameters */
+    average_parameters_of_improvements = (double*)Malloc(number_of_parameters * sizeof(double));
     for (i = 0; i < number_of_parameters; i++)
-      average_parameters_of_improvements[i] /= (double)number_of_improvements;
+        average_parameters_of_improvements[i] = 0.0;
 
-    *st_dev_ratio = getStDevRatio(population_index, average_parameters_of_improvements);
-  }
+    index_best_population = 0;
+    number_of_improvements = 0;
+    for (i = 0; i < population_size; i++) {
+        if (betterFitness(objective_values[population_index][i], constraint_values[population_index][i],
+                          objective_values[population_index][index_best_population],
+                          constraint_values[population_index][index_best_population]))
+            index_best_population = i;
 
-  free(average_parameters_of_improvements);
+        if (betterFitness(objective_values[population_index][i], constraint_values[population_index][i],
+                          objective_values_selections[population_index][index_best_selected],
+                          constraint_values_selections[population_index][index_best_selected])) {
+            number_of_improvements++;
+            for (j = 0; j < number_of_parameters; j++)
+                average_parameters_of_improvements[j] += populations[population_index][i][j];
+        }
+    }
 
-  if (fabs(objective_values_selections[population_index][index_best_selected] -
-           objective_values[population_index][index_best_population]) == 0.0)
-    return (0);
+    /* Determine st.dev. ratio */
+    *st_dev_ratio = 0.0;
+    if (number_of_improvements > 0) {
+        for (i = 0; i < number_of_parameters; i++)
+            average_parameters_of_improvements[i] /= (double)number_of_improvements;
 
-  return (1);
+        *st_dev_ratio = getStDevRatio(population_index, average_parameters_of_improvements);
+    }
+
+    free(average_parameters_of_improvements);
+
+    if (fabs(objective_values_selections[population_index][index_best_selected] -
+             objective_values[population_index][index_best_population]) == 0.0)
+        return (0);
+
+    return (1);
 }
 
 /**
@@ -3023,29 +3029,29 @@ short betterFitness(double objective_value_x,
                     double constraint_value_x,
                     double objective_value_y,
                     double constraint_value_y) {
-  short result;
+    short result;
 
-  result = 0;
+    result = 0;
 
-  if (constraint_value_x > 0) /* x is infeasible */
-  {
-    if (constraint_value_y > 0) /* Both are infeasible */
+    if (constraint_value_x > 0) /* x is infeasible */
     {
-      if (constraint_value_x < constraint_value_y)
-        result = 1;
-    }
-  } else /* x is feasible */
-  {
-    if (constraint_value_y > 0) /* x is feasible and y is not */
-      result = 1;
-    else /* Both are feasible */
+        if (constraint_value_y > 0) /* Both are infeasible */
+        {
+            if (constraint_value_x < constraint_value_y)
+                result = 1;
+        }
+    } else /* x is feasible */
     {
-      if (objective_value_x < objective_value_y)
-        result = 1;
+        if (constraint_value_y > 0) /* x is feasible and y is not */
+            result = 1;
+        else /* Both are feasible */
+        {
+            if (objective_value_x < objective_value_y)
+                result = 1;
+        }
     }
-  }
 
-  return (result);
+    return (result);
 }
 
 /**
@@ -3053,31 +3059,31 @@ short betterFitness(double objective_value_x,
  * of a given point for a given model.
  */
 double getStDevRatio(int population_index, double* parameters) {
-  int i;
-  double **inverse, result, *x_min_mu, *z;
+    int i;
+    double **inverse, result, *x_min_mu, *z;
 
-  inverse = matrixLowerTriangularInverse(cholesky_factors_lower_triangle[population_index], number_of_parameters);
+    inverse = matrixLowerTriangularInverse(cholesky_factors_lower_triangle[population_index], number_of_parameters);
 
-  x_min_mu = (double*)Malloc(number_of_parameters * sizeof(double));
+    x_min_mu = (double*)Malloc(number_of_parameters * sizeof(double));
 
-  for (i = 0; i < number_of_parameters; i++)
-    x_min_mu[i] = parameters[i] - mean_vectors[population_index][i];
+    for (i = 0; i < number_of_parameters; i++)
+        x_min_mu[i] = parameters[i] - mean_vectors[population_index][i];
 
-  z = matrixVectorMultiplication(inverse, x_min_mu, number_of_parameters, number_of_parameters);
+    z = matrixVectorMultiplication(inverse, x_min_mu, number_of_parameters, number_of_parameters);
 
-  result = 0.0;
-  for (i = 0; i < number_of_parameters; i++) {
-    if (fabs(z[i]) > result)
-      result = fabs(z[i]);
-  }
+    result = 0.0;
+    for (i = 0; i < number_of_parameters; i++) {
+        if (fabs(z[i]) > result)
+            result = fabs(z[i]);
+    }
 
-  free(z);
-  free(x_min_mu);
-  for (i = 0; i < number_of_parameters; i++)
-    free(inverse[i]);
-  free(inverse);
+    free(z);
+    free(x_min_mu);
+    for (i = 0; i < number_of_parameters; i++)
+        free(inverse[i]);
+    free(inverse);
 
-  return (result);
+    return (result);
 }
 
 /**
@@ -3086,18 +3092,18 @@ double getStDevRatio(int population_index, double* parameters) {
  * Then stores the very best solution found so far.
  */
 void determineBestSolutionSoFar(void) {
-  int i, population_of_best, index_of_best;
+    int i, population_of_best, index_of_best;
 
-  determineBestSolutionInCurrentPopulations(&population_of_best, &index_of_best);
+    determineBestSolutionInCurrentPopulations(&population_of_best, &index_of_best);
 
-  if (number_of_starts == 1 || betterFitness(objective_values[population_of_best][index_of_best],
-                                             constraint_values[population_of_best][index_of_best],
-                                             best_so_far_objective_value, best_so_far_constraint_value)) {
-    best_so_far_objective_value = objective_values[population_of_best][index_of_best];
-    best_so_far_constraint_value = constraint_values[population_of_best][index_of_best];
-    for (i = 0; i < number_of_parameters; i++)
-      best_so_far_solution[i] = populations[population_of_best][index_of_best][i];
-  }
+    if (number_of_starts == 1 || betterFitness(objective_values[population_of_best][index_of_best],
+                                               constraint_values[population_of_best][index_of_best],
+                                               best_so_far_objective_value, best_so_far_constraint_value)) {
+        best_so_far_objective_value = objective_values[population_of_best][index_of_best];
+        best_so_far_constraint_value = constraint_values[population_of_best][index_of_best];
+        for (i = 0; i < number_of_parameters; i++)
+            best_so_far_solution[i] = populations[population_of_best][index_of_best][i];
+    }
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -3106,93 +3112,93 @@ void determineBestSolutionSoFar(void) {
  * Undoes initialization procedure by freeing up memory.
  */
 void ezilaitini(void) {
-  ezilaitiniMemory();
+    ezilaitiniMemory();
 
-  ezilaitiniDistributionMultipliers();
+    ezilaitiniDistributionMultipliers();
 
-  ezilaitiniObjectiveRotationMatrix();
+    ezilaitiniObjectiveRotationMatrix();
 }
 
 /**
  * Undoes initialization procedure by freeing up memory.
  */
 void ezilaitiniMemory(void) {
-  int i, j;
+    int i, j;
 
-  for (i = 0; i < number_of_populations; i++) {
-    for (j = 0; j < population_size; j++)
-      free(populations[i][j]);
-    free(populations[i]);
+    for (i = 0; i < number_of_populations; i++) {
+        for (j = 0; j < population_size; j++)
+            free(populations[i][j]);
+        free(populations[i]);
 
-    free(objective_values[i]);
+        free(objective_values[i]);
 
-    free(constraint_values[i]);
+        free(constraint_values[i]);
 
-    free(ranks[i]);
+        free(ranks[i]);
 
-    for (j = 0; j < selection_size; j++)
-      free(selections[i][j]);
-    free(selections[i]);
+        for (j = 0; j < selection_size; j++)
+            free(selections[i][j]);
+        free(selections[i]);
 
-    free(objective_values_selections[i]);
+        free(objective_values_selections[i]);
 
-    free(constraint_values_selections[i]);
+        free(constraint_values_selections[i]);
 
-    free(mean_vectors[i]);
+        free(mean_vectors[i]);
 
-    free(mean_vectors_previous[i]);
+        free(mean_vectors_previous[i]);
 
-    for (j = 0; j < number_of_parameters; j++)
-      free(covariance_matrices[i][j]);
-    free(covariance_matrices[i]);
+        for (j = 0; j < number_of_parameters; j++)
+            free(covariance_matrices[i][j]);
+        free(covariance_matrices[i]);
 
-    if (cholesky_factors_lower_triangle[i]) {
-      for (j = 0; j < number_of_parameters; j++)
-        free(cholesky_factors_lower_triangle[i][j]);
-      free(cholesky_factors_lower_triangle[i]);
+        if (cholesky_factors_lower_triangle[i]) {
+            for (j = 0; j < number_of_parameters; j++)
+                free(cholesky_factors_lower_triangle[i][j]);
+            free(cholesky_factors_lower_triangle[i]);
+        }
     }
-  }
 
-  free(covariance_matrices);
-  free(cholesky_factors_lower_triangle);
-  free(lower_range_bounds);
-  free(upper_range_bounds);
-  free(lower_init_ranges);
-  free(upper_init_ranges);
-  free(populations_terminated);
-  free(no_improvement_stretch);
-  free(populations);
-  free(objective_values);
-  free(constraint_values);
-  free(ranks);
-  free(selections);
-  free(objective_values_selections);
-  free(constraint_values_selections);
-  free(mean_vectors);
-  free(mean_vectors_previous);
+    free(covariance_matrices);
+    free(cholesky_factors_lower_triangle);
+    free(lower_range_bounds);
+    free(upper_range_bounds);
+    free(lower_init_ranges);
+    free(upper_init_ranges);
+    free(populations_terminated);
+    free(no_improvement_stretch);
+    free(populations);
+    free(objective_values);
+    free(constraint_values);
+    free(ranks);
+    free(selections);
+    free(objective_values_selections);
+    free(constraint_values_selections);
+    free(mean_vectors);
+    free(mean_vectors_previous);
 }
 
 /**
  * Undoes initialization procedure by freeing up memory.
  */
 void ezilaitiniDistributionMultipliers(void) {
-  free(distribution_multipliers);
-  free(samples_drawn_from_normal);
-  free(out_of_bounds_draws);
+    free(distribution_multipliers);
+    free(samples_drawn_from_normal);
+    free(out_of_bounds_draws);
 }
 
 /**
  * Undoes initialization procedure by freeing up memory.
  */
 void ezilaitiniObjectiveRotationMatrix(void) {
-  int i;
+    int i;
 
-  if (rotation_angle == 0.0)
-    return;
+    if (rotation_angle == 0.0)
+        return;
 
-  for (i = 0; i < number_of_parameters; i++)
-    free(rotation_matrix[i]);
-  free(rotation_matrix);
+    for (i = 0; i < number_of_parameters; i++)
+        free(rotation_matrix[i]);
+    free(rotation_matrix);
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -3204,40 +3210,40 @@ void ezilaitiniObjectiveRotationMatrix(void) {
  * number of parallel populations.
  */
 void run(std::optional<goblin::usize> base_population_size) {
-  int population_size_base;
+    int population_size_base;
 
-  number_of_starts = 0;
+    number_of_starts = 0;
 
-  best_so_far_solution = (double*)Malloc(number_of_parameters * sizeof(double));
+    best_so_far_solution = (double*)Malloc(number_of_parameters * sizeof(double));
 
-  distribution_multiplier_decrease = 0.9;
-  st_dev_ratio_threshold = 1.0;
-  tau = 0.35;
-  maximum_no_improvement_stretch = 25 + number_of_parameters;
-  if (base_population_size.has_value()) {
-    population_size_base = static_cast<int>(base_population_size.value());
-  } else {
-    population_size_base = (int)(17.0 + 3.0 * pow((double)number_of_parameters, 1.5));
-  }
-
-  do {
-    if (number_of_starts % 2 == 0) {
-      population_size = (1 + number_of_starts / 2) * population_size_base;
-      number_of_populations = (int)pow(2.0, number_of_starts / 2);
-
-      if (number_of_populations > maximum_number_of_populations) {
-        population_size = (population_size * number_of_populations) / maximum_number_of_populations;
-        number_of_populations = maximum_number_of_populations;
-      }
+    distribution_multiplier_decrease = 0.9;
+    st_dev_ratio_threshold = 1.0;
+    tau = 0.35;
+    maximum_no_improvement_stretch = 25 + number_of_parameters;
+    if (base_population_size.has_value()) {
+        population_size_base = static_cast<int>(base_population_size.value());
     } else {
-      population_size = ((int)pow(2.0, 1 + (number_of_starts / 2))) * population_size_base;
-      number_of_populations = 1;
+        population_size_base = (int)(17.0 + 3.0 * pow((double)number_of_parameters, 1.5));
     }
 
-    runOnce();
-  } while (!checkTerminationCondition());
+    do {
+        if (number_of_starts % 2 == 0) {
+            population_size = (1 + number_of_starts / 2) * population_size_base;
+            number_of_populations = (int)pow(2.0, number_of_starts / 2);
 
-  free(best_so_far_solution);
+            if (number_of_populations > maximum_number_of_populations) {
+                population_size = (population_size * number_of_populations) / maximum_number_of_populations;
+                number_of_populations = maximum_number_of_populations;
+            }
+        } else {
+            population_size = ((int)pow(2.0, 1 + (number_of_starts / 2))) * population_size_base;
+            number_of_populations = 1;
+        }
+
+        runOnce();
+    } while (!checkTerminationCondition());
+
+    free(best_so_far_solution);
 }
 
 /**
@@ -3245,40 +3251,40 @@ void run(std::optional<goblin::usize> base_population_size) {
  * and number of parallel populations.
  */
 void runOnce(void) {
-  number_of_starts++;
+    number_of_starts++;
 
-  initialize();
+    initialize();
 
-  if (print_verbose_overview && (number_of_starts == 1))
-    printVerboseOverview();
+    if (print_verbose_overview && (number_of_starts == 1))
+        printVerboseOverview();
 
-  while (!checkTerminationConditionForRunOnce()) {
-    if (write_generational_statistics)
+    while (!checkTerminationConditionForRunOnce()) {
+        if (write_generational_statistics)
+            writeGenerationalStatistics();
+
+        if (write_generational_solutions)
+            writeGenerationalSolutions(0);
+
+        makeSelections();
+
+        makePopulations();
+
+        number_of_generations++;
+    }
+
+    determineBestSolutionSoFar();
+
+    /*
+    // No printing for anything...
+    if( checkTerminationCondition() )
+    {
       writeGenerationalStatistics();
 
-    if (write_generational_solutions)
-      writeGenerationalSolutions(0);
+      writeGenerationalSolutions( 1 );
+    }
+     */
 
-    makeSelections();
-
-    makePopulations();
-
-    number_of_generations++;
-  }
-
-  determineBestSolutionSoFar();
-
-  /*
-  // No printing for anything...
-  if( checkTerminationCondition() )
-  {
-    writeGenerationalStatistics();
-
-    writeGenerationalSolutions( 1 );
-  }
-   */
-
-  ezilaitini();
+    ezilaitini();
 }
 /*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
@@ -3303,60 +3309,60 @@ void runOnce(void) {
 
 namespace goblin {
 std::optional<u64> AMaLGaM::current_generation() const {
-  return static_cast<u64>(amalgam_impl::number_of_generations);
+    return static_cast<u64>(amalgam_impl::number_of_generations);
 };
 
 std::tuple<Vec<double>, double, double> AMaLGaM::run(
     std::function<std::tuple<double, double>(const Eigen::Ref<Eigen::VectorXd>& parameters)>& function,
     std::vector<std::tuple<double, double>> bounds) {
-  const std::lock_guard<std::mutex> lock(amalgam_impl::global_instance_mutex);
+    const std::lock_guard<std::mutex> lock(amalgam_impl::global_instance_mutex);
 
-  // fix the random seed so that the rng state determines the seed...
-  std::random_device rd;
-  amalgam_impl::random_seed_changing =
-      seed.has_value() ? seed.value() + 1
-                       : std::uniform_int_distribution<int64_t>(1, std::numeric_limits<int64_t>::max())(rd);
+    // fix the random seed so that the rng state determines the seed...
+    std::random_device rd;
+    amalgam_impl::random_seed_changing =
+        seed.has_value() ? seed.value() + 1
+                         : std::uniform_int_distribution<int64_t>(1, std::numeric_limits<int64_t>::max())(rd);
 
-  amalgam_impl::write_generational_statistics = 0;
-  amalgam_impl::write_generational_solutions = 0;
-  amalgam_impl::print_verbose_overview = 0;
-  amalgam_impl::problem_index = 13;
-  amalgam_impl::rotation_angle = 0.0;
+    amalgam_impl::write_generational_statistics = 0;
+    amalgam_impl::write_generational_solutions = 0;
+    amalgam_impl::print_verbose_overview = 0;
+    amalgam_impl::problem_index = 13;
+    amalgam_impl::rotation_angle = 0.0;
 
-  if (target_value.has_value()) {
-    amalgam_impl::vtr = target_value.value();
-    amalgam_impl::use_vtr = 1;
-  } else {
-    amalgam_impl::use_vtr = 0;
-  }
-
-  amalgam_impl::number_of_parameters = static_cast<int>(bounds.size());
-
-  amalgam_impl::lower_user_range = init_lower_bound;
-  amalgam_impl::upper_user_range = init_upper_bound;
-  amalgam_impl::fitness_variance_tolerance = fitness_variance_threshold;
-  amalgam_impl::maximum_number_of_populations = static_cast<int>(max_num_populations);
-  amalgam_impl::maximum_number_of_evaluations = max_evaluations;
-
-  Eigen::VectorXd best;
-  double best_ov = std::numeric_limits<double>().infinity(), best_cv = std::numeric_limits<double>().infinity();
-  amalgam_impl::global_evaluate = [&](double* parameters, double* objective_value, double* constraint_value) {
-    Eigen::Map<Eigen::VectorXd> pv(parameters, amalgam_impl::number_of_parameters);
-    auto [ov, cv] = function(pv);
-    *objective_value = ov;
-    *constraint_value = cv;
-
-    if (amalgam_impl::betterFitness(ov, cv, best_ov, best_cv)) {
-      best = pv;
-      best_ov = ov;
-      best_cv = cv;
+    if (target_value.has_value()) {
+        amalgam_impl::vtr = target_value.value();
+        amalgam_impl::use_vtr = 1;
+    } else {
+        amalgam_impl::use_vtr = 0;
     }
-  };
 
-  amalgam_impl::global_bounds = bounds;
+    amalgam_impl::number_of_parameters = static_cast<int>(bounds.size());
 
-  amalgam_impl::run(base_population_size);
+    amalgam_impl::lower_user_range = init_lower_bound;
+    amalgam_impl::upper_user_range = init_upper_bound;
+    amalgam_impl::fitness_variance_tolerance = fitness_variance_threshold;
+    amalgam_impl::maximum_number_of_populations = static_cast<int>(max_num_populations);
+    amalgam_impl::maximum_number_of_evaluations = max_evaluations;
 
-  return std::make_tuple(best, best_ov, best_cv);
+    Eigen::VectorXd best;
+    double best_ov = std::numeric_limits<double>().infinity(), best_cv = std::numeric_limits<double>().infinity();
+    amalgam_impl::global_evaluate = [&](double* parameters, double* objective_value, double* constraint_value) {
+        Eigen::Map<Eigen::VectorXd> pv(parameters, amalgam_impl::number_of_parameters);
+        auto [ov, cv] = function(pv);
+        *objective_value = ov;
+        *constraint_value = cv;
+
+        if (amalgam_impl::betterFitness(ov, cv, best_ov, best_cv)) {
+            best = pv;
+            best_ov = ov;
+            best_cv = cv;
+        }
+    };
+
+    amalgam_impl::global_bounds = bounds;
+
+    amalgam_impl::run(base_population_size);
+
+    return std::make_tuple(best, best_ov, best_cv);
 };
 }  // namespace goblin

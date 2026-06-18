@@ -19,7 +19,7 @@ class PyProblem(PyFunctionBase):
         return 0  # no continuous variables
 
     def eval(self, solution: SolutionBase):  # overridable (pure virtual)
-        """Evaluates and updates the solution fitness ('quality') in-place"""
+        """Evaluates and returns the solution fitness ('quality')"""
 
         values_np = solution.discrete_values()
         # print(type(values_np)) # -> <class 'numpy.ndarray'>
@@ -37,7 +37,7 @@ class PyProblem(PyFunctionBase):
         return objectives, constraint_value
 
 
-if __name__ == "__main__":
+def example_discrete():
     problem = BenchmarkInstance(
         objectives=PyProblem(3),
         # either one number corresponding to the domain size (will use values [0,domain_size-1], you need to map that to whatever options you have)
@@ -85,7 +85,105 @@ if __name__ == "__main__":
         )
 
     # for hypervolumes (not implemented yet) I'd recommend https://esa.github.io/pygmo2/tutorials/hypervolume.html (needs conda though)
+    # Note: 2d hypervolume is available
 
     # somehow the fact that the C++ code (benchmarkinstance) holds a reference to a python object (PyProblem) creates a reference cycle that requires manual deletion
     # notably the issue only appears if a C++ object owns (a reference) to the python object, just calling with a callback is fine
     del problem
+
+
+class PyZDT1(PyFunctionBase):
+    def __init__(self) -> None:
+        super().__init__()
+
+        self.dims = 30
+
+    def num_objectives(self) -> int:  # overridable (pure virtual)
+        return 2
+
+    def num_discrete(self) -> int:  # overridable (pure virtual)
+        return 0
+
+    def num_continuous(self) -> int:  # overridable (pure virtual)
+        return self.dims
+
+    def eval(self, solution: SolutionBase):  # overridable (pure virtual)
+        """Evaluates and returns the solution fitness ('quality')"""
+
+        x = solution.continuous_values()
+        # print(type(values_np)) # -> <class 'numpy.ndarray'>
+
+        # then do whatever (either accessing single variables or the whole thing as np.ndarray)
+        g = 1.0 + 9.0 * np.sum(x[1:]) / (self.dims - 1)
+        h = 1.0 - np.sqrt(x[0] / g)
+
+        objectives = np.array([x[0], g * h], dtype=np.float64)
+        constraint_value = 0.0
+
+        return objectives, constraint_value
+
+
+def example_rv():
+    problem = BenchmarkInstance(
+        objectives=PyZDT1(),
+        init=RandomInit(),
+        continuous_init_lower_bound=0.0,
+        continuous_init_upper_bound=1.0,
+        continuous_lower_bound=0.0,
+        continuous_upper_bound=1.0,
+    )
+
+    # works, but has heavy overhead due to the Python boundary...
+    # pareto_front = ZDT1().pareto_front(25)
+    # problem.add_target(lambda a: a.approximately_covers(pareto_front, 1e-2))
+
+    gomea = MoRvGOMEA()
+
+    # all the standard things should work, you can also have a custom python callback as termination criterion
+    budget = Budget(max_evaluations=50_000, max_generations=10_000, max_time_seconds=10)
+
+    # or just archive, status = gomea.run(problem, budget=budget, seed=42)
+    archive, status = Tracked.run(
+        problem,
+        gomea,
+        budget=budget,
+        config=TrackingOptions(
+            logpath="build/mo_rv_stats.csv"  # this needs to be a string, not a pathlib.Path
+            # you can use this to
+            # - add run specific information (e.g. a method name for comparing different methods, or problem dimensionality or whatever)
+            # - define when you want to log (e.g. every generation, every 1000 evaluations, or time-based)
+        ),
+        seed=42,
+    )
+    print(status)
+
+    print(f"Archive contains {archive.size()} solutions")
+    objectives = np.empty((archive.size(), 2))
+    for i in range(archive.size()):
+        s = archive[i]
+        print(
+            f"{i}: {s.discrete_values()} @ {s.quality().objectives}/{s.quality().constraint_value}"
+        )
+        objectives[i, :] = s.quality().objectives
+
+    print(objectives)
+
+    try:
+        import matplotlib.pyplot as plt
+
+        # compute pareto front
+        x = np.linspace(0, 1, 100)
+        y = 1.0 - np.sqrt(x)
+        plt.plot(x, y, label="Pareto front")
+
+        plt.scatter(objectives[:, 0], objectives[:, 1])
+
+        plt.title("ZDT1")
+        plt.show()
+    except ImportError as e:
+        print("Matplotlib is not available so the approximation set cannot be shown...")
+
+
+if __name__ == "__main__":
+    example_discrete()
+    example_rv()

@@ -4,12 +4,11 @@ import pathlib
 import pandas as pd
 import pygom
 from pygom import *
-from tqdm import tqdm
-
 from src.config import Config, c
 from src.plots import plot_convergence_so, plot_scalability
 from src.postprocessing import load_results
 from src.run import run_all, run_one
+from tqdm import tqdm
 
 REPEATS = 30
 REPEATS = 100
@@ -31,7 +30,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.OneMax(d),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -40,7 +39,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Repeat(c.DeceptiveTrap(5), d // 5),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -49,7 +48,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Masked(c.LeadingOnes(d)),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -59,7 +58,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.LeadingOnes(d),
-                target=[float(d)],
+                target_objectives=[float(d)],
                 init=c.RandomInit(),
             ),
         )
@@ -76,7 +75,7 @@ def problems():
     #             f"LeadingOnes IA ({init})",
     #             d,
     #             c.BenchmarkInstance(
-    #                 c.LeadingOnes(d), target=[float(d)], init=actual_init
+    #                 c.LeadingOnes(d), target_objectives=[float(d)], init=actual_init
     #             ),
     #         )
     #         branching_factor = 2
@@ -87,7 +86,7 @@ def problems():
     #                 c.HLeadingOnes(d, branching_factor),
     #                 discrete_domain=branching_factor
     #                 + 1,  # each node can be in [0, branching_factor]
-    #                 target=[float(d)],
+    #                 target_objectives=[float(d)],
     #                 init=actual_init,
     #             ),
     #         )
@@ -107,6 +106,16 @@ def methods():
     #     '"Library (GIGA, U)"',
     #     c.DiscreteGOMEA(linkage_model="Univariate", gene_invariant=True),
     # )
+    # yield (
+    #     '"Mixed (GIGA)"',
+    #     c.MixedGOMEA(
+    #         discrete_model=c.LinkageTreeFOS(
+    #             metric="random",
+    #             filter_root=True,
+    #         ),
+    #         population_options=c.PopulationOptions(gene_invariant=True),
+    #     ),
+    # )
 
     for sn, selection in [
         # ("Truncation", c.classic.TruncationSelection()),
@@ -121,8 +130,8 @@ def methods():
                 f'"SimpleGA(SS, S={sn},C={cx})"',
                 c.classic.SimpleGA(
                     population_size=100,
-                    crossover_strategy=crossover,
-                    selection_strategy=selection,
+                    crossover=crossover,
+                    selection=selection,
                 ),
             )
             # if sn != "Truncation":

@@ -30,7 +30,7 @@ VTR = 1e-10
 INIT_BOUNDS = (100.0, 125.0)
 
 
-INITIAL_POPULATION_SIZE = 10 # 25
+INITIAL_POPULATION_SIZE = 10  # 25
 MAX_NUM_POPULATIONS = 1
 RESTART_STALE = False
 
@@ -90,7 +90,12 @@ def run(clean: bool = True):
     print(type(method).__name__)
 
     if clean or not POPULATION_LOGFILE.is_file():
-        Tracked.run(problem, method, budget, TrackingOptions(logpath=STATS_LOGFILE))
+        Tracked.run(
+            problem,
+            method,
+            budget,
+            TrackingOptions(logpath=STATS_LOGFILE, report_raw_solutions=True),
+        )
 
     return problem
 

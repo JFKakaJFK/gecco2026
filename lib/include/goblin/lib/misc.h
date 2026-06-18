@@ -3,15 +3,13 @@
 
 #pragma once
 
-#include <format>
 #include <Eigen/Dense>
+#include <format>
 #include <vector>
 
-template<>
+template <>
 struct std::formatter<Eigen::VectorXd, char> {
-    constexpr auto parse(std::format_parse_context& ctx) {
-        return ctx.begin();
-    }
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
     auto format(const Eigen::VectorXd& v, std::format_context& ctx) const {
         auto out = ctx.out();
@@ -26,11 +24,9 @@ struct std::formatter<Eigen::VectorXd, char> {
     }
 };
 
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 struct std::formatter<std::vector<T, Alloc>, char> {
-    constexpr auto parse(std::format_parse_context& ctx) {
-        return ctx.begin();
-    }
+    constexpr auto parse(std::format_parse_context& ctx) { return ctx.begin(); }
 
     auto format(const std::vector<T, Alloc>& v, std::format_context& ctx) const {
         auto out = ctx.out();

@@ -40,6 +40,9 @@ set(
     solution
     solution_extension
     so_gomea
+    mixed_giga
+    mixed_mo_rv
+    mo_rv_gomea
     sr
     sr_stats
     sr_precision
@@ -59,16 +62,16 @@ set(LIB_OPTIMIZED_TESTS
 )
 
 if(GOBLIN_HAS_CUDA)
-    list(APPEND LIB_TEST_SOURCES evaluate)
+  list(APPEND LIB_TEST_SOURCES evaluate)
 endif()
 
 foreach(testcase IN LISTS LIB_TEST_SOURCES)
-    set(_target lib_test_${testcase})
-    add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
-    target_link_libraries(${_target} PRIVATE ${deps})
-    add_test(NAME ${_target} COMMAND ${_target})
+  set(_target lib_test_${testcase})
+  add_executable(${_target} ${testcase}.cpp $<TARGET_OBJECTS:${test_target}>)
+  target_link_libraries(${_target} PRIVATE ${deps})
+  add_test(NAME ${_target} COMMAND ${_target})
 
-    # if(testcase IN_LIST LIB_OPTIMIZED_TESTS)
-    #     target_compile_options(${_target} PRIVATE -O2 -g1)
-    # endif()
+  # if(testcase IN_LIST LIB_OPTIMIZED_TESTS)
+  #     target_compile_options(${_target} PRIVATE -O2 -g1)
+  # endif()
 endforeach()

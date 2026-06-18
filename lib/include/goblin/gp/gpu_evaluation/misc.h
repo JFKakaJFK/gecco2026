@@ -16,6 +16,6 @@ void check(cudaError_t err, char const* func, char const* file, int line);
 #define __CHECK_CUDA_ERR__(err) check((err), #err, __FILE__, __LINE__)
 #endif
 
-}
+}  // namespace goblin
 
 #endif /* _GOBLIN_GA_GP_MISC_H */

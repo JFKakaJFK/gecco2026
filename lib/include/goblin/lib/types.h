@@ -8,8 +8,8 @@
 #include <Eigen/Dense>
 #include <cstdint>
 #include <span>
-#include <vector>
 #include <string>
+#include <vector>
 
 namespace goblin {
 
@@ -55,7 +55,7 @@ using CRefS = const Eigen::Ref<const T, 0, Eigen::InnerStride<>>;
 
 template <typename T>
 constexpr bool isna(const T& v) {
-  return std::isnan(v) || std::isinf(v);
+    return std::isnan(v) || std::isinf(v);
 };
 };  // namespace goblin
 

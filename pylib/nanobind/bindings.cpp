@@ -4,11 +4,11 @@
 #include <nanobind/nanobind.h>
 #include <nanobind/ndarray.h>
 #include <nanobind/stl/array.h>
+#include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/chrono.h>
 #include <nanobind/stl/filesystem.h>
 #include <nanobind/stl/function.h>
 #include <nanobind/stl/map.h>
-#include <nanobind/stl/bind_map.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/shared_ptr.h>
 #include <nanobind/stl/string.h>
@@ -31,16 +31,13 @@ namespace nb = nanobind;
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class QualityBase_trampoline : public QualityBase
-{
-public:
+class QualityBase_trampoline : public QualityBase {
+   public:
     NB_TRAMPOLINE(QualityBase, 1);
 
-    std::unique_ptr<goblin::QualityBase> clone() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clone", // function name (python)
-            clone // function name (c++)
+    std::unique_ptr<goblin::QualityBase> clone() const override {
+        NB_OVERRIDE_PURE_NAME("clone",  // function name (python)
+                              clone     // function name (c++)
         );
     }
 };
@@ -48,56 +45,47 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class FitnessBase_trampoline : public FitnessBase
-{
-public:
+class FitnessBase_trampoline : public FitnessBase {
+   public:
     NB_TRAMPOLINE(FitnessBase, 6);
 
-    usize num_objectives() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_objectives", // function name (python)
-            num_objectives // function name (c++)
+    usize num_objectives() const override {
+        NB_OVERRIDE_PURE_NAME("num_objectives",  // function name (python)
+                              num_objectives     // function name (c++)
         );
     }
-    goblin::Ordering cmp(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "cmp", // function name (python)
-            cmp, // function name (c++)
-            lhs, rhs, objective // params
+    goblin::Ordering cmp(const goblin::QualityBase& lhs,
+                         const goblin::QualityBase& rhs,
+                         std::optional<usize> objective) const override {
+        NB_OVERRIDE_PURE_NAME("cmp",               // function name (python)
+                              cmp,                 // function name (c++)
+                              lhs, rhs, objective  // params
         );
     }
-    CType distance(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "distance", // function name (python)
-            distance, // function name (c++)
-            lhs, rhs, objective // params
+    CType distance(const goblin::QualityBase& lhs,
+                   const goblin::QualityBase& rhs,
+                   std::optional<usize> objective) const override {
+        NB_OVERRIDE_PURE_NAME("distance",          // function name (python)
+                              distance,            // function name (c++)
+                              lhs, rhs, objective  // params
         );
     }
-    void log_header(std::ostream & os) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "log_header", // function name (python)
-            log_header, // function name (c++)
-            os // params
+    void log_header(std::ostream& os) const override {
+        NB_OVERRIDE_PURE_NAME("log_header",  // function name (python)
+                              log_header,    // function name (c++)
+                              os             // params
         );
     }
-    void log(std::ostream & os, const goblin::QualityBase & quality) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "log", // function name (python)
-            log, // function name (c++)
-            os, quality // params
+    void log(std::ostream& os, const goblin::QualityBase& quality) const override {
+        NB_OVERRIDE_PURE_NAME("log",       // function name (python)
+                              log,         // function name (c++)
+                              os, quality  // params
         );
     }
-    std::string format(const goblin::QualityBase & quality) const override
-    {
-        NB_OVERRIDE_NAME(
-            "format", // function name (python)
-            format, // function name (c++)
-            quality // params
+    std::string format(const goblin::QualityBase& quality) const override {
+        NB_OVERRIDE_NAME("format",  // function name (python)
+                         format,    // function name (c++)
+                         quality    // params
         );
     }
 };
@@ -105,63 +93,52 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class ArchiveFitnessBase_trampoline : public ArchiveFitnessBase
-{
-public:
+class ArchiveFitnessBase_trampoline : public ArchiveFitnessBase {
+   public:
     NB_TRAMPOLINE(ArchiveFitnessBase, 7);
 
-    std::unique_ptr<goblin::QualityBase> worst() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "worst", // function name (python)
-            worst // function name (c++)
+    std::unique_ptr<goblin::QualityBase> worst() const override {
+        NB_OVERRIDE_PURE_NAME("worst",  // function name (python)
+                              worst     // function name (c++)
         );
     }
-    usize num_objectives() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_objectives", // function name (python)
-            num_objectives // function name (c++)
+    usize num_objectives() const override {
+        NB_OVERRIDE_PURE_NAME("num_objectives",  // function name (python)
+                              num_objectives     // function name (c++)
         );
     }
-    goblin::Ordering cmp(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "cmp", // function name (python)
-            cmp, // function name (c++)
-            lhs, rhs, objective // params
+    goblin::Ordering cmp(const goblin::QualityBase& lhs,
+                         const goblin::QualityBase& rhs,
+                         std::optional<usize> objective) const override {
+        NB_OVERRIDE_PURE_NAME("cmp",               // function name (python)
+                              cmp,                 // function name (c++)
+                              lhs, rhs, objective  // params
         );
     }
-    CType distance(const goblin::QualityBase & lhs, const goblin::QualityBase & rhs, std::optional<usize> objective) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "distance", // function name (python)
-            distance, // function name (c++)
-            lhs, rhs, objective // params
+    CType distance(const goblin::QualityBase& lhs,
+                   const goblin::QualityBase& rhs,
+                   std::optional<usize> objective) const override {
+        NB_OVERRIDE_PURE_NAME("distance",          // function name (python)
+                              distance,            // function name (c++)
+                              lhs, rhs, objective  // params
         );
     }
-    void log_header(std::ostream & os) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "log_header", // function name (python)
-            log_header, // function name (c++)
-            os // params
+    void log_header(std::ostream& os) const override {
+        NB_OVERRIDE_PURE_NAME("log_header",  // function name (python)
+                              log_header,    // function name (c++)
+                              os             // params
         );
     }
-    void log(std::ostream & os, const goblin::QualityBase & quality) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "log", // function name (python)
-            log, // function name (c++)
-            os, quality // params
+    void log(std::ostream& os, const goblin::QualityBase& quality) const override {
+        NB_OVERRIDE_PURE_NAME("log",       // function name (python)
+                              log,         // function name (c++)
+                              os, quality  // params
         );
     }
-    std::string format(const goblin::QualityBase & quality) const override
-    {
-        NB_OVERRIDE_NAME(
-            "format", // function name (python)
-            format, // function name (c++)
-            quality // params
+    std::string format(const goblin::QualityBase& quality) const override {
+        NB_OVERRIDE_NAME("format",  // function name (python)
+                         format,    // function name (c++)
+                         quality    // params
         );
     }
 };
@@ -169,23 +146,18 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class SolutionExtensionBase_trampoline : public SolutionExtensionBase
-{
-public:
+class SolutionExtensionBase_trampoline : public SolutionExtensionBase {
+   public:
     NB_TRAMPOLINE(SolutionExtensionBase, 2);
 
-    std::unique_ptr<goblin::SolutionExtensionBase> clone() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clone", // function name (python)
-            clone // function name (c++)
+    std::unique_ptr<goblin::SolutionExtensionBase> clone() const override {
+        NB_OVERRIDE_PURE_NAME("clone",  // function name (python)
+                              clone     // function name (c++)
         );
     }
-    goblin::SolutionExtensionKey key() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "key", // function name (python)
-            key // function name (c++)
+    goblin::SolutionExtensionKey key() const override {
+        NB_OVERRIDE_PURE_NAME("key",  // function name (python)
+                              key     // function name (c++)
         );
     }
 };
@@ -193,155 +165,116 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class SolutionBase_trampoline : public SolutionBase
-{
-public:
+class SolutionBase_trampoline : public SolutionBase {
+   public:
     NB_TRAMPOLINE(SolutionBase, 20);
 
-    bool has_extension(const goblin::SolutionExtensionKey & key) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "has_extension", // function name (python)
-            has_extension, // function name (c++)
-            key // params
+    bool has_extension(const goblin::SolutionExtensionKey& key) const override {
+        NB_OVERRIDE_PURE_NAME("has_extension",  // function name (python)
+                              has_extension,    // function name (c++)
+                              key               // params
         );
     }
-    goblin::SolutionExtensionBase & get_or_insert_extension(const goblin::SolutionExtensionBase & extension) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "get_or_insert_extension", // function name (python)
-            get_or_insert_extension, // function name (c++)
-            extension // params
+    goblin::SolutionExtensionBase& get_or_insert_extension(const goblin::SolutionExtensionBase& extension) override {
+        NB_OVERRIDE_PURE_NAME("get_or_insert_extension",  // function name (python)
+                              get_or_insert_extension,    // function name (c++)
+                              extension                   // params
         );
     }
-    std::optional<std::reference_wrapper<const goblin::SolutionExtensionBase>> get_extension(const goblin::SolutionExtensionKey & key) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "get_extension", // function name (python)
-            get_extension, // function name (c++)
-            key // params
+    std::optional<std::reference_wrapper<const goblin::SolutionExtensionBase>> get_extension(
+        const goblin::SolutionExtensionKey& key) const override {
+        NB_OVERRIDE_PURE_NAME("get_extension",  // function name (python)
+                              get_extension,    // function name (c++)
+                              key               // params
         );
     }
-    std::optional<std::reference_wrapper<goblin::SolutionExtensionBase>> get_extension(const goblin::SolutionExtensionKey & key) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "get_extension", // function name (python)
-            get_extension, // function name (c++)
-            key // params
+    std::optional<std::reference_wrapper<goblin::SolutionExtensionBase>> get_extension(
+        const goblin::SolutionExtensionKey& key) override {
+        NB_OVERRIDE_PURE_NAME("get_extension",  // function name (python)
+                              get_extension,    // function name (c++)
+                              key               // params
         );
     }
-    bool remove_extension(const goblin::SolutionExtensionKey & key) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "remove_extension", // function name (python)
-            remove_extension, // function name (c++)
-            key // params
+    bool remove_extension(const goblin::SolutionExtensionKey& key) override {
+        NB_OVERRIDE_PURE_NAME("remove_extension",  // function name (python)
+                              remove_extension,    // function name (c++)
+                              key                  // params
         );
     }
-    void clear_extensions() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clear_extensions", // function name (python)
-            clear_extensions // function name (c++)
+    void clear_extensions() override {
+        NB_OVERRIDE_PURE_NAME("clear_extensions",  // function name (python)
+                              clear_extensions     // function name (c++)
         );
     }
-    usize num_extensions() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_extensions", // function name (python)
-            num_extensions // function name (c++)
+    usize num_extensions() const override {
+        NB_OVERRIDE_PURE_NAME("num_extensions",  // function name (python)
+                              num_extensions     // function name (c++)
         );
     }
-    std::vector<std::reference_wrapper<const goblin::SolutionExtensionBase>> extensions() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "extensions", // function name (python)
-            extensions // function name (c++)
+    std::vector<std::reference_wrapper<const goblin::SolutionExtensionBase>> extensions() const override {
+        NB_OVERRIDE_PURE_NAME("extensions",  // function name (python)
+                              extensions     // function name (c++)
         );
     }
-    std::vector<std::reference_wrapper<goblin::SolutionExtensionBase>> extensions() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "extensions", // function name (python)
-            extensions // function name (c++)
+    std::vector<std::reference_wrapper<goblin::SolutionExtensionBase>> extensions() override {
+        NB_OVERRIDE_PURE_NAME("extensions",  // function name (python)
+                              extensions     // function name (c++)
         );
     }
-    goblin::QualityBase & quality() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "quality", // function name (python)
-            quality // function name (c++)
+    goblin::QualityBase& quality() override {
+        NB_OVERRIDE_PURE_NAME("quality",  // function name (python)
+                              quality     // function name (c++)
         );
     }
-    const goblin::QualityBase & quality() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "quality", // function name (python)
-            quality // function name (c++)
+    const goblin::QualityBase& quality() const override {
+        NB_OVERRIDE_PURE_NAME("quality",  // function name (python)
+                              quality     // function name (c++)
         );
     }
-    void assign_quality(const goblin::QualityBase & quality) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "assign_quality", // function name (python)
-            assign_quality, // function name (c++)
-            quality // params
+    void assign_quality(const goblin::QualityBase& quality) override {
+        NB_OVERRIDE_PURE_NAME("assign_quality",  // function name (python)
+                              assign_quality,    // function name (c++)
+                              quality            // params
         );
     }
-    RefS<Vec<DType>> discrete_values() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_values", // function name (python)
-            discrete_values // function name (c++)
+    RefS<Vec<DType>> discrete_values() override {
+        NB_OVERRIDE_PURE_NAME("discrete_values",  // function name (python)
+                              discrete_values     // function name (c++)
         );
     }
-    CRefS<Vec<DType>> discrete_values() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_values", // function name (python)
-            discrete_values // function name (c++)
+    CRefS<Vec<DType>> discrete_values() const override {
+        NB_OVERRIDE_PURE_NAME("discrete_values",  // function name (python)
+                              discrete_values     // function name (c++)
         );
     }
-    RefS<Array<BType>> discrete_active() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_active", // function name (python)
-            discrete_active // function name (c++)
+    RefS<Array<BType>> discrete_active() override {
+        NB_OVERRIDE_PURE_NAME("discrete_active",  // function name (python)
+                              discrete_active     // function name (c++)
         );
     }
-    CRefS<Array<BType>> discrete_active() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_active", // function name (python)
-            discrete_active // function name (c++)
+    CRefS<Array<BType>> discrete_active() const override {
+        NB_OVERRIDE_PURE_NAME("discrete_active",  // function name (python)
+                              discrete_active     // function name (c++)
         );
     }
-    RefS<Vec<CType>> continuous_values() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_values", // function name (python)
-            continuous_values // function name (c++)
+    RefS<Vec<CType>> continuous_values() override {
+        NB_OVERRIDE_PURE_NAME("continuous_values",  // function name (python)
+                              continuous_values     // function name (c++)
         );
     }
-    CRefS<Vec<CType>> continuous_values() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_values", // function name (python)
-            continuous_values // function name (c++)
+    CRefS<Vec<CType>> continuous_values() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_values",  // function name (python)
+                              continuous_values     // function name (c++)
         );
     }
-    RefS<Array<BType>> continuous_active() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_active", // function name (python)
-            continuous_active // function name (c++)
+    RefS<Array<BType>> continuous_active() override {
+        NB_OVERRIDE_PURE_NAME("continuous_active",  // function name (python)
+                              continuous_active     // function name (c++)
         );
     }
-    CRefS<Array<BType>> continuous_active() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_active", // function name (python)
-            continuous_active // function name (c++)
+    CRefS<Array<BType>> continuous_active() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_active",  // function name (python)
+                              continuous_active     // function name (c++)
         );
     }
 };
@@ -349,78 +282,59 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class SolutionSetBase_trampoline : public SolutionSetBase
-{
-public:
+class SolutionSetBase_trampoline : public SolutionSetBase {
+   public:
     NB_TRAMPOLINE(SolutionSetBase, 9);
 
-    goblin::SolutionBase & operator[](usize idx) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "operator[]", // function name (python)
-            operator[], // function name (c++)
-            idx // params
+    goblin::SolutionBase& operator[](usize idx) override {
+        NB_OVERRIDE_PURE_NAME("operator[]",  // function name (python)
+                              operator[],    // function name (c++)
+                              idx            // params
         );
     }
-    const goblin::SolutionBase & operator[](usize idx) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "operator[]", // function name (python)
-            operator[], // function name (c++)
-            idx // params
+    const goblin::SolutionBase& operator[](usize idx) const override {
+        NB_OVERRIDE_PURE_NAME("operator[]",  // function name (python)
+                              operator[],    // function name (c++)
+                              idx            // params
         );
     }
-    usize size() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "size", // function name (python)
-            size // function name (c++)
+    usize size() const override {
+        NB_OVERRIDE_PURE_NAME("size",  // function name (python)
+                              size     // function name (c++)
         );
     }
-    bool empty() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "empty", // function name (python)
-            empty // function name (c++)
+    bool empty() const override {
+        NB_OVERRIDE_PURE_NAME("empty",  // function name (python)
+                              empty     // function name (c++)
         );
     }
-    void add(const goblin::SolutionBase & s) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "add", // function name (python)
-            add, // function name (c++)
-            s // params
+    void add(const goblin::SolutionBase& s) override {
+        NB_OVERRIDE_PURE_NAME("add",  // function name (python)
+                              add,    // function name (c++)
+                              s       // params
         );
     }
-    void remove_at(usize idx) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "remove_at", // function name (python)
-            remove_at, // function name (c++)
-            idx // params
+    void remove_at(usize idx) override {
+        NB_OVERRIDE_PURE_NAME("remove_at",  // function name (python)
+                              remove_at,    // function name (c++)
+                              idx           // params
         );
     }
-    void remove_indices_sorted(const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "remove_indices_sorted", // function name (python)
-            remove_indices_sorted, // function name (c++)
-            indices // params
+    void remove_indices_sorted(const std::span<const usize>& indices) override {
+        NB_OVERRIDE_PURE_NAME("remove_indices_sorted",  // function name (python)
+                              remove_indices_sorted,    // function name (c++)
+                              indices                   // params
         );
     }
-    void reserve(usize new_capacity) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "reserve", // function name (python)
-            reserve, // function name (c++)
-            new_capacity // params
+    void reserve(usize new_capacity) override {
+        NB_OVERRIDE_PURE_NAME("reserve",    // function name (python)
+                              reserve,      // function name (c++)
+                              new_capacity  // params
         );
     }
-    void clear() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clear", // function name (python)
-            clear // function name (c++)
+    void clear() override {
+        NB_OVERRIDE_PURE_NAME("clear",  // function name (python)
+                              clear     // function name (c++)
         );
     }
 };
@@ -428,76 +342,57 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class ArchiveBase_trampoline : public ArchiveBase
-{
-public:
+class ArchiveBase_trampoline : public ArchiveBase {
+   public:
     NB_TRAMPOLINE(ArchiveBase, 9);
 
-    usize size() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "size", // function name (python)
-            size // function name (c++)
+    usize size() const override {
+        NB_OVERRIDE_PURE_NAME("size",  // function name (python)
+                              size     // function name (c++)
         );
     }
-    const goblin::SolutionBase & operator[](usize idx) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "operator[]", // function name (python)
-            operator[], // function name (c++)
-            idx // params
+    const goblin::SolutionBase& operator[](usize idx) const override {
+        NB_OVERRIDE_PURE_NAME("operator[]",  // function name (python)
+                              operator[],    // function name (c++)
+                              idx            // params
         );
     }
-    goblin::SolutionBase & unsafe_at(usize idx) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "unsafe_at", // function name (python)
-            unsafe_at, // function name (c++)
-            idx // params
+    goblin::SolutionBase& unsafe_at(usize idx) override {
+        NB_OVERRIDE_PURE_NAME("unsafe_at",  // function name (python)
+                              unsafe_at,    // function name (c++)
+                              idx           // params
         );
     }
-    const goblin::SolutionBase & so_solution(usize objective) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "so_solution", // function name (python)
-            so_solution, // function name (c++)
-            objective // params
+    const goblin::SolutionBase& so_solution(usize objective) const override {
+        NB_OVERRIDE_PURE_NAME("so_solution",  // function name (python)
+                              so_solution,    // function name (c++)
+                              objective       // params
         );
     }
-    void adapt() override
-    {
-        NB_OVERRIDE_NAME(
-            "adapt", // function name (python)
-            adapt // function name (c++)
+    void adapt() override {
+        NB_OVERRIDE_NAME("adapt",  // function name (python)
+                         adapt     // function name (c++)
         );
     }
-    void clear() override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clear", // function name (python)
-            clear // function name (c++)
+    void clear() override {
+        NB_OVERRIDE_PURE_NAME("clear",  // function name (python)
+                              clear     // function name (c++)
         );
     }
-    const goblin::ArchiveFitnessBase & fitness() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "fitness", // function name (python)
-            fitness // function name (c++)
+    const goblin::ArchiveFitnessBase& fitness() const override {
+        NB_OVERRIDE_PURE_NAME("fitness",  // function name (python)
+                              fitness     // function name (c++)
         );
     }
-    std::unique_ptr<goblin::ArchiveBase> clone() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clone", // function name (python)
-            clone // function name (c++)
+    std::unique_ptr<goblin::ArchiveBase> clone() const override {
+        NB_OVERRIDE_PURE_NAME("clone",  // function name (python)
+                              clone     // function name (c++)
         );
     }
-    std::tuple<bool, bool> update_archive(const goblin::SolutionBase & solution, bool strict) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "update_archive", // function name (python)
-            update_archive, // function name (c++)
-            solution, strict // params
+    std::tuple<bool, bool> update_archive(const goblin::SolutionBase& solution, bool strict) override {
+        NB_OVERRIDE_PURE_NAME("update_archive",  // function name (python)
+                              update_archive,    // function name (c++)
+                              solution, strict   // params
         );
     }
 };
@@ -505,169 +400,135 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class InstanceBase_trampoline : public InstanceBase
-{
-public:
-    NB_TRAMPOLINE(InstanceBase, 21);
+class InstanceBase_trampoline : public InstanceBase {
+   public:
+    NB_TRAMPOLINE(InstanceBase, 20);
 
-    CRef<Vec<DType>> discrete_domain_sizes() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_domain_sizes", // function name (python)
-            discrete_domain_sizes // function name (c++)
+    CRef<Vec<DType>> discrete_domain_sizes() const override {
+        NB_OVERRIDE_PURE_NAME("discrete_domain_sizes",  // function name (python)
+                              discrete_domain_sizes     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_lower_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_lower_bounds", // function name (python)
-            continuous_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_lower_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_lower_bounds",  // function name (python)
+                              continuous_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_upper_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_upper_bounds", // function name (python)
-            continuous_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_upper_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_upper_bounds",  // function name (python)
+                              continuous_upper_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_lower_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_init_lower_bounds", // function name (python)
-            continuous_init_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_init_lower_bounds",  // function name (python)
+                              continuous_init_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_upper_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_init_upper_bounds", // function name (python)
-            continuous_init_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_init_upper_bounds",  // function name (python)
+                              continuous_init_upper_bounds     // function name (c++)
         );
     }
-    void evaluate(Rng & rng, goblin::SolutionSetBase & solutions, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            rng, solutions, indices // params
+    void evaluate(Rng& rng, goblin::SolutionSetBase& solutions, const std::span<const usize>& indices) override {
+        NB_OVERRIDE_PURE_NAME("evaluate",              // function name (python)
+                              evaluate,                // function name (c++)
+                              rng, solutions, indices  // params
         );
     }
-    void evaluate_partial(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            rng, solutions, parents, subsets, indices // params
+    void evaluate_partial(Rng& rng,
+                          goblin::SolutionSetBase& solutions,
+                          goblin::SolutionSetBase& parents,
+                          const std::vector<const goblin::Subset*>& subsets,
+                          const std::span<const usize>& indices) override {
+        NB_OVERRIDE_NAME("evaluate_partial",                        // function name (python)
+                         evaluate_partial,                          // function name (c++)
+                         rng, solutions, parents, subsets, indices  // params
         );
     }
-    bool adapt(Rng & rng) override
-    {
-        NB_OVERRIDE_NAME(
-            "adapt", // function name (python)
-            adapt, // function name (c++)
-            rng // params
+    bool adapt(Rng& rng) override {
+        NB_OVERRIDE_NAME("adapt",  // function name (python)
+                         adapt,    // function name (c++)
+                         rng       // params
         );
     }
-    Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradients", // function name (python)
-            gradients, // function name (c++)
-            rng, solutions, parents, subsets, indices, evaluations // params
+    Mat<CType> gradients(Rng& rng,
+                         goblin::SolutionSetBase& solutions,
+                         goblin::SolutionSetBase& parents,
+                         const std::vector<const goblin::Subset*>& subsets,
+                         const std::span<const usize>& indices,
+                         u64& evaluations) override {
+        NB_OVERRIDE_NAME("gradients",                                            // function name (python)
+                         gradients,                                              // function name (c++)
+                         rng, solutions, parents, subsets, indices, evaluations  // params
         );
     }
-    std::tuple<std::vector<usize>, u64> gradient_steps(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::span<const usize> & indices, usize num_steps) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradient_steps", // function name (python)
-            gradient_steps, // function name (c++)
-            rng, solutions, parents, indices, num_steps // params
+    std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                       goblin::SolutionSetBase& solutions,
+                                                       goblin::SolutionSetBase& parents,
+                                                       const std::span<const usize>& indices,
+                                                       usize num_steps) override {
+        NB_OVERRIDE_NAME("gradient_steps",                            // function name (python)
+                         gradient_steps,                              // function name (c++)
+                         rng, solutions, parents, indices, num_steps  // params
         );
     }
-    void add_random(Rng & rng, goblin::SolutionSetBase & solutions, usize count) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "add_random", // function name (python)
-            add_random, // function name (c++)
-            rng, solutions, count // params
+    void add_random(Rng& rng, goblin::SolutionSetBase& solutions, usize count) const override {
+        NB_OVERRIDE_PURE_NAME("add_random",          // function name (python)
+                              add_random,            // function name (c++)
+                              rng, solutions, count  // params
         );
     }
-    const goblin::FitnessBase & fitness() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "fitness", // function name (python)
-            fitness // function name (c++)
+    const goblin::FitnessBase& fitness() const override {
+        NB_OVERRIDE_PURE_NAME("fitness",  // function name (python)
+                              fitness     // function name (c++)
         );
     }
-    const goblin::ArchiveFitnessBase & archive_fitness() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "archive_fitness", // function name (python)
-            archive_fitness // function name (c++)
+    const goblin::ArchiveFitnessBase& archive_fitness() const override {
+        NB_OVERRIDE_PURE_NAME("archive_fitness",  // function name (python)
+                              archive_fitness     // function name (c++)
         );
     }
-    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase & offspring, const goblin::SolutionBase & donor, const goblin::Subset & subset) const override
-    {
-        NB_OVERRIDE_NAME(
-            "inherit_discrete", // function name (python)
-            inherit_discrete, // function name (c++)
-            offspring, donor, subset // params
+    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase& offspring,
+                                            const goblin::SolutionBase& donor,
+                                            const goblin::Subset& subset) const override {
+        NB_OVERRIDE_NAME("inherit_discrete",       // function name (python)
+                         inherit_discrete,         // function name (c++)
+                         offspring, donor, subset  // params
         );
     }
-    std::optional<CType> as_continuous(const goblin::SolutionBase & solution, usize discrete_index) const override
-    {
-        NB_OVERRIDE_NAME(
-            "as_continuous", // function name (python)
-            as_continuous, // function name (c++)
-            solution, discrete_index // params
+    std::optional<CType> as_continuous(const goblin::SolutionBase& solution, usize discrete_index) const override {
+        NB_OVERRIDE_NAME("as_continuous",          // function name (python)
+                         as_continuous,            // function name (c++)
+                         solution, discrete_index  // params
         );
     }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
+    void log_header(std::ostream& os) const override {
+        NB_OVERRIDE_NAME("log_header",  // function name (python)
+                         log_header,    // function name (c++)
+                         os             // params
         );
     }
-    void log_header(std::ostream & os) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_header", // function name (python)
-            log_header, // function name (c++)
-            os // params
+    void log_solution(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log_solution",  // function name (python)
+                         log_solution,    // function name (c++)
+                         os, solution     // params
         );
     }
-    void log_solution(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_solution", // function name (python)
-            log_solution, // function name (c++)
-            os, solution // params
+    void log(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log",        // function name (python)
+                         log,          // function name (c++)
+                         os, solution  // params
         );
     }
-    void log(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log", // function name (python)
-            log, // function name (c++)
-            os, solution // params
+    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("solution_cache_key",  // function name (python)
+                         solution_cache_key,    // function name (c++)
+                         solution               // params
         );
     }
-    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "solution_cache_key", // function name (python)
-            solution_cache_key, // function name (c++)
-            solution // params
-        );
-    }
-    const goblin::InstanceBase & unwrap() const override
-    {
-        NB_OVERRIDE_NAME(
-            "unwrap", // function name (python)
-            unwrap // function name (c++)
+    const goblin::InstanceBase& unwrap() const override {
+        NB_OVERRIDE_NAME("unwrap",  // function name (python)
+                         unwrap     // function name (c++)
         );
     }
 };
@@ -675,232 +536,180 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class CachedInstanceBase_trampoline : public CachedInstanceBase
-{
-public:
-    NB_TRAMPOLINE(CachedInstanceBase, 30);
+class CachedInstanceBase_trampoline : public CachedInstanceBase {
+   public:
+    NB_TRAMPOLINE(CachedInstanceBase, 29);
 
-    usize hit_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "hit_count", // function name (python)
-            hit_count // function name (c++)
+    usize hit_count() const override {
+        NB_OVERRIDE_PURE_NAME("hit_count",  // function name (python)
+                              hit_count     // function name (c++)
         );
     }
-    usize miss_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "miss_count", // function name (python)
-            miss_count // function name (c++)
+    usize miss_count() const override {
+        NB_OVERRIDE_PURE_NAME("miss_count",  // function name (python)
+                              miss_count     // function name (c++)
         );
     }
-    usize access_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "access_count", // function name (python)
-            access_count // function name (c++)
+    usize access_count() const override {
+        NB_OVERRIDE_PURE_NAME("access_count",  // function name (python)
+                              access_count     // function name (c++)
         );
     }
-    usize entry_invalidation_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "entry_invalidation_count", // function name (python)
-            entry_invalidation_count // function name (c++)
+    usize entry_invalidation_count() const override {
+        NB_OVERRIDE_PURE_NAME("entry_invalidation_count",  // function name (python)
+                              entry_invalidation_count     // function name (c++)
         );
     }
-    usize cache_invalidation_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "cache_invalidation_count", // function name (python)
-            cache_invalidation_count // function name (c++)
+    usize cache_invalidation_count() const override {
+        NB_OVERRIDE_PURE_NAME("cache_invalidation_count",  // function name (python)
+                              cache_invalidation_count     // function name (c++)
         );
     }
-    usize evicted_count() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "evicted_count", // function name (python)
-            evicted_count // function name (c++)
+    usize evicted_count() const override {
+        NB_OVERRIDE_PURE_NAME("evicted_count",  // function name (python)
+                              evicted_count     // function name (c++)
         );
     }
-    CType hit_ratio() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "hit_ratio", // function name (python)
-            hit_ratio // function name (c++)
+    CType hit_ratio() const override {
+        NB_OVERRIDE_PURE_NAME("hit_ratio",  // function name (python)
+                              hit_ratio     // function name (c++)
         );
     }
-    CType miss_ratio() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "miss_ratio", // function name (python)
-            miss_ratio // function name (c++)
+    CType miss_ratio() const override {
+        NB_OVERRIDE_PURE_NAME("miss_ratio",  // function name (python)
+                              miss_ratio     // function name (c++)
         );
     }
-    CType utilization() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "utilization", // function name (python)
-            utilization // function name (c++)
+    CType utilization() const override {
+        NB_OVERRIDE_PURE_NAME("utilization",  // function name (python)
+                              utilization     // function name (c++)
         );
     }
-    CRef<Vec<DType>> discrete_domain_sizes() const override
-    {
-        NB_OVERRIDE_NAME(
-            "discrete_domain_sizes", // function name (python)
-            discrete_domain_sizes // function name (c++)
+    CRef<Vec<DType>> discrete_domain_sizes() const override {
+        NB_OVERRIDE_NAME("discrete_domain_sizes",  // function name (python)
+                         discrete_domain_sizes     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_lower_bounds() const override
-    {
-        NB_OVERRIDE_NAME(
-            "continuous_lower_bounds", // function name (python)
-            continuous_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_lower_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_lower_bounds",  // function name (python)
+                         continuous_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_upper_bounds() const override
-    {
-        NB_OVERRIDE_NAME(
-            "continuous_upper_bounds", // function name (python)
-            continuous_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_upper_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_upper_bounds",  // function name (python)
+                         continuous_upper_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_lower_bounds() const override
-    {
-        NB_OVERRIDE_NAME(
-            "continuous_init_lower_bounds", // function name (python)
-            continuous_init_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_init_lower_bounds",  // function name (python)
+                         continuous_init_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_upper_bounds() const override
-    {
-        NB_OVERRIDE_NAME(
-            "continuous_init_upper_bounds", // function name (python)
-            continuous_init_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_init_upper_bounds",  // function name (python)
+                         continuous_init_upper_bounds     // function name (c++)
         );
     }
-    void evaluate(Rng & rng, goblin::SolutionSetBase & solutions, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            rng, solutions, indices // params
+    void evaluate(Rng& rng, goblin::SolutionSetBase& solutions, const std::span<const usize>& indices) override {
+        NB_OVERRIDE_NAME("evaluate",              // function name (python)
+                         evaluate,                // function name (c++)
+                         rng, solutions, indices  // params
         );
     }
-    void evaluate_partial(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            rng, solutions, parents, subsets, indices // params
+    void evaluate_partial(Rng& rng,
+                          goblin::SolutionSetBase& solutions,
+                          goblin::SolutionSetBase& parents,
+                          const std::vector<const goblin::Subset*>& subsets,
+                          const std::span<const usize>& indices) override {
+        NB_OVERRIDE_NAME("evaluate_partial",                        // function name (python)
+                         evaluate_partial,                          // function name (c++)
+                         rng, solutions, parents, subsets, indices  // params
         );
     }
-    bool adapt(Rng & rng) override
-    {
-        NB_OVERRIDE_NAME(
-            "adapt", // function name (python)
-            adapt, // function name (c++)
-            rng // params
+    bool adapt(Rng& rng) override {
+        NB_OVERRIDE_NAME("adapt",  // function name (python)
+                         adapt,    // function name (c++)
+                         rng       // params
         );
     }
-    Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradients", // function name (python)
-            gradients, // function name (c++)
-            rng, solutions, parents, subsets, indices, evaluations // params
+    Mat<CType> gradients(Rng& rng,
+                         goblin::SolutionSetBase& solutions,
+                         goblin::SolutionSetBase& parents,
+                         const std::vector<const goblin::Subset*>& subsets,
+                         const std::span<const usize>& indices,
+                         u64& evaluations) override {
+        NB_OVERRIDE_NAME("gradients",                                            // function name (python)
+                         gradients,                                              // function name (c++)
+                         rng, solutions, parents, subsets, indices, evaluations  // params
         );
     }
-    std::tuple<std::vector<usize>, u64> gradient_steps(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::span<const usize> & indices, usize num_steps) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradient_steps", // function name (python)
-            gradient_steps, // function name (c++)
-            rng, solutions, parents, indices, num_steps // params
+    std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                       goblin::SolutionSetBase& solutions,
+                                                       goblin::SolutionSetBase& parents,
+                                                       const std::span<const usize>& indices,
+                                                       usize num_steps) override {
+        NB_OVERRIDE_NAME("gradient_steps",                            // function name (python)
+                         gradient_steps,                              // function name (c++)
+                         rng, solutions, parents, indices, num_steps  // params
         );
     }
-    void add_random(Rng & rng, goblin::SolutionSetBase & solutions, usize count) const override
-    {
-        NB_OVERRIDE_NAME(
-            "add_random", // function name (python)
-            add_random, // function name (c++)
-            rng, solutions, count // params
+    void add_random(Rng& rng, goblin::SolutionSetBase& solutions, usize count) const override {
+        NB_OVERRIDE_NAME("add_random",          // function name (python)
+                         add_random,            // function name (c++)
+                         rng, solutions, count  // params
         );
     }
-    const goblin::FitnessBase & fitness() const override
-    {
-        NB_OVERRIDE_NAME(
-            "fitness", // function name (python)
-            fitness // function name (c++)
+    const goblin::FitnessBase& fitness() const override {
+        NB_OVERRIDE_NAME("fitness",  // function name (python)
+                         fitness     // function name (c++)
         );
     }
-    const goblin::ArchiveFitnessBase & archive_fitness() const override
-    {
-        NB_OVERRIDE_NAME(
-            "archive_fitness", // function name (python)
-            archive_fitness // function name (c++)
+    const goblin::ArchiveFitnessBase& archive_fitness() const override {
+        NB_OVERRIDE_NAME("archive_fitness",  // function name (python)
+                         archive_fitness     // function name (c++)
         );
     }
-    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase & offspring, const goblin::SolutionBase & donor, const goblin::Subset & subset) const override
-    {
-        NB_OVERRIDE_NAME(
-            "inherit_discrete", // function name (python)
-            inherit_discrete, // function name (c++)
-            offspring, donor, subset // params
+    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase& offspring,
+                                            const goblin::SolutionBase& donor,
+                                            const goblin::Subset& subset) const override {
+        NB_OVERRIDE_NAME("inherit_discrete",       // function name (python)
+                         inherit_discrete,         // function name (c++)
+                         offspring, donor, subset  // params
         );
     }
-    std::optional<CType> as_continuous(const goblin::SolutionBase & solution, usize discrete_index) const override
-    {
-        NB_OVERRIDE_NAME(
-            "as_continuous", // function name (python)
-            as_continuous, // function name (c++)
-            solution, discrete_index // params
+    std::optional<CType> as_continuous(const goblin::SolutionBase& solution, usize discrete_index) const override {
+        NB_OVERRIDE_NAME("as_continuous",          // function name (python)
+                         as_continuous,            // function name (c++)
+                         solution, discrete_index  // params
         );
     }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
+    void log_header(std::ostream& os) const override {
+        NB_OVERRIDE_NAME("log_header",  // function name (python)
+                         log_header,    // function name (c++)
+                         os             // params
         );
     }
-    void log_header(std::ostream & os) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_header", // function name (python)
-            log_header, // function name (c++)
-            os // params
+    void log_solution(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log_solution",  // function name (python)
+                         log_solution,    // function name (c++)
+                         os, solution     // params
         );
     }
-    void log_solution(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_solution", // function name (python)
-            log_solution, // function name (c++)
-            os, solution // params
+    void log(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log",        // function name (python)
+                         log,          // function name (c++)
+                         os, solution  // params
         );
     }
-    void log(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log", // function name (python)
-            log, // function name (c++)
-            os, solution // params
+    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("solution_cache_key",  // function name (python)
+                         solution_cache_key,    // function name (c++)
+                         solution               // params
         );
     }
-    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "solution_cache_key", // function name (python)
-            solution_cache_key, // function name (c++)
-            solution // params
-        );
-    }
-    const goblin::InstanceBase & unwrap() const override
-    {
-        NB_OVERRIDE_NAME(
-            "unwrap", // function name (python)
-            unwrap // function name (c++)
+    const goblin::InstanceBase& unwrap() const override {
+        NB_OVERRIDE_NAME("unwrap",  // function name (python)
+                         unwrap     // function name (c++)
         );
     }
 };
@@ -908,39 +717,37 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class LinkageModelBase_trampoline : public LinkageModelBase
-{
-public:
+class LinkageModelBase_trampoline : public LinkageModelBase {
+   public:
     NB_TRAMPOLINE(LinkageModelBase, 4);
 
-    void init(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & solutions, goblin::VariableSet variables) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "init", // function name (python)
-            init, // function name (c++)
-            rng, problem, solutions, variables // params
+    void init(Rng& rng,
+              goblin::InstanceBase& problem,
+              goblin::SolutionSetBase& solutions,
+              goblin::VariableSet variables) override {
+        NB_OVERRIDE_PURE_NAME("init",                             // function name (python)
+                              init,                               // function name (c++)
+                              rng, problem, solutions, variables  // params
         );
     }
-    FOS subsets(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & solutions, const std::span<const usize> indices, std::optional<std::reference_wrapper<const Mat<CType>>> covariance) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "subsets", // function name (python)
-            subsets, // function name (c++)
-            rng, problem, solutions, indices, covariance // params
+    FOS subsets(Rng& rng,
+                goblin::InstanceBase& problem,
+                goblin::SolutionSetBase& solutions,
+                const std::span<const usize> indices,
+                std::optional<std::reference_wrapper<const Mat<CType>>> covariance) const override {
+        NB_OVERRIDE_PURE_NAME("subsets",                                    // function name (python)
+                              subsets,                                      // function name (c++)
+                              rng, problem, solutions, indices, covariance  // params
         );
     }
-    bool is_static() const override
-    {
-        NB_OVERRIDE_NAME(
-            "is_static", // function name (python)
-            is_static // function name (c++)
+    bool is_static() const override {
+        NB_OVERRIDE_NAME("is_static",  // function name (python)
+                         is_static     // function name (c++)
         );
     }
-    std::unique_ptr<goblin::LinkageModelBase> clone() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "clone", // function name (python)
-            clone // function name (c++)
+    std::unique_ptr<goblin::LinkageModelBase> clone() const override {
+        NB_OVERRIDE_PURE_NAME("clone",  // function name (python)
+                              clone     // function name (c++)
         );
     }
 };
@@ -948,31 +755,28 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class MethodBase_trampoline : public MethodBase
-{
-public:
+class MethodBase_trampoline : public MethodBase {
+   public:
     NB_TRAMPOLINE(MethodBase, 3);
 
-    std::tuple<std::shared_ptr<goblin::ArchiveBase>, goblin::TerminationStatus> run(goblin::InstanceBase & problem, const goblin::Budget & budget, std::optional<u64> seed, std::optional<usize> population_size) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "run", // function name (python)
-            run, // function name (c++)
-            problem, budget, seed, population_size // params
+    std::tuple<std::shared_ptr<goblin::ArchiveBase>, goblin::TerminationStatus> run(
+        goblin::InstanceBase& problem,
+        const goblin::Budget& budget,
+        std::optional<u64> seed,
+        std::optional<usize> population_size) override {
+        NB_OVERRIDE_PURE_NAME("run",                                  // function name (python)
+                              run,                                    // function name (c++)
+                              problem, budget, seed, population_size  // params
         );
     }
-    std::optional<u64> current_generation() const override
-    {
-        NB_OVERRIDE_NAME(
-            "current_generation", // function name (python)
-            current_generation // function name (c++)
+    std::optional<u64> current_generation() const override {
+        NB_OVERRIDE_NAME("current_generation",  // function name (python)
+                         current_generation     // function name (c++)
         );
     }
-    std::optional<std::tuple<usize, u64>> current_population() const override
-    {
-        NB_OVERRIDE_NAME(
-            "current_population", // function name (python)
-            current_population // function name (c++)
+    std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+        NB_OVERRIDE_NAME("current_population",  // function name (python)
+                         current_population     // function name (c++)
         );
     }
 };
@@ -980,17 +784,16 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class InitBase_trampoline : public InitBase
-{
-public:
+class InitBase_trampoline : public InitBase {
+   public:
     NB_TRAMPOLINE(InitBase, 1);
 
-    std::tuple<Mat<DType>, Mat<CType>> sample(Rng & rng, const goblin::InstanceBase & problem, usize count) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "sample", // function name (python)
-            sample, // function name (c++)
-            rng, problem, count // params
+    std::tuple<Mat<DType>, Mat<CType>> sample(Rng& rng,
+                                              const goblin::InstanceBase& problem,
+                                              usize count) const override {
+        NB_OVERRIDE_PURE_NAME("sample",            // function name (python)
+                              sample,              // function name (c++)
+                              rng, problem, count  // params
         );
     }
 };
@@ -998,17 +801,14 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class DiscreteInitBase_trampoline : public DiscreteInitBase
-{
-public:
+class DiscreteInitBase_trampoline : public DiscreteInitBase {
+   public:
     NB_TRAMPOLINE(DiscreteInitBase, 1);
 
-    Mat<DType> sample(Rng & rng, const goblin::InstanceBase & problem, usize count) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "sample", // function name (python)
-            sample, // function name (c++)
-            rng, problem, count // params
+    Mat<DType> sample(Rng& rng, const goblin::InstanceBase& problem, usize count) const override {
+        NB_OVERRIDE_PURE_NAME("sample",            // function name (python)
+                              sample,              // function name (c++)
+                              rng, problem, count  // params
         );
     }
 };
@@ -1016,17 +816,14 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class ContinuousInitBase_trampoline : public ContinuousInitBase
-{
-public:
+class ContinuousInitBase_trampoline : public ContinuousInitBase {
+   public:
     NB_TRAMPOLINE(ContinuousInitBase, 1);
 
-    Mat<CType> sample(Rng & rng, const goblin::InstanceBase & problem, usize count) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "sample", // function name (python)
-            sample, // function name (c++)
-            rng, problem, count // params
+    Mat<CType> sample(Rng& rng, const goblin::InstanceBase& problem, usize count) const override {
+        NB_OVERRIDE_PURE_NAME("sample",            // function name (python)
+                              sample,              // function name (c++)
+                              rng, problem, count  // params
         );
     }
 };
@@ -1034,76 +831,60 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class OperatorBase_trampoline : public OperatorBase
-{
-public:
+class OperatorBase_trampoline : public OperatorBase {
+   public:
     NB_TRAMPOLINE(OperatorBase, 9);
 
-    usize min_arity() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "min_arity", // function name (python)
-            min_arity // function name (c++)
+    usize min_arity() const override {
+        NB_OVERRIDE_PURE_NAME("min_arity",  // function name (python)
+                              min_arity     // function name (c++)
         );
     }
-    usize max_arity() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "max_arity", // function name (python)
-            max_arity // function name (c++)
+    usize max_arity() const override {
+        NB_OVERRIDE_PURE_NAME("max_arity",  // function name (python)
+                              max_arity     // function name (c++)
         );
     }
-    bool is_commutative() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "is_commutative", // function name (python)
-            is_commutative // function name (c++)
+    bool is_commutative() const override {
+        NB_OVERRIDE_PURE_NAME("is_commutative",  // function name (python)
+                              is_commutative     // function name (c++)
         );
     }
-    void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "apply", // function name (python)
-            apply, // function name (c++)
-            out, args // params
+    void apply(Ref<Array<CType>> out, CRef<Arr2D<CType>> args) const override {
+        NB_OVERRIDE_PURE_NAME("apply",   // function name (python)
+                              apply,     // function name (c++)
+                              out, args  // params
         );
     }
-    void apply_buf(Arr2D<CType> & buf, usize out, const std::span<const usize> & args) const override
-    {
-        NB_OVERRIDE_NAME(
-            "apply_buf", // function name (python)
-            apply_buf, // function name (c++)
-            buf, out, args // params
+    void apply_buf(Arr2D<CType>& buf, usize out, const std::span<const usize>& args) const override {
+        NB_OVERRIDE_NAME("apply_buf",    // function name (python)
+                         apply_buf,      // function name (c++)
+                         buf, out, args  // params
         );
     }
-    bool has_gradient() const override
-    {
-        NB_OVERRIDE_NAME(
-            "has_gradient", // function name (python)
-            has_gradient // function name (c++)
+    bool has_gradient() const override {
+        NB_OVERRIDE_NAME("has_gradient",  // function name (python)
+                         has_gradient     // function name (c++)
         );
     }
-    void apply_grad(Ref<Array<CType>> out, Ref<Array<CType>> d_out, CRef<Arr2D<CType>> args, CRef<Arr2D<CType>> d_args) const override
-    {
-        NB_OVERRIDE_NAME(
-            "apply_grad", // function name (python)
-            apply_grad, // function name (c++)
-            out, d_out, args, d_args // params
+    void apply_grad(Ref<Array<CType>> out,
+                    Ref<Array<CType>> d_out,
+                    CRef<Arr2D<CType>> args,
+                    CRef<Arr2D<CType>> d_args) const override {
+        NB_OVERRIDE_NAME("apply_grad",             // function name (python)
+                         apply_grad,               // function name (c++)
+                         out, d_out, args, d_args  // params
         );
     }
-    std::optional<uint8_t> gpu_operator_id() const override
-    {
-        NB_OVERRIDE_NAME(
-            "gpu_operator_id", // function name (python)
-            gpu_operator_id // function name (c++)
+    std::optional<uint8_t> gpu_operator_id() const override {
+        NB_OVERRIDE_NAME("gpu_operator_id",  // function name (python)
+                         gpu_operator_id     // function name (c++)
         );
     }
-    std::string format(const std::span<const std::string> & args) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "format", // function name (python)
-            format, // function name (c++)
-            args // params
+    std::string format(const std::span<const std::string>& args) const override {
+        NB_OVERRIDE_PURE_NAME("format",  // function name (python)
+                              format,    // function name (c++)
+                              args       // params
         );
     }
 };
@@ -1111,176 +892,140 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class GPInstanceBase_trampoline : public GPInstanceBase
-{
-public:
-    NB_TRAMPOLINE(GPInstanceBase, 22);
+class GPInstanceBase_trampoline : public GPInstanceBase {
+   public:
+    NB_TRAMPOLINE(GPInstanceBase, 21);
 
-    const goblin::GPContext & context() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "context", // function name (python)
-            context // function name (c++)
+    const goblin::GPContext& context() const override {
+        NB_OVERRIDE_PURE_NAME("context",  // function name (python)
+                              context     // function name (c++)
         );
     }
-    CRef<Vec<DType>> discrete_domain_sizes() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "discrete_domain_sizes", // function name (python)
-            discrete_domain_sizes // function name (c++)
+    CRef<Vec<DType>> discrete_domain_sizes() const override {
+        NB_OVERRIDE_PURE_NAME("discrete_domain_sizes",  // function name (python)
+                              discrete_domain_sizes     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_lower_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_lower_bounds", // function name (python)
-            continuous_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_lower_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_lower_bounds",  // function name (python)
+                              continuous_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_upper_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_upper_bounds", // function name (python)
-            continuous_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_upper_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_upper_bounds",  // function name (python)
+                              continuous_upper_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_lower_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_init_lower_bounds", // function name (python)
-            continuous_init_lower_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_lower_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_init_lower_bounds",  // function name (python)
+                              continuous_init_lower_bounds     // function name (c++)
         );
     }
-    CRef<Vec<CType>> continuous_init_upper_bounds() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "continuous_init_upper_bounds", // function name (python)
-            continuous_init_upper_bounds // function name (c++)
+    CRef<Vec<CType>> continuous_init_upper_bounds() const override {
+        NB_OVERRIDE_PURE_NAME("continuous_init_upper_bounds",  // function name (python)
+                              continuous_init_upper_bounds     // function name (c++)
         );
     }
-    void evaluate(Rng & rng, goblin::SolutionSetBase & solutions, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            rng, solutions, indices // params
+    void evaluate(Rng& rng, goblin::SolutionSetBase& solutions, const std::span<const usize>& indices) override {
+        NB_OVERRIDE_PURE_NAME("evaluate",              // function name (python)
+                              evaluate,                // function name (c++)
+                              rng, solutions, indices  // params
         );
     }
-    void evaluate_partial(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            rng, solutions, parents, subsets, indices // params
+    void evaluate_partial(Rng& rng,
+                          goblin::SolutionSetBase& solutions,
+                          goblin::SolutionSetBase& parents,
+                          const std::vector<const goblin::Subset*>& subsets,
+                          const std::span<const usize>& indices) override {
+        NB_OVERRIDE_NAME("evaluate_partial",                        // function name (python)
+                         evaluate_partial,                          // function name (c++)
+                         rng, solutions, parents, subsets, indices  // params
         );
     }
-    bool adapt(Rng & rng) override
-    {
-        NB_OVERRIDE_NAME(
-            "adapt", // function name (python)
-            adapt, // function name (c++)
-            rng // params
+    bool adapt(Rng& rng) override {
+        NB_OVERRIDE_NAME("adapt",  // function name (python)
+                         adapt,    // function name (c++)
+                         rng       // params
         );
     }
-    Mat<CType> gradients(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::vector<const goblin::Subset*> & subsets, const std::span<const usize> & indices, u64 & evaluations) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradients", // function name (python)
-            gradients, // function name (c++)
-            rng, solutions, parents, subsets, indices, evaluations // params
+    Mat<CType> gradients(Rng& rng,
+                         goblin::SolutionSetBase& solutions,
+                         goblin::SolutionSetBase& parents,
+                         const std::vector<const goblin::Subset*>& subsets,
+                         const std::span<const usize>& indices,
+                         u64& evaluations) override {
+        NB_OVERRIDE_NAME("gradients",                                            // function name (python)
+                         gradients,                                              // function name (c++)
+                         rng, solutions, parents, subsets, indices, evaluations  // params
         );
     }
-    std::tuple<std::vector<usize>, u64> gradient_steps(Rng & rng, goblin::SolutionSetBase & solutions, goblin::SolutionSetBase & parents, const std::span<const usize> & indices, usize num_steps) override
-    {
-        NB_OVERRIDE_NAME(
-            "gradient_steps", // function name (python)
-            gradient_steps, // function name (c++)
-            rng, solutions, parents, indices, num_steps // params
+    std::tuple<std::vector<usize>, u64> gradient_steps(Rng& rng,
+                                                       goblin::SolutionSetBase& solutions,
+                                                       goblin::SolutionSetBase& parents,
+                                                       const std::span<const usize>& indices,
+                                                       usize num_steps) override {
+        NB_OVERRIDE_NAME("gradient_steps",                            // function name (python)
+                         gradient_steps,                              // function name (c++)
+                         rng, solutions, parents, indices, num_steps  // params
         );
     }
-    void add_random(Rng & rng, goblin::SolutionSetBase & solutions, usize count) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "add_random", // function name (python)
-            add_random, // function name (c++)
-            rng, solutions, count // params
+    void add_random(Rng& rng, goblin::SolutionSetBase& solutions, usize count) const override {
+        NB_OVERRIDE_PURE_NAME("add_random",          // function name (python)
+                              add_random,            // function name (c++)
+                              rng, solutions, count  // params
         );
     }
-    const goblin::FitnessBase & fitness() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "fitness", // function name (python)
-            fitness // function name (c++)
+    const goblin::FitnessBase& fitness() const override {
+        NB_OVERRIDE_PURE_NAME("fitness",  // function name (python)
+                              fitness     // function name (c++)
         );
     }
-    const goblin::ArchiveFitnessBase & archive_fitness() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "archive_fitness", // function name (python)
-            archive_fitness // function name (c++)
+    const goblin::ArchiveFitnessBase& archive_fitness() const override {
+        NB_OVERRIDE_PURE_NAME("archive_fitness",  // function name (python)
+                              archive_fitness     // function name (c++)
         );
     }
-    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase & offspring, const goblin::SolutionBase & donor, const goblin::Subset & subset) const override
-    {
-        NB_OVERRIDE_NAME(
-            "inherit_discrete", // function name (python)
-            inherit_discrete, // function name (c++)
-            offspring, donor, subset // params
+    std::tuple<bool, bool> inherit_discrete(goblin::SolutionBase& offspring,
+                                            const goblin::SolutionBase& donor,
+                                            const goblin::Subset& subset) const override {
+        NB_OVERRIDE_NAME("inherit_discrete",       // function name (python)
+                         inherit_discrete,         // function name (c++)
+                         offspring, donor, subset  // params
         );
     }
-    std::optional<CType> as_continuous(const goblin::SolutionBase & solution, usize discrete_index) const override
-    {
-        NB_OVERRIDE_NAME(
-            "as_continuous", // function name (python)
-            as_continuous, // function name (c++)
-            solution, discrete_index // params
+    std::optional<CType> as_continuous(const goblin::SolutionBase& solution, usize discrete_index) const override {
+        NB_OVERRIDE_NAME("as_continuous",          // function name (python)
+                         as_continuous,            // function name (c++)
+                         solution, discrete_index  // params
         );
     }
-    bool target_reached(const goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_NAME(
-            "target_reached", // function name (python)
-            target_reached, // function name (c++)
-            archive // params
+    void log_header(std::ostream& os) const override {
+        NB_OVERRIDE_NAME("log_header",  // function name (python)
+                         log_header,    // function name (c++)
+                         os             // params
         );
     }
-    void log_header(std::ostream & os) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_header", // function name (python)
-            log_header, // function name (c++)
-            os // params
+    void log_solution(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log_solution",  // function name (python)
+                         log_solution,    // function name (c++)
+                         os, solution     // params
         );
     }
-    void log_solution(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log_solution", // function name (python)
-            log_solution, // function name (c++)
-            os, solution // params
+    void log(std::ostream& os, const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("log",        // function name (python)
+                         log,          // function name (c++)
+                         os, solution  // params
         );
     }
-    void log(std::ostream & os, const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "log", // function name (python)
-            log, // function name (c++)
-            os, solution // params
+    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase& solution) const override {
+        NB_OVERRIDE_NAME("solution_cache_key",  // function name (python)
+                         solution_cache_key,    // function name (c++)
+                         solution               // params
         );
     }
-    std::optional<goblin::CacheKey> solution_cache_key(const goblin::SolutionBase & solution) const override
-    {
-        NB_OVERRIDE_NAME(
-            "solution_cache_key", // function name (python)
-            solution_cache_key, // function name (c++)
-            solution // params
-        );
-    }
-    const goblin::InstanceBase & unwrap() const override
-    {
-        NB_OVERRIDE_NAME(
-            "unwrap", // function name (python)
-            unwrap // function name (c++)
+    const goblin::InstanceBase& unwrap() const override {
+        NB_OVERRIDE_NAME("unwrap",  // function name (python)
+                         unwrap     // function name (c++)
         );
     }
 };
@@ -1288,86 +1033,47 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class ObjectiveBase_trampoline : public ObjectiveBase
-{
-public:
+class ObjectiveBase_trampoline : public ObjectiveBase {
+   public:
     NB_TRAMPOLINE(ObjectiveBase, 4);
 
-    usize num_discrete() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_discrete", // function name (python)
-            num_discrete // function name (c++)
+    usize num_discrete() const override {
+        NB_OVERRIDE_PURE_NAME("num_discrete",  // function name (python)
+                              num_discrete     // function name (c++)
         );
     }
-    usize num_continuous() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_continuous", // function name (python)
-            num_continuous // function name (c++)
+    usize num_continuous() const override {
+        NB_OVERRIDE_PURE_NAME("num_continuous",  // function name (python)
+                              num_continuous     // function name (c++)
         );
     }
-    std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values, RefS<Vec<CType>> continuous_values, RefS<Array<BType>> discrete_active, RefS<Array<BType>> continuous_active) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            discrete_values, continuous_values, discrete_active, continuous_active // params
+    std::tuple<CType, CType> evaluate(RefS<Vec<DType>> discrete_values,
+                                      RefS<Vec<CType>> continuous_values,
+                                      RefS<Array<BType>> discrete_active,
+                                      RefS<Array<BType>> continuous_active) override {
+        NB_OVERRIDE_PURE_NAME("evaluate",  // function name (python)
+                              evaluate,    // function name (c++)
+                              discrete_values, continuous_values, discrete_active, continuous_active  // params
         );
     }
-    std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values, RefS<Vec<CType>> continuous_values, RefS<Array<BType>> discrete_active, RefS<Array<BType>> continuous_active, CRefS<Vec<DType>> parent_discrete_values, CRefS<Vec<CType>> parent_continuous_values, CRefS<Array<BType>> parent_discrete_active, CRefS<Array<BType>> parent_continuous_active, const CType parent_objective_value, const CType parent_constraint_value, const std::span<const usize> & discrete_indices, const std::span<const usize> & continuous_indices) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values, parent_continuous_values, parent_discrete_active, parent_continuous_active, parent_objective_value, parent_constraint_value, discrete_indices, continuous_indices // params
-        );
-    }
-};
-}  // namespace goblin
-
-namespace goblin {
-// helper type to enable overriding virtual methods in python
-class MOFunctionBase_trampoline : public MOFunctionBase
-{
-public:
-    NB_TRAMPOLINE(MOFunctionBase, 5);
-
-    usize num_objectives() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_objectives", // function name (python)
-            num_objectives // function name (c++)
-        );
-    }
-    usize num_discrete() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_discrete", // function name (python)
-            num_discrete // function name (c++)
-        );
-    }
-    usize num_continuous() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_continuous", // function name (python)
-            num_continuous // function name (c++)
-        );
-    }
-    void evaluate(goblin::SolutionBase & solution) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            solution // params
-        );
-    }
-    void evaluate_partial(goblin::SolutionBase & solution, const goblin::SolutionBase & parent, const goblin::Subset & subset) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            solution, parent, subset // params
+    std::tuple<CType, CType> evaluate_partial(RefS<Vec<DType>> discrete_values,
+                                              RefS<Vec<CType>> continuous_values,
+                                              RefS<Array<BType>> discrete_active,
+                                              RefS<Array<BType>> continuous_active,
+                                              CRefS<Vec<DType>> parent_discrete_values,
+                                              CRefS<Vec<CType>> parent_continuous_values,
+                                              CRefS<Array<BType>> parent_discrete_active,
+                                              CRefS<Array<BType>> parent_continuous_active,
+                                              const CType parent_objective_value,
+                                              const CType parent_constraint_value,
+                                              const std::span<const usize>& discrete_indices,
+                                              const std::span<const usize>& continuous_indices) override {
+        NB_OVERRIDE_NAME("evaluate_partial",  // function name (python)
+                         evaluate_partial,    // function name (c++)
+                         discrete_values, continuous_values, discrete_active, continuous_active, parent_discrete_values,
+                         parent_continuous_values, parent_discrete_active, parent_continuous_active,
+                         parent_objective_value, parent_constraint_value, discrete_indices,
+                         continuous_indices  // params
         );
     }
 };
@@ -1375,54 +1081,57 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class PyFunctionBase_trampoline : public PyFunctionBase
-{
-public:
-    NB_TRAMPOLINE(PyFunctionBase, 6);
+class MOFunctionBase_trampoline : public MOFunctionBase {
+   public:
+    NB_TRAMPOLINE(MOFunctionBase, 9);
 
-    usize num_objectives() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_objectives", // function name (python)
-            num_objectives // function name (c++)
+    usize num_objectives() const override {
+        NB_OVERRIDE_PURE_NAME("num_objectives",  // function name (python)
+                              num_objectives     // function name (c++)
         );
     }
-    usize num_discrete() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_discrete", // function name (python)
-            num_discrete // function name (c++)
+    usize num_discrete() const override {
+        NB_OVERRIDE_PURE_NAME("num_discrete",  // function name (python)
+                              num_discrete     // function name (c++)
         );
     }
-    usize num_continuous() const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "num_continuous", // function name (python)
-            num_continuous // function name (c++)
+    usize num_continuous() const override {
+        NB_OVERRIDE_PURE_NAME("num_continuous",  // function name (python)
+                              num_continuous     // function name (c++)
         );
     }
-    std::tuple<Vec<CType>, CType> eval(goblin::SolutionBase & solution) override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "eval", // function name (python)
-            eval, // function name (c++)
-            solution // params
+    std::optional<CRef<Vec<DType>>> discrete_domain_sizes() const override {
+        NB_OVERRIDE_NAME("discrete_domain_sizes",  // function name (python)
+                         discrete_domain_sizes     // function name (c++)
         );
     }
-    void evaluate(goblin::SolutionBase & solution) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate", // function name (python)
-            evaluate, // function name (c++)
-            solution // params
+    std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_lower_bounds",  // function name (python)
+                         continuous_lower_bounds     // function name (c++)
         );
     }
-    void evaluate_partial(goblin::SolutionBase & solution, const goblin::SolutionBase & parent, const goblin::Subset & subset) override
-    {
-        NB_OVERRIDE_NAME(
-            "evaluate_partial", // function name (python)
-            evaluate_partial, // function name (c++)
-            solution, parent, subset // params
+    std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_upper_bounds",  // function name (python)
+                         continuous_upper_bounds     // function name (c++)
+        );
+    }
+    std::optional<std::shared_ptr<goblin::ArchiveBase>> pareto_front() const override {
+        NB_OVERRIDE_NAME("pareto_front",  // function name (python)
+                         pareto_front     // function name (c++)
+        );
+    }
+    void evaluate(goblin::SolutionBase& solution) override {
+        NB_OVERRIDE_PURE_NAME("evaluate",  // function name (python)
+                              evaluate,    // function name (c++)
+                              solution     // params
+        );
+    }
+    void evaluate_partial(goblin::SolutionBase& solution,
+                          const goblin::SolutionBase& parent,
+                          const goblin::Subset& subset) override {
+        NB_OVERRIDE_NAME("evaluate_partial",       // function name (python)
+                         evaluate_partial,         // function name (c++)
+                         solution, parent, subset  // params
         );
     }
 };
@@ -1430,3644 +1139,3564 @@ public:
 
 namespace goblin {
 // helper type to enable overriding virtual methods in python
-class RvSamplingModelBase_trampoline : public RvSamplingModelBase
-{
-public:
+class PyFunctionBase_trampoline : public PyFunctionBase {
+   public:
+    NB_TRAMPOLINE(PyFunctionBase, 10);
+
+    usize num_objectives() const override {
+        NB_OVERRIDE_PURE_NAME("num_objectives",  // function name (python)
+                              num_objectives     // function name (c++)
+        );
+    }
+    usize num_discrete() const override {
+        NB_OVERRIDE_PURE_NAME("num_discrete",  // function name (python)
+                              num_discrete     // function name (c++)
+        );
+    }
+    usize num_continuous() const override {
+        NB_OVERRIDE_PURE_NAME("num_continuous",  // function name (python)
+                              num_continuous     // function name (c++)
+        );
+    }
+    std::tuple<Vec<CType>, CType> eval(goblin::SolutionBase& solution) override {
+        NB_OVERRIDE_PURE_NAME("eval",   // function name (python)
+                              eval,     // function name (c++)
+                              solution  // params
+        );
+    }
+    void evaluate(goblin::SolutionBase& solution) override {
+        NB_OVERRIDE_NAME("evaluate",  // function name (python)
+                         evaluate,    // function name (c++)
+                         solution     // params
+        );
+    }
+    void evaluate_partial(goblin::SolutionBase& solution,
+                          const goblin::SolutionBase& parent,
+                          const goblin::Subset& subset) override {
+        NB_OVERRIDE_NAME("evaluate_partial",       // function name (python)
+                         evaluate_partial,         // function name (c++)
+                         solution, parent, subset  // params
+        );
+    }
+    std::optional<CRef<Vec<DType>>> discrete_domain_sizes() const override {
+        NB_OVERRIDE_NAME("discrete_domain_sizes",  // function name (python)
+                         discrete_domain_sizes     // function name (c++)
+        );
+    }
+    std::optional<CRef<Vec<CType>>> continuous_lower_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_lower_bounds",  // function name (python)
+                         continuous_lower_bounds     // function name (c++)
+        );
+    }
+    std::optional<CRef<Vec<CType>>> continuous_upper_bounds() const override {
+        NB_OVERRIDE_NAME("continuous_upper_bounds",  // function name (python)
+                         continuous_upper_bounds     // function name (c++)
+        );
+    }
+    std::optional<std::shared_ptr<goblin::ArchiveBase>> pareto_front() const override {
+        NB_OVERRIDE_NAME("pareto_front",  // function name (python)
+                         pareto_front     // function name (c++)
+        );
+    }
+};
+}  // namespace goblin
+
+namespace goblin {
+// helper type to enable overriding virtual methods in python
+class RvSamplingModelBase_trampoline : public RvSamplingModelBase {
+   public:
     NB_TRAMPOLINE(RvSamplingModelBase, 6);
 
-    std::unique_ptr<goblin::RvSubsetStateBase> init(const goblin::Subset & subset) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "init", // function name (python)
-            init, // function name (c++)
-            subset // params
+    std::unique_ptr<goblin::RvSubsetStateBase> init(const goblin::Subset& subset) const override {
+        NB_OVERRIDE_PURE_NAME("init",  // function name (python)
+                              init,    // function name (c++)
+                              subset   // params
         );
     }
-    std::unique_ptr<goblin::RvSubsetStateBase> inherit(const goblin::Subset & subset, const goblin::Subset & previous_subset, const goblin::RvSubsetStateBase & previous_state) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "inherit", // function name (python)
-            inherit, // function name (c++)
-            subset, previous_subset, previous_state // params
+    std::unique_ptr<goblin::RvSubsetStateBase> inherit(const goblin::Subset& subset,
+                                                       const goblin::Subset& previous_subset,
+                                                       const goblin::RvSubsetStateBase& previous_state) const override {
+        NB_OVERRIDE_PURE_NAME("inherit",                               // function name (python)
+                              inherit,                                 // function name (c++)
+                              subset, previous_subset, previous_state  // params
         );
     }
-    void update(const goblin::SolutionSetBase & solutions, const std::span<const usize> by_fitness_decreasing, const std::span<const usize> active_counts, bool intron_aware, const goblin::Subset & subset, double selection_percentile, goblin::RvSubsetStateBase & state) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "update", // function name (python)
-            update, // function name (c++)
-            solutions, by_fitness_decreasing, active_counts, intron_aware, subset, selection_percentile, state // params
+    void update(const goblin::SolutionSetBase& solutions,
+                const std::span<const usize> by_fitness_decreasing,
+                const std::span<const usize> active_counts,
+                bool intron_aware,
+                const goblin::Subset& subset,
+                double selection_percentile,
+                goblin::RvSubsetStateBase& state) const override {
+        NB_OVERRIDE_PURE_NAME("update",  // function name (python)
+                              update,    // function name (c++)
+                              solutions, by_fitness_decreasing, active_counts, intron_aware, subset,
+                              selection_percentile, state  // params
         );
     }
-    Vec<CType> sample(Rng & rng, const goblin::RvSubsetStateBase & state) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "sample", // function name (python)
-            sample, // function name (c++)
-            rng, state // params
+    Vec<CType> sample(Rng& rng, const goblin::RvSubsetStateBase& state) const override {
+        NB_OVERRIDE_PURE_NAME("sample",   // function name (python)
+                              sample,     // function name (c++)
+                              rng, state  // params
         );
     }
-    void adapt(const goblin::SolutionSetBase & solutions, const std::span<const usize> improved_indices, double oob_ratio, bool max_nis_reached, bool intron_aware, const goblin::Subset & subset, goblin::RvSubsetStateBase & state) const override
-    {
-        NB_OVERRIDE_NAME(
-            "adapt", // function name (python)
-            adapt, // function name (c++)
-            solutions, improved_indices, oob_ratio, max_nis_reached, intron_aware, subset, state // params
+    void adapt(const goblin::SolutionSetBase& solutions,
+               const std::span<const usize> improved_indices,
+               double oob_ratio,
+               bool max_nis_reached,
+               bool intron_aware,
+               const goblin::Subset& subset,
+               goblin::RvSubsetStateBase& state) const override {
+        NB_OVERRIDE_NAME("adapt",  // function name (python)
+                         adapt,    // function name (c++)
+                         solutions, improved_indices, oob_ratio, max_nis_reached, intron_aware, subset, state  // params
         );
     }
-    bool converged(const goblin::RvSubsetStateBase & state) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "converged", // function name (python)
-            converged, // function name (c++)
-            state // params
+    bool converged(const goblin::RvSubsetStateBase& state) const override {
+        NB_OVERRIDE_PURE_NAME("converged",  // function name (python)
+                              converged,    // function name (c++)
+                              state         // params
         );
     }
 };
 }  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class SelectionStrategyBase_trampoline : public SelectionStrategyBase
-{
-public:
+class SelectionStrategyBase_trampoline : public SelectionStrategyBase {
+   public:
     NB_TRAMPOLINE(SelectionStrategyBase, 1);
 
-    std::vector<usize> select(Rng & rng, const goblin::FitnessBase & fitness, const goblin::SolutionSetBase & solutions, usize target_size) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "select", // function name (python)
-            select, // function name (c++)
-            rng, fitness, solutions, target_size // params
+    std::vector<usize> select(Rng& rng,
+                              const goblin::FitnessBase& fitness,
+                              const goblin::SolutionSetBase& solutions,
+                              usize target_size) const override {
+        NB_OVERRIDE_PURE_NAME("select",                             // function name (python)
+                              select,                               // function name (c++)
+                              rng, fitness, solutions, target_size  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class EABase_trampoline : public EABase
-{
-public:
+class EABase_trampoline : public EABase {
+   public:
     NB_TRAMPOLINE(EABase, 4);
 
-    u64 step(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionSetBase & population, goblin::ArchiveBase & archive) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "step", // function name (python)
-            step, // function name (c++)
-            rng, problem, population, archive // params
+    u64 step(Rng& rng,
+             goblin::InstanceBase& problem,
+             goblin::SolutionSetBase& population,
+             goblin::ArchiveBase& archive) const override {
+        NB_OVERRIDE_PURE_NAME("step",                            // function name (python)
+                              step,                              // function name (c++)
+                              rng, problem, population, archive  // params
         );
     }
-    std::tuple<std::shared_ptr<goblin::ArchiveBase>, goblin::TerminationStatus> run(goblin::InstanceBase & problem, const goblin::Budget & budget, std::optional<u64> seed = std::nullopt, std::optional<usize> population_size = std::nullopt) override
-    {
-        NB_OVERRIDE_NAME(
-            "run", // function name (python)
-            run, // function name (c++)
-            problem, budget, seed, population_size // params
+    std::tuple<std::shared_ptr<goblin::ArchiveBase>, goblin::TerminationStatus> run(
+        goblin::InstanceBase& problem,
+        const goblin::Budget& budget,
+        std::optional<u64> seed = std::nullopt,
+        std::optional<usize> population_size = std::nullopt) override {
+        NB_OVERRIDE_NAME("run",                                  // function name (python)
+                         run,                                    // function name (c++)
+                         problem, budget, seed, population_size  // params
         );
     }
-    std::optional<u64> current_generation() const override
-    {
-        NB_OVERRIDE_NAME(
-            "current_generation", // function name (python)
-            current_generation // function name (c++)
+    std::optional<u64> current_generation() const override {
+        NB_OVERRIDE_NAME("current_generation",  // function name (python)
+                         current_generation     // function name (c++)
         );
     }
-    std::optional<std::tuple<usize, u64>> current_population() const override
-    {
-        NB_OVERRIDE_NAME(
-            "current_population", // function name (python)
-            current_population // function name (c++)
+    std::optional<std::tuple<usize, u64, u64>> current_population() const override {
+        NB_OVERRIDE_NAME("current_population",  // function name (python)
+                         current_population     // function name (c++)
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class DEStrategyBase_trampoline : public DEStrategyBase
-{
-public:
+class DEStrategyBase_trampoline : public DEStrategyBase {
+   public:
     NB_TRAMPOLINE(DEStrategyBase, 1);
 
-    std::tuple<goblin::Solution, bool> trial_vector(Rng & rng, goblin::InstanceBase & problem, const goblin::SolutionSetBase & population, const goblin::ArchiveBase & archive, usize idx, goblin::Subset & subset) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "trial_vector", // function name (python)
-            trial_vector, // function name (c++)
-            rng, problem, population, archive, idx, subset // params
+    std::tuple<goblin::Solution, bool> trial_vector(Rng& rng,
+                                                    goblin::InstanceBase& problem,
+                                                    const goblin::SolutionSetBase& population,
+                                                    const goblin::ArchiveBase& archive,
+                                                    usize idx,
+                                                    goblin::Subset& subset) const override {
+        NB_OVERRIDE_PURE_NAME("trial_vector",                                 // function name (python)
+                              trial_vector,                                   // function name (c++)
+                              rng, problem, population, archive, idx, subset  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class PSOTopologyBase_trampoline : public PSOTopologyBase
-{
-public:
+class PSOTopologyBase_trampoline : public PSOTopologyBase {
+   public:
     NB_TRAMPOLINE(PSOTopologyBase, 1);
 
-    std::vector<usize> neighbours(Rng & rng, const goblin::SolutionSetBase & population, usize idx) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "neighbours", // function name (python)
-            neighbours, // function name (c++)
-            rng, population, idx // params
+    std::vector<usize> neighbours(Rng& rng, const goblin::SolutionSetBase& population, usize idx) const override {
+        NB_OVERRIDE_PURE_NAME("neighbours",         // function name (python)
+                              neighbours,           // function name (c++)
+                              rng, population, idx  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class DiscreteCrossoverBase_trampoline : public DiscreteCrossoverBase
-{
-public:
+class DiscreteCrossoverBase_trampoline : public DiscreteCrossoverBase {
+   public:
     NB_TRAMPOLINE(DiscreteCrossoverBase, 2);
 
-    goblin::Subset crossover_mask(Rng & rng, goblin::InstanceBase & problem, const goblin::SolutionBase & donor, goblin::SolutionBase & offspring) const override
-    {
-        NB_OVERRIDE_NAME(
-            "crossover_mask", // function name (python)
-            crossover_mask, // function name (c++)
-            rng, problem, donor, offspring // params
+    goblin::Subset crossover_mask(Rng& rng,
+                                  goblin::InstanceBase& problem,
+                                  const goblin::SolutionBase& donor,
+                                  goblin::SolutionBase& offspring) const override {
+        NB_OVERRIDE_NAME("crossover_mask",               // function name (python)
+                         crossover_mask,                 // function name (c++)
+                         rng, problem, donor, offspring  // params
         );
     }
-    bool crossover(Rng & rng, goblin::InstanceBase & problem, const goblin::SolutionBase & donor, goblin::SolutionBase & offspring) const override
-    {
-        NB_OVERRIDE_NAME(
-            "crossover", // function name (python)
-            crossover, // function name (c++)
-            rng, problem, donor, offspring // params
+    bool crossover(Rng& rng,
+                   goblin::InstanceBase& problem,
+                   const goblin::SolutionBase& donor,
+                   goblin::SolutionBase& offspring) const override {
+        NB_OVERRIDE_NAME("crossover",                    // function name (python)
+                         crossover,                      // function name (c++)
+                         rng, problem, donor, offspring  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class DiscreteMutationBase_trampoline : public DiscreteMutationBase
-{
-public:
+class DiscreteMutationBase_trampoline : public DiscreteMutationBase {
+   public:
     NB_TRAMPOLINE(DiscreteMutationBase, 1);
 
-    void mutate(Rng & rng, goblin::InstanceBase & problem, goblin::SolutionBase & offspring) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "mutate", // function name (python)
-            mutate, // function name (c++)
-            rng, problem, offspring // params
+    void mutate(Rng& rng, goblin::InstanceBase& problem, goblin::SolutionBase& offspring) const override {
+        NB_OVERRIDE_PURE_NAME("mutate",                // function name (python)
+                              mutate,                  // function name (c++)
+                              rng, problem, offspring  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
-namespace goblin { namespace classic {
+namespace goblin {
+namespace classic {
 // helper type to enable overriding virtual methods in python
-class GPVariationOperatorBase_trampoline : public GPVariationOperatorBase
-{
-public:
+class GPVariationOperatorBase_trampoline : public GPVariationOperatorBase {
+   public:
     NB_TRAMPOLINE(GPVariationOperatorBase, 1);
 
-    void apply(Rng & rng, const goblin::InstanceBase & problem, const goblin::GPContext & ctx, const goblin::SolutionSetBase & population, goblin::SolutionBase & offspring) const override
-    {
-        NB_OVERRIDE_PURE_NAME(
-            "apply", // function name (python)
-            apply, // function name (c++)
-            rng, problem, ctx, population, offspring // params
+    void apply(Rng& rng,
+               const goblin::InstanceBase& problem,
+               const goblin::GPContext& ctx,
+               const goblin::SolutionSetBase& population,
+               goblin::SolutionBase& offspring) const override {
+        NB_OVERRIDE_PURE_NAME("apply",                                  // function name (python)
+                              apply,                                    // function name (c++)
+                              rng, problem, ctx, population, offspring  // params
         );
     }
 };
-} }  // namespace classic  // namespace goblin
+}  // namespace classic
+}  // namespace goblin
 
 // </litgen_glue_code> // Autogenerated code end
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  AUTOGENERATED CODE END
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 void py_init_module_pygoblin(nb::module_& m) {
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  AUTOGENERATED CODE
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <litgen_pydef> // Autogenerated code
-  ////////////////////    <generated_from:amalgamation.h>    ////////////////////
-  // #ifndef _GOBLIN_H
-  //
-  // #ifndef _GOBLIN_LIB_TYPES_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_LIB_RNG_H
-  //
-
-
-  m.def("permute",
-      goblin::permute, nb::arg("rng"), nb::arg("n"));
-  // #endif
-  // #ifndef _GOBLIN_LIB_ORDERING_H
-  //
-
-
-  auto pyEnumOrdering =
-      nb::enum_<goblin::Ordering>(m, "Ordering", nb::is_arithmetic(), "")
-          .value("better", goblin::Ordering::Better, "")
-          .value("equal", goblin::Ordering::Equal, "")
-          .value("worse", goblin::Ordering::Worse, "")
-          .value("non_dominated", goblin::Ordering::NonDominated, "");
-  // #endif
-  // #ifndef _GOBLIN_LIB_FITNESS_H
-  //
-
-
-  auto pyClassQualityBase =
-      nb::class_<goblin::QualityBase, goblin::QualityBase_trampoline>
-          (m, "QualityBase", "/ Something that describes how good a solution is")
-      .def(nb::init<>()) // implicit default constructor
-      .def("clone",
-          &goblin::QualityBase::clone)
-      ;
-
-
-  auto pyClassFitnessBase =
-      nb::class_<goblin::FitnessBase, goblin::FitnessBase_trampoline>
-          (m, "FitnessBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_objectives",
-          &goblin::FitnessBase::num_objectives)
-      .def("cmp",
-          &goblin::FitnessBase::cmp, nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none())
-      .def("distance",
-          &goblin::FitnessBase::distance, nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none())
-      .def("log_header",
-          &goblin::FitnessBase::log_header, nb::arg("os"))
-      .def("log",
-          &goblin::FitnessBase::log, nb::arg("os"), nb::arg("quality"))
-      .def("format",
-          &goblin::FitnessBase::format, nb::arg("quality"))
-      ;
-
-
-  auto pyClassArchiveFitnessBase =
-      nb::class_<goblin::ArchiveFitnessBase, goblin::FitnessBase, goblin::ArchiveFitnessBase_trampoline>
-          (m, "ArchiveFitnessBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("worst",
-          &goblin::ArchiveFitnessBase::worst)
-      ;
-
-
-  auto pyClassMOQuality =
-      nb::class_<goblin::MOQuality, goblin::QualityBase>
-          (m, "MOQuality", "/ Something that describes how good a solution is")
-      .def(nb::init<>()) // implicit default constructor
-      .def("clone",
-          &goblin::MOQuality::clone)
-      .def_rw("objectives", &goblin::MOQuality::objectives, "")
-      .def_rw("constraint_value", &goblin::MOQuality::constraint_value, "")
-      ;
-
-
-  auto pyClassMOFitness =
-      nb::class_<goblin::MOFitness, goblin::ArchiveFitnessBase>
-          (m, "MOFitness", "")
-      // (default constructor explicitly deleted)
-      .def(nb::init<usize, bool, CType>(),
-          nb::arg("num_objectives"), nb::arg("minimize") = true, nb::arg("epsilon") = 0.0)
-      .def("log_header",
-          &goblin::MOFitness::log_header, nb::arg("os"))
-      .def("log",
-          &goblin::MOFitness::log, nb::arg("os"), nb::arg("quality"))
-      .def("format",
-          &goblin::MOFitness::format, nb::arg("quality"))
-      .def("num_objectives",
-          &goblin::MOFitness::num_objectives)
-      .def("cmp",
-          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::cmp, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
-      .def("distance",
-          nb::overload_cast<const goblin::QualityBase &, const goblin::QualityBase &, std::optional<usize>>(&goblin::MOFitness::distance, nb::const_), nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
-      .def("worst",
-          &goblin::MOFitness::worst)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_SUBSET_H
-  //
-
-
-  auto pyClassSubset =
-      nb::class_<goblin::Subset>
-          (m, "Subset", "")
-      .def("__init__", [](goblin::Subset * self, const std::optional<const std::vector<usize>> & discrete = std::nullopt, const std::optional<const std::vector<usize>> & continuous = std::nullopt)
-      {
-          new (self) goblin::Subset();  // placement new
-          auto r_ctor_ = self;
-          if (discrete.has_value())
-              r_ctor_->discrete = discrete.value();
-          else
-              r_ctor_->discrete = std::vector<usize>();
-          if (continuous.has_value())
-              r_ctor_->continuous = continuous.value();
-          else
-              r_ctor_->continuous = std::vector<usize>();
-      },
-      nb::arg("discrete").none() = nb::none(), nb::arg("continuous").none() = nb::none()
-      )
-      .def_rw("discrete", &goblin::Subset::discrete, "")
-      .def_rw("continuous", &goblin::Subset::continuous, "")
-      .def("clear",
-          &goblin::Subset::clear)
-      .def("size",
-          &goblin::Subset::size)
-      .def("empty",
-          &goblin::Subset::empty)
-      .def("similarity",
-          &goblin::Subset::similarity, nb::arg("other"))
-      .def("merge",
-          &goblin::Subset::merge, nb::arg("other"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_SOLUTION_H
-  //
-
-
-  auto pyClassSolutionExtensionKey =
-      nb::class_<goblin::SolutionExtensionKey>
-          (m, "SolutionExtensionKey", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def_rw("token", &goblin::SolutionExtensionKey::token, "")
-      ;
-
-
-  auto pyClassSolutionExtensionKeyHash =
-      nb::class_<goblin::SolutionExtensionKeyHash>
-          (m, "SolutionExtensionKeyHash", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("__call__",
-          &goblin::SolutionExtensionKeyHash::operator(), nb::arg("key"))
-      ;
-
-
-  auto pyClassSolutionExtensionBase =
-      nb::class_<goblin::SolutionExtensionBase, goblin::SolutionExtensionBase_trampoline>
-          (m, "SolutionExtensionBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("clone",
-          &goblin::SolutionExtensionBase::clone)
-      .def("key",
-          &goblin::SolutionExtensionBase::key)
-      ;
-
-
-  auto pyClassSolutionBase =
-      nb::class_<goblin::SolutionBase, goblin::SolutionBase_trampoline>
-          (m, "SolutionBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("has_extension",
-          &goblin::SolutionBase::has_extension, nb::arg("key"))
-      .def("get_or_insert_extension",
-          &goblin::SolutionBase::get_or_insert_extension,
-          nb::arg("extension"),
-          "this is fine")
-      .def("get_extension",
-          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::SolutionBase::get_extension, nb::const_), nb::arg("key"))
-      .def("get_extension",
-          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::SolutionBase::get_extension), nb::arg("key"))
-      .def("remove_extension",
-          &goblin::SolutionBase::remove_extension, nb::arg("key"))
-      .def("clear_extensions",
-          &goblin::SolutionBase::clear_extensions)
-      .def("num_extensions",
-          &goblin::SolutionBase::num_extensions)
-      .def("extensions",
-          [](goblin::SolutionBase & self) { return self.extensions(); })
-      .def("extensions",
-          [](goblin::SolutionBase & self) { return self.extensions(); })
-      .def("num_discrete",
-          &goblin::SolutionBase::num_discrete)
-      .def("discrete_values",
-          [](goblin::SolutionBase & self) { return self.discrete_values(); })
-      .def("discrete_values",
-          [](goblin::SolutionBase & self) { return self.discrete_values(); })
-      .def("discrete_active",
-          [](goblin::SolutionBase & self) { return self.discrete_active(); })
-      .def("discrete_active",
-          [](goblin::SolutionBase & self) { return self.discrete_active(); })
-      .def("num_continuous",
-          &goblin::SolutionBase::num_continuous)
-      .def("continuous_values",
-          [](goblin::SolutionBase & self) { return self.continuous_values(); })
-      .def("continuous_values",
-          [](goblin::SolutionBase & self) { return self.continuous_values(); })
-      .def("continuous_active",
-          [](goblin::SolutionBase & self) { return self.continuous_active(); })
-      .def("continuous_active",
-          [](goblin::SolutionBase & self) { return self.continuous_active(); })
-      ;
-
-  pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality, nb::const_), nb::rv_policy::reference_internal);
-  pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality), nb::rv_policy::reference_internal);
-
-
-
-
-  auto pyClassSolution =
-      nb::class_<goblin::Solution, goblin::SolutionBase>
-          (m, "Solution", "")
-      .def(nb::init<std::unique_ptr<goblin::QualityBase>, std::optional<Vec<DType>>, std::optional<Vec<CType>>>(),
-          nb::arg("quality"), nb::arg("discrete_values").none() = nb::none(), nb::arg("continuous_values").none() = nb::none())
-      .def(nb::init<const goblin::Solution &>(),
-          nb::arg("other"))
-      .def(nb::init<goblin::Solution &&>(),
-          nb::arg("other"))
-      .def(nb::init<const goblin::SolutionBase &>(),
-          nb::arg("s"),
-          "explicitly not explicit since implicit conversion is the intent")
-      .def("discrete_values",
-          [](goblin::Solution & self) { return self.discrete_values(); })
-      .def("discrete_values",
-          [](goblin::Solution & self) { return self.discrete_values(); })
-      .def("discrete_active",
-          [](goblin::Solution & self) { return self.discrete_active(); })
-      .def("discrete_active",
-          [](goblin::Solution & self) { return self.discrete_active(); })
-      .def("continuous_values",
-          [](goblin::Solution & self) { return self.continuous_values(); })
-      .def("continuous_values",
-          [](goblin::Solution & self) { return self.continuous_values(); })
-      .def("continuous_active",
-          [](goblin::Solution & self) { return self.continuous_active(); })
-      .def("continuous_active",
-          [](goblin::Solution & self) { return self.continuous_active(); })
-      .def("has_extension",
-          &goblin::Solution::has_extension, nb::arg("key"))
-      .def("get_or_insert_extension",
-          &goblin::Solution::get_or_insert_extension, nb::arg("extension"))
-      .def("get_extension",
-          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::Solution::get_extension, nb::const_), nb::arg("key"))
-      .def("get_extension",
-          nb::overload_cast<const goblin::SolutionExtensionKey &>(&goblin::Solution::get_extension), nb::arg("key"))
-      .def("remove_extension",
-          &goblin::Solution::remove_extension, nb::arg("key"))
-      .def("clear_extensions",
-          &goblin::Solution::clear_extensions)
-      .def("num_extensions",
-          &goblin::Solution::num_extensions)
-      .def("extensions",
-          [](goblin::Solution & self) { return self.extensions(); })
-      .def("extensions",
-          [](goblin::Solution & self) { return self.extensions(); })
-      ;
-
-  pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality, nb::const_), nb::rv_policy::reference_internal);
-  pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality), nb::rv_policy::reference_internal);
-
-
-
-
-  auto pyClassSolutionSetBase =
-      nb::class_<goblin::SolutionSetBase, goblin::SolutionSetBase_trampoline>
-          (m, "SolutionSetBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("__getitem__",
-          nb::overload_cast<usize>(&goblin::SolutionSetBase::operator[]), nb::arg("idx"))
-      .def("__getitem__",
-          nb::overload_cast<usize>(&goblin::SolutionSetBase::operator[], nb::const_), nb::arg("idx"))
-      .def("size",
-          &goblin::SolutionSetBase::size)
-      .def("empty",
-          &goblin::SolutionSetBase::empty)
-      .def("add",
-          &goblin::SolutionSetBase::add, nb::arg("s"))
-      .def("remove_at",
-          &goblin::SolutionSetBase::remove_at, nb::arg("idx"))
-      .def("remove_indices_sorted",
-          &goblin::SolutionSetBase::remove_indices_sorted, nb::arg("indices"))
-      .def("reserve",
-          &goblin::SolutionSetBase::reserve, nb::arg("new_capacity"))
-      .def("clear",
-          &goblin::SolutionSetBase::clear)
-      ;
-
-
-  auto pyClassAoSSet =
-      nb::class_<goblin::AoSSet, goblin::SolutionSetBase>
-          (m, "AoSSet", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("__getitem__",
-          nb::overload_cast<usize>(&goblin::AoSSet::operator[]), nb::arg("idx"))
-      .def("__getitem__",
-          nb::overload_cast<usize>(&goblin::AoSSet::operator[], nb::const_), nb::arg("idx"))
-      .def("size",
-          &goblin::AoSSet::size)
-      .def("empty",
-          &goblin::AoSSet::empty)
-      .def("add",
-          &goblin::AoSSet::add, nb::arg("s"))
-      .def("remove_at",
-          &goblin::AoSSet::remove_at, nb::arg("idx"))
-      .def("remove_indices_sorted",
-          &goblin::AoSSet::remove_indices_sorted, nb::arg("indices"))
-      .def("reserve",
-          &goblin::AoSSet::reserve, nb::arg("new_capacity"))
-      .def("clear",
-          &goblin::AoSSet::clear)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_ARCHIVE_H
-  //
-
-
-  auto pyClassArchiveBase =
-      nb::class_<goblin::ArchiveBase, goblin::ArchiveBase_trampoline>
-          (m, "ArchiveBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("size",
-          &goblin::ArchiveBase::size)
-      .def("empty",
-          &goblin::ArchiveBase::empty)
-      .def("__getitem__",
-          &goblin::ArchiveBase::operator[], nb::arg("idx"))
-      .def("unsafe_at",
-          &goblin::ArchiveBase::unsafe_at,
-          nb::arg("idx"),
-          " Unsafe because by being in the archive we assume the invariant that the\n solution is non-dominated. Allowing potential changes to the solution\n without re-checking non-dominance hence is not \"safe\" from the logic\n perspective.")
-      .def("change_count",
-          &goblin::ArchiveBase::change_count)
-      .def("reset_change_count",
-          &goblin::ArchiveBase::reset_change_count)
-      .def("so_solution",
-          &goblin::ArchiveBase::so_solution, nb::arg("objective"))
-      .def("adapt",
-          &goblin::ArchiveBase::adapt)
-      .def("clear",
-          &goblin::ArchiveBase::clear)
-      .def("fitness",
-          &goblin::ArchiveBase::fitness)
-      .def("clone",
-          &goblin::ArchiveBase::clone)
-      .def("update",
-          &goblin::ArchiveBase::update,
-          nb::arg("solution"), nb::arg("strict"), nb::arg("check_synched") = true,
-          "/ Updates the archive with the solution and returns whether the solution was\n/ accepted into the archive.")
-      .def("sync_with",
-          &goblin::ArchiveBase::sync_with, nb::arg("other"))
-      .def("unsync_all",
-          &goblin::ArchiveBase::unsync_all)
-      .def("dominates",
-          &goblin::ArchiveBase::dominates, nb::arg("solution"), nb::arg("strict"))
-      .def("covers",
-          &goblin::ArchiveBase::covers, nb::arg("other"))
-      .def("random_solution",
-          &goblin::ArchiveBase::random_solution, nb::arg("rng"))
-      ;
-
-
-  auto pyClassUnboundedArchive =
-      nb::class_<goblin::UnboundedArchive, goblin::ArchiveBase>
-          (m, "UnboundedArchive", "")
-      .def(nb::init<const goblin::ArchiveFitnessBase &>(),
-          nb::arg("fitness"))
-      .def("clone",
-          &goblin::UnboundedArchive::clone)
-      .def("size",
-          &goblin::UnboundedArchive::size)
-      .def("__getitem__",
-          &goblin::UnboundedArchive::operator[], nb::arg("idx"))
-      .def("unsafe_at",
-          &goblin::UnboundedArchive::unsafe_at, nb::arg("idx"))
-      .def("so_solution",
-          &goblin::UnboundedArchive::so_solution, nb::arg("objective"))
-      .def("clear",
-          &goblin::UnboundedArchive::clear)
-      .def("update_archive",
-          &goblin::UnboundedArchive::update_archive, nb::arg("solution"), nb::arg("strict"))
-      .def("fitness",
-          &goblin::UnboundedArchive::fitness)
-      ;
-
-
-  auto pyClassAdaptiveGridArchive =
-      nb::class_<goblin::AdaptiveGridArchive, goblin::ArchiveBase>
-          (m, "AdaptiveGridArchive", "")
-      .def(nb::init<const goblin::ArchiveFitnessBase &, usize, float, usize, std::optional<CType>>(),
-          nb::arg("fitness"), nb::arg("capacity"), nb::arg("max_deviation") = 0.25, nb::arg("max_iterations") = 25, nb::arg("initial_discretization").none() = nb::none())
-      .def("clone",
-          &goblin::AdaptiveGridArchive::clone)
-      .def("size",
-          &goblin::AdaptiveGridArchive::size)
-      .def("__getitem__",
-          &goblin::AdaptiveGridArchive::operator[], nb::arg("idx"))
-      .def("unsafe_at",
-          &goblin::AdaptiveGridArchive::unsafe_at, nb::arg("idx"))
-      .def("clear",
-          &goblin::AdaptiveGridArchive::clear)
-      .def("so_solution",
-          &goblin::AdaptiveGridArchive::so_solution, nb::arg("objective"))
-      .def("update_archive",
-          &goblin::AdaptiveGridArchive::update_archive, nb::arg("solution"), nb::arg("strict"))
-      .def("adapt",
-          &goblin::AdaptiveGridArchive::adapt)
-      .def("fitness",
-          &goblin::AdaptiveGridArchive::fitness)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_BUDGET_H
-  //
-
-
-  auto pyEnumTerminationStatus =
-      nb::enum_<goblin::TerminationStatus>(m, "TerminationStatus", nb::is_arithmetic(), "")
-          .value("time_limit_reached", goblin::TerminationStatus::TimeLimitReached, "")
-          .value("generation_limit_reached", goblin::TerminationStatus::GenerationLimitReached, "")
-          .value("evaluation_limit_reached", goblin::TerminationStatus::EvaluationLimitReached, "")
-          .value("target_reached", goblin::TerminationStatus::TargetReached, "")
-          .value("converged", goblin::TerminationStatus::Converged, "")
-          .value("aborted", goblin::TerminationStatus::Aborted, "")
-          .value("running", goblin::TerminationStatus::Running, "");
-
-
-  auto pyClassBudget =
-      nb::class_<goblin::Budget>
-          (m, "Budget", "")
-      .def_rw("max_evaluations", &goblin::Budget::max_evaluations, "")
-      .def_rw("max_generations", &goblin::Budget::max_generations, "")
-      .def_rw("max_time", &goblin::Budget::max_time, "")
-      .def_rw("termination_callback", &goblin::Budget::termination_callback, "")
-      .def(nb::init<std::optional<u64>, std::optional<u64>, std::optional<u64>, std::optional<std::chrono::nanoseconds>, std::optional<std::function<bool()>>>(),
-          nb::arg("max_evaluations").none() = nb::none(), nb::arg("max_generations").none() = nb::none(), nb::arg("max_time_seconds").none() = nb::none(), nb::arg("max_duration").none() = nb::none(), nb::arg("termination_callback").none() = nb::none())
-      .def("exhausted",
-          &goblin::Budget::exhausted, nb::arg("generations"), nb::arg("evaluations"), nb::arg("elapsed"))
-      .def("exhausted_or_external_criterion_met",
-          &goblin::Budget::exhausted_or_external_criterion_met, nb::arg("generations"), nb::arg("evaluations"), nb::arg("elapsed"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_INSTANCE_H
-  //
-
-
-  auto pyClassCacheKey =
-      nb::class_<goblin::CacheKey>
-          (m, "CacheKey", "")
-      .def(nb::init<const std::string &>(),
-          nb::arg("key"))
-      .def(nb::init<std::vector<std::byte> &&>(),
-          nb::arg("key"))
-      .def("__eq__",
-          &goblin::CacheKey::operator==, nb::arg("other"))
-      ;
-
-
-  auto pyClassInstanceBase =
-      nb::class_<goblin::InstanceBase, goblin::InstanceBase_trampoline>
-          (m, "InstanceBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_objectives",
-          &goblin::InstanceBase::num_objectives)
-      .def("num_discrete",
-          &goblin::InstanceBase::num_discrete)
-      .def("discrete_domain_sizes",
-          &goblin::InstanceBase::discrete_domain_sizes)
-      .def("num_continuous",
-          &goblin::InstanceBase::num_continuous)
-      .def("continuous_lower_bounds",
-          &goblin::InstanceBase::continuous_lower_bounds)
-      .def("continuous_upper_bounds",
-          &goblin::InstanceBase::continuous_upper_bounds)
-      .def("continuous_init_lower_bounds",
-          &goblin::InstanceBase::continuous_init_lower_bounds)
-      .def("continuous_init_upper_bounds",
-          &goblin::InstanceBase::continuous_init_upper_bounds)
-      .def("evaluate",
-          &goblin::InstanceBase::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("evaluate_partial",
-          &goblin::InstanceBase::evaluate_partial, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
-      .def("evaluate_solutions",
-          &goblin::InstanceBase::evaluate_solutions, nb::arg("solutions"), nb::arg("seed").none() = nb::none())
-      .def("adapt",
-          &goblin::InstanceBase::adapt,
-          nb::arg("rng"),
-          "/ Possibly adapts the problem in some way that may require re-evaluating any elites stored thus far (indicated by\n/ the return value)")
-      .def("gradients",
-          &goblin::InstanceBase::gradients,
-          nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"),
-          "/ Returns the gradient for each index of indices (row) and continuous variable (column) with respect to the\n/ optimization goal. The number of evaluations performed to calculate the gradients are added to `evaluations`;\n/\n/ Note: The default implementation assumes that the passes subsets contain all active indices and the finite\n/ difference approach used requires up to `2 * indices.size() * num_continuous()` evaluations.")
-      .def("gradient_steps",
-          &goblin::InstanceBase::gradient_steps,
-          nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"),
-          "/ Performs gradient optimization steps of the continuous variables and returns the\n/ subset of `indices` that changed together with the number of evaluations performed.\n/ Guarantees that the quality of all solutions is up-to-date.")
-      .def("add_random",
-          &goblin::InstanceBase::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-      .def("fitness",
-          &goblin::InstanceBase::fitness)
-      .def("archive_fitness",
-          &goblin::InstanceBase::archive_fitness, "/ The fitness the archive should be use, in case the archive should record the front in more objectives than what\n/ should be optimized (as per https://arxiv.org/abs/2507.03777v1)\n/\n/ Note: What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.")
-      .def("inherit_discrete",
-          &goblin::InstanceBase::inherit_discrete,
-          nb::arg("offspring"), nb::arg("donor"), nb::arg("subset"),
-          "/ The offspring inherits a subset of the decision variables from the donor, returning True if there was a change to\n/ the active variables and an evaluation is needed, possibly with problem specific modifications.\n/\n/ Returns a `(any_active_changed, anything_changed)` tuple")
-      .def("as_continuous",
-          &goblin::InstanceBase::as_continuous,
-          nb::arg("solution"), nb::arg("discrete_index"),
-          " useful for discrete linkage learning in GP\n - needed to be able to perform constant binning\n - needed to erase constant pool references")
-      .def("target_reached",
-          &goblin::InstanceBase::target_reached, nb::arg("archive"))
-      .def("log_header",
-          &goblin::InstanceBase::log_header, nb::arg("os"))
-      .def("log_solution",
-          &goblin::InstanceBase::log_solution, nb::arg("os"), nb::arg("solution"))
-      .def("log",
-          &goblin::InstanceBase::log, nb::arg("os"), nb::arg("solution"))
-      .def("format_solution",
-          &goblin::InstanceBase::format_solution, nb::arg("solution"))
-      .def("solution_cache_key",
-          &goblin::InstanceBase::solution_cache_key,
-          nb::arg("solution"),
-          "/ By returning std::nullopt, caching can be disabled on a per solution basis")
-      .def("reevaluate_and_rebuild_archive",
-          &goblin::InstanceBase::reevaluate_and_rebuild_archive, nb::arg("rng"), nb::arg("archive"))
-      .def("unwrap",
-          &goblin::InstanceBase::unwrap)
-      ;
-
-
-  auto pyClassWrappedInstance =
-      nb::class_<goblin::WrappedInstance, goblin::InstanceBase>
-          (m, "WrappedInstance", "/ Intermediate class for wrapping instances that by default forwards everything to the actual inner method. Still\n/ allows accidentally not overwriting some methods, but at least defaults to the behaviour of the wrapped instance\n/ instead of the default implementations of virtual methods.")
-      .def(nb::init<goblin::InstanceBase &>(),
-          nb::arg("instance"))
-      .def("discrete_domain_sizes",
-          &goblin::WrappedInstance::discrete_domain_sizes)
-      .def("continuous_lower_bounds",
-          &goblin::WrappedInstance::continuous_lower_bounds)
-      .def("continuous_upper_bounds",
-          &goblin::WrappedInstance::continuous_upper_bounds)
-      .def("continuous_init_lower_bounds",
-          &goblin::WrappedInstance::continuous_init_lower_bounds)
-      .def("continuous_init_upper_bounds",
-          &goblin::WrappedInstance::continuous_init_upper_bounds)
-      .def("evaluate",
-          &goblin::WrappedInstance::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("evaluate_partial",
-          &goblin::WrappedInstance::evaluate_partial, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
-      .def("adapt",
-          &goblin::WrappedInstance::adapt, nb::arg("rng"))
-      .def("gradients",
-          &goblin::WrappedInstance::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
-      .def("gradient_steps",
-          &goblin::WrappedInstance::gradient_steps, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
-      .def("add_random",
-          &goblin::WrappedInstance::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-      .def("fitness",
-          &goblin::WrappedInstance::fitness)
-      .def("archive_fitness",
-          &goblin::WrappedInstance::archive_fitness)
-      .def("inherit_discrete",
-          &goblin::WrappedInstance::inherit_discrete, nb::arg("offspring"), nb::arg("donor"), nb::arg("subset"))
-      .def("as_continuous",
-          &goblin::WrappedInstance::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
-      .def("target_reached",
-          &goblin::WrappedInstance::target_reached, nb::arg("archive"))
-      .def("log_header",
-          &goblin::WrappedInstance::log_header, nb::arg("os"))
-      .def("log_solution",
-          &goblin::WrappedInstance::log_solution, nb::arg("os"), nb::arg("solution"))
-      .def("log",
-          &goblin::WrappedInstance::log, nb::arg("os"), nb::arg("solution"))
-      .def("solution_cache_key",
-          &goblin::WrappedInstance::solution_cache_key, nb::arg("solution"))
-      .def("unwrap",
-          &goblin::WrappedInstance::unwrap)
-      ;
-
-
-  auto pyClassCachedInstanceBase =
-      nb::class_<goblin::CachedInstanceBase, goblin::WrappedInstance, goblin::CachedInstanceBase_trampoline>
-          (m, "CachedInstanceBase", "")
-      .def(nb::init<goblin::InstanceBase &>(),
-          nb::arg("instance"))
-      .def("hit_count",
-          &goblin::CachedInstanceBase::hit_count)
-      .def("miss_count",
-          &goblin::CachedInstanceBase::miss_count)
-      .def("access_count",
-          &goblin::CachedInstanceBase::access_count)
-      .def("entry_invalidation_count",
-          &goblin::CachedInstanceBase::entry_invalidation_count)
-      .def("cache_invalidation_count",
-          &goblin::CachedInstanceBase::cache_invalidation_count)
-      .def("evicted_count",
-          &goblin::CachedInstanceBase::evicted_count)
-      .def("hit_ratio",
-          &goblin::CachedInstanceBase::hit_ratio)
-      .def("miss_ratio",
-          &goblin::CachedInstanceBase::miss_ratio)
-      .def("utilization",
-          &goblin::CachedInstanceBase::utilization, "/ Proportion of cache entries used w.r.t. maximum size")
-      ;
-
-
-  m.def("cached",
-      goblin::Cached, nb::arg("problem"), nb::arg("cache_size") = 10000, nb::arg("cache_policy") = "lru");
-  // #endif
-  // #ifndef _GOBLIN_LIB_UPGMA_H
-  //
-
-
-  auto pyClassUPGMA =
-      nb::class_<goblin::UPGMA>
-          (m, "UPGMA", "/ Arthur's UPGMA implementation from\n/ https://github.com/8uurg/Impact-of-Asynchrony-on-MBEAs/blob/07083732629661c7efccddb4c1b15e69cc462e/EALib/src/gomea.cpp#L216\n/ This implementation was chosen because it returns the whole dendrogram, it\n/ is commented better and Arthur's code was easier to adapt to work with Eigen\n/ matrices directly...");
-
-  { // inner classes & enums of UPGMA
-      auto pyClassUPGMA_ClassMerge =
-          nb::class_<goblin::UPGMA::Merge>
-              (pyClassUPGMA, "Merge", "")
-          .def("__init__", [](goblin::UPGMA::Merge * self, const std::optional<const usize> & left = std::nullopt, const std::optional<const usize> & right = std::nullopt, const std::optional<const CType> & distance = std::nullopt, const std::optional<const usize> & size = std::nullopt)
-          {
-              new (self) goblin::UPGMA::Merge();  // placement new
-              auto r_ctor_ = self;
-              if (left.has_value())
-                  r_ctor_->left = left.value();
-              else
-                  r_ctor_->left = usize();
-              if (right.has_value())
-                  r_ctor_->right = right.value();
-              else
-                  r_ctor_->right = usize();
-              if (distance.has_value())
-                  r_ctor_->distance = distance.value();
-              else
-                  r_ctor_->distance = CType();
-              if (size.has_value())
-                  r_ctor_->size = size.value();
-              else
-                  r_ctor_->size = usize();
-          },
-          nb::arg("left").none() = nb::none(), nb::arg("right").none() = nb::none(), nb::arg("distance").none() = nb::none(), nb::arg("size").none() = nb::none()
-          )
-          .def_rw("left", &goblin::UPGMA::Merge::left, "")
-          .def_rw("right", &goblin::UPGMA::Merge::right, "")
-          .def_rw("distance", &goblin::UPGMA::Merge::distance, "")
-          .def_rw("size", &goblin::UPGMA::Merge::size, "")
-          ;
-  } // end of inner classes & enums of UPGMA
-
-  pyClassUPGMA
-      .def(nb::init<>()) // implicit default constructor
-      .def_static("cluster",
-          &goblin::UPGMA::cluster,
-          nb::arg("rng"), nb::arg("similarity"),
-          "/ UPGMA that clusters based on similarity (higher = closer), not distance\n/ (lower = closer)")
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_SUBSET_SELECTION_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_LIB_ALGORITHMS_MO_H
-  //
-
-  m.def("hypervolume2_d",
-      nb::overload_cast<const ArchiveBase &, const FitnessBase &, const QualityBase &>(hypervolume2D), nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
-
-  m.def("hypervolume2_d",
-      nb::overload_cast<const SolutionSetBase &, const FitnessBase &, const QualityBase &>(hypervolume2D), nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
-
-  m.def("hypervolume2_d",
-      nb::overload_cast<const Arr2D<CType>, const Array<CType>>(hypervolume2D), nb::arg("points"), nb::arg("reference_point"));
-  // #endif
-  // #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
-  //
-
-
-  auto pyEnumVariableSet =
-      nb::enum_<goblin::VariableSet>(m, "VariableSet", nb::is_arithmetic(), "")
-          .value("discrete", goblin::VariableSet::Discrete, "")
-          .value("continuous", goblin::VariableSet::Continuous, "")
-          .value("mixed", goblin::VariableSet::Mixed, "");
-
-
-  m.def("estimate_entropy",
-      goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"), nb::arg("num_continuous_bins").none());
-
-
-  auto pyClassLinkageModelBase =
-      nb::class_<goblin::LinkageModelBase, goblin::LinkageModelBase_trampoline>
-          (m, "LinkageModelBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("init",
-          &goblin::LinkageModelBase::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
-      .def("subsets",
-          &goblin::LinkageModelBase::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none())
-      .def("is_static",
-          &goblin::LinkageModelBase::is_static)
-      .def("clone",
-          &goblin::LinkageModelBase::clone)
-      ;
-
-
-  auto pyClassUnivariateFOS =
-      nb::class_<goblin::UnivariateFOS, goblin::LinkageModelBase>
-          (m, "UnivariateFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<goblin::Subset>>(),
-          nb::arg("subset").none() = nb::none())
-      .def("clone",
-          &goblin::UnivariateFOS::clone)
-      .def("init",
-          &goblin::UnivariateFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
-      .def("subsets",
-          &goblin::UnivariateFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
-      .def("is_static",
-          &goblin::UnivariateFOS::is_static)
-      ;
-
-
-  auto pyClassFullFOS =
-      nb::class_<goblin::FullFOS, goblin::LinkageModelBase>
-          (m, "FullFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<goblin::Subset>>(),
-          nb::arg("subset").none() = nb::none())
-      .def("clone",
-          &goblin::FullFOS::clone)
-      .def("init",
-          &goblin::FullFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
-      .def("subsets",
-          &goblin::FullFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
-      .def("is_static",
-          &goblin::FullFOS::is_static)
-      ;
-
-
-  auto pyClassLinkageTreeFOS =
-      nb::class_<goblin::LinkageTreeFOS, goblin::LinkageModelBase>
-          (m, "LinkageTreeFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>, std::optional<CType>, std::optional<bool>, std::optional<usize>, bool, std::optional<goblin::Subset>, std::optional<Mat<CType>>, std::optional<CType>, std::optional<std::string>, std::optional<std::function<void(CRef<Mat<CType>>)>>, bool>(),
-          nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true, nb::arg("num_continuous_bins").none() = nb::none(), nb::arg("filter_parent_threshold").none() = nb::none(), nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(), nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false, nb::arg("subset").none() = nb::none(), nb::arg("custom_similarity").none() = nb::none(), nb::arg("eta_custom_similarity").none() = nb::none(), nb::arg("custom_similarity_agg").none() = nb::none(), nb::arg("similarity_callback").none() = nb::none(), nb::arg("freeze") = false)
-      .def("clone",
-          &goblin::LinkageTreeFOS::clone)
-      .def("is_static",
-          &goblin::LinkageTreeFOS::is_static)
-      .def("register_similarity_callback",
-          &goblin::LinkageTreeFOS::register_similarity_callback, nb::arg("similarity_callback"))
-      .def("unregister_similarity_callback",
-          &goblin::LinkageTreeFOS::unregister_similarity_callback)
-      .def("init",
-          &goblin::LinkageTreeFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
-      .def("compute_similarity",
-          &goblin::LinkageTreeFOS::compute_similarity, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
-      .def("learn_lt",
-          &goblin::LinkageTreeFOS::learn_lt, nb::arg("rng"), nb::arg("similarity"), nb::arg("filter_root_default"))
-      .def("learn_lt_original",
-          &goblin::LinkageTreeFOS::learn_lt_original, nb::arg("rng"), nb::arg("similarity"), nb::arg("filter_root_default"))
-      .def("subsets",
-          &goblin::LinkageTreeFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
-      ;
-
-
-  auto pyClassCombinedFOS =
-      nb::class_<goblin::CombinedFOS, goblin::LinkageModelBase>
-          (m, "CombinedFOS", nb::is_final(), "\n(final class)")
-      .def(nb::init<const std::vector<std::unique_ptr<goblin::LinkageModelBase>> &>(),
-          nb::arg("linkage_models"))
-      .def("add_model",
-          &goblin::CombinedFOS::add_model, nb::arg("model"))
-      .def(nb::init<goblin::CombinedFOS &&>(),
-          nb::arg("param_0"),
-          "But moving is allowed")
-      .def("clone",
-          &goblin::CombinedFOS::clone)
-      .def("init",
-          &goblin::CombinedFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("variables"))
-      .def("subsets",
-          &goblin::CombinedFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
-      .def("is_static",
-          &goblin::CombinedFOS::is_static)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_METHOD_H
-  //
-
-
-  auto pyClassMethodBase =
-      nb::class_<goblin::MethodBase, goblin::MethodBase_trampoline>
-          (m, "MethodBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("run",
-          &goblin::MethodBase::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none(), nb::arg("population_size").none())
-      .def("current_generation",
-          &goblin::MethodBase::current_generation, "/ Evaluations used and time elapsed can be collected without knowing about\n/ method details, but not the generation/iteraction. This method provides a\n/ hook for tracking the progress over generations")
-      .def("current_population",
-          &goblin::MethodBase::current_population, "/ Size and generations of the currently active population if available for multi-start schemes")
-      ;
-  // #endif
-  // #ifndef _GOBLIN_LIB_INIT_H
-  //
-
-
-  auto pyClassInitBase =
-      nb::class_<goblin::InitBase, goblin::InitBase_trampoline>
-          (m, "InitBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::InitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      .def("add_random",
-          &goblin::InitBase::add_random, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"), nb::arg("count"))
-      ;
-
-
-  auto pyClassDiscreteInitBase =
-      nb::class_<goblin::DiscreteInitBase, goblin::DiscreteInitBase_trampoline>
-          (m, "DiscreteInitBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::DiscreteInitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassContinuousInitBase =
-      nb::class_<goblin::ContinuousInitBase, goblin::ContinuousInitBase_trampoline>
-          (m, "ContinuousInitBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::ContinuousInitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassRandomDInit =
-      nb::class_<goblin::RandomDInit, goblin::DiscreteInitBase>
-          (m, "RandomDInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::RandomDInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassRandomCInit =
-      nb::class_<goblin::RandomCInit, goblin::ContinuousInitBase>
-          (m, "RandomCInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::RandomCInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassRandomInit =
-      nb::class_<goblin::RandomInit, goblin::InitBase>
-          (m, "RandomInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::RandomInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassCombinedInit =
-      nb::class_<goblin::CombinedInit, goblin::InitBase>
-          (m, "CombinedInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<std::shared_ptr<goblin::DiscreteInitBase>>, std::optional<std::shared_ptr<goblin::ContinuousInitBase>>>(),
-          nb::arg("discrete").none() = nb::none(), nb::arg("continuous").none() = nb::none())
-      .def("sample",
-          &goblin::CombinedInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  m.def("from_any_init",
-      goblin::from_any_init, nb::arg("any_init"));
-
-
-  auto pyClassCompleteInit =
-      nb::class_<goblin::CompleteInit, goblin::DiscreteInitBase>
-          (m, "CompleteInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_GP_CONTEXT_H
-  //
-  // #ifndef _GOBLIN_GP_OPERATOR_H
-  //
-  // #ifndef _GOBLIN_GP_TEMPLATE_H
-  //
-
-
-  auto pyClassTemplateNode =
-      nb::class_<goblin::TemplateNode>
-          (m, "TemplateNode", "")
-      .def("__init__", [](goblin::TemplateNode * self, const std::optional<const std::vector<goblin::TemplateNode>> & children = std::nullopt, size_t max_num_nodes = size_t())
-      {
-          new (self) goblin::TemplateNode();  // placement new
-          auto r_ctor_ = self;
-          if (children.has_value())
-              r_ctor_->children = children.value();
-          else
-              r_ctor_->children = std::vector<goblin::TemplateNode>();
-          r_ctor_->max_num_nodes = max_num_nodes;
-      },
-      nb::arg("children").none() = nb::none(), nb::arg("max_num_nodes") = size_t()
-      )
-      .def_rw("children", &goblin::TemplateNode::children, "")
-      .def_rw("max_num_nodes", &goblin::TemplateNode::max_num_nodes, "")
-      .def_static("full_nary",
-          &goblin::TemplateNode::full_nary, nb::arg("branching_factor"), nb::arg("depth"))
-      .def("size",
-          &goblin::TemplateNode::size)
-      .def("max_num_children",
-          &goblin::TemplateNode::max_num_children)
-      .def("is_tree",
-          &goblin::TemplateNode::is_tree)
-      .def("is_cycle_free",
-          &goblin::TemplateNode::is_cycle_free)
-      ;
-
-
-  auto pyClassTemplate =
-      nb::class_<goblin::Template>
-          (m, "Template", "")
-      .def_rw("outputs", &goblin::Template::outputs, "")
-      .def_rw("subexpressions", &goblin::Template::subexpressions, "")
-      .def(nb::init<>())
-      .def(nb::init<std::vector<goblin::TemplateNode>, std::vector<goblin::TemplateNode>>(),
-          nb::arg("outputs"), nb::arg("subexpressions"))
-      .def("size",
-          &goblin::Template::size)
-      .def("max_num_children",
-          &goblin::Template::max_num_children)
-      .def("add_output",
-          &goblin::Template::add_output, nb::arg("output"))
-      .def("add_subtree",
-          &goblin::Template::add_subtree, nb::arg("subexpression"))
-      .def("is_valid",
-          &goblin::Template::is_valid)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_GA_GP_TYPES_H
-  //
-
-
-  auto pyEnumKernelVersion =
-      nb::enum_<goblin::KernelVersion>(m, "KernelVersion", nb::is_arithmetic(), " SingleBlock: one block per solution; threads partition the datapoints within that block.\n DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.")
-          .value("single_block", goblin::KernelVersion::SingleBlock, "")
-          .value("dynamic_block", goblin::KernelVersion::DynamicBlock, "");
-
-
-  m.def("to_string",
-      goblin::to_string, nb::arg("v"));
-
-
-  auto pyEnumNodeType =
-      nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(), " Trees are encoded as parallel arrays (type[], value[]) in postfix order.\n Input: value holds the feature index.\n Constant: value holds the literal constant.\n Operator: value is the Operator enum cast to float.")
-          .value("input", goblin::NodeType::Input, "")
-          .value("constant", goblin::NodeType::Constant, "")
-          .value("operator", goblin::NodeType::Operator, "")
-          .value("parameter", goblin::NodeType::Parameter, "");
-
-
-  auto pyEnumOperator =
-      nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
-          .value("add", goblin::Operator::Add, "")
-          .value("sub", goblin::Operator::Sub, "")
-          .value("mul", goblin::Operator::Mul, "")
-          .value("div", goblin::Operator::Div, "")
-          .value("sin", goblin::Operator::Sin, "")
-          .value("cos", goblin::Operator::Cos, "")
-          .value("exp", goblin::Operator::Exp, "")
-          .value("log", goblin::Operator::Log, "")
-          .value("square", goblin::Operator::Square, "")
-          .value("sqrt", goblin::Operator::Sqrt, "")
-          .value("pow", goblin::Operator::Pow, "")
-          .value("abs", goblin::Operator::Abs, "")
-          .value("min", goblin::Operator::Min, "")
-          .value("max", goblin::Operator::Max, "");
-  // #endif
-
-
-  auto pyClassOperatorBase =
-      nb::class_<goblin::OperatorBase, goblin::OperatorBase_trampoline>
-          (m, "OperatorBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OperatorBase::min_arity)
-      .def("max_arity",
-          &goblin::OperatorBase::max_arity)
-      .def("is_commutative",
-          &goblin::OperatorBase::is_commutative)
-      .def("apply",
-          &goblin::OperatorBase::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OperatorBase::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OperatorBase::has_gradient)
-      .def("apply_grad",
-          &goblin::OperatorBase::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("__call__",
-          &goblin::OperatorBase::operator(), nb::arg("args"))
-      .def("gpu_operator_id",
-          &goblin::OperatorBase::gpu_operator_id)
-      .def("format",
-          &goblin::OperatorBase::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpIdentity =
-      nb::class_<goblin::OpIdentity, goblin::OperatorBase>
-          (m, "OpIdentity", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpIdentity::min_arity)
-      .def("max_arity",
-          &goblin::OpIdentity::max_arity)
-      .def("is_commutative",
-          &goblin::OpIdentity::is_commutative)
-      .def("apply",
-          &goblin::OpIdentity::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpIdentity::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpIdentity::has_gradient)
-      .def("apply_grad",
-          &goblin::OpIdentity::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("format",
-          &goblin::OpIdentity::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpAdd =
-      nb::class_<goblin::OpAdd, goblin::OperatorBase>
-          (m, "OpAdd", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpAdd::min_arity)
-      .def("max_arity",
-          &goblin::OpAdd::max_arity)
-      .def("is_commutative",
-          &goblin::OpAdd::is_commutative)
-      .def("apply",
-          &goblin::OpAdd::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpAdd::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpAdd::has_gradient)
-      .def("apply_grad",
-          &goblin::OpAdd::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpAdd::gpu_operator_id)
-      .def("format",
-          &goblin::OpAdd::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpSub =
-      nb::class_<goblin::OpSub, goblin::OperatorBase>
-          (m, "OpSub", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpSub::min_arity)
-      .def("max_arity",
-          &goblin::OpSub::max_arity)
-      .def("is_commutative",
-          &goblin::OpSub::is_commutative)
-      .def("apply",
-          &goblin::OpSub::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpSub::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpSub::has_gradient)
-      .def("apply_grad",
-          &goblin::OpSub::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("format",
-          &goblin::OpSub::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpSubGPU =
-      nb::class_<goblin::OpSubGPU, goblin::OperatorBase>
-          (m, "OpSubGPU", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpSubGPU::min_arity)
-      .def("max_arity",
-          &goblin::OpSubGPU::max_arity)
-      .def("is_commutative",
-          &goblin::OpSubGPU::is_commutative)
-      .def("apply",
-          &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpSubGPU::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpSubGPU::has_gradient)
-      .def("apply_grad",
-          &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpSubGPU::gpu_operator_id)
-      .def("format",
-          &goblin::OpSubGPU::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpMul =
-      nb::class_<goblin::OpMul, goblin::OperatorBase>
-          (m, "OpMul", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpMul::min_arity)
-      .def("max_arity",
-          &goblin::OpMul::max_arity)
-      .def("is_commutative",
-          &goblin::OpMul::is_commutative)
-      .def("apply",
-          &goblin::OpMul::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpMul::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpMul::has_gradient)
-      .def("apply_grad",
-          &goblin::OpMul::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpMul::gpu_operator_id)
-      .def("format",
-          &goblin::OpMul::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpDiv =
-      nb::class_<goblin::OpDiv, goblin::OperatorBase>
-          (m, "OpDiv", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpDiv::min_arity)
-      .def("max_arity",
-          &goblin::OpDiv::max_arity)
-      .def("is_commutative",
-          &goblin::OpDiv::is_commutative)
-      .def("apply",
-          &goblin::OpDiv::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpDiv::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpDiv::has_gradient)
-      .def("apply_grad",
-          &goblin::OpDiv::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpDiv::gpu_operator_id)
-      .def("format",
-          &goblin::OpDiv::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpSin =
-      nb::class_<goblin::OpSin, goblin::OperatorBase>
-          (m, "OpSin", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpSin::min_arity)
-      .def("max_arity",
-          &goblin::OpSin::max_arity)
-      .def("is_commutative",
-          &goblin::OpSin::is_commutative)
-      .def("apply",
-          &goblin::OpSin::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpSin::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpSin::has_gradient)
-      .def("apply_grad",
-          &goblin::OpSin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpSin::gpu_operator_id)
-      .def("format",
-          &goblin::OpSin::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpCos =
-      nb::class_<goblin::OpCos, goblin::OperatorBase>
-          (m, "OpCos", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpCos::min_arity)
-      .def("max_arity",
-          &goblin::OpCos::max_arity)
-      .def("is_commutative",
-          &goblin::OpCos::is_commutative)
-      .def("apply",
-          &goblin::OpCos::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpCos::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpCos::has_gradient)
-      .def("apply_grad",
-          &goblin::OpCos::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpCos::gpu_operator_id)
-      .def("format",
-          &goblin::OpCos::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpExp =
-      nb::class_<goblin::OpExp, goblin::OperatorBase>
-          (m, "OpExp", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpExp::min_arity)
-      .def("max_arity",
-          &goblin::OpExp::max_arity)
-      .def("is_commutative",
-          &goblin::OpExp::is_commutative)
-      .def("apply",
-          &goblin::OpExp::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpExp::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpExp::has_gradient)
-      .def("apply_grad",
-          &goblin::OpExp::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpExp::gpu_operator_id)
-      .def("format",
-          &goblin::OpExp::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpLog =
-      nb::class_<goblin::OpLog, goblin::OperatorBase>
-          (m, "OpLog", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpLog::min_arity)
-      .def("max_arity",
-          &goblin::OpLog::max_arity)
-      .def("is_commutative",
-          &goblin::OpLog::is_commutative)
-      .def("apply",
-          &goblin::OpLog::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpLog::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpLog::has_gradient)
-      .def("apply_grad",
-          &goblin::OpLog::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpLog::gpu_operator_id)
-      .def("format",
-          &goblin::OpLog::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpSquare =
-      nb::class_<goblin::OpSquare, goblin::OperatorBase>
-          (m, "OpSquare", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpSquare::min_arity)
-      .def("max_arity",
-          &goblin::OpSquare::max_arity)
-      .def("is_commutative",
-          &goblin::OpSquare::is_commutative)
-      .def("apply",
-          &goblin::OpSquare::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpSquare::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpSquare::has_gradient)
-      .def("apply_grad",
-          &goblin::OpSquare::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpSquare::gpu_operator_id)
-      .def("format",
-          &goblin::OpSquare::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpSqrt =
-      nb::class_<goblin::OpSqrt, goblin::OperatorBase>
-          (m, "OpSqrt", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpSqrt::min_arity)
-      .def("max_arity",
-          &goblin::OpSqrt::max_arity)
-      .def("is_commutative",
-          &goblin::OpSqrt::is_commutative)
-      .def("apply",
-          &goblin::OpSqrt::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpSqrt::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpSqrt::has_gradient)
-      .def("apply_grad",
-          &goblin::OpSqrt::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpSqrt::gpu_operator_id)
-      .def("format",
-          &goblin::OpSqrt::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpPow =
-      nb::class_<goblin::OpPow, goblin::OperatorBase>
-          (m, "OpPow", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpPow::min_arity)
-      .def("max_arity",
-          &goblin::OpPow::max_arity)
-      .def("is_commutative",
-          &goblin::OpPow::is_commutative)
-      .def("apply",
-          &goblin::OpPow::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpPow::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpPow::has_gradient)
-      .def("apply_grad",
-          &goblin::OpPow::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpPow::gpu_operator_id)
-      .def("format",
-          &goblin::OpPow::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpAbs =
-      nb::class_<goblin::OpAbs, goblin::OperatorBase>
-          (m, "OpAbs", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpAbs::min_arity)
-      .def("max_arity",
-          &goblin::OpAbs::max_arity)
-      .def("is_commutative",
-          &goblin::OpAbs::is_commutative)
-      .def("apply",
-          &goblin::OpAbs::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpAbs::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpAbs::has_gradient)
-      .def("apply_grad",
-          &goblin::OpAbs::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpAbs::gpu_operator_id)
-      .def("format",
-          &goblin::OpAbs::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpMin =
-      nb::class_<goblin::OpMin, goblin::OperatorBase>
-          (m, "OpMin", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpMin::min_arity)
-      .def("max_arity",
-          &goblin::OpMin::max_arity)
-      .def("is_commutative",
-          &goblin::OpMin::is_commutative)
-      .def("apply",
-          &goblin::OpMin::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpMin::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpMin::has_gradient)
-      .def("apply_grad",
-          &goblin::OpMin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpMin::gpu_operator_id)
-      .def("format",
-          &goblin::OpMin::format, nb::arg("args"))
-      ;
-
-
-  auto pyClassOpMax =
-      nb::class_<goblin::OpMax, goblin::OperatorBase>
-          (m, "OpMax", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("min_arity",
-          &goblin::OpMax::min_arity)
-      .def("max_arity",
-          &goblin::OpMax::max_arity)
-      .def("is_commutative",
-          &goblin::OpMax::is_commutative)
-      .def("apply",
-          &goblin::OpMax::apply, nb::arg("out"), nb::arg("args"))
-      .def("apply_buf",
-          &goblin::OpMax::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
-      .def("has_gradient",
-          &goblin::OpMax::has_gradient)
-      .def("apply_grad",
-          &goblin::OpMax::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"), nb::arg("d_args"))
-      .def("gpu_operator_id",
-          &goblin::OpMax::gpu_operator_id)
-      .def("format",
-          &goblin::OpMax::format, nb::arg("args"))
-      ;
-  // #endif
-
-
-  auto pyEnumConstantRepr =
-      nb::enum_<goblin::ConstantRepr>(m, "ConstantRepr", nb::is_arithmetic(), "")
-          .value("er_cs", goblin::ConstantRepr::ERCs, "")
-          .value("edges", goblin::ConstantRepr::Edges, "")
-          .value("pool", goblin::ConstantRepr::Pool, "")
-          .value("none", goblin::ConstantRepr::None, "");
-
-
-  auto pyEnumValueKind =
-      nb::enum_<goblin::ValueKind>(m, "ValueKind", nb::is_arithmetic(), "")
-          .value("input", goblin::ValueKind::Input, "input feature idx")
-          .value("constant", goblin::ValueKind::Constant, "constant marker/pool idx")
-          .value("operator", goblin::ValueKind::Operator, "operator idx")
-          .value("arg", goblin::ValueKind::Arg, "subfunction argument idx")
-          .value("subtree", goblin::ValueKind::Subtree, "subtree idx")
-          .value("parameter", goblin::ValueKind::Parameter, "function class parameter idx");
-
-
-  auto pyClassGPContext =
-      nb::class_<goblin::GPContext>
-          (m, "GPContext", "/ The lookup tables needed to map the linear representation to the encoded\n/ semantics and the methods for computing the output, active nodes and sympy\n/ conversion.\n/\n/ A two-step approach is used, where each semantic symbol (e.g. operators or\n/ input features) are mapped to a value. However, the domain for e.g. leaf\n/ nodes does not contain all values, so a second mapping is used to map\n/ between node domain and value.")
-      .def(nb::init<usize, goblin::Template, std::vector<std::shared_ptr<goblin::OperatorBase>>, usize, std::string_view, usize, bool, std::optional<usize>, bool>(),
-          nb::arg("num_inputs"), nb::arg("expression_template"), nb::arg("operators"), nb::arg("num_parameters") = 0, nb::arg("constant_representation") = "ercs", nb::arg("constant_pool_size") = 10, nb::arg("enable_subfunctions") = false, nb::arg("max_expression_size").none() = nb::none(), nb::arg("use_apply_buf") = true)
-      .def("value2domain",
-          &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
-      .def("parent",
-          &goblin::GPContext::parent, nb::arg("index"))
-      .def("debug_log_expressions",
-          &goblin::GPContext::debug_log_expressions,
-          nb::arg("os"), nb::arg("solution"), nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
-          "A helper that prints the expression in a human readable format")
-      .def("subtrees_to_sympy",
-          &goblin::GPContext::subtrees_to_sympy,
-          nb::arg("solution"),
-          " Returns a sympy-like string for each subexpression tree in isolation.\n Subtree references within a subtree are inlined (subtrees can only call\n earlier ones). Arg nodes (enable_subfunctions=True) appear as arg0, arg1, ...")
-      .def("to_sympy_unresolved",
-          &goblin::GPContext::to_sympy_unresolved, nb::arg("solution"))
-      .def("to_sympy",
-          &goblin::GPContext::to_sympy, nb::arg("solution"))
-      .def("normalized_root_proximity",
-          &goblin::GPContext::normalized_root_proximity, " Matrix of size `num_discrete x num_discrete`, where the entry i,j\n corresponds to the average proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)\n if both are from the same tree, otherwise 0")
-      .def("normalized_node_proximity",
-          &goblin::GPContext::normalized_node_proximity, "Normalized node proximity [1.0: same node, 0.0: no connection]")
-      .def("normalized_w_vig",
-          &goblin::GPContext::normalized_wVIG, "Normalized node proximity [1.0: same node, 0.0: no connection]")
-      .def("subtree_co_occurrences",
-          &goblin::GPContext::subtree_co_occurrences)
-      .def("copy_tree",
-          &goblin::GPContext::copy_tree, nb::arg("source"), nb::arg("source_node"), nb::arg("target"), nb::arg("target_node"))
-      .def("active_nodes",
-          &goblin::GPContext::active_nodes, nb::arg("solution"))
-      .def("active_constant_indices",
-          &goblin::GPContext::active_constant_indices, nb::arg("solution"))
-      .def_rw("const_repr", &goblin::GPContext::const_repr, "")
-      .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
-      .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")
-      .def_rw("num_subexpressions", &goblin::GPContext::num_subexpressions, "")
-      .def_rw("num_discrete", &goblin::GPContext::num_discrete, "")
-      .def_rw("num_continuous", &goblin::GPContext::num_continuous, "")
-      .def_rw("max_expression_size", &goblin::GPContext::max_expression_size, "")
-      .def_rw("num_parameters", &goblin::GPContext::num_parameters, "")
-      .def_rw("max_num_children", &goblin::GPContext::max_num_children, "")
-      .def_rw("enable_subfunctions", &goblin::GPContext::enable_subfunctions, "")
-      .def_rw("use_apply_buf", &goblin::GPContext::use_apply_buf, "")
-      .def_rw("operators", &goblin::GPContext::operators, "")
-      .def_rw("op_idx2value", &goblin::GPContext::op_idx2value, "")
-      .def_rw("value_kind", &goblin::GPContext::value_kind, "")
-      .def_rw("value_min_arity", &goblin::GPContext::value_min_arity, "")
-      .def_rw("value_max_arity", &goblin::GPContext::value_max_arity, "")
-      .def_rw("value_idx", &goblin::GPContext::value_idx, "")
-      .def_rw("subtree_roots", &goblin::GPContext::subtree_roots, "indices of all subtree root nodes")
-      .def_rw("output_roots", &goblin::GPContext::output_roots, "indices of all output root nodes")
-      .def_rw("domain_sizes", &goblin::GPContext::domain_sizes, "node -> domain size")
-      .def_rw("domain2value", &goblin::GPContext::domain2value, "node domain -> value")
-      .def_rw("root", &goblin::GPContext::root, "node -> current tree root")
-      .def_rw("sizes", &goblin::GPContext::sizes, "node -> size of subtree starting at node,")
-      .def_rw("depth", &goblin::GPContext::depth, "node -> node depth")
-      .def_rw("height", &goblin::GPContext::height, "node -> node height")
-      .def_rw("children", &goblin::GPContext::children, "node -> child node indices")
-      .def_rw("nodes", &goblin::GPContext::nodes, "node -> indices corresponding to the subtree starting at this")
-      ;
-  // #endif
-  // #ifndef _GOBLIN_GP_INIT_H
-  //
-  // #ifndef _GOBLIN_GP_INSTANCE_H
-  //
-
-
-  auto pyClassGPInstanceBase =
-      nb::class_<goblin::GPInstanceBase, goblin::InstanceBase, goblin::GPInstanceBase_trampoline>
-          (m, "GPInstanceBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("context",
-          &goblin::GPInstanceBase::context)
-      ;
-
-
-  auto pyClassPyGPInstance =
-      nb::class_<goblin::PyGPInstance, goblin::GPInstanceBase>
-          (m, "PyGPInstance", "")
-      .def(nb::init<goblin::GPContext, std::function<std::tuple<Vec<CType>, CType>(std::function<std::optional<Arr2D<CType>>(Arr2D<CType>)>,
-                                                                 std::vector<std::string>,
-                                                                 usize)>, usize, AnyInit, bool, CType, CType>(),
-          nb::arg("ctx"), nb::arg("evaluate"), nb::arg("num_objectives"), nb::arg("init"), nb::arg("minimize") = true, nb::arg("erc_init_lb") = -10.0, nb::arg("erc_init_ub") = 10.0)
-      .def("discrete_domain_sizes",
-          &goblin::PyGPInstance::discrete_domain_sizes)
-      .def("continuous_lower_bounds",
-          &goblin::PyGPInstance::continuous_lower_bounds)
-      .def("continuous_upper_bounds",
-          &goblin::PyGPInstance::continuous_upper_bounds)
-      .def("continuous_init_lower_bounds",
-          &goblin::PyGPInstance::continuous_init_lower_bounds)
-      .def("continuous_init_upper_bounds",
-          &goblin::PyGPInstance::continuous_init_upper_bounds)
-      .def("evaluate",
-          &goblin::PyGPInstance::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("add_random",
-          &goblin::PyGPInstance::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-      .def("fitness",
-          &goblin::PyGPInstance::fitness)
-      .def("archive_fitness",
-          &goblin::PyGPInstance::archive_fitness)
-      .def("inherit_discrete",
-          &goblin::PyGPInstance::inherit_discrete, nb::arg("offspring"), nb::arg("donor"), nb::arg("subset"))
-      .def("as_continuous",
-          &goblin::PyGPInstance::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
-      .def("log_solution",
-          &goblin::PyGPInstance::log_solution, nb::arg("os"), nb::arg("solution"))
-      .def("context",
-          &goblin::PyGPInstance::context)
-      ;
-  // #endif
-
-
-  auto pyClassGrowInit =
-      nb::class_<goblin::GrowInit, goblin::DiscreteInitBase>
-          (m, "GrowInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<double>, std::optional<double>>(),
-          nb::arg("p_terminal").none() = nb::none(), nb::arg("p_constant").none() = nb::none())
-      .def("sample",
-          &goblin::GrowInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassFullInit =
-      nb::class_<goblin::FullInit, goblin::DiscreteInitBase>
-          (m, "FullInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<double>>(),
-          nb::arg("p_constant").none() = nb::none())
-      .def("sample",
-          &goblin::FullInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassHalfHalfInit =
-      nb::class_<goblin::HalfHalfInit, goblin::DiscreteInitBase>
-          (m, "HalfHalfInit", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::optional<double>, std::optional<double>>(),
-          nb::arg("p_terminal").none() = nb::none(), nb::arg("p_constant").none() = nb::none())
-      .def("sample",
-          &goblin::HalfHalfInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassPTC2Init =
-      nb::class_<goblin::PTC2Init, goblin::DiscreteInitBase>
-          (m, "PTC2Init", nb::is_final(), "/ PTC2 as per https://cs.gmu.edu/~sean/papers/treecreation.pdf\n(final class)")
-      .def(nb::init<std::optional<double>>(),
-          nb::arg("p_constant").none() = nb::none())
-      .def("sample",
-          &goblin::PTC2Init::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassRecursiveCompleteInit =
-      nb::class_<goblin::RecursiveCompleteInit, goblin::DiscreteInitBase>
-          (m, "RecursiveCompleteInit", nb::is_final(), "/ Complete init does not really work as intended for GP, since a lot of the diversity is distributed to inactive\n/ individuals. This version aims to have the active and inactive values per variable be \"probabilistically complete\"\n/ in isolation.\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def("sample",
-          &goblin::RecursiveCompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-
-
-  auto pyClassRecursiveCompleteInit2 =
-      nb::class_<goblin::RecursiveCompleteInit2, goblin::DiscreteInitBase>
-          (m, "RecursiveCompleteInit2", nb::is_final(), "/ Complete init does not really work as intended for GP, since a lot of the diversity is distributed to inactive\n/ individuals. This version aims to have the active and inactive values per variable be \"probabilistically complete\"\n/ in isolation.\n(final class)")
-      .def(nb::init<std::optional<double>, std::optional<double>>(),
-          nb::arg("p_terminal").none() = nb::none(), nb::arg("p_constant").none() = nb::none())
-      .def("sample",
-          &goblin::RecursiveCompleteInit2::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_GP_SR_H
-  //
-  // #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
-  //
-
-
-  m.def("round_up",
-      goblin::round_up, nb::arg("value"), nb::arg("multiple"));
-
-  m.def("ceil_div",
-      goblin::ceil_div, nb::arg("a"), nb::arg("b"));
-
-
-  auto pyClassKernelDim =
-      nb::class_<goblin::KernelDim>
-          (m, "KernelDim", "")
-      .def_rw("x", &goblin::KernelDim::x, "")
-      .def_rw("y", &goblin::KernelDim::y, "")
-      .def_rw("z", &goblin::KernelDim::z, "")
-      .def(nb::init<>())
-      .def(nb::init<size_t, size_t, size_t>(),
-          nb::arg("x"), nb::arg("y") = 1, nb::arg("z") = 1)
-      .def_static("determine",
-          &goblin::KernelDim::determine,
-          nb::arg("count"),
-          " Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)\n that minimizes idle threads when covering `count` items.")
-      .def("check",
-          &goblin::KernelDim::check)
-      .def("__eq__",
-          &goblin::KernelDim::operator==, nb::arg("other"))
-      ;
-
-
-  auto pyClassKernelConfig =
-      nb::class_<goblin::KernelConfig>
-          (m, "KernelConfig", "")
-      .def_rw("grid", &goblin::KernelConfig::grid, "")
-      .def_rw("block", &goblin::KernelConfig::block, "")
-      .def(nb::init<>())
-      .def(nb::init<goblin::KernelDim, goblin::KernelDim>(),
-          nb::arg("grid"), nb::arg("block"))
-      .def_static("single_block",
-          &goblin::KernelConfig::single_block,
-          nb::arg("num_solutions"), nb::arg("num_datapoints"),
-          "One block per solution; threads cover all datapoints in a single pass.")
-      .def_static("dynamic_block_evaluation",
-          &goblin::KernelConfig::dynamic_block_evaluation,
-          nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("blocks_per_individual"),
-          "Multiple blocks per solution; blocks partition the datapoints.")
-      .def_static("dynamic_block_reduction",
-          &goblin::KernelConfig::dynamic_block_reduction,
-          nb::arg("num_solutions"), nb::arg("num_partial"),
-          "One block per solution for the MSE reduction.")
-      .def("check",
-          &goblin::KernelConfig::check)
-      .def("__eq__",
-          &goblin::KernelConfig::operator==, nb::arg("other"))
-      ;
-
-
-  auto pyClassLaunchConfig =
-      nb::class_<goblin::LaunchConfig>
-          (m, "LaunchConfig", "")
-      .def_rw("eval", &goblin::LaunchConfig::eval, "")
-      .def_rw("mse", &goblin::LaunchConfig::mse, "DynamicBlock only: reduction pass")
-      .def_rw("kernel_version", &goblin::LaunchConfig::kernel_version, "")
-      .def_rw("num_solutions", &goblin::LaunchConfig::num_solutions, "")
-      .def_rw("num_datapoints", &goblin::LaunchConfig::num_datapoints, "")
-      .def_rw("solution_length", &goblin::LaunchConfig::solution_length, "")
-      .def_rw("blocks_per_individual", &goblin::LaunchConfig::blocks_per_individual, "DynamicBlock only: blocks assigned per solution")
-      .def_rw("datapoints_per_block", &goblin::LaunchConfig::datapoints_per_block, "DynamicBlock only: datapoints handled per block")
-      .def_rw("datapoints_per_thread", &goblin::LaunchConfig::datapoints_per_thread, "datapoints each thread evaluates in its loop")
-      .def(nb::init<>())
-      .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion>(),
-          nb::arg("eval"), nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::SingleBlock)
-      .def_static("determine",
-          &goblin::LaunchConfig::determine, nb::arg("kernel_version"), nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("solution_length"), nb::arg("num_sms").none())
-      .def("check",
-          &goblin::LaunchConfig::check)
-      .def("__eq__",
-          &goblin::LaunchConfig::operator==, nb::arg("other"))
-      ;
-  // #endif
-
-
-  auto pyClassSRQuality =
-      nb::class_<goblin::SRQuality, goblin::MOQuality>
-          (m, "SRQuality", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("clone",
-          &goblin::SRQuality::clone)
-      .def_rw("ls_params", &goblin::SRQuality::ls_params, " Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.\n Scaled prediction: intercept + slope * raw_tree_output.")
-      .def_rw("test_quality", &goblin::SRQuality::test_quality, " Lazily computed test-set accuracy, populated on first request via evaluate_test().\n Declared mutable because it is not part of solution identity and never drives decisions.")
-      ;
-
-
-  auto pyClassSRFitness =
-      nb::class_<goblin::SRFitness, goblin::MOFitness>
-          (m, "SRFitness", "")
-      .def(nb::init<usize, bool, CType>(),
-          nb::arg("num_objectives"), nb::arg("minimize") = true, nb::arg("epsilon") = 0.0)
-      .def("worst",
-          &goblin::SRFitness::worst)
-      ;
-
-
-  auto pyClassSRProblem =
-      nb::class_<goblin::SRProblem, goblin::GPInstanceBase>
-          (m, "SRProblem", " Symbolic regression problem: fits a GP tree to minimise one or more objectives\n (e.g. MSE, NMSE, tree size) over (X_train, Y_train) with optional linear scaling\n of the raw tree output.  GPU evaluation is available when GOBLIN_HAS_CUDA is defined.")
-      .def("__init__",
-          [](goblin::SRProblem * self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", const std::optional<const CType> & gradient_epsilon = std::nullopt, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt)
-          {
-              auto ctor_wrapper = [](goblin::SRProblem* self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", CType gradient_epsilon = goblin::DEFAULT_GRADIENT_EPSILON, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt) ->  void
-              {
-                  new(self) goblin::SRProblem(ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size, kernel_version); // placement new
-              };
-              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::SRProblem * self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt, std::variant<std::string, std::vector<std::string>> objectives = "mse", std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0, std::optional<std::vector<CType>> target_objectives = std::nullopt, std::string gradient_mode = "forward", const std::optional<const CType> & gradient_epsilon = std::nullopt, CType archive_epsilon = 0.0, std::optional<bool> always_inherit_continuous = std::nullopt, std::optional<usize> batch_size = std::nullopt, std::optional<goblin::KernelVersion> kernel_version = std::nullopt)
-              {
-
-                  const CType& gradient_epsilon_or_default = [&]() -> const CType {
-                      if (gradient_epsilon.has_value())
-                          return gradient_epsilon.value();
-                      else
-                          return goblin::DEFAULT_GRADIENT_EPSILON;
-                  }();
-
-                  ctor_wrapper(self, ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon_or_default, archive_epsilon, always_inherit_continuous, batch_size, kernel_version);
-              };
-
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling, init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode, gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size, kernel_version);
-          },
-          nb::arg("ctx"), nb::arg("x_train"), nb::arg("y_train"), nb::arg("x_test").none() = nb::none(), nb::arg("y_test").none() = nb::none(), nb::arg("objectives") = "mse", nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true, nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0, nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(), nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon").none() = nb::none(), nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(), nb::arg("batch_size").none() = nb::none(), nb::arg("kernel_version").none() = nb::none(),
-          " TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes\n adding custom objectives hard.  Dependency injection would be cleaner but risks\n recomputing the tree output multiple times.  Leaving hardcoded until a better design\n is found (see how other GP/SR libraries handle this).\n\n\nPython bindings defaults:\n    If gradient_epsilon is None, then its default value will be: DEFAULT_GRADIENT_EPSILON")
-      .def("adapt",
-          &goblin::SRProblem::adapt, nb::arg("rng"))
-      .def("discrete_domain_sizes",
-          &goblin::SRProblem::discrete_domain_sizes)
-      .def("continuous_lower_bounds",
-          &goblin::SRProblem::continuous_lower_bounds)
-      .def("continuous_upper_bounds",
-          &goblin::SRProblem::continuous_upper_bounds)
-      .def("continuous_init_lower_bounds",
-          &goblin::SRProblem::continuous_init_lower_bounds)
-      .def("continuous_init_upper_bounds",
-          &goblin::SRProblem::continuous_init_upper_bounds)
-      .def("evaluate",
-          &goblin::SRProblem::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("add_random",
-          &goblin::SRProblem::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-      .def("fitness",
-          &goblin::SRProblem::fitness)
-      .def("archive_fitness",
-          &goblin::SRProblem::archive_fitness)
-      .def("inherit_discrete",
-          &goblin::SRProblem::inherit_discrete, nb::arg("offspring"), nb::arg("donor"), nb::arg("subset"))
-      .def("as_continuous",
-          &goblin::SRProblem::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
-      .def("register_target",
-          nb::overload_cast<CRefS<Vec<CType>>>(&goblin::SRProblem::register_target), nb::arg("target_objectives"))
-      .def("register_target",
-          nb::overload_cast<std::vector<CType>>(&goblin::SRProblem::register_target), nb::arg("target_objectives"))
-      .def("target_reached",
-          &goblin::SRProblem::target_reached, nb::arg("archive"))
-      .def("log_header",
-          &goblin::SRProblem::log_header, nb::arg("os"))
-      .def("log",
-          &goblin::SRProblem::log, nb::arg("os"), nb::arg("solution"))
-      .def("log_solution",
-          &goblin::SRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
-      .def("log_solution_unresolved",
-          &goblin::SRProblem::log_solution_unresolved, nb::arg("os"), nb::arg("solution"))
-      .def("evaluate_test",
-          &goblin::SRProblem::evaluate_test, nb::arg("solution"))
-      .def("context",
-          &goblin::SRProblem::context)
-      .def("gradient_steps",
-          &goblin::SRProblem::gradient_steps, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
-      .def_rw("ctx", &goblin::SRProblem::ctx, "")
-      .def_rw("linear_scaling", &goblin::SRProblem::linear_scaling, "")
-      .def_rw("objectives", &goblin::SRProblem::objectives, "")
-      .def_rw("x_train", &goblin::SRProblem::X_train, "")
-      .def_rw("y_train", &goblin::SRProblem::Y_train, "")
-      .def_rw("var_y_train", &goblin::SRProblem::var_Y_train, "")
-      .def_rw("x_batch", &goblin::SRProblem::X_batch, "")
-      .def_rw("y_batch", &goblin::SRProblem::Y_batch, "")
-      .def_rw("var_y_batch", &goblin::SRProblem::var_Y_batch, "")
-      .def_rw("x_test", &goblin::SRProblem::X_test, "")
-      .def_rw("y_test", &goblin::SRProblem::Y_test, "")
-      .def_rw("var_y_test", &goblin::SRProblem::var_Y_test, "")
-      ;
-  // #endif
-
-  m.def("has_gpu_support",
-      has_gpu_support);
-  // #ifndef _GOBLIN_BENCH_FUNCTIONS_H
-  //
-
-
-  auto pyClassObjectiveBase =
-      nb::class_<goblin::ObjectiveBase, goblin::ObjectiveBase_trampoline>
-          (m, "ObjectiveBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_discrete",
-          &goblin::ObjectiveBase::num_discrete)
-      .def("num_continuous",
-          &goblin::ObjectiveBase::num_continuous)
-      .def("evaluate",
-          &goblin::ObjectiveBase::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::ObjectiveBase::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
-  //
-
-
-  auto pyClassBBO =
-      nb::class_<goblin::BBO, goblin::ObjectiveBase>
-          (m, "BBO", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(),
-          nb::arg("objective"))
-      .def("num_discrete",
-          &goblin::BBO::num_discrete)
-      .def("num_continuous",
-          &goblin::BBO::num_continuous)
-      .def("evaluate",
-          &goblin::BBO::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassMasked =
-      nb::class_<goblin::Masked, goblin::ObjectiveBase>
-          (m, "Masked", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(),
-          nb::arg("objective"))
-      .def("num_discrete",
-          &goblin::Masked::num_discrete)
-      .def("num_continuous",
-          &goblin::Masked::num_continuous)
-      .def("evaluate",
-          &goblin::Masked::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Masked::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassInverted =
-      nb::class_<goblin::Inverted, goblin::ObjectiveBase>
-          (m, "Inverted", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(),
-          nb::arg("objective"))
-      .def("num_discrete",
-          &goblin::Inverted::num_discrete)
-      .def("num_continuous",
-          &goblin::Inverted::num_continuous)
-      .def("evaluate",
-          &goblin::Inverted::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Inverted::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassRotated =
-      nb::class_<goblin::Rotated, goblin::ObjectiveBase>
-          (m, "Rotated", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, CType, std::optional<usize>>(),
-          nb::arg("objective"), nb::arg("rotation_angle") = -45.0, nb::arg("rotation_block_size").none() = nb::none())
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, usize, std::optional<usize>>(),
-          nb::arg("objective"), nb::arg("seed"), nb::arg("rotation_block_size").none() = nb::none())
-      .def("num_discrete",
-          &goblin::Rotated::num_discrete)
-      .def("num_continuous",
-          &goblin::Rotated::num_continuous)
-      .def("evaluate",
-          &goblin::Rotated::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Rotated::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassSum =
-      nb::class_<goblin::Sum, goblin::ObjectiveBase>
-          (m, "Sum", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(),
-          nb::arg("objectives"))
-      .def("num_discrete",
-          &goblin::Sum::num_discrete)
-      .def("num_continuous",
-          &goblin::Sum::num_continuous)
-      .def("evaluate",
-          &goblin::Sum::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Sum::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassMax =
-      nb::class_<goblin::Max, goblin::ObjectiveBase>
-          (m, "Max", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(),
-          nb::arg("objectives"))
-      .def("num_discrete",
-          &goblin::Max::num_discrete)
-      .def("num_continuous",
-          &goblin::Max::num_continuous)
-      .def("evaluate",
-          &goblin::Max::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Max::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassMin =
-      nb::class_<goblin::Min, goblin::ObjectiveBase>
-          (m, "Min", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(),
-          nb::arg("objectives"))
-      .def("num_discrete",
-          &goblin::Min::num_discrete)
-      .def("num_continuous",
-          &goblin::Min::num_continuous)
-      .def("evaluate",
-          &goblin::Min::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Min::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassConcat =
-      nb::class_<goblin::Concat, goblin::ObjectiveBase>
-          (m, "Concat", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(),
-          nb::arg("objectives"))
-      .def("num_discrete",
-          &goblin::Concat::num_discrete)
-      .def("num_continuous",
-          &goblin::Concat::num_continuous)
-      .def("evaluate",
-          &goblin::Concat::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Concat::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassRepeat =
-      nb::class_<goblin::Repeat, goblin::ObjectiveBase>
-          (m, "Repeat", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, usize>(),
-          nb::arg("objective"), nb::arg("repeats"))
-      .def("num_discrete",
-          &goblin::Repeat::num_discrete)
-      .def("num_continuous",
-          &goblin::Repeat::num_continuous)
-      .def("evaluate",
-          &goblin::Repeat::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Repeat::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
-  //
-
-
-  auto pyClassOneMax =
-      nb::class_<goblin::OneMax, goblin::ObjectiveBase>
-          (m, "OneMax", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::OneMax::num_discrete)
-      .def("num_continuous",
-          &goblin::OneMax::num_continuous)
-      .def("evaluate",
-          &goblin::OneMax::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::OneMax::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassZeroMax =
-      nb::class_<goblin::ZeroMax, goblin::ObjectiveBase>
-          (m, "ZeroMax", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::ZeroMax::num_discrete)
-      .def("num_continuous",
-          &goblin::ZeroMax::num_continuous)
-      .def("evaluate",
-          &goblin::ZeroMax::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::ZeroMax::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassLeadingOnes =
-      nb::class_<goblin::LeadingOnes, goblin::ObjectiveBase>
-          (m, "LeadingOnes", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::LeadingOnes::num_discrete)
-      .def("num_continuous",
-          &goblin::LeadingOnes::num_continuous)
-      .def("evaluate",
-          &goblin::LeadingOnes::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassTrailingZeros =
-      nb::class_<goblin::TrailingZeros, goblin::ObjectiveBase>
-          (m, "TrailingZeros", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::TrailingZeros::num_discrete)
-      .def("num_continuous",
-          &goblin::TrailingZeros::num_continuous)
-      .def("evaluate",
-          &goblin::TrailingZeros::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassHLeadingOnes =
-      nb::class_<goblin::HLeadingOnes, goblin::ObjectiveBase>
-          (m, "HLeadingOnes", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize, usize>(),
-          nb::arg("ndims"), nb::arg("branching_factor") = 2)
-      .def("num_discrete",
-          &goblin::HLeadingOnes::num_discrete)
-      .def("num_continuous",
-          &goblin::HLeadingOnes::num_continuous)
-      .def("evaluate",
-          &goblin::HLeadingOnes::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassDeceptiveTrap =
-      nb::class_<goblin::DeceptiveTrap, goblin::ObjectiveBase>
-          (m, "DeceptiveTrap", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def(nb::init<usize, usize>(),
-          nb::arg("ndims"), nb::arg("block_size"))
-      .def("num_discrete",
-          &goblin::DeceptiveTrap::num_discrete)
-      .def("num_continuous",
-          &goblin::DeceptiveTrap::num_continuous)
-      .def("evaluate",
-          &goblin::DeceptiveTrap::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassBimodalTrap =
-      nb::class_<goblin::BimodalTrap, goblin::ObjectiveBase>
-          (m, "BimodalTrap", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def(nb::init<usize, usize>(),
-          nb::arg("ndims"), nb::arg("block_size"))
-      .def("num_discrete",
-          &goblin::BimodalTrap::num_discrete)
-      .def("num_continuous",
-          &goblin::BimodalTrap::num_continuous)
-      .def("evaluate",
-          &goblin::BimodalTrap::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
-  //
-
-
-  auto pyClassSphere =
-      nb::class_<goblin::Sphere, goblin::ObjectiveBase>
-          (m, "Sphere", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::Sphere::num_discrete)
-      .def("num_continuous",
-          &goblin::Sphere::num_continuous)
-      .def("evaluate",
-          &goblin::Sphere::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      .def("evaluate_partial",
-          &goblin::Sphere::evaluate_partial, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"), nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"), nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"), nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"), nb::arg("continuous_indices"))
-      ;
-
-
-  auto pyClassRosenbrock =
-      nb::class_<goblin::Rosenbrock, goblin::ObjectiveBase>
-          (m, "Rosenbrock", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::Rosenbrock::num_discrete)
-      .def("num_continuous",
-          &goblin::Rosenbrock::num_continuous)
-      .def("evaluate",
-          &goblin::Rosenbrock::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassRastrigin =
-      nb::class_<goblin::Rastrigin, goblin::ObjectiveBase>
-          (m, "Rastrigin", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::Rastrigin::num_discrete)
-      .def("num_continuous",
-          &goblin::Rastrigin::num_continuous)
-      .def("evaluate",
-          &goblin::Rastrigin::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassGriewank =
-      nb::class_<goblin::Griewank, goblin::ObjectiveBase>
-          (m, "Griewank", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::Griewank::num_discrete)
-      .def("num_continuous",
-          &goblin::Griewank::num_continuous)
-      .def("evaluate",
-          &goblin::Griewank::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassEllipsoid =
-      nb::class_<goblin::Ellipsoid, goblin::ObjectiveBase>
-          (m, "Ellipsoid", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::Ellipsoid::num_discrete)
-      .def("num_continuous",
-          &goblin::Ellipsoid::num_continuous)
-      .def("evaluate",
-          &goblin::Ellipsoid::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-
-
-  auto pyClassCirclesInASquare =
-      nb::class_<goblin::CirclesInASquare, goblin::ObjectiveBase>
-          (m, "CirclesInASquare", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::CirclesInASquare::num_discrete)
-      .def("num_continuous",
-          &goblin::CirclesInASquare::num_continuous)
-      .def("evaluate",
-          &goblin::CirclesInASquare::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
-  //
-
-
-  auto pyClassLeadingSpheres =
-      nb::class_<goblin::LeadingSpheres, goblin::ObjectiveBase>
-          (m, "LeadingSpheres", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize>(),
-          nb::arg("ndims"))
-      .def("num_discrete",
-          &goblin::LeadingSpheres::num_discrete)
-      .def("num_continuous",
-          &goblin::LeadingSpheres::num_continuous)
-      .def("evaluate",
-          &goblin::LeadingSpheres::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_PROBLEM_H
-  //
-
-
-  auto pyClassMOFunctionBase =
-      nb::class_<goblin::MOFunctionBase, goblin::MOFunctionBase_trampoline>
-          (m, "MOFunctionBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_objectives",
-          &goblin::MOFunctionBase::num_objectives)
-      .def("num_discrete",
-          &goblin::MOFunctionBase::num_discrete)
-      .def("num_continuous",
-          &goblin::MOFunctionBase::num_continuous)
-      .def("evaluate",
-          &goblin::MOFunctionBase::evaluate, nb::arg("solution"))
-      .def("evaluate_partial",
-          &goblin::MOFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"), nb::arg("subset"))
-      ;
-
-
-  auto pyClassPyFunctionBase =
-      nb::class_<goblin::PyFunctionBase, goblin::MOFunctionBase, goblin::PyFunctionBase_trampoline>
-          (m, "PyFunctionBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("num_objectives",
-          &goblin::PyFunctionBase::num_objectives)
-      .def("num_discrete",
-          &goblin::PyFunctionBase::num_discrete)
-      .def("num_continuous",
-          &goblin::PyFunctionBase::num_continuous)
-      .def("eval",
-          &goblin::PyFunctionBase::eval, nb::arg("solution"))
-      .def("evaluate",
-          &goblin::PyFunctionBase::evaluate, nb::arg("solution"))
-      .def("evaluate_partial",
-          &goblin::PyFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"), nb::arg("subset"))
-      ;
-
-
-  auto pyClassObjectives =
-      nb::class_<goblin::Objectives, goblin::MOFunctionBase>
-          (m, "Objectives", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(),
-          nb::arg("objectives"))
-      .def("num_objectives",
-          &goblin::Objectives::num_objectives)
-      .def("num_discrete",
-          &goblin::Objectives::num_discrete)
-      .def("num_continuous",
-          &goblin::Objectives::num_continuous)
-      .def("evaluate",
-          &goblin::Objectives::evaluate, nb::arg("solution"))
-      .def("evaluate_partial",
-          &goblin::Objectives::evaluate_partial, nb::arg("solution"), nb::arg("parent"), nb::arg("subset"))
-      ;
-
-
-  auto pyClassBenchmarkInstance =
-      nb::class_<goblin::BenchmarkInstance, goblin::InstanceBase>
-          (m, "BenchmarkInstance", nb::is_final(), "\n(final class)")
-      .def("__init__",
-          [](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
-                                       std::shared_ptr<goblin::MOFunctionBase>,
-                                       std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
-          {
-              auto ctor_wrapper = [](goblin::BenchmarkInstance* self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
-                                               std::shared_ptr<goblin::MOFunctionBase>,
-                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, std::variant<DType, Vec<DType>> discrete_domain = DType(2), std::variant<CType, Vec<CType>> continuous_lower_bound = -std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_upper_bound = std::numeric_limits<CType>::infinity(), std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0), std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0), std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt) ->  void
-              {
-                  new(self) goblin::BenchmarkInstance(objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size); // placement new
-              };
-              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::BenchmarkInstance * self, std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
-                                               std::shared_ptr<goblin::MOFunctionBase>,
-                                               std::shared_ptr<goblin::ObjectiveBase>> objectives, const std::optional<const std::variant<DType, Vec<DType>>> & discrete_domain = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_upper_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt, std::optional<AnyInit> init = std::nullopt, std::optional<std::variant<Vec<CType>, std::tuple<Mat<DType>, Mat<CType>>, std::vector<CType>>> target = std::nullopt, std::optional<usize> target_archive_size = std::nullopt)
-              {
-
-                  const std::variant<DType, Vec<DType>>& discrete_domain_or_default = [&]() -> const std::variant<DType, Vec<DType>> {
-                      if (discrete_domain.has_value())
-                          return discrete_domain.value();
-                      else
-                          return DType(2);
-                  }();
-
-                  const std::variant<CType, Vec<CType>>& continuous_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_lower_bound.has_value())
-                          return continuous_lower_bound.value();
-                      else
-                          return -std::numeric_limits<CType>::infinity();
-                  }();
-
-                  const std::variant<CType, Vec<CType>>& continuous_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_upper_bound.has_value())
-                          return continuous_upper_bound.value();
-                      else
-                          return std::numeric_limits<CType>::infinity();
-                  }();
-
-                  const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_init_lower_bound.has_value())
-                          return continuous_init_lower_bound.value();
-                      else
-                          return CType(0.0);
-                  }();
-
-                  const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_init_upper_bound.has_value())
-                          return continuous_init_upper_bound.value();
-                      else
-                          return CType(1.0);
-                  }();
-
-                  ctor_wrapper(self, objectives, discrete_domain_or_default, continuous_lower_bound_or_default, continuous_upper_bound_or_default, continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default, init, target, target_archive_size);
-              };
-
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound, continuous_init_lower_bound, continuous_init_upper_bound, init, target, target_archive_size);
-          },
-          nb::arg("objectives"), nb::arg("discrete_domain").none() = nb::none(), nb::arg("continuous_lower_bound").none() = nb::none(), nb::arg("continuous_upper_bound").none() = nb::none(), nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(), nb::arg("init").none() = nb::none(), nb::arg("target").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none(),
-          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * discrete_domain: int(2)\n        * continuous_lower_bound: -std.numeric_limits<float>.infinity()\n        * continuous_upper_bound: std.numeric_limits<float>.infinity()\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
-      .def("set_init",
-          &goblin::BenchmarkInstance::set_init, nb::arg("init"))
-      .def("set_initial_bounds",
-          [](goblin::BenchmarkInstance & self, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt)
-          {
-              auto set_initial_bounds_adapt_mutable_param_with_default_value = [&self](const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_lower_bound = std::nullopt, const std::optional<const std::variant<CType, Vec<CType>>> & continuous_init_upper_bound = std::nullopt)
-              {
-
-                  const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_init_lower_bound.has_value())
-                          return continuous_init_lower_bound.value();
-                      else
-                          return CType(0.0);
-                  }();
-
-                  const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default = [&]() -> const std::variant<CType, Vec<CType>> {
-                      if (continuous_init_upper_bound.has_value())
-                          return continuous_init_upper_bound.value();
-                      else
-                          return CType(1.0);
-                  }();
-
-                  self.set_initial_bounds(continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default);
-              };
-
-              set_initial_bounds_adapt_mutable_param_with_default_value(continuous_init_lower_bound, continuous_init_upper_bound);
-          },
-          nb::arg("continuous_init_lower_bound").none() = nb::none(), nb::arg("continuous_init_upper_bound").none() = nb::none(),
-          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: float(1.0)")
-      .def("register_target",
-          nb::overload_cast<CRefS<Vec<CType>>>(&goblin::BenchmarkInstance::register_target), nb::arg("target_objectives"))
-      .def("register_target",
-          nb::overload_cast<std::vector<CType>>(&goblin::BenchmarkInstance::register_target), nb::arg("target_objectives"))
-      .def("register_target_front",
-          nb::overload_cast<const goblin::ArchiveBase &>(&goblin::BenchmarkInstance::register_target_front), nb::arg("other"))
-      .def("register_target_front",
-          nb::overload_cast<Mat<DType>, Mat<CType>>(&goblin::BenchmarkInstance::register_target_front), nb::arg("discrete"), nb::arg("continuous"))
-      .def("register_target_archive_size",
-          &goblin::BenchmarkInstance::register_target_archive_size, nb::arg("target_archive_size"))
-      .def("discrete_domain_sizes",
-          &goblin::BenchmarkInstance::discrete_domain_sizes)
-      .def("continuous_lower_bounds",
-          &goblin::BenchmarkInstance::continuous_lower_bounds)
-      .def("continuous_upper_bounds",
-          &goblin::BenchmarkInstance::continuous_upper_bounds)
-      .def("add_random",
-          &goblin::BenchmarkInstance::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-      .def("continuous_init_lower_bounds",
-          &goblin::BenchmarkInstance::continuous_init_lower_bounds)
-      .def("continuous_init_upper_bounds",
-          &goblin::BenchmarkInstance::continuous_init_upper_bounds)
-      .def("evaluate",
-          &goblin::BenchmarkInstance::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("evaluate_partial",
-          &goblin::BenchmarkInstance::evaluate_partial, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
-      .def("fitness",
-          &goblin::BenchmarkInstance::fitness)
-      .def("archive_fitness",
-          &goblin::BenchmarkInstance::archive_fitness)
-      .def("target_reached",
-          &goblin::BenchmarkInstance::target_reached, nb::arg("archive"))
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_TIMER_H
-  //
-
-
-  auto pyClassTimer =
-      nb::class_<goblin::Timer>
-          (m, "Timer", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def("start",
-          &goblin::Timer::start)
-      .def("stop",
-          &goblin::Timer::stop)
-      .def("elapsed",
-          &goblin::Timer::elapsed)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_BENCH_TRACKED_H
-  //
-
-
-  auto pyClassTrackingOptions =
-      nb::class_<goblin::TrackingOptions>
-          (m, "TrackingOptions", "")
-      // (default constructor explicitly deleted)
-      .def("__init__",
-          [](goblin::TrackingOptions * self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, bool report_on_archive_change = false, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, const std::optional<const std::chrono::nanoseconds> & initial_time_until_next_report = std::nullopt, u64 time_factor = 2, const std::optional<const std::chrono::nanoseconds> & max_time_until_next_report = std::nullopt)
-          {
-              auto ctor_wrapper = [](goblin::TrackingOptions* self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, bool report_on_archive_change = false, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1), u64 time_factor = 2, std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10)) ->  void
-              {
-                  new(self) goblin::TrackingOptions(logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, report_on_archive_change, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report, time_factor, max_time_until_next_report); // placement new
-              };
-              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::TrackingOptions * self, std::filesystem::path logpath, std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt, usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000, bool consider_evaluation_time = true, bool report_intermediate_results = true, bool report_on_archive_change = false, u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2, u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1, u64 generation_factor = 2, u64 max_generations_until_next_report = 100, const std::optional<const std::chrono::nanoseconds> & initial_time_until_next_report = std::nullopt, u64 time_factor = 2, const std::optional<const std::chrono::nanoseconds> & max_time_until_next_report = std::nullopt)
-              {
-
-                  const std::chrono::nanoseconds& initial_time_until_next_report_or_default = [&]() -> const std::chrono::nanoseconds {
-                      if (initial_time_until_next_report.has_value())
-                          return initial_time_until_next_report.value();
-                      else
-                          return std::chrono::seconds(1);
-                  }();
-
-                  const std::chrono::nanoseconds& max_time_until_next_report_or_default = [&]() -> const std::chrono::nanoseconds {
-                      if (max_time_until_next_report.has_value())
-                          return max_time_until_next_report.value();
-                      else
-                          return std::chrono::minutes(10);
-                  }();
-
-                  ctor_wrapper(self, logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, report_on_archive_change, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report_or_default, time_factor, max_time_until_next_report_or_default);
-              };
-
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption, consider_evaluation_time, report_intermediate_results, report_on_archive_change, initial_evaluations_until_next_report, eval_factor, max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor, max_generations_until_next_report, initial_time_until_next_report, time_factor, max_time_until_next_report);
-          },
-          nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100, nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true, nb::arg("report_intermediate_results") = true, nb::arg("report_on_archive_change") = false, nb::arg("initial_evaluations_until_next_report") = 10, nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000, nb::arg("initial_generations_until_next_report") = 1, nb::arg("generation_factor") = 2, nb::arg("max_generations_until_next_report") = 100, nb::arg("initial_time_until_next_report").none() = nb::none(), nb::arg("time_factor") = 2, nb::arg("max_time_until_next_report").none() = nb::none(),
-          " TODO at some point think about enabling dynamically setting the logging\n precision for floating points\n TODO at some point allow these params on Tracked::run to reduce the amount\n of config object nesting?\n\n\nPython bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * initial_time_until_next_report: std.chrono.seconds(1)\n        * max_time_until_next_report: std.chrono.minutes(10)")
-      .def_rw("archive_capacity", &goblin::TrackingOptions::archive_capacity, "")
-      .def_rw("max_evaluations_until_archive_adaption", &goblin::TrackingOptions::max_evaluations_until_archive_adaption, "")
-      .def_rw("consider_evaluation_time", &goblin::TrackingOptions::consider_evaluation_time, "")
-      .def_rw("report_intermediate_results", &goblin::TrackingOptions::report_intermediate_results, "")
-      .def_rw("report_on_archive_change", &goblin::TrackingOptions::report_on_archive_change, "")
-      .def_rw("initial_evaluations_until_next_report", &goblin::TrackingOptions::initial_evaluations_until_next_report, "")
-      .def_rw("eval_factor", &goblin::TrackingOptions::eval_factor, "1 is linear, >= 2 is exponential spacing")
-      .def_rw("max_evaluations_until_next_report", &goblin::TrackingOptions::max_evaluations_until_next_report, "")
-      .def_rw("initial_generations_until_next_report", &goblin::TrackingOptions::initial_generations_until_next_report, "")
-      .def_rw("generation_factor", &goblin::TrackingOptions::generation_factor, "1 is linear, >= 2 is exponential spacing")
-      .def_rw("max_generations_until_next_report", &goblin::TrackingOptions::max_generations_until_next_report, "")
-      .def_rw("initial_time_until_next_report", &goblin::TrackingOptions::initial_time_until_next_report, "")
-      .def_rw("time_factor", &goblin::TrackingOptions::time_factor, "1 is linear, >= 2 is exponential spacing")
-      .def_rw("max_time_until_next_report", &goblin::TrackingOptions::max_time_until_next_report, "")
-      ;
-
-
-  auto pyClassTracked =
-      nb::class_<goblin::Tracked, goblin::WrappedInstance>
-          (m, "Tracked", nb::is_final(), "/ An instance that intercepts evaluations\n(final class)")
-      // (default constructor explicitly deleted)
-      .def("evaluate",
-          &goblin::Tracked::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-      .def("evaluate_partial",
-          &goblin::Tracked::evaluate_partial, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
-      .def("adapt",
-          &goblin::Tracked::adapt, nb::arg("rng"))
-      .def("gradients",
-          &goblin::Tracked::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
-      .def("gradient_steps",
-          &goblin::Tracked::gradient_steps, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
-      .def_static("run",
-          &goblin::Tracked::run, nb::arg("instance"), nb::arg("method"), nb::arg("budget"), nb::arg("config"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      ;
-
-
-  m.def("debug_log",
-      goblin::debug_log,
-      nb::arg("problem"), nb::arg("path"), nb::arg("headers") = "", nb::arg("values") = "", nb::arg("population").none() = nb::none(),
-      "/ Tracked running was intended to unify reporting across algorithms\n/ - this method abuses that functionality to re-use that logging for\n/ other purposes controlled by the algorithm, not the tracking");
-  // #endif
-  // #ifndef _GOBLIN_LIB_IMS_H
-  //
-
-
-  auto pyClassIMSOptions =
-      nb::class_<goblin::IMSOptions>
-          (m, "IMSOptions", "")
-      .def("__init__", [](goblin::IMSOptions * self, usize initial_population_size = 2, usize max_num_populations = 25, usize subgeneration_factor = 4, bool restart_stale_populations = false, bool stop_covered_populations = false, usize initial_num_clusters = 1, std::optional<usize> archive_capacity = 100, bool so_parameter_space_clustering = false, usize additional_clusters_per_start = 1, std::optional<usize> generations_without_improvement_until_restart = std::nullopt, std::optional<usize> generations_without_improvement_until_stopping = std::nullopt, bool reevaluate_solutions_after_adaption = true, std::optional<std::string> population_logfile = std::nullopt, std::string population_log_resolution = "archive")
-      {
-          new (self) goblin::IMSOptions();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->initial_population_size = initial_population_size;
-          r_ctor_->max_num_populations = max_num_populations;
-          r_ctor_->subgeneration_factor = subgeneration_factor;
-          r_ctor_->restart_stale_populations = restart_stale_populations;
-          r_ctor_->stop_covered_populations = stop_covered_populations;
-          r_ctor_->initial_num_clusters = initial_num_clusters;
-          r_ctor_->archive_capacity = archive_capacity;
-          r_ctor_->so_parameter_space_clustering = so_parameter_space_clustering;
-          r_ctor_->additional_clusters_per_start = additional_clusters_per_start;
-          r_ctor_->generations_without_improvement_until_restart = generations_without_improvement_until_restart;
-          r_ctor_->generations_without_improvement_until_stopping = generations_without_improvement_until_stopping;
-          r_ctor_->reevaluate_solutions_after_adaption = reevaluate_solutions_after_adaption;
-          r_ctor_->population_logfile = population_logfile;
-          r_ctor_->population_log_resolution = population_log_resolution;
-      },
-      nb::arg("initial_population_size") = 2, nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 4, nb::arg("restart_stale_populations") = false, nb::arg("stop_covered_populations") = false, nb::arg("initial_num_clusters") = 1, nb::arg("archive_capacity").none() = 100, nb::arg("so_parameter_space_clustering") = false, nb::arg("additional_clusters_per_start") = 1, nb::arg("generations_without_improvement_until_restart").none() = nb::none(), nb::arg("generations_without_improvement_until_stopping").none() = nb::none(), nb::arg("reevaluate_solutions_after_adaption") = true, nb::arg("population_logfile").none() = nb::none(), nb::arg("population_log_resolution") = "archive"
-      )
-      .def_rw("initial_population_size", &goblin::IMSOptions::initial_population_size, "")
-      .def_rw("max_num_populations", &goblin::IMSOptions::max_num_populations, "")
-      .def_rw("subgeneration_factor", &goblin::IMSOptions::subgeneration_factor, "")
-      .def_rw("restart_stale_populations", &goblin::IMSOptions::restart_stale_populations, "")
-      .def_rw("stop_covered_populations", &goblin::IMSOptions::stop_covered_populations, "")
-      .def_rw("initial_num_clusters", &goblin::IMSOptions::initial_num_clusters, "")
-      .def_rw("archive_capacity", &goblin::IMSOptions::archive_capacity, "")
-      .def_rw("so_parameter_space_clustering", &goblin::IMSOptions::so_parameter_space_clustering, "TODO remove or implement parameter space clustering")
-      .def_rw("additional_clusters_per_start", &goblin::IMSOptions::additional_clusters_per_start, "")
-      .def_rw("generations_without_improvement_until_restart", &goblin::IMSOptions::generations_without_improvement_until_restart, "")
-      .def_rw("generations_without_improvement_until_stopping", &goblin::IMSOptions::generations_without_improvement_until_stopping, "")
-      .def_rw("reevaluate_solutions_after_adaption", &goblin::IMSOptions::reevaluate_solutions_after_adaption, "")
-      .def_rw("population_logfile", &goblin::IMSOptions::population_logfile, "")
-      .def_rw("population_log_resolution", &goblin::IMSOptions::population_log_resolution, "")
-      ;
-  // #endif
-  // #ifndef _GOBLIN_AMALGAM_H
-  //
-
-
-  auto pyClassAMaLGaM =
-      nb::class_<goblin::AMaLGaM, goblin::MethodBase>
-          (m, "AMaLGaM", nb::is_final(), "\n(final class)")
-      .def(nb::init<double, double, double, usize, usize, std::optional<double>, std::optional<usize>, std::optional<usize>>(),
-          nb::arg("init_lower_bound") = -1.0, nb::arg("init_upper_bound") = 1.0, nb::arg("fitness_variance_threshold") = 0.0, nb::arg("max_num_populations") = 25, nb::arg("max_evaluations") = 1000000, nb::arg("target_value").none() = nb::none(), nb::arg("base_population_size").none() = nb::none(), nb::arg("seed").none() = nb::none())
-      .def("set_init_bounds",
-          &goblin::AMaLGaM::set_init_bounds, nb::arg("lower"), nb::arg("upper"))
-      .def("run",
-          nb::overload_cast<std::function<std::tuple<double, double>(const Ref<Vec<double>>&)> &, std::vector<std::tuple<double, double>>>(&goblin::AMaLGaM::run), nb::arg("function"), nb::arg("bounds"))
-      .def("current_generation",
-          &goblin::AMaLGaM::current_generation)
-      .def("run",
-          nb::overload_cast<goblin::InstanceBase &, const goblin::Budget &, std::optional<u64>, std::optional<usize>>(&goblin::AMaLGaM::run), nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      ;
-  // #endif
-  // #ifndef _GOBLIN_GOMEA_LIBRARY_H
-  //
-
-
-  auto pyClassDiscreteGOMEA =
-      nb::class_<goblin::DiscreteGOMEA, goblin::MethodBase>
-          (m, "DiscreteGOMEA", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string_view, std::string, bool, bool, bool, std::optional<usize>, usize, usize, usize, usize, std::string>(),
-          nb::arg("linkage_model") = "LinkageTree", nb::arg("similarity_metric") = "MI", nb::arg("gene_invariant") = false, nb::arg("forced_improvements") = true, nb::arg("filter_linkage") = false, nb::arg("max_subset_size").none() = nb::none(), nb::arg("base_population_size") = 2, nb::arg("max_number_of_populations") = 100, nb::arg("subgeneration_factor") = 4, nb::arg("max_archive_size") = 0, nb::arg("fos_order") = "default")
-      .def("run",
-          &goblin::DiscreteGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      .def("current_generation",
-          &goblin::DiscreteGOMEA::current_generation)
-      ;
-
-
-  auto pyClassRvGOMEA =
-      nb::class_<goblin::RvGOMEA, goblin::MethodBase>
-          (m, "RvGOMEA", nb::is_final(), "\n(final class)")
-      .def(nb::init<std::string_view, usize, usize, usize, usize, double, double, double, double, bool, bool>(),
-          nb::arg("linkage_model") = "Full", nb::arg("base_population_size") = 10, nb::arg("max_number_of_populations") = 25, nb::arg("subgeneration_factor") = 8, nb::arg("max_nis") = 100, nb::arg("selection_percentile") = 0.35, nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("standard_deviation_threshold") = 1.0, nb::arg("fitness_variance_tolerance") = 0.0, nb::arg("selection_during_gom") = true, nb::arg("update_elitist_during_gom") = true)
-      .def("run",
-          &goblin::RvGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      .def("current_generation",
-          &goblin::RvGOMEA::current_generation)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_MO_BINARY_GOMEA_H
-  //
-
-
-  auto pyClassMOBinaryGOMEA =
-      nb::class_<goblin::MOBinaryGOMEA, goblin::MethodBase>
-          (m, "MOBinaryGOMEA", nb::is_final(), "\n(final class)")
-      .def(nb::init<usize, usize, usize, usize, std::string, bool>(),
-          nb::arg("initial_population_size") = 8, nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 2, nb::arg("target_archive_size") = 100, nb::arg("mutation") = "none", nb::arg("stop_covered_populations") = false)
-      .def("current_generation",
-          &goblin::MOBinaryGOMEA::current_generation)
-      .def("run",
-          &goblin::MOBinaryGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      ;
-  // #endif
-  // #ifndef _GOBLIN_MIXED_GOMEA_H
-  //
-  // #ifndef _GOBLIN_METHODS_CONTINUOUS_H
-  //
-
-
-  m.def("estimate_mean",
-      goblin::estimate_mean, nb::arg("solutions"), nb::arg("active_indices"), nb::arg("active_counts"), nb::arg("selection_percentile"), nb::arg("indices"), nb::arg("intron_aware"));
-
-  m.def("estimate_cov",
-      goblin::estimate_cov, nb::arg("solutions"), nb::arg("active_indices"), nb::arg("active_counts"), nb::arg("selection_percentile"), nb::arg("mean"), nb::arg("indices"), nb::arg("intron_aware"));
-
-
-  auto pyClassRvSubsetStateBase =
-      nb::class_<goblin::RvSubsetStateBase>
-          (m, "RvSubsetStateBase", "")
-      .def(nb::init<>()) // implicit default constructor
-      .def_rw("distribution_multiplier", &goblin::RvSubsetStateBase::distribution_multiplier, "")
-      ;
-
-
-  auto pyClassRvSamplingModelBase =
-      nb::class_<goblin::RvSamplingModelBase, goblin::RvSamplingModelBase_trampoline>
-          (m, "RvSamplingModelBase", "/ Separate sampling models roughly as per https://ir.cwi.nl/pub/30344/30344.pdf\n/ TODO ask anton about API - feels still a bit crude...")
-      .def(nb::init<>()) // implicit default constructor
-      .def("init",
-          &goblin::RvSamplingModelBase::init, nb::arg("subset"))
-      .def("inherit",
-          &goblin::RvSamplingModelBase::inherit, nb::arg("subset"), nb::arg("previous_subset"), nb::arg("previous_state"))
-      .def("update",
-          &goblin::RvSamplingModelBase::update, nb::arg("solutions"), nb::arg("by_fitness_decreasing"), nb::arg("active_counts"), nb::arg("intron_aware"), nb::arg("subset"), nb::arg("selection_percentile"), nb::arg("state"))
-      .def("sample",
-          &goblin::RvSamplingModelBase::sample, nb::arg("rng"), nb::arg("state"))
-      .def("adapt",
-          &goblin::RvSamplingModelBase::adapt, nb::arg("solutions"), nb::arg("improved_indices"), nb::arg("oob_ratio"), nb::arg("max_nis_reached"), nb::arg("intron_aware"), nb::arg("subset"), nb::arg("state"))
-      .def("converged",
-          &goblin::RvSamplingModelBase::converged, nb::arg("state"))
-      ;
-
-
-  auto pyClassAMaLGaMSubsetState =
-      nb::class_<goblin::AMaLGaMSubsetState, goblin::RvSubsetStateBase>
-          (m, "AMaLGaMSubsetState", nb::is_final(), "\n(final class)")
-      .def(nb::init<>()) // implicit default constructor
-      .def_rw("enable_smoothing", &goblin::AMaLGaMSubsetState::enable_smoothing, "")
-      .def_rw("mean", &goblin::AMaLGaMSubsetState::mean, "")
-      .def_rw("cov", &goblin::AMaLGaMSubsetState::cov, "for storing the unscaled covariance, since in the incremental version the scaling happens after the")
-      .def_rw("l", &goblin::AMaLGaMSubsetState::L, " smoothing:\n https://github.com/renzoscholman/irv-gomea/blob/89c62cf007858bd8ab9c2ba7955c7b80121/src/distribution.cpp#L510")
-      ;
-
-
-  auto pyClassAMaLGaMSamplingModel =
-      nb::class_<goblin::AMaLGaMSamplingModel, goblin::RvSamplingModelBase>
-          (m, "AMaLGaMSamplingModel", nb::is_final(), "\n(final class)")
-      .def("__init__",
-          [](goblin::AMaLGaMSamplingModel * self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, const std::optional<const CType> & distribution_multiplier_increase = std::nullopt, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1)
-          {
-              auto ctor_wrapper = [](goblin::AMaLGaMSamplingModel* self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, CType distribution_multiplier_increase = 1.0 / 0.9, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1) ->  void
-              {
-                  new(self) goblin::AMaLGaMSamplingModel(use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase, min_distribution_multiplier, num_cholesky_tries); // placement new
-              };
-              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::AMaLGaMSamplingModel * self, bool use_mahalanobis_distance_for_sdr = false, CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0, CType distribution_multiplier_decrease = 0.9, const std::optional<const CType> & distribution_multiplier_increase = std::nullopt, CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1)
-              {
-
-                  const CType& distribution_multiplier_increase_or_default = [&]() -> const CType {
-                      if (distribution_multiplier_increase.has_value())
-                          return distribution_multiplier_increase.value();
-                      else
-                          return 1.0 / 0.9;
-                  }();
-
-                  ctor_wrapper(self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase_or_default, min_distribution_multiplier, num_cholesky_tries);
-              };
-
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold, distribution_multiplier_decrease, distribution_multiplier_increase, min_distribution_multiplier, num_cholesky_tries);
-          },
-          nb::arg("use_mahalanobis_distance_for_sdr") = false, nb::arg("eta_cov") = 1.0, nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("distribution_multiplier_increase").none() = nb::none(), nb::arg("min_distribution_multiplier") = 1e-10, nb::arg("num_cholesky_tries") = 1,
-          "Python bindings defaults:\n    If distribution_multiplier_increase is None, then its default value will be: 1.0 / 0.9")
-      .def("init",
-          &goblin::AMaLGaMSamplingModel::init, nb::arg("subset"))
-      .def("inherit",
-          &goblin::AMaLGaMSamplingModel::inherit, nb::arg("subset"), nb::arg("previous_subset"), nb::arg("previous_state"))
-      .def("update",
-          &goblin::AMaLGaMSamplingModel::update, nb::arg("solutions"), nb::arg("by_fitness_decreasing"), nb::arg("active_counts"), nb::arg("intron_aware"), nb::arg("subset"), nb::arg("selection_percentile"), nb::arg("state"))
-      .def("sample",
-          &goblin::AMaLGaMSamplingModel::sample, nb::arg("rng"), nb::arg("state"))
-      .def("adapt",
-          &goblin::AMaLGaMSamplingModel::adapt, nb::arg("solutions"), nb::arg("improved_indices"), nb::arg("oob_ratio"), nb::arg("max_nis_reached"), nb::arg("intron_aware"), nb::arg("subset"), nb::arg("state"))
-      .def("converged",
-          &goblin::AMaLGaMSamplingModel::converged, nb::arg("state"))
-      ;
-
-
-  auto pyClassRvOptions =
-      nb::class_<goblin::RvOptions>
-          (m, "RvOptions", "")
-      .def("__init__", [](goblin::RvOptions * self, bool enabled = true, bool intron_aware = false, bool intron_aware_intermediate_updates = false, bool intron_aware_mean_estimation = false, bool intron_aware_cov_estimation = false, bool intron_aware_ams = false, double selection_percentile = 0.35, double p_accept = 0.05, bool init_ams_from_population_mean = true, bool randomize_ams_indices = false, bool enable_partial_ams = true, bool enable_full_ams = true, CType delta_ams = 2.0, CType eta_ams = 1.0, usize max_nis = 100, usize num_forced_improvement_tries = 8, std::optional<u64> generations_until_full_evaluation = std::nullopt, std::optional<std::string> population_logfile = std::nullopt, std::optional<std::string> selection_logfile = std::nullopt, std::optional<std::string> subset_logfile = std::nullopt, std::optional<std::string> sample_logfile = std::nullopt, bool check_synched_archives = false)
-      {
-          new (self) goblin::RvOptions();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->enabled = enabled;
-          r_ctor_->intron_aware = intron_aware;
-          r_ctor_->intron_aware_intermediate_updates = intron_aware_intermediate_updates;
-          r_ctor_->intron_aware_mean_estimation = intron_aware_mean_estimation;
-          r_ctor_->intron_aware_cov_estimation = intron_aware_cov_estimation;
-          r_ctor_->intron_aware_ams = intron_aware_ams;
-          r_ctor_->selection_percentile = selection_percentile;
-          r_ctor_->p_accept = p_accept;
-          r_ctor_->init_ams_from_population_mean = init_ams_from_population_mean;
-          r_ctor_->randomize_ams_indices = randomize_ams_indices;
-          r_ctor_->enable_partial_ams = enable_partial_ams;
-          r_ctor_->enable_full_ams = enable_full_ams;
-          r_ctor_->delta_ams = delta_ams;
-          r_ctor_->eta_ams = eta_ams;
-          r_ctor_->max_nis = max_nis;
-          r_ctor_->num_forced_improvement_tries = num_forced_improvement_tries;
-          r_ctor_->generations_until_full_evaluation = generations_until_full_evaluation;
-          r_ctor_->population_logfile = population_logfile;
-          r_ctor_->selection_logfile = selection_logfile;
-          r_ctor_->subset_logfile = subset_logfile;
-          r_ctor_->sample_logfile = sample_logfile;
-          r_ctor_->check_synched_archives = check_synched_archives;
-      },
-      nb::arg("enabled") = true, nb::arg("intron_aware") = false, nb::arg("intron_aware_intermediate_updates") = false, nb::arg("intron_aware_mean_estimation") = false, nb::arg("intron_aware_cov_estimation") = false, nb::arg("intron_aware_ams") = false, nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05, nb::arg("init_ams_from_population_mean") = true, nb::arg("randomize_ams_indices") = false, nb::arg("enable_partial_ams") = true, nb::arg("enable_full_ams") = true, nb::arg("delta_ams") = 2.0, nb::arg("eta_ams") = 1.0, nb::arg("max_nis") = 100, nb::arg("num_forced_improvement_tries") = 8, nb::arg("generations_until_full_evaluation").none() = nb::none(), nb::arg("population_logfile").none() = nb::none(), nb::arg("selection_logfile").none() = nb::none(), nb::arg("subset_logfile").none() = nb::none(), nb::arg("sample_logfile").none() = nb::none(), nb::arg("check_synched_archives") = false
-      )
-      .def_rw("enabled", &goblin::RvOptions::enabled, "")
-      .def_rw("intron_aware", &goblin::RvOptions::intron_aware, "")
-      .def_rw("intron_aware_intermediate_updates", &goblin::RvOptions::intron_aware_intermediate_updates, "")
-      .def_rw("intron_aware_mean_estimation", &goblin::RvOptions::intron_aware_mean_estimation, "")
-      .def_rw("intron_aware_cov_estimation", &goblin::RvOptions::intron_aware_cov_estimation, "")
-      .def_rw("intron_aware_ams", &goblin::RvOptions::intron_aware_ams, "")
-      .def_rw("selection_percentile", &goblin::RvOptions::selection_percentile, "")
-      .def_rw("p_accept", &goblin::RvOptions::p_accept, "")
-      .def_rw("init_ams_from_population_mean", &goblin::RvOptions::init_ams_from_population_mean, "")
-      .def_rw("randomize_ams_indices", &goblin::RvOptions::randomize_ams_indices, "")
-      .def_rw("enable_partial_ams", &goblin::RvOptions::enable_partial_ams, "")
-      .def_rw("enable_full_ams", &goblin::RvOptions::enable_full_ams, "")
-      .def_rw("delta_ams", &goblin::RvOptions::delta_ams, "")
-      .def_rw("eta_ams", &goblin::RvOptions::eta_ams, "")
-      .def_rw("max_nis", &goblin::RvOptions::max_nis, "")
-      .def_rw("num_forced_improvement_tries", &goblin::RvOptions::num_forced_improvement_tries, "8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)")
-      .def_rw("generations_until_full_evaluation", &goblin::RvOptions::generations_until_full_evaluation, " In the GBO setting with partial evaluations, numerical errors of partial fitness updates\n can accumulate and it might be needed to perform full evaluations once in a while\n\n In that case, the default number of generations until re-evaluation is `50`\n\n Note that in this setting all archive solutions should be re-evaluated in case the target seems to have been\n reached to ensure that this is not due to numeric errors. This does not happen in this version.")
-      .def_rw("population_logfile", &goblin::RvOptions::population_logfile, "")
-      .def_rw("selection_logfile", &goblin::RvOptions::selection_logfile, "")
-      .def_rw("subset_logfile", &goblin::RvOptions::subset_logfile, "")
-      .def_rw("sample_logfile", &goblin::RvOptions::sample_logfile, "")
-      .def_rw("check_synched_archives", &goblin::RvOptions::check_synched_archives, "")
-      .def("validate",
-          &goblin::RvOptions::validate)
-      ;
-
-
-  m.def("sort_by_quality_decreasing",
-      goblin::sort_by_quality_decreasing, nb::arg("fitness"), nb::arg("solutions"), nb::arg("indices"), nb::arg("objective").none());
-
-
-  auto pyClassRvState =
-      nb::class_<goblin::RvState>
-          (m, "RvState", "")
-      .def(nb::init<goblin::RvOptions, const goblin::LinkageModelBase &, const goblin::RvSamplingModelBase &>(),
-          nb::arg("options"), nb::arg("linkage_model"), nb::arg("sampling_model"))
-      .def("perform_generation",
-          &goblin::RvState::perform_generation, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("cluster_solutions"))
-      .def("converged",
-          &goblin::RvState::converged)
-      .def("select_and_learn_linkage",
-          &goblin::RvState::select_and_learn_linkage, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("cluster_solutions"))
-      .def("should_accept",
-          &goblin::RvState::should_accept, nb::arg("rng"), nb::arg("fitness"), nb::arg("archive"), nb::arg("solution"), nb::arg("parent"), nb::arg("objective").none(), nb::arg("strict"))
-      .def("gom_step",
-          &goblin::RvState::gom_step, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("cluster_solutions"), nb::arg("subset_orders"), nb::arg("subset_idx"), nb::arg("ams_indices"))
-      .def("full_ams",
-          &goblin::RvState::full_ams, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("ams_indices"))
-      .def("forced_improvements",
-          &goblin::RvState::forced_improvements, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("subset_orders"), nb::arg("max_num_subsets"))
-      .def("current_generation",
-          &goblin::RvState::current_generation, "// override final")
-      .def_rw("options", &goblin::RvState::options, "")
-      ;
-  // #endif
-
-
-  m.def("create_and_register_clusters",
-      goblin::create_and_register_clusters, nb::arg("rng"), nb::arg("archive"), nb::arg("fitness"), nb::arg("solutions"), nb::arg("num_clusters"), nb::arg("donor_pool_size"), nb::arg("previous_solutions"), nb::arg("previous_clusters"));
-
-
-  auto pyClassFosStats =
-      nb::class_<goblin::FosStats>
-          (m, "FosStats", "")
-      .def("__init__", [](goblin::FosStats * self, const std::optional<const std::vector<CType>> & solution_activation_rate = std::nullopt, const std::optional<const std::vector<CType>> & variables_activation_rate = std::nullopt, const std::optional<const std::vector<u64>> & usage_count = std::nullopt, const std::optional<const std::vector<u64>> & evaluation_count = std::nullopt, const std::optional<const std::vector<u64>> & acceptance_count = std::nullopt, const std::optional<const std::vector<CType>> & cumulative_fitness_difference = std::nullopt, const std::optional<const std::vector<u64>> & finite_acceptance_count = std::nullopt, const std::optional<const Mat<CType>> & similarity = std::nullopt)
-      {
-          new (self) goblin::FosStats();  // placement new
-          auto r_ctor_ = self;
-          if (solution_activation_rate.has_value())
-              r_ctor_->solution_activation_rate = solution_activation_rate.value();
-          else
-              r_ctor_->solution_activation_rate = std::vector<CType>();
-          if (variables_activation_rate.has_value())
-              r_ctor_->variables_activation_rate = variables_activation_rate.value();
-          else
-              r_ctor_->variables_activation_rate = std::vector<CType>();
-          if (usage_count.has_value())
-              r_ctor_->usage_count = usage_count.value();
-          else
-              r_ctor_->usage_count = std::vector<u64>();
-          if (evaluation_count.has_value())
-              r_ctor_->evaluation_count = evaluation_count.value();
-          else
-              r_ctor_->evaluation_count = std::vector<u64>();
-          if (acceptance_count.has_value())
-              r_ctor_->acceptance_count = acceptance_count.value();
-          else
-              r_ctor_->acceptance_count = std::vector<u64>();
-          if (cumulative_fitness_difference.has_value())
-              r_ctor_->cumulative_fitness_difference = cumulative_fitness_difference.value();
-          else
-              r_ctor_->cumulative_fitness_difference = std::vector<CType>();
-          if (finite_acceptance_count.has_value())
-              r_ctor_->finite_acceptance_count = finite_acceptance_count.value();
-          else
-              r_ctor_->finite_acceptance_count = std::vector<u64>();
-          if (similarity.has_value())
-              r_ctor_->similarity = similarity.value();
-          else
-              r_ctor_->similarity = Mat<CType>();
-      },
-      nb::arg("solution_activation_rate").none() = nb::none(), nb::arg("variables_activation_rate").none() = nb::none(), nb::arg("usage_count").none() = nb::none(), nb::arg("evaluation_count").none() = nb::none(), nb::arg("acceptance_count").none() = nb::none(), nb::arg("cumulative_fitness_difference").none() = nb::none(), nb::arg("finite_acceptance_count").none() = nb::none(), nb::arg("similarity").none() = nb::none()
-      )
-      .def_rw("solution_activation_rate", &goblin::FosStats::solution_activation_rate, "whats the proportion of solutions where initially at least one of the")
-      .def_rw("variables_activation_rate", &goblin::FosStats::variables_activation_rate, "conditioned on solutions with at least one active variables in the subset, whats")
-      .def_rw("usage_count", &goblin::FosStats::usage_count, "how often was the FOS used? (without FI, - should be the population size)")
-      .def_rw("evaluation_count", &goblin::FosStats::evaluation_count, "how often was an evaluation needed? (i.e. active parts were modified)")
-      .def_rw("acceptance_count", &goblin::FosStats::acceptance_count, "how often was the change accepted? (after evaluation)")
-      .def_rw("cumulative_fitness_difference", &goblin::FosStats::cumulative_fitness_difference, "how big were the accepted improvements?")
-      .def_rw("finite_acceptance_count", &goblin::FosStats::finite_acceptance_count, "how many improvements had a finite fitness difference to their parent?")
-      .def_rw("similarity", &goblin::FosStats::similarity, "(inf/nan mess up the average...)")
-      ;
-
-
-  auto pyClassPopulationOptions =
-      nb::class_<goblin::PopulationOptions>
-          (m, "PopulationOptions", "")
-      .def("__init__", [](goblin::PopulationOptions * self, double donor_pool_size_multiplier = 2.0, std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true, bool enable_mixed_forced_improvements = true, double target_continuous_to_discrete_balance = 1.0, bool sequential_gom = false, bool strict_elite_acceptance = false, double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt, u64 generation = 0, u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2, double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1, CType continuous_mutation_decay_factor = 0.9, std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true, usize gradient_step_frequency = 0, usize gradient_step_count = 10)
-      {
-          new (self) goblin::PopulationOptions();  // placement new
-          auto r_ctor_ = self;
-          r_ctor_->donor_pool_size_multiplier = donor_pool_size_multiplier;
-          r_ctor_->max_nis = max_nis;
-          r_ctor_->forced_improvements = forced_improvements;
-          r_ctor_->enable_mixed_forced_improvements = enable_mixed_forced_improvements;
-          r_ctor_->target_continuous_to_discrete_balance = target_continuous_to_discrete_balance;
-          r_ctor_->sequential_gom = sequential_gom;
-          r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
-          r_ctor_->donor_search_proportion = donor_search_proportion;
-          r_ctor_->subset_logfile = subset_logfile;
-          r_ctor_->generation = generation;
-          r_ctor_->initial_generations_until_next_fos_log = initial_generations_until_next_fos_log;
-          r_ctor_->fos_log_factor = fos_log_factor;
-          r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
-          r_ctor_->continuous_mutation_temperature = continuous_mutation_temperature;
-          r_ctor_->continuous_mutation_decay_factor = continuous_mutation_decay_factor;
-          r_ctor_->continuous_mutation_decay_patience = continuous_mutation_decay_patience;
-          r_ctor_->mutate_before_gradient_step = mutate_before_gradient_step;
-          r_ctor_->gradient_step_frequency = gradient_step_frequency;
-          r_ctor_->gradient_step_count = gradient_step_count;
-      },
-      nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(), nb::arg("forced_improvements") = true, nb::arg("enable_mixed_forced_improvements") = true, nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false, nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0, nb::arg("subset_logfile").none() = nb::none(), nb::arg("generation") = 0, nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2, nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1, nb::arg("continuous_mutation_decay_factor") = 0.9, nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true, nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10
-      )
-      .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
-      .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
-      .def_rw("forced_improvements", &goblin::PopulationOptions::forced_improvements, "")
-      .def_rw("enable_mixed_forced_improvements", &goblin::PopulationOptions::enable_mixed_forced_improvements, "")
-      .def_rw("target_continuous_to_discrete_balance", &goblin::PopulationOptions::target_continuous_to_discrete_balance, "")
-      .def_rw("sequential_gom", &goblin::PopulationOptions::sequential_gom, "performs GOM sequentially per solution, incompatible with other mechanisms")
-      .def_rw("strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance, "should the single objective elite solutions accept only strict improvements or also neutral changes?")
-      .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion, "the fraction of solutions to consider before skipping an evaluation in case")
-      .def_rw("subset_logfile", &goblin::PopulationOptions::subset_logfile, "")
-      .def_rw("generation", &goblin::PopulationOptions::generation, "")
-      .def_rw("initial_generations_until_next_fos_log", &goblin::PopulationOptions::initial_generations_until_next_fos_log, "> 0, subset stats are logged every")
-      .def_rw("fos_log_factor", &goblin::PopulationOptions::fos_log_factor, "1 is linear, 2 is exponential log spacing")
-      .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")
-      .def_rw("continuous_mutation_temperature", &goblin::PopulationOptions::continuous_mutation_temperature, "")
-      .def_rw("continuous_mutation_decay_factor", &goblin::PopulationOptions::continuous_mutation_decay_factor, "")
-      .def_rw("continuous_mutation_decay_patience", &goblin::PopulationOptions::continuous_mutation_decay_patience, "")
-      .def_rw("mutate_before_gradient_step", &goblin::PopulationOptions::mutate_before_gradient_step, "")
-      .def_rw("gradient_step_frequency", &goblin::PopulationOptions::gradient_step_frequency, "")
-      .def_rw("gradient_step_count", &goblin::PopulationOptions::gradient_step_count, "")
-      ;
-
-
-  auto pyClassMixedGOMEA =
-      nb::class_<goblin::MixedGOMEA, goblin::MethodBase>
-          (m, "MixedGOMEA", "")
-      .def("__init__",
-          [](goblin::MixedGOMEA * self, const std::optional<const goblin::PopulationOptions> & population_options = std::nullopt, const std::optional<const goblin::RvOptions> & rv_options = std::nullopt, const std::optional<const goblin::IMSOptions> & ims_options = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & discrete_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & continuous_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>> & sampling_model = std::nullopt, std::string repr = "aos")
-          {
-              auto ctor_wrapper = [](goblin::MixedGOMEA* self, goblin::PopulationOptions population_options = goblin::PopulationOptions(), goblin::RvOptions rv_options = goblin::RvOptions(), goblin::IMSOptions ims_options = goblin::IMSOptions(), std::shared_ptr<goblin::LinkageModelBase> discrete_model = std::make_shared<goblin::LinkageTreeFOS>(), std::shared_ptr<goblin::LinkageModelBase> continuous_model = std::make_shared<goblin::FullFOS>(), std::shared_ptr<goblin::RvSamplingModelBase> sampling_model = std::make_shared<goblin::AMaLGaMSamplingModel>(), std::string repr = "aos") ->  void
-              {
-                  new(self) goblin::MixedGOMEA(population_options, rv_options, ims_options, discrete_model, continuous_model, sampling_model, repr); // placement new
-              };
-              auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::MixedGOMEA * self, const std::optional<const goblin::PopulationOptions> & population_options = std::nullopt, const std::optional<const goblin::RvOptions> & rv_options = std::nullopt, const std::optional<const goblin::IMSOptions> & ims_options = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & discrete_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::LinkageModelBase>> & continuous_model = std::nullopt, const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>> & sampling_model = std::nullopt, std::string repr = "aos")
-              {
-
-                  const goblin::PopulationOptions& population_options_or_default = [&]() -> const goblin::PopulationOptions {
-                      if (population_options.has_value())
-                          return population_options.value();
-                      else
-                          return goblin::PopulationOptions();
-                  }();
-
-                  const goblin::RvOptions& rv_options_or_default = [&]() -> const goblin::RvOptions {
-                      if (rv_options.has_value())
-                          return rv_options.value();
-                      else
-                          return goblin::RvOptions();
-                  }();
-
-                  const goblin::IMSOptions& ims_options_or_default = [&]() -> const goblin::IMSOptions {
-                      if (ims_options.has_value())
-                          return ims_options.value();
-                      else
-                          return goblin::IMSOptions();
-                  }();
-
-                  const std::shared_ptr<goblin::LinkageModelBase>& discrete_model_or_default = [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
-                      if (discrete_model.has_value())
-                          return discrete_model.value();
-                      else
-                          return std::make_shared<goblin::LinkageTreeFOS>();
-                  }();
-
-                  const std::shared_ptr<goblin::LinkageModelBase>& continuous_model_or_default = [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
-                      if (continuous_model.has_value())
-                          return continuous_model.value();
-                      else
-                          return std::make_shared<goblin::FullFOS>();
-                  }();
-
-                  const std::shared_ptr<goblin::RvSamplingModelBase>& sampling_model_or_default = [&]() -> const std::shared_ptr<goblin::RvSamplingModelBase> {
-                      if (sampling_model.has_value())
-                          return sampling_model.value();
-                      else
-                          return std::make_shared<goblin::AMaLGaMSamplingModel>();
-                  }();
-
-                  ctor_wrapper(self, population_options_or_default, rv_options_or_default, ims_options_or_default, discrete_model_or_default, continuous_model_or_default, sampling_model_or_default, repr);
-              };
-
-              ctor_wrapper_adapt_mutable_param_with_default_value(self, population_options, rv_options, ims_options, discrete_model, continuous_model, sampling_model, repr);
-          },
-          nb::arg("population_options").none() = nb::none(), nb::arg("rv_options").none() = nb::none(), nb::arg("ims_options").none() = nb::none(), nb::arg("discrete_model").none() = nb::none(), nb::arg("continuous_model").none() = nb::none(), nb::arg("sampling_model").none() = nb::none(), nb::arg("repr") = "aos",
-          "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * population_options: PopulationOptions()\n        * rv_options: RvOptions()\n        * ims_options: IMSOptions()\n        * discrete_model: std.make_shared<LinkageTreeFOS>()\n        * continuous_model: std.make_shared<FullFOS>()\n        * sampling_model: std.make_shared<AMaLGaMSamplingModel>()")
-      .def("run",
-          &goblin::MixedGOMEA::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-      .def("current_generation",
-          &goblin::MixedGOMEA::current_generation)
-      .def("current_population",
-          &goblin::MixedGOMEA::current_population)
-      ;
-  // #endif
-  // #ifndef _GOBLIN_CLASSIC_COMMON_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_CLASSIC_DE_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_ES_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_CLASSIC_PSO_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_SIMPLE_GA_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_STANDARD_GP_H
-  //
-  // #endif
-  // #ifndef _GOBLIN_EXAMPLES_VORONOI_H
-  //
-  // #endif
-  // #endif
-
-  { // <namespace test>
-      nb::module_ pyNstest = m.def_submodule("test", "Helpers for writing readable test trees using the same float encoding as the runtime.");
-      pyNstest.def("val",
-          nb::overload_cast<float>(goblin::test::Val), nb::arg("x"));
-
-      pyNstest.def("val",
-          nb::overload_cast<int>(goblin::test::Val), nb::arg("x"));
-
-      pyNstest.def("val",
-          nb::overload_cast<double>(goblin::test::Val), nb::arg("x"));
-
-      pyNstest.def("idx",
-          goblin::test::Idx, nb::arg("idx"));
-
-      pyNstest.def("op",
-          goblin::test::Op, nb::arg("op"));
-  } // </namespace test>
-
-  { // <namespace classic>
-      nb::module_ pyNsclassic = m.def_submodule("classic", "");
-      auto pyNsclassic_ClassSelectionStrategyBase =
-          nb::class_<goblin::classic::SelectionStrategyBase, goblin::classic::SelectionStrategyBase_trampoline>
-              (pyNsclassic, "SelectionStrategyBase", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("select",
-              &goblin::classic::SelectionStrategyBase::select, nb::arg("rng"), nb::arg("fitness"), nb::arg("solutions"), nb::arg("target_size"))
-          ;
-
-
-      auto pyNsclassic_ClassTournamentSelection =
-          nb::class_<goblin::classic::TournamentSelection, goblin::classic::SelectionStrategyBase>
-              (pyNsclassic, "TournamentSelection", "")
-          .def(nb::init<usize, bool>(),
-              nb::arg("tournament_size") = 2, nb::arg("with_replacement") = false)
-          .def("select",
-              &goblin::classic::TournamentSelection::select, nb::arg("rng"), nb::arg("fitness"), nb::arg("solutions"), nb::arg("target_size"))
-          ;
-
-
-      auto pyNsclassic_ClassTruncationSelection =
-          nb::class_<goblin::classic::TruncationSelection, goblin::classic::SelectionStrategyBase>
-              (pyNsclassic, "TruncationSelection", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("select",
-              &goblin::classic::TruncationSelection::select, nb::arg("rng"), nb::arg("fitness"), nb::arg("solutions"), nb::arg("target_size"))
-          ;
-
-
-      auto pyNsclassic_ClassEABase =
-          nb::class_<goblin::classic::EABase, goblin::MethodBase, goblin::classic::EABase_trampoline>
-              (pyNsclassic, "EABase", "")
-          // (default constructor explicitly deleted)
-          .def(nb::init<usize>(),
-              nb::arg("population_size"))
-          .def("step",
-              &goblin::classic::EABase::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          .def("set_population",
-              &goblin::classic::EABase::set_population, nb::arg("population"))
-          .def("get_population",
-              &goblin::classic::EABase::get_population)
-          .def("run",
-              &goblin::classic::EABase::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
-          .def("current_generation",
-              &goblin::classic::EABase::current_generation)
-          .def("current_population",
-              &goblin::classic::EABase::current_population)
-          ;
-      auto pyNsclassic_ClassDEStrategyBase =
-          nb::class_<goblin::classic::DEStrategyBase, goblin::classic::DEStrategyBase_trampoline>
-              (pyNsclassic, "DEStrategyBase", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("trial_vector",
-              &goblin::classic::DEStrategyBase::trial_vector, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"), nb::arg("idx"), nb::arg("subset"))
-          ;
-
-
-      auto pyNsclassic_ClassRand1Bin =
-          nb::class_<goblin::classic::Rand1Bin, goblin::classic::DEStrategyBase>
-              (pyNsclassic, "Rand1Bin", "")
-          .def(nb::init<double, double, std::string, std::string>(),
-              nb::arg("f") = 0.8, nb::arg("cr") = 0.9, nb::arg("base") = "best", nb::arg("scale") = "dither")
-          .def("trial_vector",
-              &goblin::classic::Rand1Bin::trial_vector, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"), nb::arg("idx"), nb::arg("subset"))
-          ;
-
-
-      auto pyNsclassic_ClassDE =
-          nb::class_<goblin::classic::DE, goblin::classic::EABase>
-              (pyNsclassic, "DE", "")
-          .def("__init__",
-              [](goblin::classic::DE * self, usize population_size = 100, const std::optional<const std::shared_ptr<goblin::classic::DEStrategyBase>> & strategy = std::nullopt)
-              {
-                  auto ctor_wrapper = [](goblin::classic::DE* self, usize population_size = 100, std::shared_ptr<goblin::classic::DEStrategyBase> strategy = std::make_shared<goblin::classic::Rand1Bin>()) ->  void
-                  {
-                      new(self) goblin::classic::DE(population_size, strategy); // placement new
-                  };
-                  auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::classic::DE * self, usize population_size = 100, const std::optional<const std::shared_ptr<goblin::classic::DEStrategyBase>> & strategy = std::nullopt)
-                  {
-
-                      const std::shared_ptr<goblin::classic::DEStrategyBase>& strategy_or_default = [&]() -> const std::shared_ptr<goblin::classic::DEStrategyBase> {
-                          if (strategy.has_value())
-                              return strategy.value();
-                          else
-                              return std::make_shared<goblin::classic::Rand1Bin>();
-                      }();
-
-                      ctor_wrapper(self, population_size, strategy_or_default);
-                  };
-
-                  ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, strategy);
-              },
-              nb::arg("population_size") = 100, nb::arg("strategy").none() = nb::none(),
-              "Python bindings defaults:\n    If strategy is None, then its default value will be: std.make_shared<classic.Rand1Bin>()")
-          .def("step",
-              &goblin::classic::DE::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          ;
-      auto pyEnumESStrategy =
-          nb::enum_<goblin::classic::ESStrategy>(pyNsclassic, "ESStrategy", nb::is_arithmetic(), "")
-              .value("single_variance", goblin::classic::ESStrategy::SingleVariance, "/ Single variance for all variables")
-              .value("multiple_variance", goblin::classic::ESStrategy::MultipleVariance, "/ Separate variance for all variables")
-              .value("full_variance", goblin::classic::ESStrategy::FullVariance, "/ Full covariance matrix")
-              .value("directed_variance", goblin::classic::ESStrategy::DirectedVariance, "/ Directional variance for one arbitrary direction, single variance in all other directions");
-
-
-      auto pyNsclassic_ClassESStrategyParameters =
-          nb::class_<goblin::classic::ESStrategyParameters>
-              (pyNsclassic, "ESStrategyParameters", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def_rw("strategy", &goblin::classic::ESStrategyParameters::strategy, "")
-          .def_rw("parameters", &goblin::classic::ESStrategyParameters::parameters, "")
-          .def("clone",
-              &goblin::classic::ESStrategyParameters::clone)
-          ;
-
-
-      auto pyNsclassic_ClassES =
-          nb::class_<goblin::classic::ES, goblin::classic::EABase>
-              (pyNsclassic, "ES", "")
-          .def(nb::init<usize, usize, usize, bool, std::string, double, std::optional<double>, std::optional<double>, double>(),
-              nb::arg("population_size") = 8, nb::arg("num_parents") = 1, nb::arg("num_offspring") = 50, nb::arg("steady_state") = true, nb::arg("strategy") = "single", nb::arg("epsilon") = 1e-6, nb::arg("tau").none() = nb::none(), nb::arg("tau_i").none() = nb::none(), nb::arg("beta") = 0.0873)
-          .def("step",
-              &goblin::classic::ES::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          ;
-      auto pyNsclassic_ClassPSOTopologyBase =
-          nb::class_<goblin::classic::PSOTopologyBase, goblin::classic::PSOTopologyBase_trampoline>
-              (pyNsclassic, "PSOTopologyBase", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("neighbours",
-              &goblin::classic::PSOTopologyBase::neighbours, nb::arg("rng"), nb::arg("population"), nb::arg("idx"))
-          ;
-
-
-      auto pyNsclassic_ClassRingTopology =
-          nb::class_<goblin::classic::RingTopology, goblin::classic::PSOTopologyBase>
-              (pyNsclassic, "RingTopology", "")
-          .def(nb::init<usize>(),
-              nb::arg("num_neighbours") = 2,
-              "/ Considers a population of size N as ring where the ends wrap (nodes 0 and N-1 are neighbours). The number of\n/ neighbours determines the (symmetric) reach of each node around the ring, where `num_neighbours >= floor(N-1) / 2`\n/ corresponds to a fully connected star topology.")
-          .def("neighbours",
-              &goblin::classic::RingTopology::neighbours, nb::arg("rng"), nb::arg("population"), nb::arg("idx"))
-          ;
-
-
-      auto pyNsclassic_ClassPSOState =
-          nb::class_<goblin::classic::PSOState>
-              (pyNsclassic, "PSOState", "")
-          .def_rw("velocity", &goblin::classic::PSOState::velocity, "")
-          .def_rw("previous_best", &goblin::classic::PSOState::previous_best, "")
-          .def(nb::init<>())
-          .def(nb::init<const goblin::classic::PSOState &>(),
-              nb::arg("other"))
-          .def(nb::init<goblin::classic::PSOState &&>(),
-              nb::arg("other"))
-          .def("clone",
-              &goblin::classic::PSOState::clone)
-          ;
-
-      pyNsclassic_ClassPSOState.def("previous_best_quality", nb::overload_cast<>(&goblin::classic::PSOState::previous_best_quality, nb::const_), nb::rv_policy::reference_internal);
-      pyNsclassic_ClassPSOState.def("previous_best_quality", nb::overload_cast<>(&goblin::classic::PSOState::previous_best_quality), nb::rv_policy::reference_internal);
-
-
-
-
-      auto pyNsclassic_ClassPSO =
-          nb::class_<goblin::classic::PSO, goblin::classic::EABase>
-              (pyNsclassic, "PSO", "")
-          .def("__init__",
-              [](goblin::classic::PSO * self, usize population_size = 25, double inertia = 0.729, double cognitive = 1.494, double social = 1.494, const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>> & topology = std::nullopt)
-              {
-                  auto ctor_wrapper = [](goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729, double cognitive = 1.494, double social = 1.494, std::shared_ptr<goblin::classic::PSOTopologyBase> topology = std::make_shared<goblin::classic::RingTopology>()) ->  void
-                  {
-                      new(self) goblin::classic::PSO(population_size, inertia, cognitive, social, topology); // placement new
-                  };
-                  auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::classic::PSO * self, usize population_size = 25, double inertia = 0.729, double cognitive = 1.494, double social = 1.494, const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>> & topology = std::nullopt)
-                  {
-
-                      const std::shared_ptr<goblin::classic::PSOTopologyBase>& topology_or_default = [&]() -> const std::shared_ptr<goblin::classic::PSOTopologyBase> {
-                          if (topology.has_value())
-                              return topology.value();
-                          else
-                              return std::make_shared<goblin::classic::RingTopology>();
-                      }();
-
-                      ctor_wrapper(self, population_size, inertia, cognitive, social, topology_or_default);
-                  };
-
-                  ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, inertia, cognitive, social, topology);
-              },
-              nb::arg("population_size") = 25, nb::arg("inertia") = 0.729, nb::arg("cognitive") = 1.494, nb::arg("social") = 1.494, nb::arg("topology").none() = nb::none(),
-              "Python bindings defaults:\n    If topology is None, then its default value will be: std.make_shared<classic.RingTopology>()")
-          .def("step",
-              &goblin::classic::PSO::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          ;
-      auto pyNsclassic_ClassDiscreteCrossoverBase =
-          nb::class_<goblin::classic::DiscreteCrossoverBase, goblin::classic::DiscreteCrossoverBase_trampoline>
-              (pyNsclassic, "DiscreteCrossoverBase", "/ Strategy used to generate the crossover masks to exchange information between two parents")
-          .def(nb::init<>()) // implicit default constructor
-          .def("crossover_mask",
-              &goblin::classic::DiscreteCrossoverBase::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
-          .def("crossover",
-              &goblin::classic::DiscreteCrossoverBase::crossover, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassCombinedCrossover =
-          nb::class_<goblin::classic::CombinedCrossover, goblin::classic::DiscreteCrossoverBase>
-              (pyNsclassic, "CombinedCrossover", "")
-          // (default constructor explicitly deleted)
-          .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteCrossoverBase>, double>> &&, bool>(),
-              nb::arg("operators"), nb::arg("normalize") = true)
-          .def("crossover",
-              &goblin::classic::CombinedCrossover::crossover, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassUniformCrossover =
-          nb::class_<goblin::classic::UniformCrossover, goblin::classic::DiscreteCrossoverBase>
-              (pyNsclassic, "UniformCrossover", "")
-          .def(nb::init<double>(),
-              nb::arg("p_crossover") = 0.5)
-          .def("crossover_mask",
-              &goblin::classic::UniformCrossover::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassNPointCrossover =
-          nb::class_<goblin::classic::NPointCrossover, goblin::classic::DiscreteCrossoverBase>
-              (pyNsclassic, "NPointCrossover", "")
-          .def(nb::init<usize>(),
-              nb::arg("num_points") = 1)
-          .def("crossover_mask",
-              &goblin::classic::NPointCrossover::crossover_mask, nb::arg("rng"), nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassDiscreteMutationBase =
-          nb::class_<goblin::classic::DiscreteMutationBase, goblin::classic::DiscreteMutationBase_trampoline>
-              (pyNsclassic, "DiscreteMutationBase", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("mutate",
-              &goblin::classic::DiscreteMutationBase::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassCombinedMutation =
-          nb::class_<goblin::classic::CombinedMutation, goblin::classic::DiscreteMutationBase>
-              (pyNsclassic, "CombinedMutation", "")
-          // (default constructor explicitly deleted)
-          .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteMutationBase>, double>> &&, bool>(),
-              nb::arg("operators"), nb::arg("normalize") = true)
-          .def("mutate",
-              &goblin::classic::CombinedMutation::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassRandomMutation =
-          nb::class_<goblin::classic::RandomMutation, goblin::classic::DiscreteMutationBase>
-              (pyNsclassic, "RandomMutation", "")
-          .def(nb::init<std::optional<double>>(),
-              nb::arg("p_mutation").none() = nb::none())
-          .def("mutate",
-              &goblin::classic::RandomMutation::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassLocalizedMutation =
-          nb::class_<goblin::classic::LocalizedMutation, goblin::classic::DiscreteMutationBase>
-              (pyNsclassic, "LocalizedMutation", "/ A mutation operator that assumes an ordinal relationship for discrete variables")
-          .def(nb::init<std::optional<double>, double, bool>(),
-              nb::arg("p_mutation").none() = nb::none(), nb::arg("strength") = 0.05, nb::arg("wrap") = false)
-          .def("mutate",
-              &goblin::classic::LocalizedMutation::mutate, nb::arg("rng"), nb::arg("problem"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassSimpleGA =
-          nb::class_<goblin::classic::SimpleGA, goblin::classic::EABase>
-              (pyNsclassic, "SimpleGA", "")
-          .def("__init__",
-              [](goblin::classic::SimpleGA * self, usize population_size = 100, const std::optional<const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>> & crossover = std::nullopt, const std::optional<const std::shared_ptr<goblin::classic::DiscreteMutationBase>> & mutation = std::nullopt, bool steady_state = true, const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>> & selection = std::nullopt)
-              {
-                  auto ctor_wrapper = [](goblin::classic::SimpleGA* self, usize population_size = 100, std::shared_ptr<goblin::classic::DiscreteCrossoverBase> crossover = std::make_shared<goblin::classic::UniformCrossover>(), std::shared_ptr<goblin::classic::DiscreteMutationBase> mutation = std::make_shared<goblin::classic::RandomMutation>(), bool steady_state = true, std::shared_ptr<goblin::classic::SelectionStrategyBase> selection = std::make_shared<goblin::classic::TournamentSelection>(4)) ->  void
-                  {
-                      new(self) goblin::classic::SimpleGA(population_size, crossover, mutation, steady_state, selection); // placement new
-                  };
-                  auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::classic::SimpleGA * self, usize population_size = 100, const std::optional<const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>> & crossover = std::nullopt, const std::optional<const std::shared_ptr<goblin::classic::DiscreteMutationBase>> & mutation = std::nullopt, bool steady_state = true, const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>> & selection = std::nullopt)
-                  {
-
-                      const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>& crossover_or_default = [&]() -> const std::shared_ptr<goblin::classic::DiscreteCrossoverBase> {
-                          if (crossover.has_value())
-                              return crossover.value();
-                          else
-                              return std::make_shared<goblin::classic::UniformCrossover>();
-                      }();
-
-                      const std::shared_ptr<goblin::classic::DiscreteMutationBase>& mutation_or_default = [&]() -> const std::shared_ptr<goblin::classic::DiscreteMutationBase> {
-                          if (mutation.has_value())
-                              return mutation.value();
-                          else
-                              return std::make_shared<goblin::classic::RandomMutation>();
-                      }();
-
-                      const std::shared_ptr<goblin::classic::SelectionStrategyBase>& selection_or_default = [&]() -> const std::shared_ptr<goblin::classic::SelectionStrategyBase> {
-                          if (selection.has_value())
-                              return selection.value();
-                          else
-                              return std::make_shared<goblin::classic::TournamentSelection>(4);
-                      }();
-
-                      ctor_wrapper(self, population_size, crossover_or_default, mutation_or_default, steady_state, selection_or_default);
-                  };
-
-                  ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, crossover, mutation, steady_state, selection);
-              },
-              nb::arg("population_size") = 100, nb::arg("crossover").none() = nb::none(), nb::arg("mutation").none() = nb::none(), nb::arg("steady_state") = true, nb::arg("selection").none() = nb::none(),
-              "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * crossover: std.make_shared<classic.UniformCrossover>()\n        * mutation: std.make_shared<classic.RandomMutation>()\n        * selection: std.make_shared<classic.TournamentSelection>(4)")
-          .def("check_changes",
-              &goblin::classic::SimpleGA::check_changes, nb::arg("parent"), nb::arg("offspring"), nb::arg("changed_indices"), nb::arg("evaluation_needed"))
-          .def("step",
-              &goblin::classic::SimpleGA::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          ;
-      auto pyNsclassic_ClassGPVariationOperatorBase =
-          nb::class_<goblin::classic::GPVariationOperatorBase, goblin::classic::GPVariationOperatorBase_trampoline>
-              (pyNsclassic, "GPVariationOperatorBase", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("apply",
-              &goblin::classic::GPVariationOperatorBase::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassChained =
-          nb::class_<goblin::classic::Chained, goblin::classic::GPVariationOperatorBase>
-              (pyNsclassic, "Chained", "")
-          // (default constructor explicitly deleted)
-          .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::GPVariationOperatorBase>, double>> &&>(),
-              nb::arg("operators"))
-          .def("apply",
-              &goblin::classic::Chained::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassSubtreeCrossover =
-          nb::class_<goblin::classic::SubtreeCrossover, goblin::classic::GPVariationOperatorBase>
-              (pyNsclassic, "SubtreeCrossover", "")
-          .def(nb::init<>()) // implicit default constructor
-          .def("apply",
-              &goblin::classic::SubtreeCrossover::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassSubtreeMutation =
-          nb::class_<goblin::classic::SubtreeMutation, goblin::classic::GPVariationOperatorBase>
-              (pyNsclassic, "SubtreeMutation", "/ Replaces random subtree with a random subtree")
-          .def(nb::init<>()) // implicit default constructor
-          .def("apply",
-              &goblin::classic::SubtreeMutation::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassConstantMutation =
-          nb::class_<goblin::classic::ConstantMutation, goblin::classic::GPVariationOperatorBase>
-              (pyNsclassic, "ConstantMutation", "/ Randomly mutates constants")
-          .def(nb::init<double, CType>(),
-              nb::arg("probability") = 0.25, nb::arg("temperature") = 0.25)
-          .def("apply",
-              &goblin::classic::ConstantMutation::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"))
-          ;
-
-
-      auto pyNsclassic_ClassStandardGP =
-          nb::class_<goblin::classic::StandardGP, goblin::classic::EABase>
-              (pyNsclassic, "StandardGP", "")
-          .def("__init__",
-              [](goblin::classic::StandardGP * self, usize population_size = 32, bool steady_state = true, const std::optional<const std::shared_ptr<goblin::classic::GPVariationOperatorBase>> & variation_operator = std::nullopt, const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>> & selection_strategy = std::nullopt)
-              {
-                  auto ctor_wrapper = [](goblin::classic::StandardGP* self, usize population_size = 32, bool steady_state = true, std::shared_ptr<goblin::classic::GPVariationOperatorBase> variation_operator = std::shared_ptr<goblin::classic::GPVariationOperatorBase>(), std::shared_ptr<goblin::classic::SelectionStrategyBase> selection_strategy = std::make_shared<goblin::classic::TournamentSelection>(2)) ->  void
-                  {
-                      new(self) goblin::classic::StandardGP(population_size, steady_state, variation_operator, selection_strategy); // placement new
-                  };
-                  auto ctor_wrapper_adapt_mutable_param_with_default_value = [&ctor_wrapper](goblin::classic::StandardGP * self, usize population_size = 32, bool steady_state = true, const std::optional<const std::shared_ptr<goblin::classic::GPVariationOperatorBase>> & variation_operator = std::nullopt, const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>> & selection_strategy = std::nullopt)
-                  {
-
-                      const std::shared_ptr<goblin::classic::GPVariationOperatorBase>& variation_operator_or_default = [&]() -> const std::shared_ptr<goblin::classic::GPVariationOperatorBase> {
-                          if (variation_operator.has_value())
-                              return variation_operator.value();
-                          else
-                              return std::shared_ptr<goblin::classic::GPVariationOperatorBase>();
-                      }();
-
-                      const std::shared_ptr<goblin::classic::SelectionStrategyBase>& selection_strategy_or_default = [&]() -> const std::shared_ptr<goblin::classic::SelectionStrategyBase> {
-                          if (selection_strategy.has_value())
-                              return selection_strategy.value();
-                          else
-                              return std::make_shared<goblin::classic::TournamentSelection>(2);
-                      }();
-
-                      ctor_wrapper(self, population_size, steady_state, variation_operator_or_default, selection_strategy_or_default);
-                  };
-
-                  ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, steady_state, variation_operator, selection_strategy);
-              },
-              nb::arg("population_size") = 32, nb::arg("steady_state") = true, nb::arg("variation_operator").none() = nb::none(), nb::arg("selection_strategy").none() = nb::none(),
-              "Python bindings defaults:\n    If any of the params below is None, then its default value below will be used:\n        * variation_operator: classic.GPVariationOperatorBase()\n        * selection_strategy: std.make_shared<classic.TournamentSelection>(2)")
-          .def("step",
-              &goblin::classic::StandardGP::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"), nb::arg("archive"))
-          ;
-  } // </namespace classic>
-
-  { // <namespace voronoi>
-      nb::module_ pyNsvoronoi = m.def_submodule("voronoi", "");
-      auto pyNsvoronoi_ClassVoronoiImageReconstruction =
-          nb::class_<goblin::voronoi::VoronoiImageReconstruction, goblin::InstanceBase>
-              (pyNsvoronoi, "VoronoiImageReconstruction", "")
-          .def(nb::init<const Arr2D<DType> &, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool, usize>(),
-              nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10, nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(), nb::arg("complexity_objective") = false, nb::arg("track_complexity") = false, nb::arg("kdtree_threshold") = 50)
-          .def("discrete_domain_sizes",
-              &goblin::voronoi::VoronoiImageReconstruction::discrete_domain_sizes)
-          .def("continuous_lower_bounds",
-              &goblin::voronoi::VoronoiImageReconstruction::continuous_lower_bounds)
-          .def("continuous_upper_bounds",
-              &goblin::voronoi::VoronoiImageReconstruction::continuous_upper_bounds)
-          .def("continuous_init_lower_bounds",
-              &goblin::voronoi::VoronoiImageReconstruction::continuous_init_lower_bounds)
-          .def("continuous_init_upper_bounds",
-              &goblin::voronoi::VoronoiImageReconstruction::continuous_init_upper_bounds)
-          .def("image_data",
-              &goblin::voronoi::VoronoiImageReconstruction::image_data, nb::arg("solution"), nb::arg("scale") = 1.0)
-          .def("evaluate",
-              &goblin::voronoi::VoronoiImageReconstruction::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
-          .def("add_random",
-              &goblin::voronoi::VoronoiImageReconstruction::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
-          .def("fitness",
-              &goblin::voronoi::VoronoiImageReconstruction::fitness)
-          .def("archive_fitness",
-              &goblin::voronoi::VoronoiImageReconstruction::archive_fitness)
-          .def("log_solution",
-              &goblin::voronoi::VoronoiImageReconstruction::log_solution, nb::arg("os"), nb::arg("solution"))
-          ;
-
-
-      auto pyNsvoronoi_ClassYourCustomCrossover =
-          nb::class_<goblin::voronoi::YourCustomCrossover, goblin::classic::DiscreteCrossoverBase>
-              (pyNsvoronoi, "YourCustomCrossover", " It is important to use the fully qualified name for the base class (i.e. goblin::classic::DiscreteCrossoverBase) so\n that the bindings are generated correctly")
-          .def(nb::init<>()) // implicit default constructor
-          ;
-
-
-      auto pyNsvoronoi_ClassYourCustomMutation =
-          nb::class_<goblin::voronoi::YourCustomMutation, goblin::classic::DiscreteMutationBase>
-              (pyNsvoronoi, "YourCustomMutation", "")
-          .def(nb::init<>()) // implicit default constructor
-          ;
-  } // </namespace voronoi>
-  ////////////////////    </generated_from:amalgamation.h>    ////////////////////
-
-  // </litgen_pydef> // Autogenerated code end
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  AUTOGENERATED CODE END
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  AUTOGENERATED CODE
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! <litgen_pydef> // Autogenerated code
+    ////////////////////    <generated_from:amalgamation.h>    ////////////////////
+    // #ifndef _GOBLIN_H
+    //
+    // #ifndef _GOBLIN_LIB_TYPES_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_LIB_RNG_H
+    //
+
+    m.def("permute", goblin::permute, nb::arg("rng"), nb::arg("n"));
+    // #endif
+    // #ifndef _GOBLIN_LIB_ORDERING_H
+    //
+
+    auto pyEnumOrdering = nb::enum_<goblin::Ordering>(m, "Ordering", nb::is_arithmetic(), "")
+                              .value("Better", goblin::Ordering::Better, "")
+                              .value("Equal", goblin::Ordering::Equal, "")
+                              .value("Worse", goblin::Ordering::Worse, "")
+                              .value("NonDominated", goblin::Ordering::NonDominated, "");
+    // #endif
+    // #ifndef _GOBLIN_LIB_FITNESS_H
+    //
+
+    auto pyClassQualityBase = nb::class_<goblin::QualityBase, goblin::QualityBase_trampoline>(
+                                  m, "QualityBase", "/ Something that describes how good a solution is")
+                                  .def(nb::init<>())  // implicit default constructor
+                                  .def("clone", &goblin::QualityBase::clone);
+
+    auto pyClassFitnessBase =
+        nb::class_<goblin::FitnessBase, goblin::FitnessBase_trampoline>(m, "FitnessBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("num_objectives", &goblin::FitnessBase::num_objectives)
+            .def("cmp", &goblin::FitnessBase::cmp, nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none())
+            .def("distance", &goblin::FitnessBase::distance, nb::arg("lhs"), nb::arg("rhs"),
+                 nb::arg("objective").none())
+            .def("log_header", &goblin::FitnessBase::log_header, nb::arg("os"))
+            .def("log", &goblin::FitnessBase::log, nb::arg("os"), nb::arg("quality"))
+            .def("format", &goblin::FitnessBase::format, nb::arg("quality"));
+
+    auto pyClassArchiveFitnessBase =
+        nb::class_<goblin::ArchiveFitnessBase, goblin::FitnessBase, goblin::ArchiveFitnessBase_trampoline>(
+            m, "ArchiveFitnessBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("worst", &goblin::ArchiveFitnessBase::worst);
+
+    auto pyClassMOQuality = nb::class_<goblin::MOQuality, goblin::QualityBase>(
+                                m, "MOQuality", "/ Something that describes how good a solution is")
+                                .def(nb::init<>())  // implicit default constructor
+                                .def("clone", &goblin::MOQuality::clone)
+                                .def_rw("objectives", &goblin::MOQuality::objectives, "")
+                                .def_rw("constraint_value", &goblin::MOQuality::constraint_value, "");
+
+    auto pyClassMOFitness =
+        nb::class_<goblin::MOFitness, goblin::ArchiveFitnessBase>(m, "MOFitness", "")
+            // (default constructor explicitly deleted)
+            .def(nb::init<usize, bool, CType>(), nb::arg("num_objectives"), nb::arg("minimize") = true,
+                 nb::arg("epsilon") = 0.0)
+            .def("log_header", &goblin::MOFitness::log_header, nb::arg("os"))
+            .def("log", &goblin::MOFitness::log, nb::arg("os"), nb::arg("quality"))
+            .def("format", &goblin::MOFitness::format, nb::arg("quality"))
+            .def("num_objectives", &goblin::MOFitness::num_objectives)
+            .def("cmp",
+                 nb::overload_cast<const goblin::QualityBase&, const goblin::QualityBase&, std::optional<usize>>(
+                     &goblin::MOFitness::cmp, nb::const_),
+                 nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
+            .def("distance",
+                 nb::overload_cast<const goblin::QualityBase&, const goblin::QualityBase&, std::optional<usize>>(
+                     &goblin::MOFitness::distance, nb::const_),
+                 nb::arg("lhs"), nb::arg("rhs"), nb::arg("objective").none() = nb::none())
+            .def("worst", &goblin::MOFitness::worst);
+    // #endif
+    // #ifndef _GOBLIN_LIB_SUBSET_H
+    //
+
+    auto pyClassSubset =
+        nb::class_<goblin::Subset>(m, "Subset", "")
+            .def(
+                "__init__",
+                [](goblin::Subset* self, const std::optional<const std::vector<usize>>& discrete = std::nullopt,
+                   const std::optional<const std::vector<usize>>& continuous = std::nullopt) {
+                    new (self) goblin::Subset();  // placement new
+                    auto r_ctor_ = self;
+                    if (discrete.has_value())
+                        r_ctor_->discrete = discrete.value();
+                    else
+                        r_ctor_->discrete = std::vector<usize>();
+                    if (continuous.has_value())
+                        r_ctor_->continuous = continuous.value();
+                    else
+                        r_ctor_->continuous = std::vector<usize>();
+                },
+                nb::arg("discrete").none() = nb::none(), nb::arg("continuous").none() = nb::none())
+            .def_rw("discrete", &goblin::Subset::discrete, "")
+            .def_rw("continuous", &goblin::Subset::continuous, "")
+            .def("clear", &goblin::Subset::clear)
+            .def("size", &goblin::Subset::size)
+            .def("empty", &goblin::Subset::empty)
+            .def("similarity", &goblin::Subset::similarity, nb::arg("other"))
+            .def("merge", &goblin::Subset::merge, nb::arg("other"));
+    // #endif
+    // #ifndef _GOBLIN_LIB_SOLUTION_H
+    //
+
+    auto pyClassSolutionExtensionKey = nb::class_<goblin::SolutionExtensionKey>(m, "SolutionExtensionKey", "")
+                                           .def(nb::init<>())  // implicit default constructor
+                                           .def_rw("token", &goblin::SolutionExtensionKey::token, "");
+
+    auto pyClassSolutionExtensionKeyHash =
+        nb::class_<goblin::SolutionExtensionKeyHash>(m, "SolutionExtensionKeyHash", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("__call__", &goblin::SolutionExtensionKeyHash::operator(), nb::arg("key"));
+
+    auto pyClassSolutionExtensionBase =
+        nb::class_<goblin::SolutionExtensionBase, goblin::SolutionExtensionBase_trampoline>(m, "SolutionExtensionBase",
+                                                                                            "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("clone", &goblin::SolutionExtensionBase::clone)
+            .def("key", &goblin::SolutionExtensionBase::key);
+
+    auto pyClassSolutionBase =
+        nb::class_<goblin::SolutionBase, goblin::SolutionBase_trampoline>(m, "SolutionBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("has_extension", &goblin::SolutionBase::has_extension, nb::arg("key"))
+            .def("get_or_insert_extension", &goblin::SolutionBase::get_or_insert_extension, nb::arg("extension"),
+                 "this is fine")
+            .def("get_extension",
+                 nb::overload_cast<const goblin::SolutionExtensionKey&>(&goblin::SolutionBase::get_extension,
+                                                                        nb::const_),
+                 nb::arg("key"))
+            .def("get_extension",
+                 nb::overload_cast<const goblin::SolutionExtensionKey&>(&goblin::SolutionBase::get_extension),
+                 nb::arg("key"))
+            .def("remove_extension", &goblin::SolutionBase::remove_extension, nb::arg("key"))
+            .def("clear_extensions", &goblin::SolutionBase::clear_extensions)
+            .def("num_extensions", &goblin::SolutionBase::num_extensions)
+            .def("extensions", [](goblin::SolutionBase& self) { return self.extensions(); })
+            .def("extensions", [](goblin::SolutionBase& self) { return self.extensions(); })
+            .def("num_discrete", &goblin::SolutionBase::num_discrete)
+            .def("discrete_values", [](goblin::SolutionBase& self) { return self.discrete_values(); })
+            .def("discrete_values", [](goblin::SolutionBase& self) { return self.discrete_values(); })
+            .def("discrete_active", [](goblin::SolutionBase& self) { return self.discrete_active(); })
+            .def("discrete_active", [](goblin::SolutionBase& self) { return self.discrete_active(); })
+            .def("num_continuous", &goblin::SolutionBase::num_continuous)
+            .def("continuous_values", [](goblin::SolutionBase& self) { return self.continuous_values(); })
+            .def("continuous_values", [](goblin::SolutionBase& self) { return self.continuous_values(); })
+            .def("continuous_active", [](goblin::SolutionBase& self) { return self.continuous_active(); })
+            .def("continuous_active", [](goblin::SolutionBase& self) { return self.continuous_active(); });
+
+    pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality, nb::const_),
+                            nb::rv_policy::reference_internal);
+    pyClassSolutionBase.def("quality", nb::overload_cast<>(&goblin::SolutionBase::quality),
+                            nb::rv_policy::reference_internal);
+
+    auto pyClassSolution =
+        nb::class_<goblin::Solution, goblin::SolutionBase>(m, "Solution", "")
+            .def(nb::init<std::unique_ptr<goblin::QualityBase>, std::optional<Vec<DType>>, std::optional<Vec<CType>>>(),
+                 nb::arg("quality"), nb::arg("discrete_values").none() = nb::none(),
+                 nb::arg("continuous_values").none() = nb::none())
+            .def(nb::init<const goblin::Solution&>(), nb::arg("other"))
+            .def(nb::init<goblin::Solution&&>(), nb::arg("other"))
+            .def(nb::init<const goblin::SolutionBase&>(), nb::arg("s"),
+                 "explicitly not explicit since implicit conversion is the intent")
+            .def("discrete_values", [](goblin::Solution& self) { return self.discrete_values(); })
+            .def("discrete_values", [](goblin::Solution& self) { return self.discrete_values(); })
+            .def("discrete_active", [](goblin::Solution& self) { return self.discrete_active(); })
+            .def("discrete_active", [](goblin::Solution& self) { return self.discrete_active(); })
+            .def("continuous_values", [](goblin::Solution& self) { return self.continuous_values(); })
+            .def("continuous_values", [](goblin::Solution& self) { return self.continuous_values(); })
+            .def("continuous_active", [](goblin::Solution& self) { return self.continuous_active(); })
+            .def("continuous_active", [](goblin::Solution& self) { return self.continuous_active(); })
+            .def("has_extension", &goblin::Solution::has_extension, nb::arg("key"))
+            .def("get_or_insert_extension", &goblin::Solution::get_or_insert_extension, nb::arg("extension"))
+            .def("get_extension",
+                 nb::overload_cast<const goblin::SolutionExtensionKey&>(&goblin::Solution::get_extension, nb::const_),
+                 nb::arg("key"))
+            .def("get_extension",
+                 nb::overload_cast<const goblin::SolutionExtensionKey&>(&goblin::Solution::get_extension),
+                 nb::arg("key"))
+            .def("remove_extension", &goblin::Solution::remove_extension, nb::arg("key"))
+            .def("clear_extensions", &goblin::Solution::clear_extensions)
+            .def("num_extensions", &goblin::Solution::num_extensions)
+            .def("extensions", [](goblin::Solution& self) { return self.extensions(); })
+            .def("extensions", [](goblin::Solution& self) { return self.extensions(); });
+
+    pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality, nb::const_),
+                        nb::rv_policy::reference_internal);
+    pyClassSolution.def("quality", nb::overload_cast<>(&goblin::Solution::quality), nb::rv_policy::reference_internal);
+
+    auto pyClassSolutionSetBase =
+        nb::class_<goblin::SolutionSetBase, goblin::SolutionSetBase_trampoline>(m, "SolutionSetBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("__getitem__", nb::overload_cast<usize>(&goblin::SolutionSetBase::operator[]), nb::arg("idx"))
+            .def("__getitem__", nb::overload_cast<usize>(&goblin::SolutionSetBase::operator[], nb::const_),
+                 nb::arg("idx"))
+            .def("size", &goblin::SolutionSetBase::size)
+            .def("empty", &goblin::SolutionSetBase::empty)
+            .def("add", &goblin::SolutionSetBase::add, nb::arg("s"))
+            .def("remove_at", &goblin::SolutionSetBase::remove_at, nb::arg("idx"))
+            .def("remove_indices_sorted", &goblin::SolutionSetBase::remove_indices_sorted, nb::arg("indices"))
+            .def("reserve", &goblin::SolutionSetBase::reserve, nb::arg("new_capacity"))
+            .def("clear", &goblin::SolutionSetBase::clear);
+
+    auto pyClassAoSSet =
+        nb::class_<goblin::AoSSet, goblin::SolutionSetBase>(m, "AoSSet", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("__getitem__", nb::overload_cast<usize>(&goblin::AoSSet::operator[]), nb::arg("idx"))
+            .def("__getitem__", nb::overload_cast<usize>(&goblin::AoSSet::operator[], nb::const_), nb::arg("idx"))
+            .def("size", &goblin::AoSSet::size)
+            .def("empty", &goblin::AoSSet::empty)
+            .def("add", &goblin::AoSSet::add, nb::arg("s"))
+            .def("remove_at", &goblin::AoSSet::remove_at, nb::arg("idx"))
+            .def("remove_indices_sorted", &goblin::AoSSet::remove_indices_sorted, nb::arg("indices"))
+            .def("reserve", &goblin::AoSSet::reserve, nb::arg("new_capacity"))
+            .def("clear", &goblin::AoSSet::clear);
+    // #endif
+    // #ifndef _GOBLIN_LIB_ARCHIVE_H
+    //
+
+    auto pyClassArchiveBase =
+        nb::class_<goblin::ArchiveBase, goblin::ArchiveBase_trampoline>(m, "ArchiveBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("size", &goblin::ArchiveBase::size)
+            .def("empty", &goblin::ArchiveBase::empty)
+            .def("__getitem__", &goblin::ArchiveBase::operator[], nb::arg("idx"))
+            .def("unsafe_at", &goblin::ArchiveBase::unsafe_at, nb::arg("idx"),
+                 " Unsafe because by being in the archive we assume the invariant that the\n solution is "
+                 "non-dominated. Allowing potential changes to the solution\n without re-checking non-dominance hence "
+                 "is not \"safe\" from the logic\n perspective.")
+            .def("change_count", &goblin::ArchiveBase::change_count)
+            .def("reset_change_count", &goblin::ArchiveBase::reset_change_count)
+            .def("so_solution", &goblin::ArchiveBase::so_solution, nb::arg("objective"))
+            .def("adapt", &goblin::ArchiveBase::adapt)
+            .def("clear", &goblin::ArchiveBase::clear)
+            .def("fitness", &goblin::ArchiveBase::fitness)
+            .def("clone", &goblin::ArchiveBase::clone)
+            .def("update", &goblin::ArchiveBase::update, nb::arg("solution"), nb::arg("strict") = true,
+                 nb::arg("check_synched") = true,
+                 "/ Updates the archive with the solution and returns whether the solution was\n/ accepted into the "
+                 "archive.")
+            .def("sync_with", &goblin::ArchiveBase::sync_with, nb::arg("other"))
+            .def("unsync_all", &goblin::ArchiveBase::unsync_all)
+            .def("dominates", &goblin::ArchiveBase::dominates, nb::arg("solution"), nb::arg("strict"))
+            .def("covers", &goblin::ArchiveBase::covers, nb::arg("other"))
+            .def(
+                "approximately_covers", &goblin::ArchiveBase::approximately_covers, nb::arg("other"),
+                nb::arg("epsilon"),
+                "/ Checks if this archive approximately covers other, where\n/ approximate coverage corresponds to the "
+                "one-sided Hausdorff distance (or max[D_PF->S]) in objective space being\n/ lower than some epsilon.")
+            .def("random_solution", &goblin::ArchiveBase::random_solution, nb::arg("rng"));
+
+    auto pyClassUnboundedArchive =
+        nb::class_<goblin::UnboundedArchive, goblin::ArchiveBase>(m, "UnboundedArchive", "")
+            .def(nb::init<const goblin::ArchiveFitnessBase&>(), nb::arg("fitness"))
+            .def("clone", &goblin::UnboundedArchive::clone)
+            .def("size", &goblin::UnboundedArchive::size)
+            .def("__getitem__", &goblin::UnboundedArchive::operator[], nb::arg("idx"))
+            .def("unsafe_at", &goblin::UnboundedArchive::unsafe_at, nb::arg("idx"))
+            .def("so_solution", &goblin::UnboundedArchive::so_solution, nb::arg("objective"))
+            .def("clear", &goblin::UnboundedArchive::clear)
+            .def("update_archive", &goblin::UnboundedArchive::update_archive, nb::arg("solution"), nb::arg("strict"))
+            .def("fitness", &goblin::UnboundedArchive::fitness);
+
+    auto pyClassAdaptiveGridArchive =
+        nb::class_<goblin::AdaptiveGridArchive, goblin::ArchiveBase>(m, "AdaptiveGridArchive", "")
+            .def(nb::init<const goblin::ArchiveFitnessBase&, usize, float, usize, std::optional<CType>>(),
+                 nb::arg("fitness"), nb::arg("capacity"), nb::arg("max_deviation") = 0.25,
+                 nb::arg("max_iterations") = 25, nb::arg("initial_discretization").none() = nb::none())
+            .def("clone", &goblin::AdaptiveGridArchive::clone)
+            .def("size", &goblin::AdaptiveGridArchive::size)
+            .def("__getitem__", &goblin::AdaptiveGridArchive::operator[], nb::arg("idx"))
+            .def("unsafe_at", &goblin::AdaptiveGridArchive::unsafe_at, nb::arg("idx"))
+            .def("clear", &goblin::AdaptiveGridArchive::clear)
+            .def("so_solution", &goblin::AdaptiveGridArchive::so_solution, nb::arg("objective"))
+            .def("update_archive", &goblin::AdaptiveGridArchive::update_archive, nb::arg("solution"), nb::arg("strict"))
+            .def("adapt", &goblin::AdaptiveGridArchive::adapt)
+            .def("fitness", &goblin::AdaptiveGridArchive::fitness);
+    // #endif
+    // #ifndef _GOBLIN_LIB_BUDGET_H
+    //
+
+    auto pyEnumTerminationStatus =
+        nb::enum_<goblin::TerminationStatus>(m, "TerminationStatus", nb::is_arithmetic(), "")
+            .value("TimeLimitReached", goblin::TerminationStatus::TimeLimitReached, "")
+            .value("GenerationLimitReached", goblin::TerminationStatus::GenerationLimitReached, "")
+            .value("EvaluationLimitReached", goblin::TerminationStatus::EvaluationLimitReached, "")
+            .value("TargetReached", goblin::TerminationStatus::TargetReached, "")
+            .value("Converged", goblin::TerminationStatus::Converged, "")
+            .value("Aborted", goblin::TerminationStatus::Aborted, "")
+            .value("Running", goblin::TerminationStatus::Running, "");
+
+    auto pyClassBudget =
+        nb::class_<goblin::Budget>(m, "Budget", "")
+            .def_rw("max_evaluations", &goblin::Budget::max_evaluations, "")
+            .def_rw("max_generations", &goblin::Budget::max_generations, "")
+            .def_rw("max_time", &goblin::Budget::max_time, "")
+            .def_rw("termination_callback", &goblin::Budget::termination_callback, "")
+            .def(nb::init<std::optional<u64>, std::optional<u64>, std::optional<u64>,
+                          std::optional<std::chrono::nanoseconds>, std::optional<std::function<bool()>>>(),
+                 nb::arg("max_evaluations").none() = nb::none(), nb::arg("max_generations").none() = nb::none(),
+                 nb::arg("max_time_seconds").none() = nb::none(), nb::arg("max_duration").none() = nb::none(),
+                 nb::arg("termination_callback").none() = nb::none())
+            .def("exhausted", &goblin::Budget::exhausted, nb::arg("generations"), nb::arg("evaluations"),
+                 nb::arg("elapsed"))
+            .def("exhausted_or_external_criterion_met", &goblin::Budget::exhausted_or_external_criterion_met,
+                 nb::arg("generations"), nb::arg("evaluations"), nb::arg("elapsed"));
+    // #endif
+    // #ifndef _GOBLIN_LIB_INSTANCE_H
+    //
+
+    auto pyClassCacheKey = nb::class_<goblin::CacheKey>(m, "CacheKey", "")
+                               .def(nb::init<const std::string&>(), nb::arg("key"))
+                               .def(nb::init<std::vector<std::byte>&&>(), nb::arg("key"))
+                               .def("__eq__", &goblin::CacheKey::operator==, nb::arg("other"));
+
+    auto pyClassInstanceBase =
+        nb::class_<goblin::InstanceBase, goblin::InstanceBase_trampoline>(m, "InstanceBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("num_objectives", &goblin::InstanceBase::num_objectives)
+            .def("num_discrete", &goblin::InstanceBase::num_discrete)
+            .def("discrete_domain_sizes", &goblin::InstanceBase::discrete_domain_sizes)
+            .def("num_continuous", &goblin::InstanceBase::num_continuous)
+            .def("continuous_lower_bounds", &goblin::InstanceBase::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::InstanceBase::continuous_upper_bounds)
+            .def("continuous_init_lower_bounds", &goblin::InstanceBase::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds", &goblin::InstanceBase::continuous_init_upper_bounds)
+            .def("evaluate", &goblin::InstanceBase::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+            .def("evaluate_partial", &goblin::InstanceBase::evaluate_partial, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
+            .def("evaluate_solutions", &goblin::InstanceBase::evaluate_solutions, nb::arg("solutions"),
+                 nb::arg("seed").none() = nb::none())
+            .def("adapt", &goblin::InstanceBase::adapt, nb::arg("rng"),
+                 "/ Possibly adapts the problem in some way that may require re-evaluating any elites stored thus far "
+                 "(indicated by\n/ the return value)")
+            .def("gradients", &goblin::InstanceBase::gradients, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"),
+                 "/ Returns the gradient for each index of indices (row) and continuous variable (column) with respect "
+                 "to the\n/ optimization goal. The number of evaluations performed to calculate the gradients are "
+                 "added to `evaluations`;\n/\n/ Note: The default implementation assumes that the passes subsets "
+                 "contain all active indices and the finite\n/ difference approach used requires up to `2 * "
+                 "indices.size() * num_continuous()` evaluations.")
+            .def("gradient_steps", &goblin::InstanceBase::gradient_steps, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"),
+                 "/ Performs gradient optimization steps of the continuous variables and returns the\n/ subset of "
+                 "`indices` that changed together with the number of evaluations performed.\n/ Guarantees that the "
+                 "quality of all solutions is up-to-date.")
+            .def("add_random", &goblin::InstanceBase::add_random, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("count"))
+            .def("fitness", &goblin::InstanceBase::fitness)
+            .def("archive_fitness", &goblin::InstanceBase::archive_fitness,
+                 "/ The fitness the archive should be use, in case the archive should record the front in more "
+                 "objectives than what\n/ should be optimized (as per https://arxiv.org/abs/2507.03777v1)\n/\n/ Note: "
+                 "What `fitness()` optimizes must always be a compatible subset of what `archive_fitness()` optimizes.")
+            .def("inherit_discrete", &goblin::InstanceBase::inherit_discrete, nb::arg("offspring"), nb::arg("donor"),
+                 nb::arg("subset"),
+                 "/ The offspring inherits a subset of the decision variables from the donor, returning True if there "
+                 "was a change to\n/ the active variables and an evaluation is needed, possibly with problem specific "
+                 "modifications.\n/\n/ Returns a `(any_active_changed, anything_changed)` tuple")
+            .def("as_continuous", &goblin::InstanceBase::as_continuous, nb::arg("solution"), nb::arg("discrete_index"),
+                 " useful for discrete linkage learning in GP\n - needed to be able to perform constant binning\n - "
+                 "needed to erase constant pool references")
+            .def("target_reached", &goblin::InstanceBase::target_reached, nb::arg("archive"))
+            .def("add_target",
+                 nb::overload_cast<std::function<bool(const goblin::ArchiveBase&)>>(&goblin::InstanceBase::add_target),
+                 nb::arg("target_reached_check"))
+            .def("add_target", nb::overload_cast<const goblin::ArchiveBase&>(&goblin::InstanceBase::add_target),
+                 nb::arg("target_front"))
+            .def("add_target", nb::overload_cast<const goblin::SolutionBase&>(&goblin::InstanceBase::add_target),
+                 nb::arg("target_solution"))
+            .def("add_target", nb::overload_cast<const goblin::QualityBase&>(&goblin::InstanceBase::add_target),
+                 nb::arg("target_quality"))
+            .def("add_target",
+                 nb::overload_cast<std::variant<Vec<CType>, std::vector<CType>>>(&goblin::InstanceBase::add_target),
+                 nb::arg("target_objectives"))
+            .def("add_target_front_size", &goblin::InstanceBase::add_target_front_size, nb::arg("target_front_size"))
+            .def("add_target_front", nb::overload_cast<Mat<CType>>(&goblin::InstanceBase::add_target_front),
+                 nb::arg("target_objectives"))
+            .def("add_target_front",
+                 nb::overload_cast<std::optional<Mat<DType>>, std::optional<Mat<CType>>, std::optional<usize>>(
+                     &goblin::InstanceBase::add_target_front),
+                 nb::arg("discrete").none(), nb::arg("continuous").none(),
+                 nb::arg("evaluation_seed").none() = nb::none())
+            .def("add_target", nb::overload_cast<CType>(&goblin::InstanceBase::add_target), nb::arg("target_fitness"))
+            .def("log_header", &goblin::InstanceBase::log_header, nb::arg("os"))
+            .def("log_solution", &goblin::InstanceBase::log_solution, nb::arg("os"), nb::arg("solution"))
+            .def("log", &goblin::InstanceBase::log, nb::arg("os"), nb::arg("solution"))
+            .def("format_solution", &goblin::InstanceBase::format_solution, nb::arg("solution"))
+            .def("solution_cache_key", &goblin::InstanceBase::solution_cache_key, nb::arg("solution"),
+                 "/ By returning std::nullopt, caching can be disabled on a per solution basis")
+            .def("reevaluate_and_rebuild_archive", &goblin::InstanceBase::reevaluate_and_rebuild_archive,
+                 nb::arg("rng"), nb::arg("archive"))
+            .def("unwrap", &goblin::InstanceBase::unwrap);
+
+    auto pyClassWrappedInstance =
+        nb::class_<goblin::WrappedInstance, goblin::InstanceBase>(
+            m, "WrappedInstance",
+            "/ Intermediate class for wrapping instances that by default forwards everything to the actual inner "
+            "method. Still\n/ allows accidentally not overwriting some methods, but at least defaults to the behaviour "
+            "of the wrapped instance\n/ instead of the default implementations of virtual methods.")
+            .def(nb::init<goblin::InstanceBase&>(), nb::arg("instance"))
+            .def("discrete_domain_sizes", &goblin::WrappedInstance::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::WrappedInstance::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::WrappedInstance::continuous_upper_bounds)
+            .def("continuous_init_lower_bounds", &goblin::WrappedInstance::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds", &goblin::WrappedInstance::continuous_init_upper_bounds)
+            .def("evaluate", &goblin::WrappedInstance::evaluate, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("indices"))
+            .def("evaluate_partial", &goblin::WrappedInstance::evaluate_partial, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
+            .def("adapt", &goblin::WrappedInstance::adapt, nb::arg("rng"))
+            .def("gradients", &goblin::WrappedInstance::gradients, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
+            .def("gradient_steps", &goblin::WrappedInstance::gradient_steps, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
+            .def("add_random", &goblin::WrappedInstance::add_random, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("count"))
+            .def("fitness", &goblin::WrappedInstance::fitness)
+            .def("archive_fitness", &goblin::WrappedInstance::archive_fitness)
+            .def("inherit_discrete", &goblin::WrappedInstance::inherit_discrete, nb::arg("offspring"), nb::arg("donor"),
+                 nb::arg("subset"))
+            .def("as_continuous", &goblin::WrappedInstance::as_continuous, nb::arg("solution"),
+                 nb::arg("discrete_index"))
+            .def("target_reached", &goblin::WrappedInstance::target_reached, nb::arg("archive"))
+            .def("log_header", &goblin::WrappedInstance::log_header, nb::arg("os"))
+            .def("log_solution", &goblin::WrappedInstance::log_solution, nb::arg("os"), nb::arg("solution"))
+            .def("log", &goblin::WrappedInstance::log, nb::arg("os"), nb::arg("solution"))
+            .def("solution_cache_key", &goblin::WrappedInstance::solution_cache_key, nb::arg("solution"))
+            .def("unwrap", &goblin::WrappedInstance::unwrap);
+
+    auto pyClassCachedInstanceBase =
+        nb::class_<goblin::CachedInstanceBase, goblin::WrappedInstance, goblin::CachedInstanceBase_trampoline>(
+            m, "CachedInstanceBase", "")
+            .def(nb::init<goblin::InstanceBase&>(), nb::arg("instance"))
+            .def("hit_count", &goblin::CachedInstanceBase::hit_count)
+            .def("miss_count", &goblin::CachedInstanceBase::miss_count)
+            .def("access_count", &goblin::CachedInstanceBase::access_count)
+            .def("entry_invalidation_count", &goblin::CachedInstanceBase::entry_invalidation_count)
+            .def("cache_invalidation_count", &goblin::CachedInstanceBase::cache_invalidation_count)
+            .def("evicted_count", &goblin::CachedInstanceBase::evicted_count)
+            .def("hit_ratio", &goblin::CachedInstanceBase::hit_ratio)
+            .def("miss_ratio", &goblin::CachedInstanceBase::miss_ratio)
+            .def("utilization", &goblin::CachedInstanceBase::utilization,
+                 "/ Proportion of cache entries used w.r.t. maximum size");
+
+    m.def("Cached", goblin::Cached, nb::arg("problem"), nb::arg("cache_size") = 10000, nb::arg("cache_policy") = "lru");
+    // #endif
+    // #ifndef _GOBLIN_LIB_UPGMA_H
+    //
+
+    auto pyClassUPGMA = nb::class_<goblin::UPGMA>(
+        m, "UPGMA",
+        "/ Arthur's UPGMA implementation from\n/ "
+        "https://github.com/8uurg/Impact-of-Asynchrony-on-MBEAs/blob/07083732629661c7efccddb4c1b15e69cc462e/EALib/src/"
+        "gomea.cpp#L216\n/ This implementation was chosen because it returns the whole dendrogram, it\n/ is commented "
+        "better and Arthur's code was easier to adapt to work with Eigen\n/ matrices directly...");
+
+    {  // inner classes & enums of UPGMA
+        auto pyClassUPGMA_ClassMerge =
+            nb::class_<goblin::UPGMA::Merge>(pyClassUPGMA, "Merge", "")
+                .def(
+                    "__init__",
+                    [](goblin::UPGMA::Merge* self, const std::optional<const usize>& left = std::nullopt,
+                       const std::optional<const usize>& right = std::nullopt,
+                       const std::optional<const CType>& distance = std::nullopt,
+                       const std::optional<const usize>& size = std::nullopt) {
+                        new (self) goblin::UPGMA::Merge();  // placement new
+                        auto r_ctor_ = self;
+                        if (left.has_value())
+                            r_ctor_->left = left.value();
+                        else
+                            r_ctor_->left = usize();
+                        if (right.has_value())
+                            r_ctor_->right = right.value();
+                        else
+                            r_ctor_->right = usize();
+                        if (distance.has_value())
+                            r_ctor_->distance = distance.value();
+                        else
+                            r_ctor_->distance = CType();
+                        if (size.has_value())
+                            r_ctor_->size = size.value();
+                        else
+                            r_ctor_->size = usize();
+                    },
+                    nb::arg("left").none() = nb::none(), nb::arg("right").none() = nb::none(),
+                    nb::arg("distance").none() = nb::none(), nb::arg("size").none() = nb::none())
+                .def_rw("left", &goblin::UPGMA::Merge::left, "")
+                .def_rw("right", &goblin::UPGMA::Merge::right, "")
+                .def_rw("distance", &goblin::UPGMA::Merge::distance, "")
+                .def_rw("size", &goblin::UPGMA::Merge::size, "");
+    }  // end of inner classes & enums of UPGMA
+
+    pyClassUPGMA
+        .def(nb::init<>())  // implicit default constructor
+        .def_static("cluster", &goblin::UPGMA::cluster, nb::arg("rng"), nb::arg("similarity"),
+                    "/ UPGMA that clusters based on similarity (higher = closer), not distance\n/ (lower = closer)");
+    // #endif
+    // #ifndef _GOBLIN_LIB_SUBSET_SELECTION_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_LIB_ALGORITHMS_MO_H
+    //
+
+    m.def("hypervolume2D", nb::overload_cast<const ArchiveBase&, const FitnessBase&, const QualityBase&>(hypervolume2D),
+          nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
+
+    m.def("hypervolume2D",
+          nb::overload_cast<const SolutionSetBase&, const FitnessBase&, const QualityBase&>(hypervolume2D),
+          nb::arg("solutions"), nb::arg("fitness"), nb::arg("reference_point"));
+
+    m.def("hypervolume2D", nb::overload_cast<const Arr2D<CType>, const Array<CType>>(hypervolume2D), nb::arg("points"),
+          nb::arg("reference_point"));
+    // #endif
+    // #ifndef _GOBLIN_LIB_LINKAGE_MODEL_H
+    //
+
+    auto pyEnumVariableSet = nb::enum_<goblin::VariableSet>(m, "VariableSet", nb::is_arithmetic(), "")
+                                 .value("Discrete", goblin::VariableSet::Discrete, "")
+                                 .value("Continuous", goblin::VariableSet::Continuous, "")
+                                 .value("Mixed", goblin::VariableSet::Mixed, "");
+
+    m.def("estimate_entropy", goblin::estimate_entropy, nb::arg("problem"), nb::arg("solutions"), nb::arg("indices"),
+          nb::arg("subset"), nb::arg("intron_strategy"), nb::arg("merge_continuous"),
+          nb::arg("num_continuous_bins").none());
+
+    auto pyClassLinkageModelBase =
+        nb::class_<goblin::LinkageModelBase, goblin::LinkageModelBase_trampoline>(m, "LinkageModelBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("init", &goblin::LinkageModelBase::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("subsets", &goblin::LinkageModelBase::subsets, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none())
+            .def("is_static", &goblin::LinkageModelBase::is_static)
+            .def("clone", &goblin::LinkageModelBase::clone);
+
+    auto pyClassUnivariateFOS =
+        nb::class_<goblin::UnivariateFOS, goblin::LinkageModelBase>(m, "UnivariateFOS", nb::is_final(),
+                                                                    "\n(final class)")
+            .def(nb::init<std::optional<goblin::Subset>>(), nb::arg("subset").none() = nb::none())
+            .def("clone", &goblin::UnivariateFOS::clone)
+            .def("init", &goblin::UnivariateFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("subsets", &goblin::UnivariateFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+            .def("is_static", &goblin::UnivariateFOS::is_static);
+
+    auto pyClassStaticFOS =
+        nb::class_<goblin::StaticFOS, goblin::LinkageModelBase>(m, "StaticFOS", nb::is_final(), "\n(final class)")
+            .def(nb::init<FOS>(), nb::arg("fos"))
+            .def("clone", &goblin::StaticFOS::clone)
+            .def("init", &goblin::StaticFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("subsets", &goblin::StaticFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+            .def("is_static", &goblin::StaticFOS::is_static)
+            .def("get", &goblin::StaticFOS::get);
+
+    auto pyClassFullFOS =
+        nb::class_<goblin::FullFOS, goblin::LinkageModelBase>(m, "FullFOS", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<goblin::Subset>>(), nb::arg("subset").none() = nb::none())
+            .def("clone", &goblin::FullFOS::clone)
+            .def("init", &goblin::FullFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("subsets", &goblin::FullFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+            .def("is_static", &goblin::FullFOS::is_static);
+
+    auto pyClassLinkageTreeFOS =
+        nb::class_<goblin::LinkageTreeFOS, goblin::LinkageModelBase>(m, "LinkageTreeFOS", nb::is_final(),
+                                                                     "\n(final class)")
+            .def(nb::init<std::string, std::string, bool, std::optional<usize>, std::optional<CType>,
+                          std::optional<CType>, std::optional<bool>, std::optional<usize>, bool,
+                          std::optional<goblin::Subset>, std::optional<Mat<CType>>, std::optional<CType>,
+                          std::optional<std::string>, std::optional<std::function<void(CRef<Mat<CType>>)>>, bool>(),
+                 nb::arg("metric") = "mi", nb::arg("intron_strategy") = "none", nb::arg("merge_continuous") = true,
+                 nb::arg("num_continuous_bins").none() = nb::none(),
+                 nb::arg("filter_parent_threshold").none() = nb::none(),
+                 nb::arg("filter_children_threshold").none() = nb::none(), nb::arg("filter_root").none() = nb::none(),
+                 nb::arg("max_subset_size").none() = nb::none(), nb::arg("normalize_initial_linkage_bias") = false,
+                 nb::arg("subset").none() = nb::none(), nb::arg("custom_similarity").none() = nb::none(),
+                 nb::arg("eta_custom_similarity").none() = nb::none(),
+                 nb::arg("custom_similarity_agg").none() = nb::none(),
+                 nb::arg("similarity_callback").none() = nb::none(), nb::arg("freeze") = false)
+            .def("clone", &goblin::LinkageTreeFOS::clone)
+            .def("is_static", &goblin::LinkageTreeFOS::is_static)
+            .def("register_similarity_callback", &goblin::LinkageTreeFOS::register_similarity_callback,
+                 nb::arg("similarity_callback"))
+            .def("unregister_similarity_callback", &goblin::LinkageTreeFOS::unregister_similarity_callback)
+            .def("init", &goblin::LinkageTreeFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("compute_similarity", &goblin::LinkageTreeFOS::compute_similarity, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("solutions"), nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+            .def("learn_lt", &goblin::LinkageTreeFOS::learn_lt, nb::arg("rng"), nb::arg("similarity"),
+                 nb::arg("filter_root_default"))
+            .def("learn_lt_original", &goblin::LinkageTreeFOS::learn_lt_original, nb::arg("rng"), nb::arg("similarity"),
+                 nb::arg("filter_root_default"))
+            .def("subsets", &goblin::LinkageTreeFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("indices"), nb::arg("covariance").none() = nb::none());
+
+    auto pyClassCombinedFOS =
+        nb::class_<goblin::CombinedFOS, goblin::LinkageModelBase>(m, "CombinedFOS", nb::is_final(), "\n(final class)")
+            .def(nb::init<const std::vector<std::unique_ptr<goblin::LinkageModelBase>>&>(), nb::arg("linkage_models"))
+            .def("add_model", &goblin::CombinedFOS::add_model, nb::arg("model"))
+            .def(nb::init<const goblin::CombinedFOS&>(), nb::arg("other"),
+                 "Copy operations must copy the underlying models manually...")
+            .def(nb::init<goblin::CombinedFOS&&>(), nb::arg("param_0"), "But moving is allowed")
+            .def("clone", &goblin::CombinedFOS::clone)
+            .def("init", &goblin::CombinedFOS::init, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("variables"))
+            .def("subsets", &goblin::CombinedFOS::subsets, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("indices"), nb::arg("covariance").none() = nb::none())
+            .def("is_static", &goblin::CombinedFOS::is_static);
+    // #endif
+    // #ifndef _GOBLIN_LIB_METHOD_H
+    //
+
+    auto pyClassMethodBase =
+        nb::class_<goblin::MethodBase, goblin::MethodBase_trampoline>(m, "MethodBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("run", &goblin::MethodBase::run, nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none(),
+                 nb::arg("population_size").none())
+            .def(
+                "current_generation", &goblin::MethodBase::current_generation,
+                "/ Evaluations used and time elapsed can be collected without knowing about\n/ method details, but not "
+                "the generation/iteraction. This method provides a\n/ hook for tracking the progress over generations")
+            .def("current_population", &goblin::MethodBase::current_population,
+                 "/ Size, generations and restarts of the currently active population if available for multi-start "
+                 "schemes");
+    // #endif
+    // #ifndef _GOBLIN_LIB_INIT_H
+    //
+
+    auto pyClassInitBase =
+        nb::class_<goblin::InitBase, goblin::InitBase_trampoline>(m, "InitBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::InitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"))
+            .def("add_random", &goblin::InitBase::add_random, nb::arg("rng"), nb::arg("problem"), nb::arg("solutions"),
+                 nb::arg("count"));
+
+    auto pyClassDiscreteInitBase =
+        nb::class_<goblin::DiscreteInitBase, goblin::DiscreteInitBase_trampoline>(m, "DiscreteInitBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::DiscreteInitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassContinuousInitBase =
+        nb::class_<goblin::ContinuousInitBase, goblin::ContinuousInitBase_trampoline>(m, "ContinuousInitBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::ContinuousInitBase::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassRandomDInit =
+        nb::class_<goblin::RandomDInit, goblin::DiscreteInitBase>(m, "RandomDInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::RandomDInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassRandomCInit =
+        nb::class_<goblin::RandomCInit, goblin::ContinuousInitBase>(m, "RandomCInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::RandomCInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassRandomInit =
+        nb::class_<goblin::RandomInit, goblin::InitBase>(m, "RandomInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::RandomInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassCombinedInit =
+        nb::class_<goblin::CombinedInit, goblin::InitBase>(m, "CombinedInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<std::shared_ptr<goblin::DiscreteInitBase>>,
+                          std::optional<std::shared_ptr<goblin::ContinuousInitBase>>>(),
+                 nb::arg("discrete").none() = nb::none(), nb::arg("continuous").none() = nb::none())
+            .def("sample", &goblin::CombinedInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    m.def("from_any_init", goblin::from_any_init, nb::arg("any_init"));
+
+    auto pyClassCompleteInit =
+        nb::class_<goblin::CompleteInit, goblin::DiscreteInitBase>(m, "CompleteInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::CompleteInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+    // #endif
+    // #ifndef _GOBLIN_GP_CONTEXT_H
+    //
+    // #ifndef _GOBLIN_GP_OPERATOR_H
+    //
+    // #ifndef _GOBLIN_GP_TEMPLATE_H
+    //
+
+    auto pyClassTemplateNode =
+        nb::class_<goblin::TemplateNode>(m, "TemplateNode", "")
+            .def(
+                "__init__",
+                [](goblin::TemplateNode* self,
+                   const std::optional<const std::vector<goblin::TemplateNode>>& children = std::nullopt,
+                   size_t max_num_nodes = size_t()) {
+                    new (self) goblin::TemplateNode();  // placement new
+                    auto r_ctor_ = self;
+                    if (children.has_value())
+                        r_ctor_->children = children.value();
+                    else
+                        r_ctor_->children = std::vector<goblin::TemplateNode>();
+                    r_ctor_->max_num_nodes = max_num_nodes;
+                },
+                nb::arg("children").none() = nb::none(), nb::arg("max_num_nodes") = size_t())
+            .def_rw("children", &goblin::TemplateNode::children, "")
+            .def_rw("max_num_nodes", &goblin::TemplateNode::max_num_nodes, "")
+            .def_static("full_nary", &goblin::TemplateNode::full_nary, nb::arg("branching_factor"), nb::arg("depth"))
+            .def("size", &goblin::TemplateNode::size)
+            .def("max_num_children", &goblin::TemplateNode::max_num_children)
+            .def("is_tree", &goblin::TemplateNode::is_tree)
+            .def("is_cycle_free", &goblin::TemplateNode::is_cycle_free);
+
+    auto pyClassTemplate = nb::class_<goblin::Template>(m, "Template", "")
+                               .def_rw("outputs", &goblin::Template::outputs, "")
+                               .def_rw("subexpressions", &goblin::Template::subexpressions, "")
+                               .def(nb::init<>())
+                               .def(nb::init<std::vector<goblin::TemplateNode>, std::vector<goblin::TemplateNode>>(),
+                                    nb::arg("outputs"), nb::arg("subexpressions"))
+                               .def("size", &goblin::Template::size)
+                               .def("max_num_children", &goblin::Template::max_num_children)
+                               .def("add_output", &goblin::Template::add_output, nb::arg("output"))
+                               .def("add_subtree", &goblin::Template::add_subtree, nb::arg("subexpression"))
+                               .def("is_valid", &goblin::Template::is_valid);
+    // #endif
+    // #ifndef _GOBLIN_GA_GP_TYPES_H
+    //
+
+    auto pyEnumKernelVersion =
+        nb::enum_<goblin::KernelVersion>(
+            m, "KernelVersion", nb::is_arithmetic(),
+            " SingleBlock: one block per solution; threads partition the datapoints within that block.\n DynamicBlock: "
+            "multiple blocks per solution; improves SM occupancy for small populations.")
+            .value("SingleBlock", goblin::KernelVersion::SingleBlock, "")
+            .value("DynamicBlock", goblin::KernelVersion::DynamicBlock, "");
+
+    m.def("to_string", goblin::to_string, nb::arg("v"));
+
+    auto pyEnumNodeType =
+        nb::enum_<goblin::NodeType>(m, "NodeType", nb::is_arithmetic(),
+                                    " Trees are encoded as parallel arrays (type[], value[]) in postfix order.\n "
+                                    "Input: value holds the feature index.\n Constant: value holds the literal "
+                                    "constant.\n Operator: value is the Operator enum cast to float.")
+            .value("Input", goblin::NodeType::Input, "")
+            .value("Constant", goblin::NodeType::Constant, "")
+            .value("Operator", goblin::NodeType::Operator, "")
+            .value("Parameter", goblin::NodeType::Parameter, "");
+
+    auto pyEnumOperator = nb::enum_<goblin::Operator>(m, "Operator", nb::is_arithmetic(), "")
+                              .value("Add", goblin::Operator::Add, "")
+                              .value("Sub", goblin::Operator::Sub, "")
+                              .value("Mul", goblin::Operator::Mul, "")
+                              .value("Div", goblin::Operator::Div, "")
+                              .value("Sin", goblin::Operator::Sin, "")
+                              .value("Cos", goblin::Operator::Cos, "")
+                              .value("Exp", goblin::Operator::Exp, "")
+                              .value("Log", goblin::Operator::Log, "")
+                              .value("Square", goblin::Operator::Square, "")
+                              .value("Sqrt", goblin::Operator::Sqrt, "")
+                              .value("Pow", goblin::Operator::Pow, "")
+                              .value("Abs", goblin::Operator::Abs, "")
+                              .value("Min", goblin::Operator::Min, "")
+                              .value("Max", goblin::Operator::Max, "");
+    // #endif
+
+    auto pyClassOperatorBase =
+        nb::class_<goblin::OperatorBase, goblin::OperatorBase_trampoline>(m, "OperatorBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OperatorBase::min_arity)
+            .def("max_arity", &goblin::OperatorBase::max_arity)
+            .def("is_commutative", &goblin::OperatorBase::is_commutative)
+            .def("apply", &goblin::OperatorBase::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OperatorBase::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OperatorBase::has_gradient)
+            .def("apply_grad", &goblin::OperatorBase::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("__call__", &goblin::OperatorBase::operator(), nb::arg("args"))
+            .def("gpu_operator_id", &goblin::OperatorBase::gpu_operator_id)
+            .def("format", &goblin::OperatorBase::format, nb::arg("args"));
+
+    auto pyClassOpIdentity =
+        nb::class_<goblin::OpIdentity, goblin::OperatorBase>(m, "OpIdentity", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpIdentity::min_arity)
+            .def("max_arity", &goblin::OpIdentity::max_arity)
+            .def("is_commutative", &goblin::OpIdentity::is_commutative)
+            .def("apply", &goblin::OpIdentity::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpIdentity::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpIdentity::has_gradient)
+            .def("apply_grad", &goblin::OpIdentity::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("format", &goblin::OpIdentity::format, nb::arg("args"));
+
+    auto pyClassOpAdd =
+        nb::class_<goblin::OpAdd, goblin::OperatorBase>(m, "OpAdd", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpAdd::min_arity)
+            .def("max_arity", &goblin::OpAdd::max_arity)
+            .def("is_commutative", &goblin::OpAdd::is_commutative)
+            .def("apply", &goblin::OpAdd::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpAdd::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpAdd::has_gradient)
+            .def("apply_grad", &goblin::OpAdd::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpAdd::gpu_operator_id)
+            .def("format", &goblin::OpAdd::format, nb::arg("args"));
+
+    auto pyClassOpSub =
+        nb::class_<goblin::OpSub, goblin::OperatorBase>(m, "OpSub", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpSub::min_arity)
+            .def("max_arity", &goblin::OpSub::max_arity)
+            .def("is_commutative", &goblin::OpSub::is_commutative)
+            .def("apply", &goblin::OpSub::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpSub::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpSub::has_gradient)
+            .def("apply_grad", &goblin::OpSub::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("format", &goblin::OpSub::format, nb::arg("args"));
+
+    auto pyClassOpSubGPU =
+        nb::class_<goblin::OpSubGPU, goblin::OperatorBase>(m, "OpSubGPU", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpSubGPU::min_arity)
+            .def("max_arity", &goblin::OpSubGPU::max_arity)
+            .def("is_commutative", &goblin::OpSubGPU::is_commutative)
+            .def("apply", &goblin::OpSubGPU::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpSubGPU::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpSubGPU::has_gradient)
+            .def("apply_grad", &goblin::OpSubGPU::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpSubGPU::gpu_operator_id)
+            .def("format", &goblin::OpSubGPU::format, nb::arg("args"));
+
+    auto pyClassOpMul =
+        nb::class_<goblin::OpMul, goblin::OperatorBase>(m, "OpMul", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpMul::min_arity)
+            .def("max_arity", &goblin::OpMul::max_arity)
+            .def("is_commutative", &goblin::OpMul::is_commutative)
+            .def("apply", &goblin::OpMul::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpMul::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpMul::has_gradient)
+            .def("apply_grad", &goblin::OpMul::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpMul::gpu_operator_id)
+            .def("format", &goblin::OpMul::format, nb::arg("args"));
+
+    auto pyClassOpDiv =
+        nb::class_<goblin::OpDiv, goblin::OperatorBase>(m, "OpDiv", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpDiv::min_arity)
+            .def("max_arity", &goblin::OpDiv::max_arity)
+            .def("is_commutative", &goblin::OpDiv::is_commutative)
+            .def("apply", &goblin::OpDiv::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpDiv::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpDiv::has_gradient)
+            .def("apply_grad", &goblin::OpDiv::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpDiv::gpu_operator_id)
+            .def("format", &goblin::OpDiv::format, nb::arg("args"));
+
+    auto pyClassOpSin =
+        nb::class_<goblin::OpSin, goblin::OperatorBase>(m, "OpSin", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpSin::min_arity)
+            .def("max_arity", &goblin::OpSin::max_arity)
+            .def("is_commutative", &goblin::OpSin::is_commutative)
+            .def("apply", &goblin::OpSin::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpSin::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpSin::has_gradient)
+            .def("apply_grad", &goblin::OpSin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpSin::gpu_operator_id)
+            .def("format", &goblin::OpSin::format, nb::arg("args"));
+
+    auto pyClassOpCos =
+        nb::class_<goblin::OpCos, goblin::OperatorBase>(m, "OpCos", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpCos::min_arity)
+            .def("max_arity", &goblin::OpCos::max_arity)
+            .def("is_commutative", &goblin::OpCos::is_commutative)
+            .def("apply", &goblin::OpCos::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpCos::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpCos::has_gradient)
+            .def("apply_grad", &goblin::OpCos::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpCos::gpu_operator_id)
+            .def("format", &goblin::OpCos::format, nb::arg("args"));
+
+    auto pyClassOpExp =
+        nb::class_<goblin::OpExp, goblin::OperatorBase>(m, "OpExp", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpExp::min_arity)
+            .def("max_arity", &goblin::OpExp::max_arity)
+            .def("is_commutative", &goblin::OpExp::is_commutative)
+            .def("apply", &goblin::OpExp::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpExp::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpExp::has_gradient)
+            .def("apply_grad", &goblin::OpExp::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpExp::gpu_operator_id)
+            .def("format", &goblin::OpExp::format, nb::arg("args"));
+
+    auto pyClassOpLog =
+        nb::class_<goblin::OpLog, goblin::OperatorBase>(m, "OpLog", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpLog::min_arity)
+            .def("max_arity", &goblin::OpLog::max_arity)
+            .def("is_commutative", &goblin::OpLog::is_commutative)
+            .def("apply", &goblin::OpLog::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpLog::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpLog::has_gradient)
+            .def("apply_grad", &goblin::OpLog::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpLog::gpu_operator_id)
+            .def("format", &goblin::OpLog::format, nb::arg("args"));
+
+    auto pyClassOpSquare =
+        nb::class_<goblin::OpSquare, goblin::OperatorBase>(m, "OpSquare", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpSquare::min_arity)
+            .def("max_arity", &goblin::OpSquare::max_arity)
+            .def("is_commutative", &goblin::OpSquare::is_commutative)
+            .def("apply", &goblin::OpSquare::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpSquare::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpSquare::has_gradient)
+            .def("apply_grad", &goblin::OpSquare::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpSquare::gpu_operator_id)
+            .def("format", &goblin::OpSquare::format, nb::arg("args"));
+
+    auto pyClassOpSqrt =
+        nb::class_<goblin::OpSqrt, goblin::OperatorBase>(m, "OpSqrt", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpSqrt::min_arity)
+            .def("max_arity", &goblin::OpSqrt::max_arity)
+            .def("is_commutative", &goblin::OpSqrt::is_commutative)
+            .def("apply", &goblin::OpSqrt::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpSqrt::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpSqrt::has_gradient)
+            .def("apply_grad", &goblin::OpSqrt::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpSqrt::gpu_operator_id)
+            .def("format", &goblin::OpSqrt::format, nb::arg("args"));
+
+    auto pyClassOpPow =
+        nb::class_<goblin::OpPow, goblin::OperatorBase>(m, "OpPow", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpPow::min_arity)
+            .def("max_arity", &goblin::OpPow::max_arity)
+            .def("is_commutative", &goblin::OpPow::is_commutative)
+            .def("apply", &goblin::OpPow::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpPow::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpPow::has_gradient)
+            .def("apply_grad", &goblin::OpPow::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpPow::gpu_operator_id)
+            .def("format", &goblin::OpPow::format, nb::arg("args"));
+
+    auto pyClassOpAbs =
+        nb::class_<goblin::OpAbs, goblin::OperatorBase>(m, "OpAbs", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpAbs::min_arity)
+            .def("max_arity", &goblin::OpAbs::max_arity)
+            .def("is_commutative", &goblin::OpAbs::is_commutative)
+            .def("apply", &goblin::OpAbs::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpAbs::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpAbs::has_gradient)
+            .def("apply_grad", &goblin::OpAbs::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpAbs::gpu_operator_id)
+            .def("format", &goblin::OpAbs::format, nb::arg("args"));
+
+    auto pyClassOpMin =
+        nb::class_<goblin::OpMin, goblin::OperatorBase>(m, "OpMin", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpMin::min_arity)
+            .def("max_arity", &goblin::OpMin::max_arity)
+            .def("is_commutative", &goblin::OpMin::is_commutative)
+            .def("apply", &goblin::OpMin::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpMin::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpMin::has_gradient)
+            .def("apply_grad", &goblin::OpMin::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpMin::gpu_operator_id)
+            .def("format", &goblin::OpMin::format, nb::arg("args"));
+
+    auto pyClassOpMax =
+        nb::class_<goblin::OpMax, goblin::OperatorBase>(m, "OpMax", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("min_arity", &goblin::OpMax::min_arity)
+            .def("max_arity", &goblin::OpMax::max_arity)
+            .def("is_commutative", &goblin::OpMax::is_commutative)
+            .def("apply", &goblin::OpMax::apply, nb::arg("out"), nb::arg("args"))
+            .def("apply_buf", &goblin::OpMax::apply_buf, nb::arg("buf"), nb::arg("out"), nb::arg("args"))
+            .def("has_gradient", &goblin::OpMax::has_gradient)
+            .def("apply_grad", &goblin::OpMax::apply_grad, nb::arg("out"), nb::arg("d_out"), nb::arg("args"),
+                 nb::arg("d_args"))
+            .def("gpu_operator_id", &goblin::OpMax::gpu_operator_id)
+            .def("format", &goblin::OpMax::format, nb::arg("args"));
+    // #endif
+
+    auto pyEnumConstantRepr = nb::enum_<goblin::ConstantRepr>(m, "ConstantRepr", nb::is_arithmetic(), "")
+                                  .value("ERCs", goblin::ConstantRepr::ERCs, "")
+                                  .value("Edges", goblin::ConstantRepr::Edges, "")
+                                  .value("Pool", goblin::ConstantRepr::Pool, "")
+                                  .value("None_", goblin::ConstantRepr::None, "");
+
+    auto pyEnumValueKind = nb::enum_<goblin::ValueKind>(m, "ValueKind", nb::is_arithmetic(), "")
+                               .value("Input", goblin::ValueKind::Input, "input feature idx")
+                               .value("Constant", goblin::ValueKind::Constant, "constant marker/pool idx")
+                               .value("Operator", goblin::ValueKind::Operator, "operator idx")
+                               .value("Arg", goblin::ValueKind::Arg, "subfunction argument idx")
+                               .value("Subtree", goblin::ValueKind::Subtree, "subtree idx")
+                               .value("Parameter", goblin::ValueKind::Parameter, "function class parameter idx");
+
+    auto pyClassGPContext =
+        nb::class_<goblin::GPContext>(
+            m, "GPContext",
+            "/ The lookup tables needed to map the linear representation to the encoded\n/ semantics and the methods "
+            "for computing the output, active nodes and sympy\n/ conversion.\n/\n/ A two-step approach is used, where "
+            "each semantic symbol (e.g. operators or\n/ input features) are mapped to a value. However, the domain for "
+            "e.g. leaf\n/ nodes does not contain all values, so a second mapping is used to map\n/ between node domain "
+            "and value.")
+            .def(nb::init<usize, goblin::Template, std::vector<std::shared_ptr<goblin::OperatorBase>>, usize,
+                          std::string_view, usize, bool, std::optional<usize>, bool>(),
+                 nb::arg("num_inputs"), nb::arg("expression_template"), nb::arg("operators"),
+                 nb::arg("num_parameters") = 0, nb::arg("constant_representation") = "ercs",
+                 nb::arg("constant_pool_size") = 10, nb::arg("enable_subfunctions") = false,
+                 nb::arg("max_expression_size").none() = nb::none(), nb::arg("use_apply_buf") = true)
+            .def("value2domain", &goblin::GPContext::value2domain, nb::arg("index"), nb::arg("value"))
+            .def("parent", &goblin::GPContext::parent, nb::arg("index"))
+            .def("debug_log_expressions", &goblin::GPContext::debug_log_expressions, nb::arg("os"), nb::arg("solution"),
+                 nb::arg("node").none() = nb::none(), nb::arg("indent") = "",
+                 "A helper that prints the expression in a human readable format")
+            .def("subtrees_to_sympy", &goblin::GPContext::subtrees_to_sympy, nb::arg("solution"),
+                 " Returns a sympy-like string for each subexpression tree in isolation.\n Subtree references within a "
+                 "subtree are inlined (subtrees can only call\n earlier ones). Arg nodes (enable_subfunctions=True) "
+                 "appear as arg0, arg1, ...")
+            .def("to_sympy_unresolved", &goblin::GPContext::to_sympy_unresolved, nb::arg("solution"))
+            .def("to_sympy", &goblin::GPContext::to_sympy, nb::arg("solution"))
+            .def("normalized_root_proximity", &goblin::GPContext::normalized_root_proximity,
+                 " Matrix of size `num_discrete x num_discrete`, where the entry i,j\n corresponds to the average "
+                 "proximity to the subtree root of nodes i and j (1.0 is close, 0.0 is distant)\n if both are from the "
+                 "same tree, otherwise 0")
+            .def("normalized_node_proximity", &goblin::GPContext::normalized_node_proximity,
+                 "Normalized node proximity [1.0: same node, 0.0: no connection]")
+            .def("normalized_wVIG", &goblin::GPContext::normalized_wVIG,
+                 "Normalized node proximity [1.0: same node, 0.0: no connection]")
+            .def("subtree_co_occurrences", &goblin::GPContext::subtree_co_occurrences)
+            .def("copy_tree", &goblin::GPContext::copy_tree, nb::arg("source"), nb::arg("source_node"),
+                 nb::arg("target"), nb::arg("target_node"))
+            .def("active_nodes", &goblin::GPContext::active_nodes, nb::arg("solution"))
+            .def("active_constant_indices", &goblin::GPContext::active_constant_indices, nb::arg("solution"))
+            .def("inherit_shifted", &goblin::GPContext::inherit_shifted, nb::arg("solution"), nb::arg("donor"),
+                 nb::arg("node"), nb::arg("num_levels"))
+            .def_rw("const_repr", &goblin::GPContext::const_repr, "")
+            .def_rw("num_inputs", &goblin::GPContext::num_inputs, "")
+            .def_rw("num_outputs", &goblin::GPContext::num_outputs, "")
+            .def_rw("num_subexpressions", &goblin::GPContext::num_subexpressions, "")
+            .def_rw("num_discrete", &goblin::GPContext::num_discrete, "")
+            .def_rw("num_continuous", &goblin::GPContext::num_continuous, "")
+            .def_rw("max_expression_size", &goblin::GPContext::max_expression_size, "")
+            .def_rw("num_parameters", &goblin::GPContext::num_parameters, "")
+            .def_rw("max_num_children", &goblin::GPContext::max_num_children, "")
+            .def_rw("enable_subfunctions", &goblin::GPContext::enable_subfunctions, "")
+            .def_rw("use_apply_buf", &goblin::GPContext::use_apply_buf, "")
+            .def_rw("operators", &goblin::GPContext::operators, "")
+            .def_rw("op_idx2value", &goblin::GPContext::op_idx2value, "")
+            .def_rw("value_kind", &goblin::GPContext::value_kind, "")
+            .def_rw("value_min_arity", &goblin::GPContext::value_min_arity, "")
+            .def_rw("value_max_arity", &goblin::GPContext::value_max_arity, "")
+            .def_rw("value_idx", &goblin::GPContext::value_idx, "")
+            .def_rw("subtree_roots", &goblin::GPContext::subtree_roots, "indices of all subtree root nodes")
+            .def_rw("output_roots", &goblin::GPContext::output_roots, "indices of all output root nodes")
+            .def_rw("domain_sizes", &goblin::GPContext::domain_sizes, "node -> domain size")
+            .def_rw("domain2value", &goblin::GPContext::domain2value, "node domain -> value")
+            .def_rw("root", &goblin::GPContext::root, "node -> current tree root")
+            .def_rw("sizes", &goblin::GPContext::sizes, "node -> size of subtree starting at node,")
+            .def_rw("depth", &goblin::GPContext::depth, "node -> node depth")
+            .def_rw("height", &goblin::GPContext::height, "node -> node height")
+            .def_rw("children", &goblin::GPContext::children, "node -> child node indices")
+            .def_rw("nodes", &goblin::GPContext::nodes,
+                    "node -> indices corresponding to the subtree starting at this");
+    // #endif
+    // #ifndef _GOBLIN_GP_INIT_H
+    //
+    // #ifndef _GOBLIN_GP_INSTANCE_H
+    //
+
+    auto pyClassGPInstanceBase =
+        nb::class_<goblin::GPInstanceBase, goblin::InstanceBase, goblin::GPInstanceBase_trampoline>(m, "GPInstanceBase",
+                                                                                                    "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("context", &goblin::GPInstanceBase::context);
+
+    auto pyClassPyGPInstance =
+        nb::class_<goblin::PyGPInstance, goblin::GPInstanceBase>(m, "PyGPInstance", "")
+            .def(nb::init<
+                     goblin::GPContext,
+                     std::function<std::tuple<Vec<CType>, CType>(
+                         std::function<std::optional<Arr2D<CType>>(Arr2D<CType>)>, std::vector<std::string>, usize)>,
+                     usize, AnyInit, bool, CType, CType>(),
+                 nb::arg("ctx"), nb::arg("evaluate"), nb::arg("num_objectives"), nb::arg("init"),
+                 nb::arg("minimize") = true, nb::arg("erc_init_lb") = -10.0, nb::arg("erc_init_ub") = 10.0)
+            .def("discrete_domain_sizes", &goblin::PyGPInstance::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::PyGPInstance::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::PyGPInstance::continuous_upper_bounds)
+            .def("continuous_init_lower_bounds", &goblin::PyGPInstance::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds", &goblin::PyGPInstance::continuous_init_upper_bounds)
+            .def("evaluate", &goblin::PyGPInstance::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+            .def("add_random", &goblin::PyGPInstance::add_random, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("count"))
+            .def("fitness", &goblin::PyGPInstance::fitness)
+            .def("archive_fitness", &goblin::PyGPInstance::archive_fitness)
+            .def("inherit_discrete", &goblin::PyGPInstance::inherit_discrete, nb::arg("offspring"), nb::arg("donor"),
+                 nb::arg("subset"))
+            .def("as_continuous", &goblin::PyGPInstance::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
+            .def("log_solution", &goblin::PyGPInstance::log_solution, nb::arg("os"), nb::arg("solution"))
+            .def("context", &goblin::PyGPInstance::context);
+    // #endif
+
+    auto pyClassGrowInit =
+        nb::class_<goblin::GrowInit, goblin::DiscreteInitBase>(m, "GrowInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<double>, std::optional<double>>(), nb::arg("p_terminal").none() = nb::none(),
+                 nb::arg("p_constant").none() = nb::none())
+            .def("sample", &goblin::GrowInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassFullInit =
+        nb::class_<goblin::FullInit, goblin::DiscreteInitBase>(m, "FullInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<double>>(), nb::arg("p_constant").none() = nb::none())
+            .def("sample", &goblin::FullInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassHalfHalfInit =
+        nb::class_<goblin::HalfHalfInit, goblin::DiscreteInitBase>(m, "HalfHalfInit", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<double>, std::optional<double>>(), nb::arg("p_terminal").none() = nb::none(),
+                 nb::arg("p_constant").none() = nb::none())
+            .def("sample", &goblin::HalfHalfInit::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassPTC2Init =
+        nb::class_<goblin::PTC2Init, goblin::DiscreteInitBase>(
+            m, "PTC2Init", nb::is_final(),
+            "/ PTC2 as per https://cs.gmu.edu/~sean/papers/treecreation.pdf\n(final class)")
+            .def(nb::init<std::optional<double>>(), nb::arg("p_constant").none() = nb::none())
+            .def("sample", &goblin::PTC2Init::sample, nb::arg("rng"), nb::arg("problem"), nb::arg("count"));
+
+    auto pyClassRecursiveCompleteInit =
+        nb::class_<goblin::RecursiveCompleteInit, goblin::DiscreteInitBase>(
+            m, "RecursiveCompleteInit", nb::is_final(),
+            "/ Complete init does not really work as intended for GP, since a lot of the diversity is distributed to "
+            "inactive\n/ individuals. This version aims to have the active and inactive values per variable be "
+            "\"probabilistically complete\"\n/ in isolation.\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def("sample", &goblin::RecursiveCompleteInit::sample, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("count"));
+
+    auto pyClassRecursiveCompleteInit2 =
+        nb::class_<goblin::RecursiveCompleteInit2, goblin::DiscreteInitBase>(
+            m, "RecursiveCompleteInit2", nb::is_final(),
+            "/ Complete init does not really work as intended for GP, since a lot of the diversity is distributed to "
+            "inactive\n/ individuals. This version aims to have the active and inactive values per variable be "
+            "\"probabilistically complete\"\n/ in isolation.\n(final class)")
+            .def(nb::init<std::optional<double>, std::optional<double>>(), nb::arg("p_terminal").none() = nb::none(),
+                 nb::arg("p_constant").none() = nb::none())
+            .def("sample", &goblin::RecursiveCompleteInit2::sample, nb::arg("rng"), nb::arg("problem"),
+                 nb::arg("count"));
+    // #endif
+    // #ifndef _GOBLIN_GP_SR_H
+    //
+    // #ifndef _GOBLIN_GA_GP_LAUNCH_CONFIG_H
+    //
+
+    m.def("round_up", goblin::round_up, nb::arg("value"), nb::arg("multiple"));
+
+    m.def("ceil_div", goblin::ceil_div, nb::arg("a"), nb::arg("b"));
+
+    auto pyClassKernelDim =
+        nb::class_<goblin::KernelDim>(m, "KernelDim", "")
+            .def_rw("x", &goblin::KernelDim::x, "")
+            .def_rw("y", &goblin::KernelDim::y, "")
+            .def_rw("z", &goblin::KernelDim::z, "")
+            .def(nb::init<>())
+            .def(nb::init<size_t, size_t, size_t>(), nb::arg("x"), nb::arg("y") = 1, nb::arg("z") = 1)
+            .def_static("determine", &goblin::KernelDim::determine, nb::arg("count"),
+                        " Finds the thread count in [WARP_SIZE, MAX_THREADS_PER_BLOCK] (step WARP_SIZE)\n that "
+                        "minimizes idle threads when covering `count` items.")
+            .def("check", &goblin::KernelDim::check)
+            .def("__eq__", &goblin::KernelDim::operator==, nb::arg("other"));
+
+    auto pyClassKernelConfig =
+        nb::class_<goblin::KernelConfig>(m, "KernelConfig", "")
+            .def_rw("grid", &goblin::KernelConfig::grid, "")
+            .def_rw("block", &goblin::KernelConfig::block, "")
+            .def(nb::init<>())
+            .def(nb::init<goblin::KernelDim, goblin::KernelDim>(), nb::arg("grid"), nb::arg("block"))
+            .def_static("single_block", &goblin::KernelConfig::single_block, nb::arg("num_solutions"),
+                        nb::arg("num_datapoints"),
+                        "One block per solution; threads cover all datapoints in a single pass.")
+            .def_static("dynamic_block_evaluation", &goblin::KernelConfig::dynamic_block_evaluation,
+                        nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("blocks_per_individual"),
+                        "Multiple blocks per solution; blocks partition the datapoints.")
+            .def_static("dynamic_block_reduction", &goblin::KernelConfig::dynamic_block_reduction,
+                        nb::arg("num_solutions"), nb::arg("num_partial"),
+                        "One block per solution for the MSE reduction.")
+            .def("check", &goblin::KernelConfig::check)
+            .def("__eq__", &goblin::KernelConfig::operator==, nb::arg("other"));
+
+    auto pyClassLaunchConfig =
+        nb::class_<goblin::LaunchConfig>(m, "LaunchConfig", "")
+            .def_rw("eval", &goblin::LaunchConfig::eval, "")
+            .def_rw("mse", &goblin::LaunchConfig::mse, "DynamicBlock only: reduction pass")
+            .def_rw("kernel_version", &goblin::LaunchConfig::kernel_version, "")
+            .def_rw("num_solutions", &goblin::LaunchConfig::num_solutions, "")
+            .def_rw("num_datapoints", &goblin::LaunchConfig::num_datapoints, "")
+            .def_rw("solution_length", &goblin::LaunchConfig::solution_length, "")
+            .def_rw("blocks_per_individual", &goblin::LaunchConfig::blocks_per_individual,
+                    "DynamicBlock only: blocks assigned per solution")
+            .def_rw("datapoints_per_block", &goblin::LaunchConfig::datapoints_per_block,
+                    "DynamicBlock only: datapoints handled per block")
+            .def_rw("datapoints_per_thread", &goblin::LaunchConfig::datapoints_per_thread,
+                    "datapoints each thread evaluates in its loop")
+            .def(nb::init<>())
+            .def(nb::init<goblin::KernelConfig, goblin::KernelConfig, goblin::KernelVersion>(), nb::arg("eval"),
+                 nb::arg("mse"), nb::arg("version") = goblin::KernelVersion::SingleBlock)
+            .def_static("determine", &goblin::LaunchConfig::determine, nb::arg("kernel_version"),
+                        nb::arg("num_solutions"), nb::arg("num_datapoints"), nb::arg("solution_length"),
+                        nb::arg("num_sms").none())
+            .def("check", &goblin::LaunchConfig::check)
+            .def("__eq__", &goblin::LaunchConfig::operator==, nb::arg("other"));
+    // #endif
+
+    auto pyClassSRQuality =
+        nb::class_<goblin::SRQuality, goblin::MOQuality>(m, "SRQuality", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("clone", &goblin::SRQuality::clone)
+            .def_rw("ls_params", &goblin::SRQuality::ls_params,
+                    " Linear scaling coefficients per output: row 0 = intercept, row 1 = slope.\n Scaled prediction: "
+                    "intercept + slope * raw_tree_output.")
+            .def_rw("test_quality", &goblin::SRQuality::test_quality,
+                    " Lazily computed test-set accuracy, populated on first request via evaluate_test().\n Declared "
+                    "mutable because it is not part of solution identity and never drives decisions.\n/*\n    The test "
+                    "accuracy uses interior mutability (i.e. it ignores const) since it is not\n    part of what "
+                    "defines a solution or its accuracy - as indicated by the name, it is never\n    used to make any "
+                    "decisions and only tracked for analysis purposes. By making it mutable\n    it can be lazily "
+                    "computed only when requested.\n     */\n/ Optional test set accuracy");
+
+    auto pyClassSRFitness = nb::class_<goblin::SRFitness, goblin::MOFitness>(m, "SRFitness", "")
+                                .def(nb::init<usize, bool, CType>(), nb::arg("num_objectives"),
+                                     nb::arg("minimize") = true, nb::arg("epsilon") = 0.0)
+                                .def("worst", &goblin::SRFitness::worst);
+
+    auto pyClassSRProblem =
+        nb::class_<goblin::SRProblem, goblin::GPInstanceBase>(
+            m, "SRProblem",
+            " Symbolic regression problem: fits a GP tree to minimise one or more objectives\n (e.g. MSE, NMSE, tree "
+            "size) over (X_train, Y_train) with optional linear scaling\n of the raw tree output.  GPU evaluation is "
+            "available when GOBLIN_HAS_CUDA is defined.")
+            .def(
+                "__init__",
+                [](goblin::SRProblem* self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train,
+                   std::optional<Arr2D<CType>> X_test = std::nullopt, std::optional<Arr2D<CType>> Y_test = std::nullopt,
+                   std::variant<std::string, std::vector<std::string>> objectives = "mse",
+                   std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true,
+                   std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0,
+                   CType constant_init_upper_bound = 1.0,
+                   std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                   std::string gradient_mode = "forward",
+                   const std::optional<const CType>& gradient_epsilon = std::nullopt, CType archive_epsilon = 0.0,
+                   std::optional<bool> always_inherit_continuous = std::nullopt,
+                   std::optional<usize> batch_size = std::nullopt,
+                   std::optional<goblin::KernelVersion> kernel_version = std::nullopt) {
+                    auto ctor_wrapper =
+                        [](goblin::SRProblem* self, goblin::GPContext ctx, Arr2D<CType> X_train, Arr2D<CType> Y_train,
+                           std::optional<Arr2D<CType>> X_test = std::nullopt,
+                           std::optional<Arr2D<CType>> Y_test = std::nullopt,
+                           std::variant<std::string, std::vector<std::string>> objectives = "mse",
+                           std::optional<usize> objectives_to_optimize = std::nullopt, bool linear_scaling = true,
+                           std::optional<AnyInit> init = std::nullopt, CType constant_init_lower_bound = -1.0,
+                           CType constant_init_upper_bound = 1.0,
+                           std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                           std::string gradient_mode = "forward",
+                           CType gradient_epsilon = goblin::DEFAULT_GRADIENT_EPSILON, CType archive_epsilon = 0.0,
+                           std::optional<bool> always_inherit_continuous = std::nullopt,
+                           std::optional<usize> batch_size = std::nullopt,
+                           std::optional<goblin::KernelVersion> kernel_version = std::nullopt) -> void {
+                        new (self) goblin::SRProblem(
+                            ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling,
+                            init, constant_init_lower_bound, constant_init_upper_bound, target_objectives,
+                            gradient_mode, gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size,
+                            kernel_version);  // placement new
+                    };
+                    auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                        [&ctor_wrapper](goblin::SRProblem* self, goblin::GPContext ctx, Arr2D<CType> X_train,
+                                        Arr2D<CType> Y_train, std::optional<Arr2D<CType>> X_test = std::nullopt,
+                                        std::optional<Arr2D<CType>> Y_test = std::nullopt,
+                                        std::variant<std::string, std::vector<std::string>> objectives = "mse",
+                                        std::optional<usize> objectives_to_optimize = std::nullopt,
+                                        bool linear_scaling = true, std::optional<AnyInit> init = std::nullopt,
+                                        CType constant_init_lower_bound = -1.0, CType constant_init_upper_bound = 1.0,
+                                        std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                                        std::string gradient_mode = "forward",
+                                        const std::optional<const CType>& gradient_epsilon = std::nullopt,
+                                        CType archive_epsilon = 0.0,
+                                        std::optional<bool> always_inherit_continuous = std::nullopt,
+                                        std::optional<usize> batch_size = std::nullopt,
+                                        std::optional<goblin::KernelVersion> kernel_version = std::nullopt) {
+                            const CType& gradient_epsilon_or_default = [&]() -> const CType {
+                                if (gradient_epsilon.has_value())
+                                    return gradient_epsilon.value();
+                                else
+                                    return goblin::DEFAULT_GRADIENT_EPSILON;
+                            }();
+
+                            ctor_wrapper(self, ctx, X_train, Y_train, X_test, Y_test, objectives,
+                                         objectives_to_optimize, linear_scaling, init, constant_init_lower_bound,
+                                         constant_init_upper_bound, target_objectives, gradient_mode,
+                                         gradient_epsilon_or_default, archive_epsilon, always_inherit_continuous,
+                                         batch_size, kernel_version);
+                        };
+
+                    ctor_wrapper_adapt_mutable_param_with_default_value(
+                        self, ctx, X_train, Y_train, X_test, Y_test, objectives, objectives_to_optimize, linear_scaling,
+                        init, constant_init_lower_bound, constant_init_upper_bound, target_objectives, gradient_mode,
+                        gradient_epsilon, archive_epsilon, always_inherit_continuous, batch_size, kernel_version);
+                },
+                nb::arg("ctx"), nb::arg("X_train"), nb::arg("Y_train"), nb::arg("X_test").none() = nb::none(),
+                nb::arg("Y_test").none() = nb::none(), nb::arg("objectives") = "mse",
+                nb::arg("objectives_to_optimize").none() = nb::none(), nb::arg("linear_scaling") = true,
+                nb::arg("init").none() = nb::none(), nb::arg("constant_init_lower_bound") = -1.0,
+                nb::arg("constant_init_upper_bound") = 1.0, nb::arg("target_objectives").none() = nb::none(),
+                nb::arg("gradient_mode") = "forward", nb::arg("gradient_epsilon").none() = nb::none(),
+                nb::arg("archive_epsilon") = 0.0, nb::arg("always_inherit_continuous").none() = nb::none(),
+                nb::arg("batch_size").none() = nb::none(), nb::arg("kernel_version").none() = nb::none(),
+                " TODO the objectives API is ad-hoc: it is convenient for Python bindings but makes\n adding custom "
+                "objectives hard.  Dependency injection would be cleaner but risks\n recomputing the tree output "
+                "multiple times.  Leaving hardcoded until a better design\n is found (see how other GP/SR libraries "
+                "handle this).\n\n\nPython bindings defaults:\n    If gradient_epsilon is None, then its default value "
+                "will be: DEFAULT_GRADIENT_EPSILON")
+            .def("adapt", &goblin::SRProblem::adapt, nb::arg("rng"))
+            .def("discrete_domain_sizes", &goblin::SRProblem::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::SRProblem::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::SRProblem::continuous_upper_bounds)
+            .def("continuous_init_lower_bounds", &goblin::SRProblem::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds", &goblin::SRProblem::continuous_init_upper_bounds)
+            .def("evaluate", &goblin::SRProblem::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+            .def("add_random", &goblin::SRProblem::add_random, nb::arg("rng"), nb::arg("solutions"), nb::arg("count"))
+            .def("fitness", &goblin::SRProblem::fitness)
+            .def("archive_fitness", &goblin::SRProblem::archive_fitness)
+            .def("inherit_discrete", &goblin::SRProblem::inherit_discrete, nb::arg("offspring"), nb::arg("donor"),
+                 nb::arg("subset"))
+            .def("as_continuous", &goblin::SRProblem::as_continuous, nb::arg("solution"), nb::arg("discrete_index"))
+            .def("log_header", &goblin::SRProblem::log_header, nb::arg("os"))
+            .def("log", &goblin::SRProblem::log, nb::arg("os"), nb::arg("solution"))
+            .def("log_solution", &goblin::SRProblem::log_solution, nb::arg("os"), nb::arg("solution"))
+            .def("log_solution_unresolved", &goblin::SRProblem::log_solution_unresolved, nb::arg("os"),
+                 nb::arg("solution"))
+            .def("evaluate_test", &goblin::SRProblem::evaluate_test, nb::arg("solution"))
+            .def("context", &goblin::SRProblem::context)
+            .def("gradient_steps", &goblin::SRProblem::gradient_steps, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
+            .def_rw("ctx", &goblin::SRProblem::ctx, "")
+            .def_rw("linear_scaling", &goblin::SRProblem::linear_scaling, "")
+            .def_rw("objectives", &goblin::SRProblem::objectives, "")
+            .def_rw("X_train", &goblin::SRProblem::X_train, "")
+            .def_rw("Y_train", &goblin::SRProblem::Y_train, "")
+            .def_rw("var_Y_train", &goblin::SRProblem::var_Y_train, "")
+            .def_rw("X_batch", &goblin::SRProblem::X_batch, "")
+            .def_rw("Y_batch", &goblin::SRProblem::Y_batch, "")
+            .def_rw("var_Y_batch", &goblin::SRProblem::var_Y_batch, "")
+            .def_rw("X_test", &goblin::SRProblem::X_test, "")
+            .def_rw("Y_test", &goblin::SRProblem::Y_test, "")
+            .def_rw("var_Y_test", &goblin::SRProblem::var_Y_test, "");
+    // #endif
+
+    m.def("has_gpu_support", has_gpu_support);
+    // #ifndef _GOBLIN_BENCH_FUNCTIONS_H
+    //
+
+    auto pyClassObjectiveBase =
+        nb::class_<goblin::ObjectiveBase, goblin::ObjectiveBase_trampoline>(m, "ObjectiveBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("num_discrete", &goblin::ObjectiveBase::num_discrete)
+            .def("num_continuous", &goblin::ObjectiveBase::num_continuous)
+            .def("evaluate", &goblin::ObjectiveBase::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::ObjectiveBase::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassMOFunctionBase =
+        nb::class_<goblin::MOFunctionBase, goblin::MOFunctionBase_trampoline>(m, "MOFunctionBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("num_objectives", &goblin::MOFunctionBase::num_objectives)
+            .def("num_discrete", &goblin::MOFunctionBase::num_discrete)
+            .def("num_continuous", &goblin::MOFunctionBase::num_continuous)
+            .def("discrete_domain_sizes", &goblin::MOFunctionBase::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::MOFunctionBase::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::MOFunctionBase::continuous_upper_bounds)
+            .def("pareto_front", &goblin::MOFunctionBase::pareto_front)
+            .def("evaluate", &goblin::MOFunctionBase::evaluate, nb::arg("solution"))
+            .def("evaluate_partial", &goblin::MOFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"),
+                 nb::arg("subset"));
+    // #endif
+    // #ifndef _GOBLIN_BENCH_FUNCTIONS_COMBINATORS_H
+    //
+
+    auto pyClassBBO = nb::class_<goblin::BBO, goblin::ObjectiveBase>(m, "BBO", nb::is_final(), "\n(final class)")
+                          .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(), nb::arg("objective"))
+                          .def("num_discrete", &goblin::BBO::num_discrete)
+                          .def("num_continuous", &goblin::BBO::num_continuous)
+                          .def("evaluate", &goblin::BBO::evaluate, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassMasked =
+        nb::class_<goblin::Masked, goblin::ObjectiveBase>(m, "Masked", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(), nb::arg("objective"))
+            .def("num_discrete", &goblin::Masked::num_discrete)
+            .def("num_continuous", &goblin::Masked::num_continuous)
+            .def("evaluate", &goblin::Masked::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Masked::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassInverted =
+        nb::class_<goblin::Inverted, goblin::ObjectiveBase>(m, "Inverted", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>>(), nb::arg("objective"))
+            .def("num_discrete", &goblin::Inverted::num_discrete)
+            .def("num_continuous", &goblin::Inverted::num_continuous)
+            .def("evaluate", &goblin::Inverted::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Inverted::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassTranslated =
+        nb::class_<goblin::Translated, goblin::ObjectiveBase>(m, "Translated", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, RefS<Vec<CType>>>(), nb::arg("objective"),
+                 nb::arg("translation_vector"))
+            .def("num_discrete", &goblin::Translated::num_discrete)
+            .def("num_continuous", &goblin::Translated::num_continuous)
+            .def("evaluate", &goblin::Translated::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Translated::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassRotated =
+        nb::class_<goblin::Rotated, goblin::ObjectiveBase>(m, "Rotated", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, CType, std::optional<usize>>(), nb::arg("objective"),
+                 nb::arg("rotation_angle") = -45.0, nb::arg("rotation_block_size").none() = nb::none())
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, usize, std::optional<usize>>(), nb::arg("objective"),
+                 nb::arg("seed"), nb::arg("rotation_block_size").none() = nb::none())
+            .def("num_discrete", &goblin::Rotated::num_discrete)
+            .def("num_continuous", &goblin::Rotated::num_continuous)
+            .def("evaluate", &goblin::Rotated::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Rotated::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassSum = nb::class_<goblin::Sum, goblin::ObjectiveBase>(m, "Sum", nb::is_final(), "\n(final class)")
+                          .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(), nb::arg("objectives"))
+                          .def("num_discrete", &goblin::Sum::num_discrete)
+                          .def("num_continuous", &goblin::Sum::num_continuous)
+                          .def("evaluate", &goblin::Sum::evaluate, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
+                          .def("evaluate_partial", &goblin::Sum::evaluate_partial, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                               nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                               nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                               nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"),
+                               nb::arg("discrete_indices"), nb::arg("continuous_indices"));
+
+    auto pyClassMax = nb::class_<goblin::Max, goblin::ObjectiveBase>(m, "Max", nb::is_final(), "\n(final class)")
+                          .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(), nb::arg("objectives"))
+                          .def("num_discrete", &goblin::Max::num_discrete)
+                          .def("num_continuous", &goblin::Max::num_continuous)
+                          .def("evaluate", &goblin::Max::evaluate, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
+                          .def("evaluate_partial", &goblin::Max::evaluate_partial, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                               nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                               nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                               nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"),
+                               nb::arg("discrete_indices"), nb::arg("continuous_indices"));
+
+    auto pyClassMin = nb::class_<goblin::Min, goblin::ObjectiveBase>(m, "Min", nb::is_final(), "\n(final class)")
+                          .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(), nb::arg("objectives"))
+                          .def("num_discrete", &goblin::Min::num_discrete)
+                          .def("num_continuous", &goblin::Min::num_continuous)
+                          .def("evaluate", &goblin::Min::evaluate, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"))
+                          .def("evaluate_partial", &goblin::Min::evaluate_partial, nb::arg("discrete_values"),
+                               nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                               nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                               nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                               nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"),
+                               nb::arg("discrete_indices"), nb::arg("continuous_indices"));
+
+    auto pyClassConcat =
+        nb::class_<goblin::Concat, goblin::ObjectiveBase>(m, "Concat", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(), nb::arg("objectives"))
+            .def("num_discrete", &goblin::Concat::num_discrete)
+            .def("num_continuous", &goblin::Concat::num_continuous)
+            .def("evaluate", &goblin::Concat::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Concat::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassRepeat =
+        nb::class_<goblin::Repeat, goblin::ObjectiveBase>(m, "Repeat", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::shared_ptr<goblin::ObjectiveBase>, usize>(), nb::arg("objective"), nb::arg("repeats"))
+            .def("num_discrete", &goblin::Repeat::num_discrete)
+            .def("num_continuous", &goblin::Repeat::num_continuous)
+            .def("evaluate", &goblin::Repeat::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Repeat::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+    // #endif
+    // #ifndef _GOBLIN_BENCH_FUNCTIONS_DISCRETE_H
+    //
+
+    auto pyClassOneMax =
+        nb::class_<goblin::OneMax, goblin::ObjectiveBase>(m, "OneMax", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::OneMax::num_discrete)
+            .def("num_continuous", &goblin::OneMax::num_continuous)
+            .def("evaluate", &goblin::OneMax::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::OneMax::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassZeroMax =
+        nb::class_<goblin::ZeroMax, goblin::ObjectiveBase>(m, "ZeroMax", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::ZeroMax::num_discrete)
+            .def("num_continuous", &goblin::ZeroMax::num_continuous)
+            .def("evaluate", &goblin::ZeroMax::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::ZeroMax::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassLeadingOnes =
+        nb::class_<goblin::LeadingOnes, goblin::ObjectiveBase>(m, "LeadingOnes", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::LeadingOnes::num_discrete)
+            .def("num_continuous", &goblin::LeadingOnes::num_continuous)
+            .def("evaluate", &goblin::LeadingOnes::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassTrailingZeros =
+        nb::class_<goblin::TrailingZeros, goblin::ObjectiveBase>(m, "TrailingZeros", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::TrailingZeros::num_discrete)
+            .def("num_continuous", &goblin::TrailingZeros::num_continuous)
+            .def("evaluate", &goblin::TrailingZeros::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassHLeadingOnes =
+        nb::class_<goblin::HLeadingOnes, goblin::ObjectiveBase>(m, "HLeadingOnes", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize, usize>(), nb::arg("ndims"), nb::arg("branching_factor") = 2)
+            .def("num_discrete", &goblin::HLeadingOnes::num_discrete)
+            .def("num_continuous", &goblin::HLeadingOnes::num_continuous)
+            .def("evaluate", &goblin::HLeadingOnes::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassDeceptiveTrap =
+        nb::class_<goblin::DeceptiveTrap, goblin::ObjectiveBase>(m, "DeceptiveTrap", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def(nb::init<usize, usize>(), nb::arg("ndims"), nb::arg("block_size"))
+            .def("num_discrete", &goblin::DeceptiveTrap::num_discrete)
+            .def("num_continuous", &goblin::DeceptiveTrap::num_continuous)
+            .def("evaluate", &goblin::DeceptiveTrap::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassBimodalTrap =
+        nb::class_<goblin::BimodalTrap, goblin::ObjectiveBase>(m, "BimodalTrap", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def(nb::init<usize, usize>(), nb::arg("ndims"), nb::arg("block_size"))
+            .def("num_discrete", &goblin::BimodalTrap::num_discrete)
+            .def("num_continuous", &goblin::BimodalTrap::num_continuous)
+            .def("evaluate", &goblin::BimodalTrap::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+    // #endif
+    // #ifndef _GOBLIN_BENCH_FUNCTIONS_CONTINUOUS_H
+    //
+
+    auto pyClassSphere =
+        nb::class_<goblin::Sphere, goblin::ObjectiveBase>(m, "Sphere", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::Sphere::num_discrete)
+            .def("num_continuous", &goblin::Sphere::num_continuous)
+            .def("evaluate", &goblin::Sphere::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"))
+            .def("evaluate_partial", &goblin::Sphere::evaluate_partial, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"),
+                 nb::arg("parent_discrete_values"), nb::arg("parent_continuous_values"),
+                 nb::arg("parent_discrete_active"), nb::arg("parent_continuous_active"),
+                 nb::arg("parent_objective_value"), nb::arg("parent_constraint_value"), nb::arg("discrete_indices"),
+                 nb::arg("continuous_indices"));
+
+    auto pyClassRosenbrock =
+        nb::class_<goblin::Rosenbrock, goblin::ObjectiveBase>(m, "Rosenbrock", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::Rosenbrock::num_discrete)
+            .def("num_continuous", &goblin::Rosenbrock::num_continuous)
+            .def("evaluate", &goblin::Rosenbrock::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassRastrigin =
+        nb::class_<goblin::Rastrigin, goblin::ObjectiveBase>(m, "Rastrigin", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::Rastrigin::num_discrete)
+            .def("num_continuous", &goblin::Rastrigin::num_continuous)
+            .def("evaluate", &goblin::Rastrigin::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassGriewank =
+        nb::class_<goblin::Griewank, goblin::ObjectiveBase>(m, "Griewank", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::Griewank::num_discrete)
+            .def("num_continuous", &goblin::Griewank::num_continuous)
+            .def("evaluate", &goblin::Griewank::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassEllipsoid =
+        nb::class_<goblin::Ellipsoid, goblin::ObjectiveBase>(m, "Ellipsoid", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::Ellipsoid::num_discrete)
+            .def("num_continuous", &goblin::Ellipsoid::num_continuous)
+            .def("evaluate", &goblin::Ellipsoid::evaluate, nb::arg("discrete_values"), nb::arg("continuous_values"),
+                 nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassCirclesInASquare =
+        nb::class_<goblin::CirclesInASquare, goblin::ObjectiveBase>(m, "CirclesInASquare", nb::is_final(),
+                                                                    "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::CirclesInASquare::num_discrete)
+            .def("num_continuous", &goblin::CirclesInASquare::num_continuous)
+            .def("evaluate", &goblin::CirclesInASquare::evaluate, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"));
+
+    auto pyClassZDT1 = nb::class_<goblin::ZDT1, goblin::MOFunctionBase>(
+                           m, "ZDT1", "/ ZDT1 from https://doi.org/10.1162/106365600568202")
+                           .def(nb::init<usize, usize>(), nb::arg("dims") = 30, nb::arg("pareto_front_samples") = 100)
+                           .def("num_objectives", &goblin::ZDT1::num_objectives)
+                           .def("num_discrete", &goblin::ZDT1::num_discrete)
+                           .def("num_continuous", &goblin::ZDT1::num_continuous)
+                           .def("evaluate", &goblin::ZDT1::evaluate, nb::arg("solution"))
+                           .def("continuous_lower_bounds", &goblin::ZDT1::continuous_lower_bounds)
+                           .def("continuous_upper_bounds", &goblin::ZDT1::continuous_upper_bounds)
+                           .def("pareto_front", &goblin::ZDT1::pareto_front);
+
+    auto pyClassZDT2 = nb::class_<goblin::ZDT2, goblin::MOFunctionBase>(
+                           m, "ZDT2", "/ ZDT2 from https://doi.org/10.1162/106365600568202")
+                           .def(nb::init<usize, usize>(), nb::arg("dims") = 30, nb::arg("pareto_front_samples") = 100)
+                           .def("num_objectives", &goblin::ZDT2::num_objectives)
+                           .def("num_discrete", &goblin::ZDT2::num_discrete)
+                           .def("num_continuous", &goblin::ZDT2::num_continuous)
+                           .def("evaluate", &goblin::ZDT2::evaluate, nb::arg("solution"))
+                           .def("continuous_lower_bounds", &goblin::ZDT2::continuous_lower_bounds)
+                           .def("continuous_upper_bounds", &goblin::ZDT2::continuous_upper_bounds)
+                           .def("pareto_front", &goblin::ZDT2::pareto_front);
+
+    auto pyClassZDT3 = nb::class_<goblin::ZDT3, goblin::MOFunctionBase>(
+                           m, "ZDT3", "/ ZDT3 from https://doi.org/10.1162/106365600568202")
+                           .def(nb::init<usize, usize>(), nb::arg("dims") = 30, nb::arg("pareto_front_samples") = 100)
+                           .def("num_objectives", &goblin::ZDT3::num_objectives)
+                           .def("num_discrete", &goblin::ZDT3::num_discrete)
+                           .def("num_continuous", &goblin::ZDT3::num_continuous)
+                           .def("evaluate", &goblin::ZDT3::evaluate, nb::arg("solution"))
+                           .def("continuous_lower_bounds", &goblin::ZDT3::continuous_lower_bounds)
+                           .def("continuous_upper_bounds", &goblin::ZDT3::continuous_upper_bounds)
+                           .def("pareto_front", &goblin::ZDT3::pareto_front);
+
+    auto pyClassZDT4 =
+        nb::class_<goblin::ZDT4, goblin::MOFunctionBase>(
+            m, "ZDT4", " TODO fix bug (crashes sometimes...)\n/ ZDT4 from https://doi.org/10.1162/106365600568202")
+            .def(nb::init<usize, usize>(), nb::arg("dims") = 10, nb::arg("pareto_front_samples") = 100)
+            .def("num_objectives", &goblin::ZDT4::num_objectives)
+            .def("num_discrete", &goblin::ZDT4::num_discrete)
+            .def("num_continuous", &goblin::ZDT4::num_continuous)
+            .def("evaluate", &goblin::ZDT4::evaluate, nb::arg("solution"))
+            .def("continuous_lower_bounds", &goblin::ZDT4::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::ZDT4::continuous_upper_bounds)
+            .def("pareto_front", &goblin::ZDT4::pareto_front);
+
+    auto pyClassZDT5 = nb::class_<goblin::ZDT5, goblin::MOFunctionBase>(
+                           m, "ZDT5", "/ ZDT5 from https://doi.org/10.1162/106365600568202")
+                           .def(nb::init<usize, usize>(), nb::arg("dims") = 11, nb::arg("pareto_front_samples") = 100)
+                           .def("num_objectives", &goblin::ZDT5::num_objectives)
+                           .def("num_discrete", &goblin::ZDT5::num_discrete)
+                           .def("num_continuous", &goblin::ZDT5::num_continuous)
+                           .def("evaluate", &goblin::ZDT5::evaluate, nb::arg("solution"))
+                           .def("continuous_lower_bounds", &goblin::ZDT5::continuous_lower_bounds)
+                           .def("continuous_upper_bounds", &goblin::ZDT5::continuous_upper_bounds)
+                           .def("pareto_front", &goblin::ZDT5::pareto_front);
+
+    auto pyClassZDT6 = nb::class_<goblin::ZDT6, goblin::MOFunctionBase>(
+                           m, "ZDT6", "/ ZDT6 from https://doi.org/10.1162/106365600568202")
+                           .def(nb::init<usize, usize>(), nb::arg("dims") = 10, nb::arg("pareto_front_samples") = 100)
+                           .def("num_objectives", &goblin::ZDT6::num_objectives)
+                           .def("num_discrete", &goblin::ZDT6::num_discrete)
+                           .def("num_continuous", &goblin::ZDT6::num_continuous)
+                           .def("evaluate", &goblin::ZDT6::evaluate, nb::arg("solution"))
+                           .def("continuous_lower_bounds", &goblin::ZDT6::continuous_lower_bounds)
+                           .def("continuous_upper_bounds", &goblin::ZDT6::continuous_upper_bounds)
+                           .def("pareto_front", &goblin::ZDT6::pareto_front);
+    // #endif
+    // #ifndef _GOBLIN_BENCH_FUNCTIONS_MIXED_H
+    //
+
+    auto pyClassLeadingSpheres =
+        nb::class_<goblin::LeadingSpheres, goblin::ObjectiveBase>(m, "LeadingSpheres", nb::is_final(),
+                                                                  "\n(final class)")
+            .def(nb::init<usize>(), nb::arg("ndims"))
+            .def("num_discrete", &goblin::LeadingSpheres::num_discrete)
+            .def("num_continuous", &goblin::LeadingSpheres::num_continuous)
+            .def("evaluate", &goblin::LeadingSpheres::evaluate, nb::arg("discrete_values"),
+                 nb::arg("continuous_values"), nb::arg("discrete_active"), nb::arg("continuous_active"));
+    // #endif
+    // #ifndef _GOBLIN_BENCH_PROBLEM_H
+    //
+
+    auto pyClassPyFunctionBase =
+        nb::class_<goblin::PyFunctionBase, goblin::MOFunctionBase, goblin::PyFunctionBase_trampoline>(
+            m, "PyFunctionBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def("num_objectives", &goblin::PyFunctionBase::num_objectives)
+            .def("num_discrete", &goblin::PyFunctionBase::num_discrete)
+            .def("num_continuous", &goblin::PyFunctionBase::num_continuous)
+            .def("eval", &goblin::PyFunctionBase::eval, nb::arg("solution"))
+            .def("evaluate", &goblin::PyFunctionBase::evaluate, nb::arg("solution"))
+            .def("evaluate_partial", &goblin::PyFunctionBase::evaluate_partial, nb::arg("solution"), nb::arg("parent"),
+                 nb::arg("subset"));
+
+    auto pyClassObjectives =
+        nb::class_<goblin::Objectives, goblin::MOFunctionBase>(m, "Objectives", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::vector<std::shared_ptr<goblin::ObjectiveBase>>>(), nb::arg("objectives"))
+            .def("num_objectives", &goblin::Objectives::num_objectives)
+            .def("num_discrete", &goblin::Objectives::num_discrete)
+            .def("num_continuous", &goblin::Objectives::num_continuous)
+            .def("evaluate", &goblin::Objectives::evaluate, nb::arg("solution"))
+            .def("evaluate_partial", &goblin::Objectives::evaluate_partial, nb::arg("solution"), nb::arg("parent"),
+                 nb::arg("subset"));
+
+    auto pyClassBenchmarkInstance =
+        nb::class_<goblin::BenchmarkInstance, goblin::InstanceBase>(m, "BenchmarkInstance", nb::is_final(),
+                                                                    "\n(final class)")
+            .def(
+                "__init__",
+                [](goblin::BenchmarkInstance* self,
+                   std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+                                std::shared_ptr<goblin::MOFunctionBase>, std::shared_ptr<goblin::ObjectiveBase>>
+                       objectives,
+                   const std::optional<const std::variant<DType, Vec<DType>>>& discrete_domain = std::nullopt,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_lower_bound = std::nullopt,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_upper_bound = std::nullopt,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_lower_bound =
+                       std::nullopt,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_upper_bound =
+                       std::nullopt,
+                   std::optional<AnyInit> init = std::nullopt,
+                   std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                   std::optional<usize> target_archive_size = std::nullopt,
+                   std::optional<CType> target_tolerance = std::nullopt) {
+                    auto ctor_wrapper = [](goblin::BenchmarkInstance* self,
+                                           std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+                                                        std::shared_ptr<goblin::MOFunctionBase>,
+                                                        std::shared_ptr<goblin::ObjectiveBase>> objectives,
+                                           std::variant<DType, Vec<DType>> discrete_domain = DType(2),
+                                           std::variant<CType, Vec<CType>> continuous_lower_bound =
+                                               -std::numeric_limits<CType>::infinity(),
+                                           std::variant<CType, Vec<CType>> continuous_upper_bound =
+                                               std::numeric_limits<CType>::infinity(),
+                                           std::variant<CType, Vec<CType>> continuous_init_lower_bound = CType(0.0),
+                                           std::variant<CType, Vec<CType>> continuous_init_upper_bound = CType(1.0),
+                                           std::optional<AnyInit> init = std::nullopt,
+                                           std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                                           std::optional<usize> target_archive_size = std::nullopt,
+                                           std::optional<CType> target_tolerance = std::nullopt) -> void {
+                        new (self) goblin::BenchmarkInstance(objectives, discrete_domain, continuous_lower_bound,
+                                                             continuous_upper_bound, continuous_init_lower_bound,
+                                                             continuous_init_upper_bound, init, target_objectives,
+                                                             target_archive_size, target_tolerance);  // placement new
+                    };
+                    auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                        [&ctor_wrapper](
+                            goblin::BenchmarkInstance* self,
+                            std::variant<std::vector<std::shared_ptr<goblin::ObjectiveBase>>,
+                                         std::shared_ptr<goblin::MOFunctionBase>,
+                                         std::shared_ptr<goblin::ObjectiveBase>> objectives,
+                            const std::optional<const std::variant<DType, Vec<DType>>>& discrete_domain = std::nullopt,
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_lower_bound =
+                                std::nullopt,
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_upper_bound =
+                                std::nullopt,
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_lower_bound =
+                                std::nullopt,
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_upper_bound =
+                                std::nullopt,
+                            std::optional<AnyInit> init = std::nullopt,
+                            std::optional<std::vector<CType>> target_objectives = std::nullopt,
+                            std::optional<usize> target_archive_size = std::nullopt,
+                            std::optional<CType> target_tolerance = std::nullopt) {
+                            const std::variant<DType, Vec<DType>>& discrete_domain_or_default =
+                                [&]() -> const std::variant<DType, Vec<DType>> {
+                                if (discrete_domain.has_value())
+                                    return discrete_domain.value();
+                                else
+                                    return DType(2);
+                            }();
+
+                            const std::variant<CType, Vec<CType>>& continuous_lower_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_lower_bound.has_value())
+                                    return continuous_lower_bound.value();
+                                else
+                                    return -std::numeric_limits<CType>::infinity();
+                            }();
+
+                            const std::variant<CType, Vec<CType>>& continuous_upper_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_upper_bound.has_value())
+                                    return continuous_upper_bound.value();
+                                else
+                                    return std::numeric_limits<CType>::infinity();
+                            }();
+
+                            const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_init_lower_bound.has_value())
+                                    return continuous_init_lower_bound.value();
+                                else
+                                    return CType(0.0);
+                            }();
+
+                            const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_init_upper_bound.has_value())
+                                    return continuous_init_upper_bound.value();
+                                else
+                                    return CType(1.0);
+                            }();
+
+                            ctor_wrapper(self, objectives, discrete_domain_or_default,
+                                         continuous_lower_bound_or_default, continuous_upper_bound_or_default,
+                                         continuous_init_lower_bound_or_default, continuous_init_upper_bound_or_default,
+                                         init, target_objectives, target_archive_size, target_tolerance);
+                        };
+
+                    ctor_wrapper_adapt_mutable_param_with_default_value(
+                        self, objectives, discrete_domain, continuous_lower_bound, continuous_upper_bound,
+                        continuous_init_lower_bound, continuous_init_upper_bound, init, target_objectives,
+                        target_archive_size, target_tolerance);
+                },
+                nb::arg("objectives"), nb::arg("discrete_domain").none() = nb::none(),
+                nb::arg("continuous_lower_bound").none() = nb::none(),
+                nb::arg("continuous_upper_bound").none() = nb::none(),
+                nb::arg("continuous_init_lower_bound").none() = nb::none(),
+                nb::arg("continuous_init_upper_bound").none() = nb::none(), nb::arg("init").none() = nb::none(),
+                nb::arg("target_objectives").none() = nb::none(), nb::arg("target_archive_size").none() = nb::none(),
+                nb::arg("target_tolerance").none() = nb::none(),
+                "Python bindings defaults:\n    If any of the params below is None, then its default value below will "
+                "be used:\n        * discrete_domain: int(2)\n        * continuous_lower_bound: "
+                "-std.numeric_limits<float>.infinity()\n        * continuous_upper_bound: "
+                "std.numeric_limits<float>.infinity()\n        * continuous_init_lower_bound: float(0.0)\n        * "
+                "continuous_init_upper_bound: float(1.0)")
+            .def("set_init", &goblin::BenchmarkInstance::set_init, nb::arg("init"))
+            .def(
+                "set_initial_bounds",
+                [](goblin::BenchmarkInstance& self,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_lower_bound =
+                       std::nullopt,
+                   const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_upper_bound =
+                       std::nullopt) {
+                    auto set_initial_bounds_adapt_mutable_param_with_default_value =
+                        [&self](
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_lower_bound =
+                                std::nullopt,
+                            const std::optional<const std::variant<CType, Vec<CType>>>& continuous_init_upper_bound =
+                                std::nullopt) {
+                            const std::variant<CType, Vec<CType>>& continuous_init_lower_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_init_lower_bound.has_value())
+                                    return continuous_init_lower_bound.value();
+                                else
+                                    return CType(0.0);
+                            }();
+
+                            const std::variant<CType, Vec<CType>>& continuous_init_upper_bound_or_default =
+                                [&]() -> const std::variant<CType, Vec<CType>> {
+                                if (continuous_init_upper_bound.has_value())
+                                    return continuous_init_upper_bound.value();
+                                else
+                                    return CType(1.0);
+                            }();
+
+                            self.set_initial_bounds(continuous_init_lower_bound_or_default,
+                                                    continuous_init_upper_bound_or_default);
+                        };
+
+                    set_initial_bounds_adapt_mutable_param_with_default_value(continuous_init_lower_bound,
+                                                                              continuous_init_upper_bound);
+                },
+                nb::arg("continuous_init_lower_bound").none() = nb::none(),
+                nb::arg("continuous_init_upper_bound").none() = nb::none(),
+                "Python bindings defaults:\n    If any of the params below is None, then its default value below will "
+                "be used:\n        * continuous_init_lower_bound: float(0.0)\n        * continuous_init_upper_bound: "
+                "float(1.0)")
+            .def("discrete_domain_sizes", &goblin::BenchmarkInstance::discrete_domain_sizes)
+            .def("continuous_lower_bounds", &goblin::BenchmarkInstance::continuous_lower_bounds)
+            .def("continuous_upper_bounds", &goblin::BenchmarkInstance::continuous_upper_bounds)
+            .def("add_random", &goblin::BenchmarkInstance::add_random, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("count"))
+            .def("continuous_init_lower_bounds", &goblin::BenchmarkInstance::continuous_init_lower_bounds)
+            .def("continuous_init_upper_bounds", &goblin::BenchmarkInstance::continuous_init_upper_bounds)
+            .def("evaluate", &goblin::BenchmarkInstance::evaluate, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("indices"))
+            .def("evaluate_partial", &goblin::BenchmarkInstance::evaluate_partial, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
+            .def("fitness", &goblin::BenchmarkInstance::fitness)
+            .def("archive_fitness", &goblin::BenchmarkInstance::archive_fitness);
+    // #endif
+    // #ifndef _GOBLIN_BENCH_TIMER_H
+    //
+
+    auto pyClassTimer = nb::class_<goblin::Timer>(m, "Timer", "")
+                            .def(nb::init<>())  // implicit default constructor
+                            .def("start", &goblin::Timer::start)
+                            .def("stop", &goblin::Timer::stop)
+                            .def("elapsed", &goblin::Timer::elapsed);
+    // #endif
+    // #ifndef _GOBLIN_BENCH_TRACKED_H
+    //
+
+    auto pyClassTrackingOptions =
+        nb::class_<goblin::TrackingOptions>(m, "TrackingOptions", "")
+            // (default constructor explicitly deleted)
+            .def(
+                "__init__",
+                [](goblin::TrackingOptions* self, std::filesystem::path logpath,
+                   std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
+                   usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000,
+                   bool consider_evaluation_time = true, bool report_intermediate_results = true,
+                   bool report_on_archive_change = false, bool report_raw_solutions = false,
+                   u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2,
+                   u64 max_evaluations_until_next_report = 1000000, u64 initial_generations_until_next_report = 1,
+                   u64 generation_factor = 2, u64 max_generations_until_next_report = 100,
+                   const std::optional<const std::chrono::nanoseconds>& initial_time_until_next_report = std::nullopt,
+                   u64 time_factor = 2,
+                   const std::optional<const std::chrono::nanoseconds>& max_time_until_next_report = std::nullopt) {
+                    auto ctor_wrapper =
+                        [](goblin::TrackingOptions* self, std::filesystem::path logpath,
+                           std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
+                           usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000,
+                           bool consider_evaluation_time = true, bool report_intermediate_results = true,
+                           bool report_on_archive_change = false, bool report_raw_solutions = false,
+                           u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2,
+                           u64 max_evaluations_until_next_report = 1000000,
+                           u64 initial_generations_until_next_report = 1, u64 generation_factor = 2,
+                           u64 max_generations_until_next_report = 100,
+                           std::chrono::nanoseconds initial_time_until_next_report = std::chrono::seconds(1),
+                           u64 time_factor = 2,
+                           std::chrono::nanoseconds max_time_until_next_report = std::chrono::minutes(10)) -> void {
+                        new (self) goblin::TrackingOptions(
+                            logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption,
+                            consider_evaluation_time, report_intermediate_results, report_on_archive_change,
+                            report_raw_solutions, initial_evaluations_until_next_report, eval_factor,
+                            max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor,
+                            max_generations_until_next_report, initial_time_until_next_report, time_factor,
+                            max_time_until_next_report);  // placement new
+                    };
+                    auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                        [&ctor_wrapper](
+                            goblin::TrackingOptions* self, std::filesystem::path logpath,
+                            std::optional<std::vector<std::tuple<std::string, std::string>>> log_info = std::nullopt,
+                            usize archive_capacity = 100, u64 max_evaluations_until_archive_adaption = 100000,
+                            bool consider_evaluation_time = true, bool report_intermediate_results = true,
+                            bool report_on_archive_change = false, bool report_raw_solutions = false,
+                            u64 initial_evaluations_until_next_report = 10, u64 eval_factor = 2,
+                            u64 max_evaluations_until_next_report = 1000000,
+                            u64 initial_generations_until_next_report = 1, u64 generation_factor = 2,
+                            u64 max_generations_until_next_report = 100,
+                            const std::optional<const std::chrono::nanoseconds>& initial_time_until_next_report =
+                                std::nullopt,
+                            u64 time_factor = 2,
+                            const std::optional<const std::chrono::nanoseconds>& max_time_until_next_report =
+                                std::nullopt) {
+                            const std::chrono::nanoseconds& initial_time_until_next_report_or_default =
+                                [&]() -> const std::chrono::nanoseconds {
+                                if (initial_time_until_next_report.has_value())
+                                    return initial_time_until_next_report.value();
+                                else
+                                    return std::chrono::seconds(1);
+                            }();
+
+                            const std::chrono::nanoseconds& max_time_until_next_report_or_default =
+                                [&]() -> const std::chrono::nanoseconds {
+                                if (max_time_until_next_report.has_value())
+                                    return max_time_until_next_report.value();
+                                else
+                                    return std::chrono::minutes(10);
+                            }();
+
+                            ctor_wrapper(self, logpath, log_info, archive_capacity,
+                                         max_evaluations_until_archive_adaption, consider_evaluation_time,
+                                         report_intermediate_results, report_on_archive_change, report_raw_solutions,
+                                         initial_evaluations_until_next_report, eval_factor,
+                                         max_evaluations_until_next_report, initial_generations_until_next_report,
+                                         generation_factor, max_generations_until_next_report,
+                                         initial_time_until_next_report_or_default, time_factor,
+                                         max_time_until_next_report_or_default);
+                        };
+
+                    ctor_wrapper_adapt_mutable_param_with_default_value(
+                        self, logpath, log_info, archive_capacity, max_evaluations_until_archive_adaption,
+                        consider_evaluation_time, report_intermediate_results, report_on_archive_change,
+                        report_raw_solutions, initial_evaluations_until_next_report, eval_factor,
+                        max_evaluations_until_next_report, initial_generations_until_next_report, generation_factor,
+                        max_generations_until_next_report, initial_time_until_next_report, time_factor,
+                        max_time_until_next_report);
+                },
+                nb::arg("logpath"), nb::arg("log_info").none() = nb::none(), nb::arg("archive_capacity") = 100,
+                nb::arg("max_evaluations_until_archive_adaption") = 100000, nb::arg("consider_evaluation_time") = true,
+                nb::arg("report_intermediate_results") = true, nb::arg("report_on_archive_change") = false,
+                nb::arg("report_raw_solutions") = false, nb::arg("initial_evaluations_until_next_report") = 10,
+                nb::arg("eval_factor") = 2, nb::arg("max_evaluations_until_next_report") = 1000000,
+                nb::arg("initial_generations_until_next_report") = 1, nb::arg("generation_factor") = 2,
+                nb::arg("max_generations_until_next_report") = 100,
+                nb::arg("initial_time_until_next_report").none() = nb::none(), nb::arg("time_factor") = 2,
+                nb::arg("max_time_until_next_report").none() = nb::none(),
+                " TODO at some point think about enabling dynamically setting the logging\n precision for floating "
+                "points\n TODO at some point allow these params on Tracked::run to reduce the amount\n of config "
+                "object nesting?\n\n\nPython bindings defaults:\n    If any of the params below is None, then its "
+                "default value below will be used:\n        * initial_time_until_next_report: std.chrono.seconds(1)\n  "
+                "      * max_time_until_next_report: std.chrono.minutes(10)")
+            .def_rw("archive_capacity", &goblin::TrackingOptions::archive_capacity, "")
+            .def_rw("max_evaluations_until_archive_adaption",
+                    &goblin::TrackingOptions::max_evaluations_until_archive_adaption, "")
+            .def_rw("consider_evaluation_time", &goblin::TrackingOptions::consider_evaluation_time, "")
+            .def_rw("report_intermediate_results", &goblin::TrackingOptions::report_intermediate_results, "")
+            .def_rw("report_on_archive_change", &goblin::TrackingOptions::report_on_archive_change, "")
+            .def_rw("report_raw_solutions", &goblin::TrackingOptions::report_raw_solutions, "")
+            .def_rw("initial_evaluations_until_next_report",
+                    &goblin::TrackingOptions::initial_evaluations_until_next_report, "")
+            .def_rw("eval_factor", &goblin::TrackingOptions::eval_factor, "1 is linear, >= 2 is exponential spacing")
+            .def_rw("max_evaluations_until_next_report", &goblin::TrackingOptions::max_evaluations_until_next_report,
+                    "")
+            .def_rw("initial_generations_until_next_report",
+                    &goblin::TrackingOptions::initial_generations_until_next_report, "")
+            .def_rw("generation_factor", &goblin::TrackingOptions::generation_factor,
+                    "1 is linear, >= 2 is exponential spacing")
+            .def_rw("max_generations_until_next_report", &goblin::TrackingOptions::max_generations_until_next_report,
+                    "")
+            .def_rw("initial_time_until_next_report", &goblin::TrackingOptions::initial_time_until_next_report, "")
+            .def_rw("time_factor", &goblin::TrackingOptions::time_factor, "1 is linear, >= 2 is exponential spacing")
+            .def_rw("max_time_until_next_report", &goblin::TrackingOptions::max_time_until_next_report, "");
+
+    auto pyClassTracked =
+        nb::class_<goblin::Tracked, goblin::WrappedInstance>(m, "Tracked", nb::is_final(),
+                                                             "/ An instance that intercepts evaluations\n(final class)")
+            // (default constructor explicitly deleted)
+            .def("evaluate", &goblin::Tracked::evaluate, nb::arg("rng"), nb::arg("solutions"), nb::arg("indices"))
+            .def("evaluate_partial", &goblin::Tracked::evaluate_partial, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("subsets"), nb::arg("indices"))
+            .def("adapt", &goblin::Tracked::adapt, nb::arg("rng"))
+            .def("gradients", &goblin::Tracked::gradients, nb::arg("rng"), nb::arg("solutions"), nb::arg("parents"),
+                 nb::arg("subsets"), nb::arg("indices"), nb::arg("evaluations"))
+            .def("gradient_steps", &goblin::Tracked::gradient_steps, nb::arg("rng"), nb::arg("solutions"),
+                 nb::arg("parents"), nb::arg("indices"), nb::arg("num_steps"))
+            .def_static("run", &goblin::Tracked::run, nb::arg("instance"), nb::arg("method"), nb::arg("budget"),
+                        nb::arg("config"), nb::arg("seed").none() = nb::none(),
+                        nb::arg("population_size").none() = nb::none());
+
+    m.def("debug_log", goblin::debug_log, nb::arg("problem"), nb::arg("path"), nb::arg("headers") = "",
+          nb::arg("values") = "", nb::arg("population").none() = nb::none(),
+          "/ Tracked running was intended to unify reporting across algorithms\n/ - this method abuses that "
+          "functionality to re-use that logging for\n/ other purposes controlled by the algorithm, not the tracking");
+    // #endif
+    // #ifndef _GOBLIN_LIB_IMS_H
+    //
+
+    auto pyClassIMSOptions =
+        nb::class_<goblin::IMSOptions>(m, "IMSOptions", "")
+            .def(
+                "__init__",
+                [](goblin::IMSOptions* self, usize initial_population_size = 2, usize max_num_populations = 25,
+                   usize subgeneration_factor = 4, bool restart_stale_populations = false,
+                   bool stop_covered_populations = false, usize initial_num_clusters = 1,
+                   std::optional<usize> archive_capacity = 100, bool so_parameter_space_clustering = false,
+                   usize additional_clusters_per_start = 1,
+                   std::optional<usize> generations_without_improvement_until_restart = std::nullopt,
+                   std::optional<usize> generations_without_improvement_until_stopping = std::nullopt,
+                   bool reevaluate_solutions_after_adaption = true,
+                   std::optional<std::string> population_logfile = std::nullopt,
+                   std::string population_log_resolution = "archive") {
+                    new (self) goblin::IMSOptions();  // placement new
+                    auto r_ctor_ = self;
+                    r_ctor_->initial_population_size = initial_population_size;
+                    r_ctor_->max_num_populations = max_num_populations;
+                    r_ctor_->subgeneration_factor = subgeneration_factor;
+                    r_ctor_->restart_stale_populations = restart_stale_populations;
+                    r_ctor_->stop_covered_populations = stop_covered_populations;
+                    r_ctor_->initial_num_clusters = initial_num_clusters;
+                    r_ctor_->archive_capacity = archive_capacity;
+                    r_ctor_->so_parameter_space_clustering = so_parameter_space_clustering;
+                    r_ctor_->additional_clusters_per_start = additional_clusters_per_start;
+                    r_ctor_->generations_without_improvement_until_restart =
+                        generations_without_improvement_until_restart;
+                    r_ctor_->generations_without_improvement_until_stopping =
+                        generations_without_improvement_until_stopping;
+                    r_ctor_->reevaluate_solutions_after_adaption = reevaluate_solutions_after_adaption;
+                    r_ctor_->population_logfile = population_logfile;
+                    r_ctor_->population_log_resolution = population_log_resolution;
+                },
+                nb::arg("initial_population_size") = 2, nb::arg("max_num_populations") = 25,
+                nb::arg("subgeneration_factor") = 4, nb::arg("restart_stale_populations") = false,
+                nb::arg("stop_covered_populations") = false, nb::arg("initial_num_clusters") = 1,
+                nb::arg("archive_capacity").none() = 100, nb::arg("so_parameter_space_clustering") = false,
+                nb::arg("additional_clusters_per_start") = 1,
+                nb::arg("generations_without_improvement_until_restart").none() = nb::none(),
+                nb::arg("generations_without_improvement_until_stopping").none() = nb::none(),
+                nb::arg("reevaluate_solutions_after_adaption") = true,
+                nb::arg("population_logfile").none() = nb::none(), nb::arg("population_log_resolution") = "archive")
+            .def_rw("initial_population_size", &goblin::IMSOptions::initial_population_size, "")
+            .def_rw("max_num_populations", &goblin::IMSOptions::max_num_populations, "")
+            .def_rw("subgeneration_factor", &goblin::IMSOptions::subgeneration_factor, "")
+            .def_rw("restart_stale_populations", &goblin::IMSOptions::restart_stale_populations, "")
+            .def_rw("stop_covered_populations", &goblin::IMSOptions::stop_covered_populations, "")
+            .def_rw("initial_num_clusters", &goblin::IMSOptions::initial_num_clusters, "")
+            .def_rw("archive_capacity", &goblin::IMSOptions::archive_capacity, "")
+            .def_rw("so_parameter_space_clustering", &goblin::IMSOptions::so_parameter_space_clustering,
+                    "TODO remove or implement parameter space clustering")
+            .def_rw("additional_clusters_per_start", &goblin::IMSOptions::additional_clusters_per_start, "")
+            .def_rw("generations_without_improvement_until_restart",
+                    &goblin::IMSOptions::generations_without_improvement_until_restart, "")
+            .def_rw("generations_without_improvement_until_stopping",
+                    &goblin::IMSOptions::generations_without_improvement_until_stopping, "")
+            .def_rw("reevaluate_solutions_after_adaption", &goblin::IMSOptions::reevaluate_solutions_after_adaption, "")
+            .def_rw("population_logfile", &goblin::IMSOptions::population_logfile, "")
+            .def_rw("population_log_resolution", &goblin::IMSOptions::population_log_resolution, "");
+    // #endif
+    // #ifndef _GOBLIN_AMALGAM_H
+    //
+
+    auto pyClassAMaLGaM =
+        nb::class_<goblin::AMaLGaM, goblin::MethodBase>(m, "AMaLGaM", nb::is_final(), "\n(final class)")
+            .def(nb::init<double, double, double, usize, usize, std::optional<double>, std::optional<usize>,
+                          std::optional<usize>>(),
+                 nb::arg("init_lower_bound") = -1.0, nb::arg("init_upper_bound") = 1.0,
+                 nb::arg("fitness_variance_threshold") = 0.0, nb::arg("max_num_populations") = 25,
+                 nb::arg("max_evaluations") = 1000000, nb::arg("target_value").none() = nb::none(),
+                 nb::arg("base_population_size").none() = nb::none(), nb::arg("seed").none() = nb::none())
+            .def("set_init_bounds", &goblin::AMaLGaM::set_init_bounds, nb::arg("lower"), nb::arg("upper"))
+            .def("run",
+                 nb::overload_cast<std::function<std::tuple<double, double>(const Ref<Vec<double>>&)>&,
+                                   std::vector<std::tuple<double, double>>>(&goblin::AMaLGaM::run),
+                 nb::arg("function"), nb::arg("bounds"))
+            .def("current_generation", &goblin::AMaLGaM::current_generation)
+            .def("run",
+                 nb::overload_cast<goblin::InstanceBase&, const goblin::Budget&, std::optional<u64>,
+                                   std::optional<usize>>(&goblin::AMaLGaM::run),
+                 nb::arg("problem"), nb::arg("budget"), nb::arg("seed").none() = nb::none(),
+                 nb::arg("population_size").none() = nb::none());
+    // #endif
+    // #ifndef _GOBLIN_GOMEA_LIBRARY_H
+    //
+
+    auto pyClassDiscreteGOMEA =
+        nb::class_<goblin::DiscreteGOMEA, goblin::MethodBase>(m, "DiscreteGOMEA", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::string_view, std::string, bool, bool, bool, std::optional<usize>, usize, usize, usize,
+                          usize, std::string>(),
+                 nb::arg("linkage_model") = "LinkageTree", nb::arg("similarity_metric") = "MI",
+                 nb::arg("gene_invariant") = false, nb::arg("forced_improvements") = true,
+                 nb::arg("filter_linkage") = false, nb::arg("max_subset_size").none() = nb::none(),
+                 nb::arg("base_population_size") = 2, nb::arg("max_number_of_populations") = 100,
+                 nb::arg("subgeneration_factor") = 4, nb::arg("max_archive_size") = 0, nb::arg("fos_order") = "default")
+            .def("run", &goblin::DiscreteGOMEA::run, nb::arg("problem"), nb::arg("budget"),
+                 nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
+            .def("current_generation", &goblin::DiscreteGOMEA::current_generation);
+
+    auto pyClassRvGOMEA =
+        nb::class_<goblin::RvGOMEA, goblin::MethodBase>(m, "RvGOMEA", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::string_view, usize, usize, usize, usize, double, double, double, double, bool, bool>(),
+                 nb::arg("linkage_model") = "Full", nb::arg("base_population_size") = 10,
+                 nb::arg("max_number_of_populations") = 25, nb::arg("subgeneration_factor") = 8,
+                 nb::arg("max_nis") = 100, nb::arg("selection_percentile") = 0.35,
+                 nb::arg("distribution_multiplier_decrease") = 0.9, nb::arg("standard_deviation_threshold") = 1.0,
+                 nb::arg("fitness_variance_tolerance") = 0.0, nb::arg("selection_during_gom") = true,
+                 nb::arg("update_elitist_during_gom") = true)
+            .def("run", &goblin::RvGOMEA::run, nb::arg("problem"), nb::arg("budget"),
+                 nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
+            .def("current_generation", &goblin::RvGOMEA::current_generation);
+    // #endif
+    // #ifndef _GOBLIN_MO_BINARY_GOMEA_H
+    //
+
+    auto pyClassMOBinaryGOMEA =
+        nb::class_<goblin::MOBinaryGOMEA, goblin::MethodBase>(m, "MOBinaryGOMEA", nb::is_final(), "\n(final class)")
+            .def(nb::init<usize, usize, usize, usize, std::string, bool>(), nb::arg("initial_population_size") = 8,
+                 nb::arg("max_num_populations") = 25, nb::arg("subgeneration_factor") = 2,
+                 nb::arg("target_archive_size") = 100, nb::arg("mutation") = "none",
+                 nb::arg("stop_covered_populations") = false)
+            .def("current_generation", &goblin::MOBinaryGOMEA::current_generation)
+            .def("run", &goblin::MOBinaryGOMEA::run, nb::arg("problem"), nb::arg("budget"),
+                 nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none());
+    // #endif
+    // #ifndef _GOBLIN_MO_RV_GOMEA_H
+    //
+
+    auto pyClassMoRvGOMEA =
+        nb::class_<goblin::MoRvGOMEA, goblin::MethodBase>(m, "MoRvGOMEA", nb::is_final(), "\n(final class)")
+            .def(nb::init<std::optional<usize>, usize, usize, usize, double, double, double, std::optional<usize>,
+                          std::optional<usize>, std::variant<std::string, goblin::StaticFOS>, std::optional<usize>,
+                          bool, bool, bool>(),
+                 nb::arg("initial_population_size").none() = nb::none(), nb::arg("max_num_populations") = 25,
+                 nb::arg("subgeneration_factor") = 8, nb::arg("target_archive_size") = 100,
+                 nb::arg("selection_percentile") = 0.35, nb::arg("distribution_multiplier_decrease") = 0.9,
+                 nb::arg("std_deviation_ratio_threshold") = 1.0,
+                 nb::arg("max_no_improvement_stretch").none() = nb::none(),
+                 nb::arg("initial_num_clusters").none() = nb::none(), nb::arg("linkage_model") = "LinkageTree",
+                 nb::arg("max_subset_size").none() = nb::none(), nb::arg("boundary_repair") = false,
+                 nb::arg("forced_improvements") = false, nb::arg("partial_evaluations") = true)
+            .def("current_generation", &goblin::MoRvGOMEA::current_generation)
+            .def("run", &goblin::MoRvGOMEA::run, nb::arg("problem"), nb::arg("budget"),
+                 nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none());
+    // #endif
+    // #ifndef _GOBLIN_MIXED_GOMEA_H
+    //
+    // #ifndef _GOBLIN_METHODS_CONTINUOUS_H
+    //
+
+    m.def("estimate_mean", goblin::estimate_mean, nb::arg("solutions"), nb::arg("active_indices"),
+          nb::arg("active_counts"), nb::arg("selection_percentile"), nb::arg("indices"), nb::arg("intron_aware"));
+
+    m.def("estimate_cov", goblin::estimate_cov, nb::arg("solutions"), nb::arg("active_indices"),
+          nb::arg("active_counts"), nb::arg("selection_percentile"), nb::arg("mean"), nb::arg("indices"),
+          nb::arg("intron_aware"));
+
+    auto pyClassRvSubsetStateBase =
+        nb::class_<goblin::RvSubsetStateBase>(m, "RvSubsetStateBase", "")
+            .def(nb::init<>())  // implicit default constructor
+            .def_rw("distribution_multiplier", &goblin::RvSubsetStateBase::distribution_multiplier, "");
+
+    auto pyClassRvSamplingModelBase =
+        nb::class_<goblin::RvSamplingModelBase, goblin::RvSamplingModelBase_trampoline>(
+            m, "RvSamplingModelBase",
+            "/ Separate sampling models roughly as per https://ir.cwi.nl/pub/30344/30344.pdf\n/ TODO ask anton about "
+            "API - feels still a bit crude...")
+            .def(nb::init<>())  // implicit default constructor
+            .def("init", &goblin::RvSamplingModelBase::init, nb::arg("subset"))
+            .def("inherit", &goblin::RvSamplingModelBase::inherit, nb::arg("subset"), nb::arg("previous_subset"),
+                 nb::arg("previous_state"))
+            .def("update", &goblin::RvSamplingModelBase::update, nb::arg("solutions"), nb::arg("by_fitness_decreasing"),
+                 nb::arg("active_counts"), nb::arg("intron_aware"), nb::arg("subset"), nb::arg("selection_percentile"),
+                 nb::arg("state"))
+            .def("sample", &goblin::RvSamplingModelBase::sample, nb::arg("rng"), nb::arg("state"))
+            .def("adapt", &goblin::RvSamplingModelBase::adapt, nb::arg("solutions"), nb::arg("improved_indices"),
+                 nb::arg("oob_ratio"), nb::arg("max_nis_reached"), nb::arg("intron_aware"), nb::arg("subset"),
+                 nb::arg("state"))
+            .def("converged", &goblin::RvSamplingModelBase::converged, nb::arg("state"));
+
+    auto pyClassAMaLGaMSubsetState =
+        nb::class_<goblin::AMaLGaMSubsetState, goblin::RvSubsetStateBase>(m, "AMaLGaMSubsetState", nb::is_final(),
+                                                                          "\n(final class)")
+            .def(nb::init<>())  // implicit default constructor
+            .def_rw("enable_smoothing", &goblin::AMaLGaMSubsetState::enable_smoothing, "")
+            .def_rw("mean", &goblin::AMaLGaMSubsetState::mean, "")
+            .def_rw(
+                "cov", &goblin::AMaLGaMSubsetState::cov,
+                "for storing the unscaled covariance, since in the incremental version the scaling happens after the")
+            .def_rw("L", &goblin::AMaLGaMSubsetState::L,
+                    " smoothing:\n "
+                    "https://github.com/renzoscholman/irv-gomea/blob/89c62cf007858bd8ab9c2ba7955c7b80121/src/"
+                    "distribution.cpp#L510");
+
+    auto pyClassAMaLGaMSamplingModel =
+        nb::class_<goblin::AMaLGaMSamplingModel, goblin::RvSamplingModelBase>(m, "AMaLGaMSamplingModel", nb::is_final(),
+                                                                              "\n(final class)")
+            .def(
+                "__init__",
+                [](goblin::AMaLGaMSamplingModel* self, bool use_mahalanobis_distance_for_sdr = false,
+                   CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0,
+                   CType distribution_multiplier_decrease = 0.9,
+                   const std::optional<const CType>& distribution_multiplier_increase = std::nullopt,
+                   CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1) {
+                    auto ctor_wrapper =
+                        [](goblin::AMaLGaMSamplingModel* self, bool use_mahalanobis_distance_for_sdr = false,
+                           CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0,
+                           CType distribution_multiplier_decrease = 0.9,
+                           CType distribution_multiplier_increase = 1.0 / 0.9,
+                           CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1) -> void {
+                        new (self) goblin::AMaLGaMSamplingModel(
+                            use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold,
+                            distribution_multiplier_decrease, distribution_multiplier_increase,
+                            min_distribution_multiplier, num_cholesky_tries);  // placement new
+                    };
+                    auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                        [&ctor_wrapper](
+                            goblin::AMaLGaMSamplingModel* self, bool use_mahalanobis_distance_for_sdr = false,
+                            CType eta_cov = 1.0, CType std_deviation_ratio_threshold = 1.0,
+                            CType distribution_multiplier_decrease = 0.9,
+                            const std::optional<const CType>& distribution_multiplier_increase = std::nullopt,
+                            CType min_distribution_multiplier = 1e-10, usize num_cholesky_tries = 1) {
+                            const CType& distribution_multiplier_increase_or_default = [&]() -> const CType {
+                                if (distribution_multiplier_increase.has_value())
+                                    return distribution_multiplier_increase.value();
+                                else
+                                    return 1.0 / 0.9;
+                            }();
+
+                            ctor_wrapper(self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold,
+                                         distribution_multiplier_decrease, distribution_multiplier_increase_or_default,
+                                         min_distribution_multiplier, num_cholesky_tries);
+                        };
+
+                    ctor_wrapper_adapt_mutable_param_with_default_value(
+                        self, use_mahalanobis_distance_for_sdr, eta_cov, std_deviation_ratio_threshold,
+                        distribution_multiplier_decrease, distribution_multiplier_increase, min_distribution_multiplier,
+                        num_cholesky_tries);
+                },
+                nb::arg("use_mahalanobis_distance_for_sdr") = false, nb::arg("eta_cov") = 1.0,
+                nb::arg("std_deviation_ratio_threshold") = 1.0, nb::arg("distribution_multiplier_decrease") = 0.9,
+                nb::arg("distribution_multiplier_increase").none() = nb::none(),
+                nb::arg("min_distribution_multiplier") = 1e-10, nb::arg("num_cholesky_tries") = 1,
+                "Python bindings defaults:\n    If distribution_multiplier_increase is None, then its default value "
+                "will be: 1.0 / 0.9")
+            .def("init", &goblin::AMaLGaMSamplingModel::init, nb::arg("subset"))
+            .def("inherit", &goblin::AMaLGaMSamplingModel::inherit, nb::arg("subset"), nb::arg("previous_subset"),
+                 nb::arg("previous_state"))
+            .def("update", &goblin::AMaLGaMSamplingModel::update, nb::arg("solutions"),
+                 nb::arg("by_fitness_decreasing"), nb::arg("active_counts"), nb::arg("intron_aware"), nb::arg("subset"),
+                 nb::arg("selection_percentile"), nb::arg("state"))
+            .def("sample", &goblin::AMaLGaMSamplingModel::sample, nb::arg("rng"), nb::arg("state"))
+            .def("adapt", &goblin::AMaLGaMSamplingModel::adapt, nb::arg("solutions"), nb::arg("improved_indices"),
+                 nb::arg("oob_ratio"), nb::arg("max_nis_reached"), nb::arg("intron_aware"), nb::arg("subset"),
+                 nb::arg("state"))
+            .def("converged", &goblin::AMaLGaMSamplingModel::converged, nb::arg("state"));
+
+    auto pyClassRvOptions =
+        nb::class_<goblin::RvOptions>(m, "RvOptions", "")
+            .def(
+                "__init__",
+                [](goblin::RvOptions* self, bool enabled = true, bool intron_aware = false,
+                   bool intron_aware_intermediate_updates = false, bool intron_aware_mean_estimation = false,
+                   bool intron_aware_cov_estimation = false, bool intron_aware_ams = false,
+                   double selection_percentile = 0.35, double p_accept = 0.05,
+                   bool init_ams_from_population_mean = true, bool randomize_ams_indices = false,
+                   bool enable_partial_ams = true, bool enable_full_ams = true, CType delta_ams = 2.0,
+                   CType eta_ams = 1.0, usize max_nis = 100, usize num_forced_improvement_tries = 8,
+                   std::optional<u64> generations_until_full_evaluation = std::nullopt,
+                   std::optional<std::string> population_logfile = std::nullopt,
+                   std::optional<std::string> selection_logfile = std::nullopt,
+                   std::optional<std::string> subset_logfile = std::nullopt,
+                   std::optional<std::string> sample_logfile = std::nullopt, bool check_synched_archives = false) {
+                    new (self) goblin::RvOptions();  // placement new
+                    auto r_ctor_ = self;
+                    r_ctor_->enabled = enabled;
+                    r_ctor_->intron_aware = intron_aware;
+                    r_ctor_->intron_aware_intermediate_updates = intron_aware_intermediate_updates;
+                    r_ctor_->intron_aware_mean_estimation = intron_aware_mean_estimation;
+                    r_ctor_->intron_aware_cov_estimation = intron_aware_cov_estimation;
+                    r_ctor_->intron_aware_ams = intron_aware_ams;
+                    r_ctor_->selection_percentile = selection_percentile;
+                    r_ctor_->p_accept = p_accept;
+                    r_ctor_->init_ams_from_population_mean = init_ams_from_population_mean;
+                    r_ctor_->randomize_ams_indices = randomize_ams_indices;
+                    r_ctor_->enable_partial_ams = enable_partial_ams;
+                    r_ctor_->enable_full_ams = enable_full_ams;
+                    r_ctor_->delta_ams = delta_ams;
+                    r_ctor_->eta_ams = eta_ams;
+                    r_ctor_->max_nis = max_nis;
+                    r_ctor_->num_forced_improvement_tries = num_forced_improvement_tries;
+                    r_ctor_->generations_until_full_evaluation = generations_until_full_evaluation;
+                    r_ctor_->population_logfile = population_logfile;
+                    r_ctor_->selection_logfile = selection_logfile;
+                    r_ctor_->subset_logfile = subset_logfile;
+                    r_ctor_->sample_logfile = sample_logfile;
+                    r_ctor_->check_synched_archives = check_synched_archives;
+                },
+                nb::arg("enabled") = true, nb::arg("intron_aware") = false,
+                nb::arg("intron_aware_intermediate_updates") = false, nb::arg("intron_aware_mean_estimation") = false,
+                nb::arg("intron_aware_cov_estimation") = false, nb::arg("intron_aware_ams") = false,
+                nb::arg("selection_percentile") = 0.35, nb::arg("p_accept") = 0.05,
+                nb::arg("init_ams_from_population_mean") = true, nb::arg("randomize_ams_indices") = false,
+                nb::arg("enable_partial_ams") = true, nb::arg("enable_full_ams") = true, nb::arg("delta_ams") = 2.0,
+                nb::arg("eta_ams") = 1.0, nb::arg("max_nis") = 100, nb::arg("num_forced_improvement_tries") = 8,
+                nb::arg("generations_until_full_evaluation").none() = nb::none(),
+                nb::arg("population_logfile").none() = nb::none(), nb::arg("selection_logfile").none() = nb::none(),
+                nb::arg("subset_logfile").none() = nb::none(), nb::arg("sample_logfile").none() = nb::none(),
+                nb::arg("check_synched_archives") = false)
+            .def_rw("enabled", &goblin::RvOptions::enabled, "")
+            .def_rw("intron_aware", &goblin::RvOptions::intron_aware, "")
+            .def_rw("intron_aware_intermediate_updates", &goblin::RvOptions::intron_aware_intermediate_updates, "")
+            .def_rw("intron_aware_mean_estimation", &goblin::RvOptions::intron_aware_mean_estimation, "")
+            .def_rw("intron_aware_cov_estimation", &goblin::RvOptions::intron_aware_cov_estimation, "")
+            .def_rw("intron_aware_ams", &goblin::RvOptions::intron_aware_ams, "")
+            .def_rw("selection_percentile", &goblin::RvOptions::selection_percentile, "")
+            .def_rw("p_accept", &goblin::RvOptions::p_accept, "")
+            .def_rw("init_ams_from_population_mean", &goblin::RvOptions::init_ams_from_population_mean, "")
+            .def_rw("randomize_ams_indices", &goblin::RvOptions::randomize_ams_indices, "")
+            .def_rw("enable_partial_ams", &goblin::RvOptions::enable_partial_ams, "")
+            .def_rw("enable_full_ams", &goblin::RvOptions::enable_full_ams, "")
+            .def_rw("delta_ams", &goblin::RvOptions::delta_ams, "")
+            .def_rw("eta_ams", &goblin::RvOptions::eta_ams, "")
+            .def_rw("max_nis", &goblin::RvOptions::max_nis, "")
+            .def_rw("num_forced_improvement_tries", &goblin::RvOptions::num_forced_improvement_tries,
+                    "8 is the RV GOMEA default if I did not miscalculate (1.0 / 2^8 < 0.01)")
+            .def_rw("generations_until_full_evaluation", &goblin::RvOptions::generations_until_full_evaluation,
+                    " In the GBO setting with partial evaluations, numerical errors of partial fitness updates\n can "
+                    "accumulate and it might be needed to perform full evaluations once in a while\n\n In that case, "
+                    "the default number of generations until re-evaluation is `50`\n\n Note that in this setting all "
+                    "archive solutions should be re-evaluated in case the target seems to have been\n reached to "
+                    "ensure that this is not due to numeric errors. This does not happen in this version.")
+            .def_rw("population_logfile", &goblin::RvOptions::population_logfile, "")
+            .def_rw("selection_logfile", &goblin::RvOptions::selection_logfile, "")
+            .def_rw("subset_logfile", &goblin::RvOptions::subset_logfile, "")
+            .def_rw("sample_logfile", &goblin::RvOptions::sample_logfile, "")
+            .def_rw("check_synched_archives", &goblin::RvOptions::check_synched_archives, "")
+            .def("validate", &goblin::RvOptions::validate);
+
+    m.def("sort_by_quality_decreasing", goblin::sort_by_quality_decreasing, nb::arg("fitness"), nb::arg("solutions"),
+          nb::arg("indices"), nb::arg("objective").none());
+
+    auto pyClassRvState =
+        nb::class_<goblin::RvState>(m, "RvState", "")
+            .def(nb::init<goblin::RvOptions, const goblin::LinkageModelBase&, const goblin::RvSamplingModelBase&>(),
+                 nb::arg("options"), nb::arg("linkage_model"), nb::arg("sampling_model"))
+            .def("perform_generation", &goblin::RvState::perform_generation, nb::arg("rng"), nb::arg("archive"),
+                 nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"),
+                 nb::arg("cluster_solutions"))
+            .def("converged", &goblin::RvState::converged)
+            .def("select_and_learn_linkage", &goblin::RvState::select_and_learn_linkage, nb::arg("rng"),
+                 nb::arg("archive"), nb::arg("problem"), nb::arg("solutions"), nb::arg("cluster_solutions"))
+            .def("should_accept", &goblin::RvState::should_accept, nb::arg("rng"), nb::arg("fitness"),
+                 nb::arg("archive"), nb::arg("solution"), nb::arg("parent"), nb::arg("objective").none(),
+                 nb::arg("strict"))
+            .def("gom_step", &goblin::RvState::gom_step, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"),
+                 nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("cluster_solutions"),
+                 nb::arg("subset_orders"), nb::arg("subset_idx"), nb::arg("ams_indices"))
+            .def("full_ams", &goblin::RvState::full_ams, nb::arg("rng"), nb::arg("archive"), nb::arg("problem"),
+                 nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"), nb::arg("ams_indices"))
+            .def("forced_improvements", &goblin::RvState::forced_improvements, nb::arg("rng"), nb::arg("archive"),
+                 nb::arg("problem"), nb::arg("solutions"), nb::arg("parents"), nb::arg("solution_clusters"),
+                 nb::arg("subset_orders"), nb::arg("max_num_subsets"))
+            .def("current_generation", &goblin::RvState::current_generation, "// override final")
+            .def_rw("options", &goblin::RvState::options, "");
+    // #endif
+
+    m.def("create_and_register_clusters", goblin::create_and_register_clusters, nb::arg("rng"), nb::arg("archive"),
+          nb::arg("fitness"), nb::arg("solutions"), nb::arg("num_clusters"), nb::arg("donor_pool_size"),
+          nb::arg("previous_solutions"), nb::arg("previous_clusters"));
+
+    auto pyClassFosStats =
+        nb::class_<goblin::FosStats>(m, "FosStats", "")
+            .def(
+                "__init__",
+                [](goblin::FosStats* self,
+                   const std::optional<const std::vector<CType>>& solution_activation_rate = std::nullopt,
+                   const std::optional<const std::vector<CType>>& variables_activation_rate = std::nullopt,
+                   const std::optional<const std::vector<u64>>& usage_count = std::nullopt,
+                   const std::optional<const std::vector<u64>>& evaluation_count = std::nullopt,
+                   const std::optional<const std::vector<u64>>& acceptance_count = std::nullopt,
+                   const std::optional<const std::vector<CType>>& cumulative_fitness_difference = std::nullopt,
+                   const std::optional<const std::vector<u64>>& finite_acceptance_count = std::nullopt,
+                   const std::optional<const Mat<CType>>& similarity = std::nullopt) {
+                    new (self) goblin::FosStats();  // placement new
+                    auto r_ctor_ = self;
+                    if (solution_activation_rate.has_value())
+                        r_ctor_->solution_activation_rate = solution_activation_rate.value();
+                    else
+                        r_ctor_->solution_activation_rate = std::vector<CType>();
+                    if (variables_activation_rate.has_value())
+                        r_ctor_->variables_activation_rate = variables_activation_rate.value();
+                    else
+                        r_ctor_->variables_activation_rate = std::vector<CType>();
+                    if (usage_count.has_value())
+                        r_ctor_->usage_count = usage_count.value();
+                    else
+                        r_ctor_->usage_count = std::vector<u64>();
+                    if (evaluation_count.has_value())
+                        r_ctor_->evaluation_count = evaluation_count.value();
+                    else
+                        r_ctor_->evaluation_count = std::vector<u64>();
+                    if (acceptance_count.has_value())
+                        r_ctor_->acceptance_count = acceptance_count.value();
+                    else
+                        r_ctor_->acceptance_count = std::vector<u64>();
+                    if (cumulative_fitness_difference.has_value())
+                        r_ctor_->cumulative_fitness_difference = cumulative_fitness_difference.value();
+                    else
+                        r_ctor_->cumulative_fitness_difference = std::vector<CType>();
+                    if (finite_acceptance_count.has_value())
+                        r_ctor_->finite_acceptance_count = finite_acceptance_count.value();
+                    else
+                        r_ctor_->finite_acceptance_count = std::vector<u64>();
+                    if (similarity.has_value())
+                        r_ctor_->similarity = similarity.value();
+                    else
+                        r_ctor_->similarity = Mat<CType>();
+                },
+                nb::arg("solution_activation_rate").none() = nb::none(),
+                nb::arg("variables_activation_rate").none() = nb::none(), nb::arg("usage_count").none() = nb::none(),
+                nb::arg("evaluation_count").none() = nb::none(), nb::arg("acceptance_count").none() = nb::none(),
+                nb::arg("cumulative_fitness_difference").none() = nb::none(),
+                nb::arg("finite_acceptance_count").none() = nb::none(), nb::arg("similarity").none() = nb::none())
+            .def_rw("solution_activation_rate", &goblin::FosStats::solution_activation_rate,
+                    "whats the proportion of solutions where initially at least one of the")
+            .def_rw("variables_activation_rate", &goblin::FosStats::variables_activation_rate,
+                    "conditioned on solutions with at least one active variables in the subset, whats")
+            .def_rw("usage_count", &goblin::FosStats::usage_count,
+                    "how often was the FOS used? (without FI, - should be the population size)")
+            .def_rw("evaluation_count", &goblin::FosStats::evaluation_count,
+                    "how often was an evaluation needed? (i.e. active parts were modified)")
+            .def_rw("acceptance_count", &goblin::FosStats::acceptance_count,
+                    "how often was the change accepted? (after evaluation)")
+            .def_rw("cumulative_fitness_difference", &goblin::FosStats::cumulative_fitness_difference,
+                    "how big were the accepted improvements?")
+            .def_rw("finite_acceptance_count", &goblin::FosStats::finite_acceptance_count,
+                    "how many improvements had a finite fitness difference to their parent?")
+            .def_rw("similarity", &goblin::FosStats::similarity, "(inf/nan mess up the average...)");
+
+    auto pyClassPopulationOptions =
+        nb::class_<goblin::PopulationOptions>(m, "PopulationOptions", "")
+            .def(
+                "__init__",
+                [](goblin::PopulationOptions* self, double donor_pool_size_multiplier = 2.0,
+                   std::optional<usize> max_nis = std::nullopt, bool forced_improvements = true,
+                   bool enable_mixed_forced_improvements = true, double target_continuous_to_discrete_balance = 1.0,
+                   bool sequential_gom = false, bool strict_elite_acceptance = false,
+                   double donor_search_proportion = 0.0, std::optional<std::string> subset_logfile = std::nullopt,
+                   std::optional<std::string> intermediate_population_logfile = std::nullopt, u64 generation = 0,
+                   u64 initial_generations_until_next_fos_log = 5, u64 fos_log_factor = 2,
+                   double continuous_mutation_probability = 0.0, CType continuous_mutation_temperature = 0.1,
+                   CType continuous_mutation_decay_factor = 0.9,
+                   std::optional<usize> continuous_mutation_decay_patience = 5, bool mutate_before_gradient_step = true,
+                   usize gradient_step_frequency = 0, usize gradient_step_count = 10,
+                   std::optional<double> discrete_mutation_probability = 0.0, bool gene_invariant = false,
+                   bool use_fancy_gpu_gp_gom = false, bool resample_inactive_donor_values = false) {
+                    new (self) goblin::PopulationOptions();  // placement new
+                    auto r_ctor_ = self;
+                    r_ctor_->donor_pool_size_multiplier = donor_pool_size_multiplier;
+                    r_ctor_->max_nis = max_nis;
+                    r_ctor_->forced_improvements = forced_improvements;
+                    r_ctor_->enable_mixed_forced_improvements = enable_mixed_forced_improvements;
+                    r_ctor_->target_continuous_to_discrete_balance = target_continuous_to_discrete_balance;
+                    r_ctor_->sequential_gom = sequential_gom;
+                    r_ctor_->strict_elite_acceptance = strict_elite_acceptance;
+                    r_ctor_->donor_search_proportion = donor_search_proportion;
+                    r_ctor_->subset_logfile = subset_logfile;
+                    r_ctor_->intermediate_population_logfile = intermediate_population_logfile;
+                    r_ctor_->generation = generation;
+                    r_ctor_->initial_generations_until_next_fos_log = initial_generations_until_next_fos_log;
+                    r_ctor_->fos_log_factor = fos_log_factor;
+                    r_ctor_->continuous_mutation_probability = continuous_mutation_probability;
+                    r_ctor_->continuous_mutation_temperature = continuous_mutation_temperature;
+                    r_ctor_->continuous_mutation_decay_factor = continuous_mutation_decay_factor;
+                    r_ctor_->continuous_mutation_decay_patience = continuous_mutation_decay_patience;
+                    r_ctor_->mutate_before_gradient_step = mutate_before_gradient_step;
+                    r_ctor_->gradient_step_frequency = gradient_step_frequency;
+                    r_ctor_->gradient_step_count = gradient_step_count;
+                    r_ctor_->discrete_mutation_probability = discrete_mutation_probability;
+                    r_ctor_->gene_invariant = gene_invariant;
+                    r_ctor_->use_fancy_gpu_gp_gom = use_fancy_gpu_gp_gom;
+                    r_ctor_->resample_inactive_donor_values = resample_inactive_donor_values;
+                },
+                nb::arg("donor_pool_size_multiplier") = 2.0, nb::arg("max_nis").none() = nb::none(),
+                nb::arg("forced_improvements") = true, nb::arg("enable_mixed_forced_improvements") = true,
+                nb::arg("target_continuous_to_discrete_balance") = 1.0, nb::arg("sequential_gom") = false,
+                nb::arg("strict_elite_acceptance") = false, nb::arg("donor_search_proportion") = 0.0,
+                nb::arg("subset_logfile").none() = nb::none(),
+                nb::arg("intermediate_population_logfile").none() = nb::none(), nb::arg("generation") = 0,
+                nb::arg("initial_generations_until_next_fos_log") = 5, nb::arg("fos_log_factor") = 2,
+                nb::arg("continuous_mutation_probability") = 0.0, nb::arg("continuous_mutation_temperature") = 0.1,
+                nb::arg("continuous_mutation_decay_factor") = 0.9,
+                nb::arg("continuous_mutation_decay_patience").none() = 5, nb::arg("mutate_before_gradient_step") = true,
+                nb::arg("gradient_step_frequency") = 0, nb::arg("gradient_step_count") = 10,
+                nb::arg("discrete_mutation_probability").none() = 0.0, nb::arg("gene_invariant") = false,
+                nb::arg("use_fancy_gpu_gp_gom") = false, nb::arg("resample_inactive_donor_values") = false)
+            .def_rw("donor_pool_size_multiplier", &goblin::PopulationOptions::donor_pool_size_multiplier, "")
+            .def_rw("max_nis", &goblin::PopulationOptions::max_nis, "")
+            .def_rw("forced_improvements", &goblin::PopulationOptions::forced_improvements, "")
+            .def_rw("enable_mixed_forced_improvements", &goblin::PopulationOptions::enable_mixed_forced_improvements,
+                    "")
+            .def_rw("target_continuous_to_discrete_balance",
+                    &goblin::PopulationOptions::target_continuous_to_discrete_balance, "")
+            .def_rw("sequential_gom", &goblin::PopulationOptions::sequential_gom,
+                    "performs GOM sequentially per solution, incompatible with other mechanisms")
+            .def_rw(
+                "strict_elite_acceptance", &goblin::PopulationOptions::strict_elite_acceptance,
+                "should the single objective elite solutions accept only strict improvements or also neutral changes?")
+            .def_rw("donor_search_proportion", &goblin::PopulationOptions::donor_search_proportion,
+                    "the fraction of solutions to consider before skipping an evaluation in case")
+            .def_rw("subset_logfile", &goblin::PopulationOptions::subset_logfile, "")
+            .def_rw("intermediate_population_logfile", &goblin::PopulationOptions::intermediate_population_logfile, "")
+            .def_rw("generation", &goblin::PopulationOptions::generation, "")
+            .def_rw("initial_generations_until_next_fos_log",
+                    &goblin::PopulationOptions::initial_generations_until_next_fos_log,
+                    "> 0, subset stats are logged every")
+            .def_rw("fos_log_factor", &goblin::PopulationOptions::fos_log_factor,
+                    "1 is linear, 2 is exponential log spacing")
+            .def_rw("continuous_mutation_probability", &goblin::PopulationOptions::continuous_mutation_probability, "")
+            .def_rw("continuous_mutation_temperature", &goblin::PopulationOptions::continuous_mutation_temperature, "")
+            .def_rw("continuous_mutation_decay_factor", &goblin::PopulationOptions::continuous_mutation_decay_factor,
+                    "")
+            .def_rw("continuous_mutation_decay_patience",
+                    &goblin::PopulationOptions::continuous_mutation_decay_patience, "")
+            .def_rw("mutate_before_gradient_step", &goblin::PopulationOptions::mutate_before_gradient_step, "")
+            .def_rw("gradient_step_frequency", &goblin::PopulationOptions::gradient_step_frequency, "")
+            .def_rw("gradient_step_count", &goblin::PopulationOptions::gradient_step_count, "")
+            .def_rw("discrete_mutation_probability", &goblin::PopulationOptions::discrete_mutation_probability,
+                    " If std::nullopt, then perform strong mutation (i.e. 1/subset size).\n Note that for single "
+                    "element subsets, this collapses to random search")
+            .def_rw("gene_invariant", &goblin::PopulationOptions::gene_invariant, "")
+            .def_rw("use_fancy_gpu_gp_gom", &goblin::PopulationOptions::use_fancy_gpu_gp_gom, "")
+            .def_rw("resample_inactive_donor_values", &goblin::PopulationOptions::resample_inactive_donor_values, "");
+
+    auto pyClassMixedGOMEA =
+        nb::class_<goblin::MixedGOMEA, goblin::MethodBase>(m, "MixedGOMEA", "")
+            .def(
+                "__init__",
+                [](goblin::MixedGOMEA* self,
+                   const std::optional<const goblin::PopulationOptions>& population_options = std::nullopt,
+                   const std::optional<const goblin::RvOptions>& rv_options = std::nullopt,
+                   const std::optional<const goblin::IMSOptions>& ims_options = std::nullopt,
+                   const std::optional<const std::shared_ptr<goblin::LinkageModelBase>>& discrete_model = std::nullopt,
+                   const std::optional<const std::shared_ptr<goblin::LinkageModelBase>>& continuous_model =
+                       std::nullopt,
+                   const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>>& sampling_model =
+                       std::nullopt,
+                   std::string repr = "aos") {
+                    auto ctor_wrapper = [](goblin::MixedGOMEA* self,
+                                           goblin::PopulationOptions population_options = goblin::PopulationOptions(),
+                                           goblin::RvOptions rv_options = goblin::RvOptions(),
+                                           goblin::IMSOptions ims_options = goblin::IMSOptions(),
+                                           std::shared_ptr<goblin::LinkageModelBase> discrete_model =
+                                               std::make_shared<goblin::LinkageTreeFOS>(),
+                                           std::shared_ptr<goblin::LinkageModelBase> continuous_model =
+                                               std::make_shared<goblin::FullFOS>(),
+                                           std::shared_ptr<goblin::RvSamplingModelBase> sampling_model =
+                                               std::make_shared<goblin::AMaLGaMSamplingModel>(),
+                                           std::string repr = "aos") -> void {
+                        new (self) goblin::MixedGOMEA(population_options, rv_options, ims_options, discrete_model,
+                                                      continuous_model, sampling_model, repr);  // placement new
+                    };
+                    auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                        [&ctor_wrapper](
+                            goblin::MixedGOMEA* self,
+                            const std::optional<const goblin::PopulationOptions>& population_options = std::nullopt,
+                            const std::optional<const goblin::RvOptions>& rv_options = std::nullopt,
+                            const std::optional<const goblin::IMSOptions>& ims_options = std::nullopt,
+                            const std::optional<const std::shared_ptr<goblin::LinkageModelBase>>& discrete_model =
+                                std::nullopt,
+                            const std::optional<const std::shared_ptr<goblin::LinkageModelBase>>& continuous_model =
+                                std::nullopt,
+                            const std::optional<const std::shared_ptr<goblin::RvSamplingModelBase>>& sampling_model =
+                                std::nullopt,
+                            std::string repr = "aos") {
+                            const goblin::PopulationOptions& population_options_or_default =
+                                [&]() -> const goblin::PopulationOptions {
+                                if (population_options.has_value())
+                                    return population_options.value();
+                                else
+                                    return goblin::PopulationOptions();
+                            }();
+
+                            const goblin::RvOptions& rv_options_or_default = [&]() -> const goblin::RvOptions {
+                                if (rv_options.has_value())
+                                    return rv_options.value();
+                                else
+                                    return goblin::RvOptions();
+                            }();
+
+                            const goblin::IMSOptions& ims_options_or_default = [&]() -> const goblin::IMSOptions {
+                                if (ims_options.has_value())
+                                    return ims_options.value();
+                                else
+                                    return goblin::IMSOptions();
+                            }();
+
+                            const std::shared_ptr<goblin::LinkageModelBase>& discrete_model_or_default =
+                                [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
+                                if (discrete_model.has_value())
+                                    return discrete_model.value();
+                                else
+                                    return std::make_shared<goblin::LinkageTreeFOS>();
+                            }();
+
+                            const std::shared_ptr<goblin::LinkageModelBase>& continuous_model_or_default =
+                                [&]() -> const std::shared_ptr<goblin::LinkageModelBase> {
+                                if (continuous_model.has_value())
+                                    return continuous_model.value();
+                                else
+                                    return std::make_shared<goblin::FullFOS>();
+                            }();
+
+                            const std::shared_ptr<goblin::RvSamplingModelBase>& sampling_model_or_default =
+                                [&]() -> const std::shared_ptr<goblin::RvSamplingModelBase> {
+                                if (sampling_model.has_value())
+                                    return sampling_model.value();
+                                else
+                                    return std::make_shared<goblin::AMaLGaMSamplingModel>();
+                            }();
+
+                            ctor_wrapper(self, population_options_or_default, rv_options_or_default,
+                                         ims_options_or_default, discrete_model_or_default, continuous_model_or_default,
+                                         sampling_model_or_default, repr);
+                        };
+
+                    ctor_wrapper_adapt_mutable_param_with_default_value(self, population_options, rv_options,
+                                                                        ims_options, discrete_model, continuous_model,
+                                                                        sampling_model, repr);
+                },
+                nb::arg("population_options").none() = nb::none(), nb::arg("rv_options").none() = nb::none(),
+                nb::arg("ims_options").none() = nb::none(), nb::arg("discrete_model").none() = nb::none(),
+                nb::arg("continuous_model").none() = nb::none(), nb::arg("sampling_model").none() = nb::none(),
+                nb::arg("repr") = "aos",
+                "Python bindings defaults:\n    If any of the params below is None, then its default value below will "
+                "be used:\n        * population_options: PopulationOptions()\n        * rv_options: RvOptions()\n      "
+                "  * ims_options: IMSOptions()\n        * discrete_model: std.make_shared<LinkageTreeFOS>()\n        * "
+                "continuous_model: std.make_shared<FullFOS>()\n        * sampling_model: "
+                "std.make_shared<AMaLGaMSamplingModel>()")
+            .def("run", &goblin::MixedGOMEA::run, nb::arg("problem"), nb::arg("budget"),
+                 nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
+            .def("current_generation", &goblin::MixedGOMEA::current_generation)
+            .def("current_population", &goblin::MixedGOMEA::current_population);
+    // #endif
+    // #ifndef _GOBLIN_CLASSIC_COMMON_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_CLASSIC_DE_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_ES_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_CLASSIC_PSO_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_SIMPLE_GA_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_STANDARD_GP_H
+    //
+    // #endif
+    // #ifndef _GOBLIN_EXAMPLES_VORONOI_H
+    //
+    // #endif
+    // #endif
+
+    {  // <namespace test>
+        nb::module_ pyNstest = m.def_submodule(
+            "test", "Helpers for writing readable test trees using the same float encoding as the runtime.");
+        pyNstest.def("Val", nb::overload_cast<float>(goblin::test::Val), nb::arg("x"));
+
+        pyNstest.def("Val", nb::overload_cast<int>(goblin::test::Val), nb::arg("x"));
+
+        pyNstest.def("Val", nb::overload_cast<double>(goblin::test::Val), nb::arg("x"));
+
+        pyNstest.def("Idx", goblin::test::Idx, nb::arg("idx"));
+
+        pyNstest.def("Op", goblin::test::Op, nb::arg("op"));
+    }  // </namespace test>
+
+    {  // <namespace classic>
+        nb::module_ pyNsclassic = m.def_submodule("classic", "");
+        auto pyNsclassic_ClassSelectionStrategyBase =
+            nb::class_<goblin::classic::SelectionStrategyBase, goblin::classic::SelectionStrategyBase_trampoline>(
+                pyNsclassic, "SelectionStrategyBase", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("select", &goblin::classic::SelectionStrategyBase::select, nb::arg("rng"), nb::arg("fitness"),
+                     nb::arg("solutions"), nb::arg("target_size"));
+
+        auto pyNsclassic_ClassTournamentSelection =
+            nb::class_<goblin::classic::TournamentSelection, goblin::classic::SelectionStrategyBase>(
+                pyNsclassic, "TournamentSelection", "")
+                .def(nb::init<usize, bool>(), nb::arg("tournament_size") = 2, nb::arg("with_replacement") = false)
+                .def("select", &goblin::classic::TournamentSelection::select, nb::arg("rng"), nb::arg("fitness"),
+                     nb::arg("solutions"), nb::arg("target_size"));
+
+        auto pyNsclassic_ClassTruncationSelection =
+            nb::class_<goblin::classic::TruncationSelection, goblin::classic::SelectionStrategyBase>(
+                pyNsclassic, "TruncationSelection", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("select", &goblin::classic::TruncationSelection::select, nb::arg("rng"), nb::arg("fitness"),
+                     nb::arg("solutions"), nb::arg("target_size"));
+
+        auto pyNsclassic_ClassEABase =
+            nb::class_<goblin::classic::EABase, goblin::MethodBase, goblin::classic::EABase_trampoline>(pyNsclassic,
+                                                                                                        "EABase", "")
+                // (default constructor explicitly deleted)
+                .def(nb::init<usize>(), nb::arg("population_size"))
+                .def("step", &goblin::classic::EABase::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
+                     nb::arg("archive"))
+                .def("set_population", &goblin::classic::EABase::set_population, nb::arg("population"))
+                .def("get_population", &goblin::classic::EABase::get_population)
+                .def("run", &goblin::classic::EABase::run, nb::arg("problem"), nb::arg("budget"),
+                     nb::arg("seed").none() = nb::none(), nb::arg("population_size").none() = nb::none())
+                .def("current_generation", &goblin::classic::EABase::current_generation)
+                .def("current_population", &goblin::classic::EABase::current_population);
+        auto pyNsclassic_ClassDEStrategyBase =
+            nb::class_<goblin::classic::DEStrategyBase, goblin::classic::DEStrategyBase_trampoline>(
+                pyNsclassic, "DEStrategyBase", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("trial_vector", &goblin::classic::DEStrategyBase::trial_vector, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("population"), nb::arg("archive"), nb::arg("idx"), nb::arg("subset"));
+
+        auto pyNsclassic_ClassRand1Bin =
+            nb::class_<goblin::classic::Rand1Bin, goblin::classic::DEStrategyBase>(pyNsclassic, "Rand1Bin", "")
+                .def(nb::init<double, double, std::string, std::string>(), nb::arg("F") = 0.8, nb::arg("Cr") = 0.9,
+                     nb::arg("base") = "best", nb::arg("scale") = "dither")
+                .def("trial_vector", &goblin::classic::Rand1Bin::trial_vector, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("population"), nb::arg("archive"), nb::arg("idx"), nb::arg("subset"));
+
+        auto pyNsclassic_ClassDE =
+            nb::class_<goblin::classic::DE, goblin::classic::EABase>(pyNsclassic, "DE", "")
+                .def(
+                    "__init__",
+                    [](goblin::classic::DE* self, usize population_size = 100,
+                       const std::optional<const std::shared_ptr<goblin::classic::DEStrategyBase>>& strategy =
+                           std::nullopt) {
+                        auto ctor_wrapper = [](goblin::classic::DE* self, usize population_size = 100,
+                                               std::shared_ptr<goblin::classic::DEStrategyBase> strategy =
+                                                   std::make_shared<goblin::classic::Rand1Bin>()) -> void {
+                            new (self) goblin::classic::DE(population_size, strategy);  // placement new
+                        };
+                        auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                            [&ctor_wrapper](
+                                goblin::classic::DE* self, usize population_size = 100,
+                                const std::optional<const std::shared_ptr<goblin::classic::DEStrategyBase>>& strategy =
+                                    std::nullopt) {
+                                const std::shared_ptr<goblin::classic::DEStrategyBase>& strategy_or_default =
+                                    [&]() -> const std::shared_ptr<goblin::classic::DEStrategyBase> {
+                                    if (strategy.has_value())
+                                        return strategy.value();
+                                    else
+                                        return std::make_shared<goblin::classic::Rand1Bin>();
+                                }();
+
+                                ctor_wrapper(self, population_size, strategy_or_default);
+                            };
+
+                        ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, strategy);
+                    },
+                    nb::arg("population_size") = 100, nb::arg("strategy").none() = nb::none(),
+                    "Python bindings defaults:\n    If strategy is None, then its default value will be: "
+                    "std.make_shared<classic.Rand1Bin>()")
+                .def("step", &goblin::classic::DE::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
+                     nb::arg("archive"));
+        auto pyEnumESStrategy =
+            nb::enum_<goblin::classic::ESStrategy>(pyNsclassic, "ESStrategy", nb::is_arithmetic(), "")
+                .value("SingleVariance", goblin::classic::ESStrategy::SingleVariance,
+                       "/ Single variance for all variables")
+                .value("MultipleVariance", goblin::classic::ESStrategy::MultipleVariance,
+                       "/ Separate variance for all variables")
+                .value("FullVariance", goblin::classic::ESStrategy::FullVariance, "/ Full covariance matrix")
+                .value("DirectedVariance", goblin::classic::ESStrategy::DirectedVariance,
+                       "/ Directional variance for one arbitrary direction, single variance in all other directions");
+
+        auto pyNsclassic_ClassESStrategyParameters =
+            nb::class_<goblin::classic::ESStrategyParameters>(pyNsclassic, "ESStrategyParameters", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def_rw("strategy", &goblin::classic::ESStrategyParameters::strategy, "")
+                .def_rw("parameters", &goblin::classic::ESStrategyParameters::parameters, "")
+                .def("clone", &goblin::classic::ESStrategyParameters::clone);
+
+        auto pyNsclassic_ClassES =
+            nb::class_<goblin::classic::ES, goblin::classic::EABase>(pyNsclassic, "ES", "")
+                .def(nb::init<usize, usize, usize, bool, std::string, double, std::optional<double>,
+                              std::optional<double>, double>(),
+                     nb::arg("population_size") = 8, nb::arg("num_parents") = 1, nb::arg("num_offspring") = 50,
+                     nb::arg("steady_state") = true, nb::arg("strategy") = "single", nb::arg("epsilon") = 1e-6,
+                     nb::arg("tau").none() = nb::none(), nb::arg("tau_i").none() = nb::none(), nb::arg("beta") = 0.0873)
+                .def("step", &goblin::classic::ES::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
+                     nb::arg("archive"));
+        auto pyNsclassic_ClassPSOTopologyBase =
+            nb::class_<goblin::classic::PSOTopologyBase, goblin::classic::PSOTopologyBase_trampoline>(
+                pyNsclassic, "PSOTopologyBase", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("neighbours", &goblin::classic::PSOTopologyBase::neighbours, nb::arg("rng"), nb::arg("population"),
+                     nb::arg("idx"));
+
+        auto pyNsclassic_ClassRingTopology =
+            nb::class_<goblin::classic::RingTopology, goblin::classic::PSOTopologyBase>(pyNsclassic, "RingTopology", "")
+                .def(nb::init<usize>(), nb::arg("num_neighbours") = 2,
+                     "/ Considers a population of size N as ring where the ends wrap (nodes 0 and N-1 are neighbours). "
+                     "The number of\n/ neighbours determines the (symmetric) reach of each node around the ring, where "
+                     "`num_neighbours >= floor(N-1) / 2`\n/ corresponds to a fully connected star topology.")
+                .def("neighbours", &goblin::classic::RingTopology::neighbours, nb::arg("rng"), nb::arg("population"),
+                     nb::arg("idx"));
+
+        auto pyNsclassic_ClassPSOState = nb::class_<goblin::classic::PSOState>(pyNsclassic, "PSOState", "")
+                                             .def_rw("velocity", &goblin::classic::PSOState::velocity, "")
+                                             .def_rw("previous_best", &goblin::classic::PSOState::previous_best, "")
+                                             .def(nb::init<>())
+                                             .def(nb::init<const goblin::classic::PSOState&>(), nb::arg("other"))
+                                             .def(nb::init<goblin::classic::PSOState&&>(), nb::arg("other"))
+                                             .def("clone", &goblin::classic::PSOState::clone);
+
+        pyNsclassic_ClassPSOState.def(
+            "previous_best_quality", nb::overload_cast<>(&goblin::classic::PSOState::previous_best_quality, nb::const_),
+            nb::rv_policy::reference_internal);
+        pyNsclassic_ClassPSOState.def("previous_best_quality",
+                                      nb::overload_cast<>(&goblin::classic::PSOState::previous_best_quality),
+                                      nb::rv_policy::reference_internal);
+
+        auto pyNsclassic_ClassPSO =
+            nb::class_<goblin::classic::PSO, goblin::classic::EABase>(pyNsclassic, "PSO", "")
+                .def(
+                    "__init__",
+                    [](goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729,
+                       double cognitive = 1.494, double social = 1.494,
+                       const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>>& topology =
+                           std::nullopt) {
+                        auto ctor_wrapper = [](goblin::classic::PSO* self, usize population_size = 25,
+                                               double inertia = 0.729, double cognitive = 1.494, double social = 1.494,
+                                               std::shared_ptr<goblin::classic::PSOTopologyBase> topology =
+                                                   std::make_shared<goblin::classic::RingTopology>()) -> void {
+                            new (self) goblin::classic::PSO(population_size, inertia, cognitive, social,
+                                                            topology);  // placement new
+                        };
+                        auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                            [&ctor_wrapper](
+                                goblin::classic::PSO* self, usize population_size = 25, double inertia = 0.729,
+                                double cognitive = 1.494, double social = 1.494,
+                                const std::optional<const std::shared_ptr<goblin::classic::PSOTopologyBase>>& topology =
+                                    std::nullopt) {
+                                const std::shared_ptr<goblin::classic::PSOTopologyBase>& topology_or_default =
+                                    [&]() -> const std::shared_ptr<goblin::classic::PSOTopologyBase> {
+                                    if (topology.has_value())
+                                        return topology.value();
+                                    else
+                                        return std::make_shared<goblin::classic::RingTopology>();
+                                }();
+
+                                ctor_wrapper(self, population_size, inertia, cognitive, social, topology_or_default);
+                            };
+
+                        ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, inertia, cognitive,
+                                                                            social, topology);
+                    },
+                    nb::arg("population_size") = 25, nb::arg("inertia") = 0.729, nb::arg("cognitive") = 1.494,
+                    nb::arg("social") = 1.494, nb::arg("topology").none() = nb::none(),
+                    "Python bindings defaults:\n    If topology is None, then its default value will be: "
+                    "std.make_shared<classic.RingTopology>()")
+                .def("step", &goblin::classic::PSO::step, nb::arg("rng"), nb::arg("problem"), nb::arg("population"),
+                     nb::arg("archive"));
+        auto pyNsclassic_ClassDiscreteCrossoverBase =
+            nb::class_<goblin::classic::DiscreteCrossoverBase, goblin::classic::DiscreteCrossoverBase_trampoline>(
+                pyNsclassic, "DiscreteCrossoverBase",
+                "/ Strategy used to generate the crossover masks to exchange information between two parents")
+                .def(nb::init<>())  // implicit default constructor
+                .def("crossover_mask", &goblin::classic::DiscreteCrossoverBase::crossover_mask, nb::arg("rng"),
+                     nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"))
+                .def("crossover", &goblin::classic::DiscreteCrossoverBase::crossover, nb::arg("rng"),
+                     nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassCombinedCrossover =
+            nb::class_<goblin::classic::CombinedCrossover, goblin::classic::DiscreteCrossoverBase>(
+                pyNsclassic, "CombinedCrossover", "")
+                // (default constructor explicitly deleted)
+                .def(
+                    nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteCrossoverBase>, double>>&&,
+                             bool>(),
+                    nb::arg("operators"), nb::arg("normalize") = true)
+                .def("crossover", &goblin::classic::CombinedCrossover::crossover, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("donor"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassUniformCrossover =
+            nb::class_<goblin::classic::UniformCrossover, goblin::classic::DiscreteCrossoverBase>(
+                pyNsclassic, "UniformCrossover", "")
+                .def(nb::init<double>(), nb::arg("p_crossover") = 0.5)
+                .def("crossover_mask", &goblin::classic::UniformCrossover::crossover_mask, nb::arg("rng"),
+                     nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassNPointCrossover =
+            nb::class_<goblin::classic::NPointCrossover, goblin::classic::DiscreteCrossoverBase>(pyNsclassic,
+                                                                                                 "NPointCrossover", "")
+                .def(nb::init<usize>(), nb::arg("num_points") = 1)
+                .def("crossover_mask", &goblin::classic::NPointCrossover::crossover_mask, nb::arg("rng"),
+                     nb::arg("problem"), nb::arg("donor"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassDiscreteMutationBase =
+            nb::class_<goblin::classic::DiscreteMutationBase, goblin::classic::DiscreteMutationBase_trampoline>(
+                pyNsclassic, "DiscreteMutationBase", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("mutate", &goblin::classic::DiscreteMutationBase::mutate, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("offspring"));
+
+        auto pyNsclassic_ClassCombinedMutation =
+            nb::class_<goblin::classic::CombinedMutation, goblin::classic::DiscreteMutationBase>(pyNsclassic,
+                                                                                                 "CombinedMutation", "")
+                // (default constructor explicitly deleted)
+                .def(nb::init<std::vector<std::tuple<std::shared_ptr<goblin::classic::DiscreteMutationBase>, double>>&&,
+                              bool>(),
+                     nb::arg("operators"), nb::arg("normalize") = true)
+                .def("mutate", &goblin::classic::CombinedMutation::mutate, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("offspring"));
+
+        auto pyNsclassic_ClassRandomMutation =
+            nb::class_<goblin::classic::RandomMutation, goblin::classic::DiscreteMutationBase>(pyNsclassic,
+                                                                                               "RandomMutation", "")
+                .def(nb::init<std::optional<double>>(), nb::arg("p_mutation").none() = nb::none())
+                .def("mutate", &goblin::classic::RandomMutation::mutate, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("offspring"));
+
+        auto pyNsclassic_ClassLocalizedMutation =
+            nb::class_<goblin::classic::LocalizedMutation, goblin::classic::DiscreteMutationBase>(
+                pyNsclassic, "LocalizedMutation",
+                "/ A mutation operator that assumes an ordinal relationship for discrete variables")
+                .def(nb::init<std::optional<double>, double, bool>(), nb::arg("p_mutation").none() = nb::none(),
+                     nb::arg("strength") = 0.05, nb::arg("wrap") = false)
+                .def("mutate", &goblin::classic::LocalizedMutation::mutate, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("offspring"));
+
+        auto pyNsclassic_ClassSimpleGA =
+            nb::class_<goblin::classic::SimpleGA, goblin::classic::EABase>(pyNsclassic, "SimpleGA", "")
+                .def(
+                    "__init__",
+                    [](goblin::classic::SimpleGA* self, usize population_size = 100,
+                       const std::optional<const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>>& crossover =
+                           std::nullopt,
+                       const std::optional<const std::shared_ptr<goblin::classic::DiscreteMutationBase>>& mutation =
+                           std::nullopt,
+                       bool steady_state = true,
+                       const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>>& selection =
+                           std::nullopt) {
+                        auto ctor_wrapper = [](goblin::classic::SimpleGA* self, usize population_size = 100,
+                                               std::shared_ptr<goblin::classic::DiscreteCrossoverBase> crossover =
+                                                   std::make_shared<goblin::classic::UniformCrossover>(),
+                                               std::shared_ptr<goblin::classic::DiscreteMutationBase> mutation =
+                                                   std::make_shared<goblin::classic::RandomMutation>(),
+                                               bool steady_state = true,
+                                               std::shared_ptr<goblin::classic::SelectionStrategyBase> selection =
+                                                   std::make_shared<goblin::classic::TournamentSelection>(4)) -> void {
+                            new (self) goblin::classic::SimpleGA(population_size, crossover, mutation, steady_state,
+                                                                 selection);  // placement new
+                        };
+                        auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                            [&ctor_wrapper](
+                                goblin::classic::SimpleGA* self, usize population_size = 100,
+                                const std::optional<const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>>&
+                                    crossover = std::nullopt,
+                                const std::optional<const std::shared_ptr<goblin::classic::DiscreteMutationBase>>&
+                                    mutation = std::nullopt,
+                                bool steady_state = true,
+                                const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>>&
+                                    selection = std::nullopt) {
+                                const std::shared_ptr<goblin::classic::DiscreteCrossoverBase>& crossover_or_default =
+                                    [&]() -> const std::shared_ptr<goblin::classic::DiscreteCrossoverBase> {
+                                    if (crossover.has_value())
+                                        return crossover.value();
+                                    else
+                                        return std::make_shared<goblin::classic::UniformCrossover>();
+                                }();
+
+                                const std::shared_ptr<goblin::classic::DiscreteMutationBase>& mutation_or_default =
+                                    [&]() -> const std::shared_ptr<goblin::classic::DiscreteMutationBase> {
+                                    if (mutation.has_value())
+                                        return mutation.value();
+                                    else
+                                        return std::make_shared<goblin::classic::RandomMutation>();
+                                }();
+
+                                const std::shared_ptr<goblin::classic::SelectionStrategyBase>& selection_or_default =
+                                    [&]() -> const std::shared_ptr<goblin::classic::SelectionStrategyBase> {
+                                    if (selection.has_value())
+                                        return selection.value();
+                                    else
+                                        return std::make_shared<goblin::classic::TournamentSelection>(4);
+                                }();
+
+                                ctor_wrapper(self, population_size, crossover_or_default, mutation_or_default,
+                                             steady_state, selection_or_default);
+                            };
+
+                        ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, crossover, mutation,
+                                                                            steady_state, selection);
+                    },
+                    nb::arg("population_size") = 100, nb::arg("crossover").none() = nb::none(),
+                    nb::arg("mutation").none() = nb::none(), nb::arg("steady_state") = true,
+                    nb::arg("selection").none() = nb::none(),
+                    "Python bindings defaults:\n    If any of the params below is None, then its default value below "
+                    "will be used:\n        * crossover: std.make_shared<classic.UniformCrossover>()\n        * "
+                    "mutation: std.make_shared<classic.RandomMutation>()\n        * selection: "
+                    "std.make_shared<classic.TournamentSelection>(4)")
+                .def("check_changes", &goblin::classic::SimpleGA::check_changes, nb::arg("parent"),
+                     nb::arg("offspring"), nb::arg("changed_indices"), nb::arg("evaluation_needed"))
+                .def("step", &goblin::classic::SimpleGA::step, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("population"), nb::arg("archive"));
+        auto pyNsclassic_ClassGPVariationOperatorBase =
+            nb::class_<goblin::classic::GPVariationOperatorBase, goblin::classic::GPVariationOperatorBase_trampoline>(
+                pyNsclassic, "GPVariationOperatorBase", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("apply", &goblin::classic::GPVariationOperatorBase::apply, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassChained =
+            nb::class_<goblin::classic::Chained, goblin::classic::GPVariationOperatorBase>(pyNsclassic, "Chained", "")
+                // (default constructor explicitly deleted)
+                .def(
+                    nb::init<
+                        std::vector<std::tuple<std::shared_ptr<goblin::classic::GPVariationOperatorBase>, double>>&&>(),
+                    nb::arg("operators"))
+                .def("apply", &goblin::classic::Chained::apply, nb::arg("rng"), nb::arg("problem"), nb::arg("ctx"),
+                     nb::arg("population"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassSubtreeCrossover =
+            nb::class_<goblin::classic::SubtreeCrossover, goblin::classic::GPVariationOperatorBase>(
+                pyNsclassic, "SubtreeCrossover", "")
+                .def(nb::init<>())  // implicit default constructor
+                .def("apply", &goblin::classic::SubtreeCrossover::apply, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassSubtreeMutation =
+            nb::class_<goblin::classic::SubtreeMutation, goblin::classic::GPVariationOperatorBase>(
+                pyNsclassic, "SubtreeMutation", "/ Replaces random subtree with a random subtree")
+                .def(nb::init<>())  // implicit default constructor
+                .def("apply", &goblin::classic::SubtreeMutation::apply, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassConstantMutation =
+            nb::class_<goblin::classic::ConstantMutation, goblin::classic::GPVariationOperatorBase>(
+                pyNsclassic, "ConstantMutation", "/ Randomly mutates constants")
+                .def(nb::init<double, CType>(), nb::arg("probability") = 0.25, nb::arg("temperature") = 0.25)
+                .def("apply", &goblin::classic::ConstantMutation::apply, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("ctx"), nb::arg("population"), nb::arg("offspring"));
+
+        auto pyNsclassic_ClassStandardGP =
+            nb::class_<goblin::classic::StandardGP, goblin::classic::EABase>(pyNsclassic, "StandardGP", "")
+                .def(
+                    "__init__",
+                    [](goblin::classic::StandardGP* self, usize population_size = 32, bool steady_state = true,
+                       const std::optional<const std::shared_ptr<goblin::classic::GPVariationOperatorBase>>&
+                           variation_operator = std::nullopt,
+                       const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>>&
+                           selection_strategy = std::nullopt) {
+                        auto ctor_wrapper =
+                            [](goblin::classic::StandardGP* self, usize population_size = 32, bool steady_state = true,
+                               std::shared_ptr<goblin::classic::GPVariationOperatorBase> variation_operator =
+                                   std::shared_ptr<goblin::classic::GPVariationOperatorBase>(),
+                               std::shared_ptr<goblin::classic::SelectionStrategyBase> selection_strategy =
+                                   std::make_shared<goblin::classic::TournamentSelection>(2)) -> void {
+                            new (self) goblin::classic::StandardGP(population_size, steady_state, variation_operator,
+                                                                   selection_strategy);  // placement new
+                        };
+                        auto ctor_wrapper_adapt_mutable_param_with_default_value =
+                            [&ctor_wrapper](
+                                goblin::classic::StandardGP* self, usize population_size = 32, bool steady_state = true,
+                                const std::optional<const std::shared_ptr<goblin::classic::GPVariationOperatorBase>>&
+                                    variation_operator = std::nullopt,
+                                const std::optional<const std::shared_ptr<goblin::classic::SelectionStrategyBase>>&
+                                    selection_strategy = std::nullopt) {
+                                const std::shared_ptr<goblin::classic::GPVariationOperatorBase>&
+                                    variation_operator_or_default =
+                                        [&]() -> const std::shared_ptr<goblin::classic::GPVariationOperatorBase> {
+                                    if (variation_operator.has_value())
+                                        return variation_operator.value();
+                                    else
+                                        return std::shared_ptr<goblin::classic::GPVariationOperatorBase>();
+                                }();
+
+                                const std::shared_ptr<goblin::classic::SelectionStrategyBase>&
+                                    selection_strategy_or_default =
+                                        [&]() -> const std::shared_ptr<goblin::classic::SelectionStrategyBase> {
+                                    if (selection_strategy.has_value())
+                                        return selection_strategy.value();
+                                    else
+                                        return std::make_shared<goblin::classic::TournamentSelection>(2);
+                                }();
+
+                                ctor_wrapper(self, population_size, steady_state, variation_operator_or_default,
+                                             selection_strategy_or_default);
+                            };
+
+                        ctor_wrapper_adapt_mutable_param_with_default_value(self, population_size, steady_state,
+                                                                            variation_operator, selection_strategy);
+                    },
+                    nb::arg("population_size") = 32, nb::arg("steady_state") = true,
+                    nb::arg("variation_operator").none() = nb::none(),
+                    nb::arg("selection_strategy").none() = nb::none(),
+                    "Python bindings defaults:\n    If any of the params below is None, then its default value below "
+                    "will be used:\n        * variation_operator: classic.GPVariationOperatorBase()\n        * "
+                    "selection_strategy: std.make_shared<classic.TournamentSelection>(2)")
+                .def("step", &goblin::classic::StandardGP::step, nb::arg("rng"), nb::arg("problem"),
+                     nb::arg("population"), nb::arg("archive"));
+    }  // </namespace classic>
+
+    {  // <namespace voronoi>
+        nb::module_ pyNsvoronoi = m.def_submodule("voronoi", "");
+        auto pyNsvoronoi_ClassVoronoiImageReconstruction =
+            nb::class_<goblin::voronoi::VoronoiImageReconstruction, goblin::InstanceBase>(
+                pyNsvoronoi, "VoronoiImageReconstruction", "")
+                .def(nb::init<const Arr2D<DType>&, usize, usize, usize, usize, std::optional<AnyInit>, bool, bool,
+                              usize>(),
+                     nb::arg("target_image"), nb::arg("width"), nb::arg("height"), nb::arg("min_num_cells") = 10,
+                     nb::arg("max_num_cells") = 100, nb::arg("init").none() = nb::none(),
+                     nb::arg("complexity_objective") = false, nb::arg("track_complexity") = false,
+                     nb::arg("kdtree_threshold") = 50)
+                .def("discrete_domain_sizes", &goblin::voronoi::VoronoiImageReconstruction::discrete_domain_sizes)
+                .def("continuous_lower_bounds", &goblin::voronoi::VoronoiImageReconstruction::continuous_lower_bounds)
+                .def("continuous_upper_bounds", &goblin::voronoi::VoronoiImageReconstruction::continuous_upper_bounds)
+                .def("continuous_init_lower_bounds",
+                     &goblin::voronoi::VoronoiImageReconstruction::continuous_init_lower_bounds)
+                .def("continuous_init_upper_bounds",
+                     &goblin::voronoi::VoronoiImageReconstruction::continuous_init_upper_bounds)
+                .def("image_data", &goblin::voronoi::VoronoiImageReconstruction::image_data, nb::arg("solution"),
+                     nb::arg("scale") = 1.0)
+                .def("evaluate", &goblin::voronoi::VoronoiImageReconstruction::evaluate, nb::arg("rng"),
+                     nb::arg("solutions"), nb::arg("indices"))
+                .def("add_random", &goblin::voronoi::VoronoiImageReconstruction::add_random, nb::arg("rng"),
+                     nb::arg("solutions"), nb::arg("count"))
+                .def("fitness", &goblin::voronoi::VoronoiImageReconstruction::fitness)
+                .def("archive_fitness", &goblin::voronoi::VoronoiImageReconstruction::archive_fitness)
+                .def("log_solution", &goblin::voronoi::VoronoiImageReconstruction::log_solution, nb::arg("os"),
+                     nb::arg("solution"));
+
+        auto pyNsvoronoi_ClassYourCustomCrossover =
+            nb::class_<goblin::voronoi::YourCustomCrossover, goblin::classic::DiscreteCrossoverBase>(
+                pyNsvoronoi, "YourCustomCrossover",
+                " It is important to use the fully qualified name for the base class (i.e. "
+                "goblin::classic::DiscreteCrossoverBase) so\n that the bindings are generated correctly")
+                .def(nb::init<>())  // implicit default constructor
+            ;
+
+        auto pyNsvoronoi_ClassYourCustomMutation =
+            nb::class_<goblin::voronoi::YourCustomMutation, goblin::classic::DiscreteMutationBase>(
+                pyNsvoronoi, "YourCustomMutation", "")
+                .def(nb::init<>())  // implicit default constructor
+            ;
+    }  // </namespace voronoi>
+    ////////////////////    </generated_from:amalgamation.h>    ////////////////////
+
+    // </litgen_pydef> // Autogenerated code end
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  AUTOGENERATED CODE END
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }

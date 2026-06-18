@@ -72,7 +72,7 @@ def sr_example():
 
 def rv_example():
     sphere = BenchmarkInstance(Sphere(5))
-    sphere.register_target([1e-8])
+    sphere.add_target(1e-8)
     sphere.set_initial_bounds(100.0, 110.0)
 
     budget = Budget(max_evaluations=10_000)

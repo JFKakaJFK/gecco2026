@@ -29,27 +29,31 @@ add_library(${PROJECT_NAME}
         methods/amalgam.cpp
         methods/library.cpp
         methods/mo_gomea.cpp
+        methods/mo_rv_gomea/FOS.cpp
+        methods/mo_rv_gomea/MO_optimization.cpp
+        methods/mo_rv_gomea/Optimization.cpp
+        methods/mo_rv_gomea/Tools.cpp
+        methods/mo_rv_gomea/mo_rv_gomea.cpp
 )
 if(GOBLIN_HAS_CUDA)
-    find_package(CUDAToolkit REQUIRED)
-    target_sources(${PROJECT_NAME} PRIVATE
+  find_package(CUDAToolkit REQUIRED)
+  target_sources(${PROJECT_NAME} PRIVATE
         gp/gpu_evaluation/evaluate.cu
         gp/gpu_evaluation/memory.cu
         gp/gpu_evaluation/misc.cu
     )
 endif()
 
-# endif()
-# disable any warnings in the amalgam code
+# disable any warnings in the amalgam/mo_binary/mo_rv code
 # also there is a memory bug in initializePopulationsAndFitnessValues() amalgam.cpp:1915...
 set_source_files_properties(
     methods/amalgam.cpp
-    PROPERTIES
-        COMPILE_FLAGS "-w -fno-sanitize=address,undefined"
-)
-# disable any warnings in the mo gomea code
-set_source_files_properties(
     methods/mo_gomea.cpp
+    methods/mo_rv_gomea/FOS.cpp
+    methods/mo_rv_gomea/MO_optimization.cpp
+    methods/mo_rv_gomea/Optimization.cpp
+    methods/mo_rv_gomea/Tools.cpp
+    methods/mo_rv_gomea/mo_rv_gomea.cpp
     PROPERTIES
         COMPILE_FLAGS "-w -fno-sanitize=address,undefined"
 )
@@ -66,8 +70,8 @@ target_link_libraries(${PROJECT_NAME}
 )
 
 if(GOBLIN_HAS_CUDA)
-    target_compile_definitions(${PROJECT_NAME} PUBLIC GOBLIN_HAS_CUDA)
-    target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart)
+  target_compile_definitions(${PROJECT_NAME} PUBLIC GOBLIN_HAS_CUDA)
+  target_link_libraries(${PROJECT_NAME} PRIVATE CUDA::cudart)
 endif()
 
 # users will need at least C++23

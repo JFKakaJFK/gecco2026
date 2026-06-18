@@ -51,6 +51,7 @@ def run_one(
                 max_evaluations_until_next_report=5000,
                 eval_factor=1,
                 initial_time_until_next_report=datetime.timedelta(hours=1),
+                # report_raw_solutions=True,
             ),
             seed=seed,
             population_size=task.get("population_size", None),

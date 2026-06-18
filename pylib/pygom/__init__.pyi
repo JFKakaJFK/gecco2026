@@ -88,10 +88,10 @@ def permute(rng: Rng, n: int) -> List[int]:
 #
 
 class Ordering(enum.IntEnum):
-    better = enum.auto()  # (= 0b10)
-    equal = enum.auto()  # (= 0b00)
-    worse = enum.auto()  # (= 0b01)
-    non_dominated = enum.auto()  # (= 0b11)
+    Better = enum.auto()  # (= 0b10)
+    Equal = enum.auto()  # (= 0b00)
+    Worse = enum.auto()  # (= 0b01)
+    NonDominated = enum.auto()  # (= 0b11)
 
 # template <typename E>
 #   requires std::is_enum_v<E> && requires { format_as(std::declval<E>()); }
@@ -315,7 +315,7 @@ class SolutionBase:
 
     def clear_extensions(self) -> None:  # overridable (pure virtual)
         pass
-    # Instead of vector, shoould this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
+    # Instead of vector, should this be an ExtensionProxy that behaves like a vector/iterator but does not allocate full
     # copies?? (size, begin, end, proxy to underlying collection)
     def num_extensions(self) -> int:  # overridable (pure virtual)
         pass
@@ -585,7 +585,7 @@ class ArchiveBase:
         pass
 
     def update(
-        self, solution: SolutionBase, strict: bool, check_synched: bool = True
+        self, solution: SolutionBase, strict: bool = True, check_synched: bool = True
     ) -> bool:
         """/ Updates the archive with the solution and returns whether the solution was
         / accepted into the archive.
@@ -602,6 +602,13 @@ class ArchiveBase:
         pass
 
     def covers(self, other: ArchiveBase) -> bool:
+        pass
+
+    def approximately_covers(self, other: ArchiveBase, epsilon: float) -> bool:
+        """/ Checks if this archive approximately covers other, where
+        / approximate coverage corresponds to the one-sided Hausdorff distance (or max[D_PF->S]) in objective space being
+        / lower than some epsilon.
+        """
         pass
 
     def random_solution(self, rng: Rng) -> SolutionBase:
@@ -686,13 +693,13 @@ class AdaptiveGridArchive(ArchiveBase):
 #
 
 class TerminationStatus(enum.IntEnum):
-    time_limit_reached = enum.auto()  # (= 0)
-    generation_limit_reached = enum.auto()  # (= 1)
-    evaluation_limit_reached = enum.auto()  # (= 2)
-    target_reached = enum.auto()  # (= 3)
-    converged = enum.auto()  # (= 4)
-    aborted = enum.auto()  # (= 5)
-    running = enum.auto()  # (= 6)
+    TimeLimitReached = enum.auto()  # (= 0)
+    GenerationLimitReached = enum.auto()  # (= 1)
+    EvaluationLimitReached = enum.auto()  # (= 2)
+    TargetReached = enum.auto()  # (= 3)
+    Converged = enum.auto()  # (= 4)
+    Aborted = enum.auto()  # (= 5)
+    Running = enum.auto()  # (= 6)
 
 class Budget:
     max_evaluations: Optional[int] = None
@@ -861,7 +868,51 @@ class InstanceBase:
         """
         pass
 
-    def target_reached(self, archive: ArchiveBase) -> bool:  # overridable
+    def target_reached(self, archive: ArchiveBase) -> bool:
+        pass
+
+    @overload
+    def add_target(
+        self, target_reached_check: Callable[[ArchiveBase], bool]
+    ) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target(self, target_front: ArchiveBase) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target(self, target_solution: SolutionBase) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target(self, target_quality: QualityBase) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target(
+        self, target_objectives: Union[np.ndarray, List[float]]
+    ) -> InstanceBase:
+        pass
+
+    def add_target_front_size(self, target_front_size: int) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target_front(self, target_objectives: np.ndarray) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target_front(
+        self,
+        discrete: Optional[np.ndarray],
+        continuous: Optional[np.ndarray],
+        evaluation_seed: Optional[int] = None,
+    ) -> InstanceBase:
+        pass
+
+    @overload
+    def add_target(self, target_fitness: float) -> InstanceBase:
         pass
 
     def log_header(self, os: io.IOBase) -> None:  # overridable
@@ -1026,7 +1077,7 @@ class CachedInstanceBase(WrappedInstance):
         """/ Proportion of cache entries used w.r.t. maximum size"""
         pass
 
-def cached(
+def Cached(
     problem: InstanceBase, cache_size: int = 10000, cache_policy: str = "lru"
 ) -> CachedInstanceBase:
     pass
@@ -1099,19 +1150,19 @@ class UPGMA:
 #
 
 @overload
-def hypervolume2_d(
+def hypervolume2D(
     solutions: ArchiveBase, fitness: FitnessBase, reference_point: QualityBase
 ) -> float:
     pass
 
 @overload
-def hypervolume2_d(
+def hypervolume2D(
     solutions: SolutionSetBase, fitness: FitnessBase, reference_point: QualityBase
 ) -> float:
     pass
 
 @overload
-def hypervolume2_d(points: np.ndarray, reference_point: np.ndarray) -> float:
+def hypervolume2D(points: np.ndarray, reference_point: np.ndarray) -> float:
     pass
 
 # namespace goblin
@@ -1125,9 +1176,9 @@ def hypervolume2_d(points: np.ndarray, reference_point: np.ndarray) -> float:
 #
 
 class VariableSet(enum.IntEnum):
-    discrete = enum.auto()  # (= 0b01)
-    continuous = enum.auto()  # (= 0b10)
-    mixed = enum.auto()  # (= 0b11)
+    Discrete = enum.auto()  # (= 0b01)
+    Continuous = enum.auto()  # (= 0b10)
+    Mixed = enum.auto()  # (= 0b11)
 
 def estimate_entropy(
     problem: InstanceBase,
@@ -1208,6 +1259,42 @@ class UnivariateFOS(LinkageModelBase):
         pass
 
     def is_static(self) -> bool:
+        pass
+
+class StaticFOS(LinkageModelBase):
+    """
+    (final class)
+    """
+
+    def __init__(self, fos: FOS) -> None:
+        pass
+
+    def clone(self) -> LinkageModelBase:
+        pass
+
+    def init(
+        self,
+        rng: Rng,
+        problem: InstanceBase,
+        solutions: SolutionSetBase,
+        variables: VariableSet,
+    ) -> None:
+        pass
+
+    def subsets(
+        self,
+        rng: Rng,
+        problem: InstanceBase,
+        solutions: SolutionSetBase,
+        indices: List[int],
+        covariance: Optional[np.ndarray] = None,
+    ) -> FOS:
+        pass
+
+    def is_static(self) -> bool:
+        pass
+
+    def get(self) -> FOS:
         pass
 
 class FullFOS(LinkageModelBase):
@@ -1334,6 +1421,11 @@ class CombinedFOS(LinkageModelBase):
         pass
 
     @overload
+    def __init__(self, other: CombinedFOS) -> None:
+        """Copy operations must copy the underlying models manually..."""
+        pass
+
+    @overload
     def __init__(self, param_0: CombinedFOS) -> None:
         """But moving is allowed"""
         pass
@@ -1388,8 +1480,8 @@ class MethodBase:
         """
         pass
 
-    def current_population(self) -> Optional[Tuple[int, int]]:  # overridable
-        """/ Size and generations of the currently active population if available for multi-start schemes"""
+    def current_population(self) -> Optional[Tuple[int, int, int]]:  # overridable
+        """/ Size, generations and restarts of the currently active population if available for multi-start schemes"""
         pass
 
     def __init__(self) -> None:
@@ -1602,8 +1694,8 @@ class KernelVersion(enum.IntEnum):
     DynamicBlock: multiple blocks per solution; improves SM occupancy for small populations.
     """
 
-    single_block = enum.auto()  # (= 0)
-    dynamic_block = enum.auto()  # (= 1)
+    SingleBlock = enum.auto()  # (= 0)
+    DynamicBlock = enum.auto()  # (= 1)
 
 def to_string(v: KernelVersion) -> str:
     pass
@@ -1615,26 +1707,26 @@ class NodeType(enum.IntEnum):
     Operator: value is the Operator enum cast to float.
     """
 
-    input = enum.auto()  # (= 0)
-    constant = enum.auto()  # (= 1)
-    operator = enum.auto()  # (= 2)
-    parameter = enum.auto()  # (= 3)
+    Input = enum.auto()  # (= 0)
+    Constant = enum.auto()  # (= 1)
+    Operator = enum.auto()  # (= 2)
+    Parameter = enum.auto()  # (= 3)
 
 class Operator(enum.IntEnum):
-    add = enum.auto()  # (= 0)
-    sub = enum.auto()  # (= 1)
-    mul = enum.auto()  # (= 2)
-    div = enum.auto()  # (= 3)
-    sin = enum.auto()  # (= 4)
-    cos = enum.auto()  # (= 5)
-    exp = enum.auto()  # (= 6)
-    log = enum.auto()  # (= 7)
-    square = enum.auto()  # (= 8)
-    sqrt = enum.auto()  # (= 9)
-    pow = enum.auto()  # (= 10)
-    abs = enum.auto()  # (= 11)
-    min = enum.auto()  # (= 12)
-    max = enum.auto()  # (= 13)
+    Add = enum.auto()  # (= 0)
+    Sub = enum.auto()  # (= 1)
+    Mul = enum.auto()  # (= 2)
+    Div = enum.auto()  # (= 3)
+    Sin = enum.auto()  # (= 4)
+    Cos = enum.auto()  # (= 5)
+    Exp = enum.auto()  # (= 6)
+    Log = enum.auto()  # (= 7)
+    Square = enum.auto()  # (= 8)
+    Sqrt = enum.auto()  # (= 9)
+    Pow = enum.auto()  # (= 10)
+    Abs = enum.auto()  # (= 11)
+    Min = enum.auto()  # (= 12)
+    Max = enum.auto()  # (= 13)
 
 # #endif
 
@@ -2261,18 +2353,18 @@ class OpMax(OperatorBase):
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 class ConstantRepr(enum.IntEnum):
-    er_cs = enum.auto()  # (= 0)
-    edges = enum.auto()  # (= 1)
-    pool = enum.auto()  # (= 2)
-    none = enum.auto()  # (= 3)
+    ERCs = enum.auto()  # (= 0)
+    Edges = enum.auto()  # (= 1)
+    Pool = enum.auto()  # (= 2)
+    None_ = enum.auto()  # (= 3)
 
 class ValueKind(enum.IntEnum):
-    input = enum.auto()  # (= 0)  # input feature idx
-    constant = enum.auto()  # (= 1)  # constant marker/pool idx
-    operator = enum.auto()  # (= 2)  # operator idx
-    arg = enum.auto()  # (= 3)  # subfunction argument idx
-    subtree = enum.auto()  # (= 4)  # subtree idx
-    parameter = enum.auto()  # (= 5)  # function class parameter idx
+    Input = enum.auto()  # (= 0)  # input feature idx
+    Constant = enum.auto()  # (= 1)  # constant marker/pool idx
+    Operator = enum.auto()  # (= 2)  # operator idx
+    Arg = enum.auto()  # (= 3)  # subfunction argument idx
+    Subtree = enum.auto()  # (= 4)  # subtree idx
+    Parameter = enum.auto()  # (= 5)  # function class parameter idx
 
 class GPContext:
     """/ The lookup tables needed to map the linear representation to the encoded
@@ -2339,7 +2431,7 @@ class GPContext:
         """Normalized node proximity [1.0: same node, 0.0: no connection]"""
         pass
 
-    def normalized_w_vig(self) -> np.ndarray:
+    def normalized_wVIG(self) -> np.ndarray:
         """Normalized node proximity [1.0: same node, 0.0: no connection]"""
         pass
 
@@ -2359,6 +2451,11 @@ class GPContext:
         pass
 
     def active_constant_indices(self, solution: SolutionBase) -> List[int]:
+        pass
+
+    def inherit_shifted(
+        self, solution: SolutionBase, donor: SolutionBase, node: int, num_levels: int
+    ) -> Optional[Tuple[bool, int]]:
         pass
     # // TODO allow gradients w.r.t. specific continuous indices OR parameter
     # / indices
@@ -2660,7 +2757,7 @@ class KernelConfig:
 class LaunchConfig:
     eval: KernelConfig
     mse: KernelConfig  # DynamicBlock only: reduction pass
-    kernel_version: KernelVersion = KernelVersion.single_block
+    kernel_version: KernelVersion = KernelVersion.SingleBlock
     num_solutions: int = 0
     num_datapoints: int = 0
     solution_length: int = 0
@@ -2677,7 +2774,7 @@ class LaunchConfig:
         self,
         eval: KernelConfig,
         mse: KernelConfig,
-        version: KernelVersion = KernelVersion.single_block,
+        version: KernelVersion = KernelVersion.SingleBlock,
     ) -> None:
         pass
 
@@ -2712,6 +2809,13 @@ class SRQuality(MOQuality):
 
     # Lazily computed test-set accuracy, populated on first request via evaluate_test().
     # Declared mutable because it is not part of solution identity and never drives decisions.
+    # /*
+    #    The test accuracy uses interior mutability (i.e. it ignores const) since it is not
+    #    part of what defines a solution or its accuracy - as indicated by the name, it is never
+    #    used to make any decisions and only tracked for analysis purposes. By making it mutable
+    #    it can be lazily computed only when requested.
+    #     */
+    # / Optional test set accuracy
     test_quality: Optional[MOQuality] = None
     def __init__(self) -> None:
         """Autogenerated default constructor"""
@@ -2735,10 +2839,10 @@ class SRProblem(GPInstanceBase):
     def __init__(
         self,
         ctx: GPContext,
-        x_train: np.ndarray,
-        y_train: np.ndarray,
-        x_test: Optional[np.ndarray] = None,
-        y_test: Optional[np.ndarray] = None,
+        X_train: np.ndarray,
+        Y_train: np.ndarray,
+        X_test: Optional[np.ndarray] = None,
+        Y_test: Optional[np.ndarray] = None,
         objectives: Union[str, List[str]] = "mse",
         objectives_to_optimize: Optional[int] = None,
         linear_scaling: bool = True,
@@ -2806,17 +2910,6 @@ class SRProblem(GPInstanceBase):
     ) -> Optional[float]:
         pass
 
-    @overload
-    def register_target(self, target_objectives: np.ndarray) -> None:
-        pass
-
-    @overload
-    def register_target(self, target_objectives: List[float]) -> None:
-        pass
-
-    def target_reached(self, archive: ArchiveBase) -> bool:
-        pass
-
     def log_header(self, os: io.IOBase) -> None:
         pass
 
@@ -2847,17 +2940,17 @@ class SRProblem(GPInstanceBase):
     ctx: GPContext
     linear_scaling: bool
     objectives: List[str]
-    x_train: np.ndarray
-    y_train: np.ndarray
+    X_train: np.ndarray
+    Y_train: np.ndarray
     # Variance per output column, precomputed for NMSE normalisation.
     # Near-zero entries are clamped to 1.0 so NMSE degrades gracefully to MSE.
-    var_y_train: np.ndarray
-    x_batch: np.ndarray
-    y_batch: np.ndarray
-    var_y_batch: np.ndarray
-    x_test: np.ndarray
-    y_test: np.ndarray
-    var_y_test: np.ndarray
+    var_Y_train: np.ndarray
+    X_batch: np.ndarray
+    Y_batch: np.ndarray
+    var_Y_batch: np.ndarray
+    X_test: np.ndarray
+    Y_test: np.ndarray
+    var_Y_test: np.ndarray
 
 # #endif
 
@@ -2880,6 +2973,7 @@ class ObjectiveBase:
 
     def num_continuous(self) -> int:  # overridable (pure virtual)
         pass
+    # TODO add extensions to allow providing domain/vtr info
 
     def evaluate(  # overridable (pure virtual)
         self,
@@ -2905,6 +2999,40 @@ class ObjectiveBase:
         discrete_indices: List[int],
         continuous_indices: List[int],
     ) -> Tuple[float, float]:
+        pass
+
+    def __init__(self) -> None:
+        """Autogenerated default constructor"""
+        pass
+
+class MOFunctionBase:
+    def num_objectives(self) -> int:  # overridable (pure virtual)
+        pass
+
+    def num_discrete(self) -> int:  # overridable (pure virtual)
+        pass
+
+    def num_continuous(self) -> int:  # overridable (pure virtual)
+        pass
+
+    def discrete_domain_sizes(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:  # overridable
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:  # overridable
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:  # overridable (pure virtual)
+        pass
+
+    def evaluate_partial(  # overridable
+        self, solution: SolutionBase, parent: SolutionBase, subset: Subset
+    ) -> None:
         pass
 
     def __init__(self) -> None:
@@ -3009,6 +3137,48 @@ class Inverted(ObjectiveBase):
     """
 
     def __init__(self, objective: ObjectiveBase) -> None:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(
+        self,
+        discrete_values: np.ndarray,
+        continuous_values: np.ndarray,
+        discrete_active: np.ndarray,
+        continuous_active: np.ndarray,
+    ) -> Tuple[float, float]:
+        pass
+
+    def evaluate_partial(
+        self,
+        discrete_values: np.ndarray,
+        continuous_values: np.ndarray,
+        discrete_active: np.ndarray,
+        continuous_active: np.ndarray,
+        parent_discrete_values: np.ndarray,
+        parent_continuous_values: np.ndarray,
+        parent_discrete_active: np.ndarray,
+        parent_continuous_active: np.ndarray,
+        parent_objective_value: float,
+        parent_constraint_value: float,
+        discrete_indices: List[int],
+        continuous_indices: List[int],
+    ) -> Tuple[float, float]:
+        pass
+
+class Translated(ObjectiveBase):
+    """
+    (final class)
+    """
+
+    def __init__(
+        self, objective: ObjectiveBase, translation_vector: np.ndarray
+    ) -> None:
         pass
 
     def num_discrete(self) -> int:
@@ -3674,6 +3844,172 @@ class CirclesInASquare(ObjectiveBase):
     ) -> Tuple[float, float]:
         pass
 
+# TODO for ZDT problems: add domains & fronts/success criterion?
+
+class ZDT1(MOFunctionBase):
+    """/ ZDT1 from https://doi.org/10.1162/106365600568202"""
+
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
+class ZDT2(MOFunctionBase):
+    """/ ZDT2 from https://doi.org/10.1162/106365600568202"""
+
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
+class ZDT3(MOFunctionBase):
+    """/ ZDT3 from https://doi.org/10.1162/106365600568202"""
+
+    def __init__(self, dims: int = 30, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
+class ZDT4(MOFunctionBase):
+    """TODO fix bug (crashes sometimes...)
+    / ZDT4 from https://doi.org/10.1162/106365600568202
+    """
+
+    def __init__(self, dims: int = 10, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
+class ZDT5(MOFunctionBase):
+    """/ ZDT5 from https://doi.org/10.1162/106365600568202"""
+
+    def __init__(self, dims: int = 11, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
+class ZDT6(MOFunctionBase):
+    """/ ZDT6 from https://doi.org/10.1162/106365600568202"""
+
+    def __init__(self, dims: int = 10, pareto_front_samples: int = 100) -> None:
+        pass
+
+    def num_objectives(self) -> int:
+        pass
+
+    def num_discrete(self) -> int:
+        pass
+
+    def num_continuous(self) -> int:
+        pass
+
+    def evaluate(self, solution: SolutionBase) -> None:
+        pass
+
+    def continuous_lower_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def continuous_upper_bounds(self) -> Optional[np.ndarray]:
+        pass
+
+    def pareto_front(self) -> Optional[ArchiveBase]:
+        pass
+
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3712,28 +4048,6 @@ class LeadingSpheres(ObjectiveBase):
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_BENCH_PROBLEM_H
 #
-
-class MOFunctionBase:
-    def num_objectives(self) -> int:  # overridable (pure virtual)
-        pass
-
-    def num_discrete(self) -> int:  # overridable (pure virtual)
-        pass
-
-    def num_continuous(self) -> int:  # overridable (pure virtual)
-        pass
-
-    def evaluate(self, solution: SolutionBase) -> None:  # overridable (pure virtual)
-        pass
-
-    def evaluate_partial(  # overridable
-        self, solution: SolutionBase, parent: SolutionBase, subset: Subset
-    ) -> None:
-        pass
-
-    def __init__(self) -> None:
-        """Autogenerated default constructor"""
-        pass
 
 class PyFunctionBase(MOFunctionBase):
     def num_objectives(self) -> int:  # overridable (pure virtual)
@@ -3801,10 +4115,9 @@ class BenchmarkInstance(InstanceBase):
         continuous_init_lower_bound: Optional[Union[float, np.ndarray]] = None,
         continuous_init_upper_bound: Optional[Union[float, np.ndarray]] = None,
         init: Optional[AnyInit] = None,
-        target: Optional[
-            Union[np.ndarray, Tuple[np.ndarray, np.ndarray], List[float]]
-        ] = None,
+        target_objectives: Optional[List[float]] = None,
         target_archive_size: Optional[int] = None,
+        target_tolerance: Optional[float] = None,
     ) -> None:
         """Python bindings defaults:
         If any of the params below is None, then its default value below will be used:
@@ -3829,27 +4142,6 @@ class BenchmarkInstance(InstanceBase):
             * continuous_init_lower_bound: float(0.0)
             * continuous_init_upper_bound: float(1.0)
         """
-        pass
-
-    @overload
-    def register_target(self, target_objectives: np.ndarray) -> None:
-        pass
-
-    @overload
-    def register_target(self, target_objectives: List[float]) -> None:
-        pass
-
-    @overload
-    def register_target_front(self, other: ArchiveBase) -> None:
-        pass
-
-    @overload
-    def register_target_front(
-        self, discrete: np.ndarray, continuous: np.ndarray
-    ) -> None:
-        pass
-
-    def register_target_archive_size(self, target_archive_size: int) -> None:
         pass
 
     def discrete_domain_sizes(self) -> np.ndarray:
@@ -3889,9 +4181,6 @@ class BenchmarkInstance(InstanceBase):
         pass
 
     def archive_fitness(self) -> ArchiveFitnessBase:
-        pass
-
-    def target_reached(self, archive: ArchiveBase) -> bool:
         pass
 
 # #endif
@@ -3935,6 +4224,7 @@ class TrackingOptions:
         consider_evaluation_time: bool = True,
         report_intermediate_results: bool = True,
         report_on_archive_change: bool = False,
+        report_raw_solutions: bool = False,
         initial_evaluations_until_next_report: int = 10,
         eval_factor: int = 2,
         max_evaluations_until_next_report: int = 1000000,
@@ -3962,6 +4252,7 @@ class TrackingOptions:
     consider_evaluation_time: bool
     report_intermediate_results: bool
     report_on_archive_change: bool
+    report_raw_solutions: bool
 
     initial_evaluations_until_next_report: int
     eval_factor: int  # 1 is linear, >= 2 is exponential spacing
@@ -4269,6 +4560,50 @@ class MOBinaryGOMEA(MethodBase):
 # #endif
 
 # ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+#                       goblin/methods/mo_rv_gomea.h included by goblin.h                                      //
+# //////////////////////////////////////////////////////////////////////////////////////////////////////////////
+# #ifndef _GOBLIN_MO_RV_GOMEA_H
+#
+
+class MoRvGOMEA(MethodBase):
+    """
+    (final class)
+    """
+
+    def __init__(
+        self,
+        initial_population_size: Optional[int] = None,
+        max_num_populations: int = 25,
+        subgeneration_factor: int = 8,
+        target_archive_size: int = 100,
+        selection_percentile: float = 0.35,
+        distribution_multiplier_decrease: float = 0.9,
+        std_deviation_ratio_threshold: float = 1.0,
+        max_no_improvement_stretch: Optional[int] = None,
+        initial_num_clusters: Optional[int] = None,
+        linkage_model: Union[str, StaticFOS] = "LinkageTree",
+        max_subset_size: Optional[int] = None,
+        boundary_repair: bool = False,
+        forced_improvements: bool = False,
+        partial_evaluations: bool = True,
+    ) -> None:
+        pass
+
+    def current_generation(self) -> Optional[int]:
+        pass
+
+    def run(
+        self,
+        problem: InstanceBase,
+        budget: Budget,
+        seed: Optional[int] = None,
+        population_size: Optional[int] = None,
+    ) -> Tuple[ArchiveBase, TerminationStatus]:
+        pass
+
+# #endif
+
+# ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 #                       goblin/methods/mixed.h included by goblin.h                                            //
 # //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 # #ifndef _GOBLIN_MIXED_GOMEA_H
@@ -4369,7 +4704,7 @@ class AMaLGaMSubsetState(RvSubsetStateBase):
     )  # for storing the unscaled covariance, since in the incremental version the scaling happens after the
     # smoothing:
     # https://github.com/renzoscholman/irv-gomea/blob/89c62cf007858bd8ab9c2ba7955c7b80121/src/distribution.cpp#L510
-    l: np.ndarray
+    L: np.ndarray
     def __init__(self) -> None:
         """Autogenerated default constructor"""
         pass
@@ -4696,6 +5031,7 @@ class PopulationOptions:
     )
     # of all subset variables being identical between the solution and donor
     subset_logfile: Optional[str] = None
+    intermediate_population_logfile: Optional[str] = None
     generation: int = 0
     initial_generations_until_next_fos_log: int = (
         5  # > 0, subset stats are logged every
@@ -4711,6 +5047,16 @@ class PopulationOptions:
     mutate_before_gradient_step: bool = True
     gradient_step_frequency: int = 0
     gradient_step_count: int = 10
+
+    # If std::nullopt, then perform strong mutation (i.e. 1/subset size).
+    # Note that for single element subsets, this collapses to random search
+    discrete_mutation_probability: Optional[float] = 0.0
+
+    gene_invariant: bool = False
+
+    # TODO this whole file really needs a refactor lol
+    use_fancy_gpu_gp_gom: bool = False
+    resample_inactive_donor_values: bool = False
     def __init__(
         self,
         donor_pool_size_multiplier: float = 2.0,
@@ -4722,6 +5068,7 @@ class PopulationOptions:
         strict_elite_acceptance: bool = False,
         donor_search_proportion: float = 0.0,
         subset_logfile: Optional[str] = None,
+        intermediate_population_logfile: Optional[str] = None,
         generation: int = 0,
         initial_generations_until_next_fos_log: int = 5,
         fos_log_factor: int = 2,
@@ -4732,6 +5079,10 @@ class PopulationOptions:
         mutate_before_gradient_step: bool = True,
         gradient_step_frequency: int = 0,
         gradient_step_count: int = 10,
+        discrete_mutation_probability: Optional[float] = 0.0,
+        gene_invariant: bool = False,
+        use_fancy_gpu_gp_gom: bool = False,
+        resample_inactive_donor_values: bool = False,
     ) -> None:
         """Auto-generated default constructor with named params"""
         pass
@@ -4770,7 +5121,7 @@ class MixedGOMEA(MethodBase):
     def current_generation(self) -> Optional[int]:
         pass
 
-    def current_population(self) -> Optional[Tuple[int, int]]:
+    def current_population(self) -> Optional[Tuple[int, int, int]]:
         pass
 
 # #endif
@@ -4845,25 +5196,25 @@ class test:  # Proxy class that introduces typings for the *submodule* test
 
     @staticmethod
     @overload
-    def val(x: float) -> float:
+    def Val(x: float) -> float:
         pass
 
     @staticmethod
     @overload
-    def val(x: int) -> float:
+    def Val(x: int) -> float:
         pass
 
     @staticmethod
     @overload
-    def val(x: float) -> float:
+    def Val(x: float) -> float:
         pass
 
     @staticmethod
-    def idx(idx: int) -> float:
+    def Idx(idx: int) -> float:
         pass
 
     @staticmethod
-    def op(op: Operator) -> float:
+    def Op(op: Operator) -> float:
         pass
 
 # </submodule test>
@@ -4947,7 +5298,7 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
         def current_generation(self) -> Optional[int]:  # overridable
             pass
 
-        def current_population(self) -> Optional[Tuple[int, int]]:  # overridable
+        def current_population(self) -> Optional[Tuple[int, int, int]]:  # overridable
             pass
 
     class DEStrategyBase:
@@ -4969,8 +5320,8 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
     class Rand1Bin(DEStrategyBase):
         def __init__(
             self,
-            f: float = 0.8,
-            cr: float = 0.9,
+            F: float = 0.8,
+            Cr: float = 0.9,
             base: str = "best",
             scale: str = "dither",
         ) -> None:
@@ -5007,13 +5358,13 @@ class classic:  # Proxy class that introduces typings for the *submodule* classi
 
     class ESStrategy(enum.IntEnum):
         # / Single variance for all variables
-        single_variance = enum.auto()  # (= 0)
+        SingleVariance = enum.auto()  # (= 0)
         # / Separate variance for all variables
-        multiple_variance = enum.auto()  # (= 1)
+        MultipleVariance = enum.auto()  # (= 1)
         # / Full covariance matrix
-        full_variance = enum.auto()  # (= 2)
+        FullVariance = enum.auto()  # (= 2)
         # / Directional variance for one arbitrary direction, single variance in all other directions
-        directed_variance = enum.auto()  # (= 3)
+        DirectedVariance = enum.auto()  # (= 3)
 
     class ESStrategyParameters:
         strategy: ESStrategy

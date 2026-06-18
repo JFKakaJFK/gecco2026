@@ -1,7 +1,6 @@
 import pathlib
 
 from pygom import *
-
 from src.config import Config, c
 from src.plots import plot_scalability
 from src.postprocessing import load_results
@@ -87,7 +86,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Sphere(d),
-                target=[VTR],
+                target_objectives=[VTR],
                 continuous_init_lower_bound=init_lb,
                 continuous_init_upper_bound=init_ub,
             ),
@@ -99,7 +98,7 @@ def problems():
                 c.BenchmarkInstance(
                     c.Repeat(c.Rotated(c.Ellipsoid(5), -45.0), d // 5),
                     # c.Repeat(c.Rotated(c.Ellipsoid(2), -45.0), d // 2),
-                    target=[VTR],
+                    target_objectives=[VTR],
                     continuous_init_lower_bound=init_lb,
                     continuous_init_upper_bound=init_ub,
                 ),
@@ -111,7 +110,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Ellipsoid(d),
-                target=[VTR],
+                target_objectives=[VTR],
                 continuous_init_lower_bound=init_lb,
                 continuous_init_upper_bound=init_ub,
             ),
@@ -121,7 +120,7 @@ def problems():
             d,
             c.BenchmarkInstance(
                 c.Rotated(c.Ellipsoid(d), -45.0),
-                target=[VTR],
+                target_objectives=[VTR],
                 continuous_init_lower_bound=init_lb,
                 continuous_init_upper_bound=init_ub,
             ),
@@ -150,7 +149,7 @@ def problems():
                 d,
                 c.BenchmarkInstance(
                     c.CirclesInASquare(d),
-                    target=[  # d *
+                    target_objectives=[  # d *
                         VTR - cias_optima[d]
                     ],
                     continuous_init_lower_bound=0.0,
@@ -169,7 +168,7 @@ def problems():
     #     #     d,
     #     #     c.BenchmarkInstance(
     #     #         c.Griewank(d),
-    #     #         target=[VTR],
+    #     #         target_objectives=[VTR],
     #     #         continuous_init_lower_bound=4.0,
     #     #         continuous_init_upper_bound=5.0,
     #     #     ),
@@ -179,7 +178,7 @@ def problems():
     #         d,
     #         c.BenchmarkInstance(
     #             c.Rastrigin(d),
-    #             target=[VTR],
+    #             target_objectives=[VTR],
     #             continuous_init_lower_bound=-5.12,
     #             continuous_init_upper_bound=5.12,
     #         ),

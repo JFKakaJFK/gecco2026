@@ -67,6 +67,7 @@ iwyu:
 	fi
 	# TODO at some point automatically fix the includes...
 
+#--no-project
 bindings:
 	cp -f pylib/nanobind/bindings_empty.cpp pylib/nanobind/bindings.cpp \
 	&& uv run scripts/autogenerate_bindings.py \

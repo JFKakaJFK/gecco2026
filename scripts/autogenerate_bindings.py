@@ -215,7 +215,7 @@ def configure_litgen() -> litgen.LitgenOptions:
 
     # the C++ already conforms to the Python convention of
     # PascalCase for classes and snake_case for methods/functions
-    # options.python_convert_to_snake_case = False
+    options.python_convert_to_snake_case = False
 
     # options.bind_library = litgen.BindLibraryType.nanobind
     options.use_nanobind()

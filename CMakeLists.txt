@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.15...4.0)
 
-project(goblin VERSION "0.1.0" LANGUAGES CXX CUDA)
+project(goblin VERSION "0.1.0" LANGUAGES CXX) # CUDA)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,23 +11,23 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 option(GOBLIN_CPU_ONLY "Disable CUDA and build CPU-only code" OFF)
 
 if(NOT GOBLIN_CPU_ONLY)
-    include(CheckLanguage)
-    check_language(CUDA)
-    if(CMAKE_CUDA_COMPILER)
-        enable_language(CUDA)
-        set(GOBLIN_HAS_CUDA ON CACHE BOOL "CUDA is available" FORCE)
-        set(CMAKE_CUDA_STANDARD 20)
-        set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-        set(CMAKE_CUDA_ARCHITECTURES "native")
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
-        message(STATUS "CUDA found: building with GPU support")
-    else()
-        set(GOBLIN_HAS_CUDA OFF CACHE BOOL "CUDA is available" FORCE)
-        message(STATUS "CUDA not found: building CPU-only")
-    endif()
-else()
+  include(CheckLanguage)
+  check_language(CUDA)
+  if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    set(GOBLIN_HAS_CUDA ON CACHE BOOL "CUDA is available" FORCE)
+    set(CMAKE_CUDA_STANDARD 20)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+    set(CMAKE_CUDA_ARCHITECTURES "native")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Wno-deprecated-gpu-targets")
+    message(STATUS "CUDA found: building with GPU support")
+  else()
     set(GOBLIN_HAS_CUDA OFF CACHE BOOL "CUDA is available" FORCE)
-    message(STATUS "GOBLIN_CPU_ONLY=ON: building CPU-only")
+    message(STATUS "CUDA not found: building CPU-only")
+  endif()
+else()
+  set(GOBLIN_HAS_CUDA OFF CACHE BOOL "CUDA is available" FORCE)
+  message(STATUS "GOBLIN_CPU_ONLY=ON: building CPU-only")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -47,91 +47,91 @@ include(CTest)
 # enable ccache if available
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
-    set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
-    set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}") # CMake 3.9+
+  set(CMAKE_CXX_COMPILER_LAUNCHER "${CCACHE_PROGRAM}")
+  set(CMAKE_CUDA_COMPILER_LAUNCHER "${CCACHE_PROGRAM}") # CMake 3.9+
 endif()
 
 if(NOT CMAKE_BUILD_TYPE)
-    # set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
-    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
+  # set(CMAKE_BUILD_TYPE Debug CACHE STRING "" FORCE)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "" FORCE)
 endif()
 
 include(CheckCXXCompilerFlag)
 # sanitizers don't work e.g. on arm macos
 if(GOBLIN_USE_ASAN)
-    check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
-    if(COMPILER_SUPPORTS_ASAN)
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
-        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
-    endif()
+  check_cxx_compiler_flag("-fsanitize=address" COMPILER_SUPPORTS_ASAN)
+  if(COMPILER_SUPPORTS_ASAN)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=address -fno-omit-frame-pointer")
+  endif()
 endif()
 if(GOBLIN_USE_MSAN)
-    check_cxx_compiler_flag("-fsanitize=memory" COMPILER_SUPPORTS_MSAN)
-    if(COMPILER_SUPPORTS_UBSAN)
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=memory")
-        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=memory")
-    endif()
+  check_cxx_compiler_flag("-fsanitize=memory" COMPILER_SUPPORTS_MSAN)
+  if(COMPILER_SUPPORTS_UBSAN)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=memory")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=memory")
+  endif()
 endif()
 if(GOBLIN_USE_UBSAN)
-    check_cxx_compiler_flag("-fsanitize=undefined" COMPILER_SUPPORTS_UBSAN)
-    if(COMPILER_SUPPORTS_UBSAN)
-        set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
-        set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=undefined")
-    endif()
+  check_cxx_compiler_flag("-fsanitize=undefined" COMPILER_SUPPORTS_UBSAN)
+  if(COMPILER_SUPPORTS_UBSAN)
+    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined")
+    set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fsanitize=undefined")
+  endif()
 endif()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    set(
+  set(
         CMAKE_CXX_FLAGS_DEBUG
         "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
     )
-    set(
+  set(
         CMAKE_CXX_FLAGS_RELEASE
         "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
         )
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    set(
+  set(
         CMAKE_CXX_FLAGS_DEBUG
         "${CMAKE_CXX_FLAGS_DEBUG} -Wall -Werror -Wpedantic -Wnon-virtual-dtor -Woverloaded-virtual -g"
     )
-    set(
+  set(
         CMAKE_CXX_FLAGS_RELEASE
         "${CMAKE_CXX_FLAGS_RELEASE} -Wall -Werror -O3 -march=native"
     )
 
-    # "temporary" fix for spurious warnings
-    # https://gcc.gnu.org/pipermail/gcc-bugs/2022-May/787134.html
-    # https://www.mail-archive.com/gcc-bugs%2540gcc.gnu.org/msg879964.html
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-error=maybe-uninitialized")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-error=maybe-uninitialized")
+  # "temporary" fix for spurious warnings
+  # https://gcc.gnu.org/pipermail/gcc-bugs/2022-May/787134.html
+  # https://www.mail-archive.com/gcc-bugs%2540gcc.gnu.org/msg879964.html
+  set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -Wno-error=maybe-uninitialized")
+  set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Wno-error=maybe-uninitialized")
 endif()
 
 # -flto (link time optimization)
 include(CheckIPOSupported)
 check_ipo_supported(RESULT ipo_supported OUTPUT error)
 if(ipo_supported)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
-    # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+  # set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
 endif()
 
 add_subdirectory(lib)
 
 if(SKBUILD OR GOBLIN_BUILD_PYLIB)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DNDEBUG")
 
-    include(cmake/litgen_cmake.cmake)
+  include(cmake/litgen_cmake.cmake)
 
-    litgen_find_nanobind()
-    set(python_module_sources
+  litgen_find_nanobind()
+  set(python_module_sources
         pylib/nanobind/module.cpp                  # The python module entry point
         pylib/nanobind/bindings.cpp        # The bindings to the library, which are mainly auto-generated by litgen
     )
 
-    # This will output a dynamic library called for example:
-    #     _pygoblin.cpython-312-darwin.so on macOS
-    #     _pygoblin.cpython-312-x86_64-linux-gnu.so on Linux
-    #     _pygoblin.cp312-win_amd64.pyd on Windows)
-    nanobind_add_module(_pygoblin
+  # This will output a dynamic library called for example:
+  #     _pygoblin.cpython-312-darwin.so on macOS
+  #     _pygoblin.cpython-312-x86_64-linux-gnu.so on Linux
+  #     _pygoblin.cp312-win_amd64.pyd on Windows)
+  nanobind_add_module(_pygoblin
         NB_STATIC
         # STABLE_ABI # https://nanobind.readthedocs.io/en/latest/api_cmake.html
         LTO
@@ -139,7 +139,7 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
         ${python_module_sources}
     )
 
-    litgen_setup_module(
+  litgen_setup_module(
         # The C++ library for which we are building bindings
         lib
         # The native python module name
@@ -150,10 +150,10 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
         ${CMAKE_CURRENT_SOURCE_DIR}/pylib/pygom
     )
 
-    find_package(Eigen3 REQUIRED)           # Eigen3::Eigen
-    find_package(OpenRAND REQUIRED)         # OpenRAND::OpenRAND
-    find_package(gomea_library REQUIRED)    # gomea_library
-    target_link_libraries(_pygoblin
+  find_package(Eigen3 REQUIRED)           # Eigen3::Eigen
+  find_package(OpenRAND REQUIRED)         # OpenRAND::OpenRAND
+  find_package(gomea_library REQUIRED)    # gomea_library
+  target_link_libraries(_pygoblin
         PRIVATE
             Eigen3::Eigen
             OpenRAND::OpenRAND
@@ -161,10 +161,10 @@ if(SKBUILD OR GOBLIN_BUILD_PYLIB)
             Cache
     )
 
-    # fPIC
-    set_target_properties(Eigen PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    set_target_properties(OpenRAND PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    set_target_properties(gomea_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
-    set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  # fPIC
+  set_target_properties(Eigen PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(OpenRAND PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(gomea_library PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  set_target_properties(_pygoblin PROPERTIES POSITION_INDEPENDENT_CODE ON)
 endif()

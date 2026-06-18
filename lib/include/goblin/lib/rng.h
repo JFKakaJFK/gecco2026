@@ -6,10 +6,10 @@
 #include <concepts>
 #include <csetjmp>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <type_traits>
 #include <vector>
-#include <optional>
 
 #include <openrand/philox.h>
 #include <openrand/squares.h>
@@ -24,26 +24,26 @@ using Rng = openrand::Philox;
 // RNG creation allows changing PRNG
 template <typename R = Rng>
 inline R seeded_rng(u64 state, u32 ctr = 0) {
-  // OpenRAND-like
-  if constexpr (std::is_constructible_v<R, u64, u32>) {
-    return R(state, ctr);
-  } else {
-    // std::random-like
-    std::seed_seq seed{static_cast<u32>(state), ctr};
-    R rng;
-    rng.seed(seed);
-    return rng;
-  }
+    // OpenRAND-like
+    if constexpr (std::is_constructible_v<R, u64, u32>) {
+        return R(state, ctr);
+    } else {
+        // std::random-like
+        std::seed_seq seed{static_cast<u32>(state), ctr};
+        R rng;
+        rng.seed(seed);
+        return rng;
+    }
 };
 inline Rng seeded_rng(std::optional<u64> seed = std::nullopt) {
-  if (seed.has_value()) {
-    return seeded_rng(seed.value());
-  } else {
-    std::random_device rd;
-    std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
+    if (seed.has_value()) {
+        return seeded_rng(seed.value());
+    } else {
+        std::random_device rd;
+        std::uniform_int_distribution<u64> seed_dist(0, std::numeric_limits<u64>::max());
 
-    return seeded_rng<Rng>(seed_dist(rd));
-  }
+        return seeded_rng<Rng>(seed_dist(rd));
+    }
 };
 
 // TODO possibly use the OpenRAND provided sampling methods (decreases rng portability, but it looks like any rng can be
@@ -54,10 +54,10 @@ inline Rng seeded_rng(std::optional<u64> seed = std::nullopt) {
 // - https://github.com/swiftlang/swift/pull/39143#issue-comment-box
 
 inline std::vector<usize> permute(Rng& rng, usize n) {
-  std::vector<usize> p(n);
-  std::iota(p.begin(), p.end(), 0);
-  std::shuffle(p.begin(), p.end(), rng);
-  return p;
+    std::vector<usize> p(n);
+    std::iota(p.begin(), p.end(), 0);
+    std::shuffle(p.begin(), p.end(), rng);
+    return p;
 };
 };  // namespace goblin
 
