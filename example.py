@@ -1,11 +1,11 @@
 import pygom.gp as gp
-from pygom import AMaLGaM, BenchmarkInstance, Budget, Sphere
+from pygom import BenchmarkInstance, Budget
 from sklearn.datasets import load_diabetes
 from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 
 
-def sr_example():
+def sr_example(linkage_model_kwargs: dict):
     X, y = load_diabetes(return_X_y=True)
     X_train, X_test, y_train, y_test = train_test_split(X, y)
 
@@ -14,15 +14,11 @@ def sr_example():
         budget_kwargs=dict(
             max_time_seconds=5,
         ),
-        ims_kwargs=dict(initial_population_size=512, max_num_populations=1),
-        rv_kwargs=dict(enabled=False),  # disable rv optimization
-        population_kwargs=dict(
-            gradient_step_frequency=1  # do gradient optimization after every generation
-        ),
+        ims_kwargs=dict(initial_population_size=256, max_num_populations=1),
         discrete_model_kwargs=dict(
             merge_continuous=False,
             num_continuous_bins=25,
-            normalize_initial_linkage_bias=True,
+            **linkage_model_kwargs
         ),
     )
 
@@ -35,23 +31,9 @@ def sr_example():
     print("R2 train:", r2_train)
     print("R2 test:", r2_test)
 
-
-def rv_example():
-    sphere = BenchmarkInstance(Sphere(5))
-    sphere.register_target([1e-8])
-    sphere.set_initial_bounds(100.0, 110.0)
-
-    budget = Budget(max_evaluations=10_000)
-
-    alg = AMaLGaM()
-
-    archive, status = alg.run(sphere, budget)
-
-    print("Best solution:", archive[0].continuous_values())
-    print("Best fitness:", archive[0].quality().objectives)
-    print("Target value reached:", sphere.target_reached(archive))
-
-
 if __name__ == "__main__":
-    sr_example()
-    rv_example()
+    sr_example(linkage_model_kwargs = dict(metric="random"))
+    sr_example(linkage_model_kwargs = dict(metric="mi"))
+    sr_example(linkage_model_kwargs = dict(metric="mi", normalize_initial_linkage_bias=True))
+    sr_example(linkage_model_kwargs = dict(metric="mi", intron_strategy="mark_only"))
+    sr_example(linkage_model_kwargs=dict(metric="node_proximity"))

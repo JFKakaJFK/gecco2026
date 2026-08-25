@@ -188,7 +188,7 @@ def methods(info, ctx):
                     max_num_populations=max_num_populations,
                     subgeneration_factor=subgeneration_factor,
                     restart_stale_populations=restart_stale_populations,
-                    population_logfile=str(run_path / "population_stats.csv")
+                    population_logfile=str(run_path / "population_stats.csv"),
                 ),
             ),
         )

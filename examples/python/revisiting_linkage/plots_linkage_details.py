@@ -12,7 +12,11 @@ from tqdm import tqdm
 from src.config import c, extract, instantiate, load_config
 from src.data import prepare_problem, problem_info
 from src.plots import plot_convergence_so
-from src.postprocessing import load_results, rliable_score_dict, rliable_convergence_score_dict
+from src.postprocessing import (
+    load_results,
+    rliable_score_dict,
+    rliable_convergence_score_dict,
+)
 from src.run import compute_run_path, run_tasks
 
 RESULT_DIR = pathlib.Path("results") / "linkage_details"
@@ -34,12 +38,11 @@ def main():
         PLOT_DIR.mkdir(parents=True, exist_ok=True)
         (PLOT_DIR / "rliable").mkdir(parents=True, exist_ok=True)
 
-        for group, where_query in [ #
+        for group, where_query in [  #
             ("_both", None),
             ("_LS", "linear_scaling"),
-            ("", "NOT linear_scaling")
+            ("", "NOT linear_scaling"),
         ]:
-
             score_dict, problems = rliable_score_dict(
                 conn,
                 run_expr="format('{}.{}', fold, run)",
@@ -80,8 +83,8 @@ def main():
             plt.clf()
 
             thresholds = np.linspace(0.0, 1.0, 50)
-            score_distributions, score_distributions_cis = rly.create_performance_profile(
-                score_dict, thresholds
+            score_distributions, score_distributions_cis = (
+                rly.create_performance_profile(score_dict, thresholds)
             )
 
             fig, ax = plt.subplots(ncols=1, figsize=(7, 5))
@@ -115,16 +118,24 @@ def main():
                 normalized_value_expr="1.0 - nmse_train",
             )
 
-            iqm = lambda scores: np.array([metrics.aggregate_iqm(scores[..., frame])
-                                           for frame in range(scores.shape[-1])])
-            iqm_scores, iqm_cis = rly.get_interval_estimates(
-              score_dict, iqm, reps=5000)
+            iqm = lambda scores: np.array(
+                [
+                    metrics.aggregate_iqm(scores[..., frame])
+                    for frame in range(scores.shape[-1])
+                ]
+            )
+            iqm_scores, iqm_cis = rly.get_interval_estimates(score_dict, iqm, reps=5000)
 
             fig, ax = plt.subplots(ncols=1, figsize=(7, 5))
             plot_utils.plot_sample_efficiency_curve(
-                generations, iqm_scores, iqm_cis, algorithms=algorithms,
-                xlabel=r'Number of Generations',
-                ylabel='$R^2$ Train', ax=ax)
+                generations,
+                iqm_scores,
+                iqm_cis,
+                algorithms=algorithms,
+                xlabel=r"Number of Generations",
+                ylabel="$R^2$ Train",
+                ax=ax,
+            )
 
             fig.legend(loc="lower right")
 

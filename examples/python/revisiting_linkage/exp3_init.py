@@ -124,7 +124,7 @@ def problems(rng):
                                         template_height=height,
                                         operator_set=operator_set,
                                         linear_scaling=linear_scaling,
-                                        init=init
+                                        init=init,
                                     ),
                                     seed,
                                     c.SRProblem(

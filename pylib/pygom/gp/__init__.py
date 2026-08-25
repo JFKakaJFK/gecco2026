@@ -125,7 +125,8 @@ class SymbolicRegressor(BaseEstimator, RegressorMixin):
                     **self.kwargs.get("population_kwargs", {})
                 ),
                 ims_options=pygom.IMSOptions(**self.kwargs.get("ims_kwargs", {})),
-                rv_options=pygom.RvOptions(**self.kwargs.get("rv_kwargs", {})),
+                # the rv optimization in this repository is buggy
+                rv_options=pygom.RvOptions(enabled=False),
                 discrete_model=vars(pygom)[
                     self.kwargs.get("discrete_model", "LinkageTreeFOS")
                 ](**discrete_model_kwargs),

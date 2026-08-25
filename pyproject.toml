@@ -9,7 +9,7 @@ version = "0.1.0"
 description="pygom, goblin C++ library interface"
 readme = "README.md"
 authors = [ { name = "Johannes Koch", email = "johannes.koch@cwi.nl" } ]
-requires-python = ">=3.7"
+requires-python = ">=3.11"
 classifiers = [
     "Development Status :: 4 - Beta",
     "License :: OSI Approved :: CC BY-NC-ND 4.0 License",
